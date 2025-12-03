@@ -1,29 +1,56 @@
+import { useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { FileText, Download, Printer, CheckCircle, AlertTriangle, Info, Target, TrendingUp, DollarSign, Users, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { useCategoryAnalyses } from "@/hooks/useCategoryAnalyses";
+import { useCategoryAnalysis } from "@/hooks/useCategoryAnalyses";
 import { useCategoryDashboard } from "@/hooks/useCategoryDashboard";
+import { useCategoryContext } from "@/contexts/CategoryContext";
+import { useCategoryByName } from "@/hooks/useCategoryByName";
 
 export default function StrategyBrief() {
-  const { data: analyses, isLoading: analysesLoading } = useCategoryAnalyses();
+  const [searchParams] = useSearchParams();
+  const urlCategoryName = searchParams.get("category");
+  
+  const { currentCategoryId, categoryName: contextCategoryName, setCategoryContext } = useCategoryContext();
+  
+  // Use URL param or context as fallback
+  const categoryName = urlCategoryName || contextCategoryName;
+  
+  // Look up category by name if we have a name but no ID
+  const { data: categoryFromName, isLoading: categoryLoading } = useCategoryByName(
+    categoryName && !currentCategoryId ? categoryName : undefined
+  );
+
+  // Update context when we find category from URL
+  useEffect(() => {
+    if (categoryFromName && !currentCategoryId) {
+      setCategoryContext(categoryFromName.id, categoryFromName.name);
+    } else if (urlCategoryName && !currentCategoryId && !categoryFromName) {
+      setCategoryContext(null, urlCategoryName);
+    }
+  }, [categoryFromName, currentCategoryId, urlCategoryName, setCategoryContext]);
+
+  const effectiveCategoryId = currentCategoryId || categoryFromName?.id;
+
+  const { data: analysis, isLoading: analysisLoading } = useCategoryAnalysis(effectiveCategoryId);
   const { data: dashboardData, isLoading: dashboardLoading } = useCategoryDashboard();
 
-  const isLoading = analysesLoading || dashboardLoading;
-  const latestAnalysis = analyses?.[0];
-  const categoryData = dashboardData?.find((d) => d.id === latestAnalysis?.category_id);
+  const isLoading = categoryLoading || analysisLoading || dashboardLoading;
+  const categoryData = dashboardData?.find((d) => d.id === effectiveCategoryId);
 
   const analysisData = {
-    category: latestAnalysis?.category_name ?? "No Analysis Available",
-    date: latestAnalysis?.created_at
-      ? new Date(latestAnalysis.created_at).toLocaleDateString("en-US", {
+    category: analysis?.category_name ?? categoryName ?? "No Analysis Available",
+    date: analysis?.created_at
+      ? new Date(analysis.created_at).toLocaleDateString("en-US", {
           year: "numeric",
           month: "long",
           day: "numeric",
         })
       : "N/A",
-    overallScore: latestAnalysis?.opportunity_index ?? 0,
+    overallScore: analysis?.opportunity_index ?? 0,
     marketSize: categoryData?.total_products ? `${categoryData.total_products} Products` : "N/A",
     growthRate: "N/A",
     avgPrice: categoryData?.avg_price ? `$${categoryData.avg_price.toFixed(2)}` : "N/A",
@@ -58,9 +85,9 @@ export default function StrategyBrief() {
   };
 
   // Parse key insights from the analysis
-  const keyInsights = toArray(latestAnalysis?.key_insights);
-  const topStrengths = toArray(latestAnalysis?.top_strengths);
-  const topWeaknesses = toArray(latestAnalysis?.top_weaknesses);
+  const keyInsights = toArray(analysis?.key_insights);
+  const topStrengths = toArray(analysis?.top_strengths);
+  const topWeaknesses = toArray(analysis?.top_weaknesses);
 
   const recommendations = [
     ...topStrengths.slice(0, 2).map((s) => ({
@@ -90,25 +117,25 @@ export default function StrategyBrief() {
     {
       icon: Target,
       label: "Opportunity Tier",
-      value: latestAnalysis?.opportunity_tier_label ?? "N/A",
-      detail: latestAnalysis?.recommendation ?? "No recommendation available",
+      value: analysis?.opportunity_tier_label ?? "N/A",
+      detail: analysis?.recommendation ?? "No recommendation available",
     },
     {
       icon: TrendingUp,
       label: "Products Analyzed",
-      value: latestAnalysis?.products_analyzed?.toString() ?? "0",
+      value: analysis?.products_analyzed?.toString() ?? "0",
       detail: "Total products in analysis",
     },
     {
       icon: DollarSign,
       label: "Recommended Price",
-      value: latestAnalysis?.recommended_price ? `$${latestAnalysis.recommended_price.toFixed(2)}` : "N/A",
+      value: analysis?.recommended_price ? `$${analysis.recommended_price.toFixed(2)}` : "N/A",
       detail: "Optimal price point",
     },
     {
       icon: Users,
       label: "Reviews Analyzed",
-      value: latestAnalysis?.reviews_analyzed?.toString() ?? "0",
+      value: analysis?.reviews_analyzed?.toString() ?? "0",
       detail: "Customer feedback processed",
     },
   ];
@@ -127,11 +154,22 @@ export default function StrategyBrief() {
     );
   }
 
-  if (!latestAnalysis) {
+  if (!categoryName) {
     return (
       <div className="flex flex-col items-center justify-center h-64 space-y-4">
         <FileText className="h-12 w-12 text-muted-foreground" />
-        <p className="text-muted-foreground">No analysis data available. Run an analysis to see the strategy brief.</p>
+        <p className="text-muted-foreground">No category selected. Start a new analysis to see the strategy brief.</p>
+      </div>
+    );
+  }
+
+  if (!analysis) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 space-y-4">
+        <FileText className="h-12 w-12 text-muted-foreground" />
+        <p className="text-muted-foreground">
+          No analysis data available for "{categoryName}". Analysis may still be in progress.
+        </p>
       </div>
     );
   }

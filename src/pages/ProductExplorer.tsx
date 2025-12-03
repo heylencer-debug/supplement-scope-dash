@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
   TableBody,
@@ -24,7 +25,12 @@ import { useProducts, Product } from "@/hooks/useProducts";
 import { useCategories } from "@/hooks/useCategories";
 import { useCategoryContext } from "@/contexts/CategoryContext";
 import { useCategoryByName } from "@/hooks/useCategoryByName";
+import { useCategoryAnalysis } from "@/hooks/useCategoryAnalyses";
 import ProductDetailModal from "@/components/ProductDetailModal";
+import BenchmarkComparison from "@/components/dashboard/BenchmarkComparison";
+import { toast } from "@/hooks/use-toast";
+
+const MAX_COMPARISON_PRODUCTS = 5;
 
 export default function ProductExplorer() {
   const [searchParams] = useSearchParams();
@@ -34,6 +40,7 @@ export default function ProductExplorer() {
   const [categoryFilter, setCategoryFilter] = useState("current");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
 
   const { currentCategoryId, categoryName: contextCategoryName, setCategoryContext } = useCategoryContext();
   
@@ -64,6 +71,7 @@ export default function ProductExplorer() {
 
   const { data: products, isLoading: productsLoading } = useProducts(effectiveCategoryId);
   const { data: categories, isLoading: categoriesLoading } = useCategories();
+  const { data: categoryAnalysis } = useCategoryAnalysis(currentCategoryId || categoryFromName?.id);
 
   const isLoading = productsLoading || categoriesLoading;
 
@@ -75,9 +83,43 @@ export default function ProductExplorer() {
     return matchesSearch;
   });
 
+  const selectedProducts = filteredProducts.filter(p => selectedProductIds.has(p.id));
+
   const handleRowClick = (product: Product) => {
     setSelectedProduct(product);
     setModalOpen(true);
+  };
+
+  const handleCheckboxChange = (productId: string, checked: boolean) => {
+    setSelectedProductIds(prev => {
+      const newSet = new Set(prev);
+      if (checked) {
+        if (newSet.size >= MAX_COMPARISON_PRODUCTS) {
+          toast({
+            title: "Maximum reached",
+            description: `You can only compare up to ${MAX_COMPARISON_PRODUCTS} products at a time.`,
+            variant: "destructive",
+          });
+          return prev;
+        }
+        newSet.add(productId);
+      } else {
+        newSet.delete(productId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleRemoveProduct = (productId: string) => {
+    setSelectedProductIds(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(productId);
+      return newSet;
+    });
+  };
+
+  const handleClearAll = () => {
+    setSelectedProductIds(new Set());
   };
 
   if (isLoading) {
@@ -143,6 +185,16 @@ export default function ProductExplorer() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-12">
+                    <div className="flex items-center gap-2">
+                      <span className="sr-only">Select</span>
+                      {selectedProductIds.size > 0 && (
+                        <Badge variant="secondary" className="text-xs">
+                          {selectedProductIds.size}
+                        </Badge>
+                      )}
+                    </div>
+                  </TableHead>
                   <TableHead>Product</TableHead>
                   <TableHead className="text-right">Price</TableHead>
                   <TableHead className="text-center">Rating</TableHead>
@@ -158,99 +210,111 @@ export default function ProductExplorer() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredProducts.slice(0, 50).map((product) => (
-                  <TableRow
-                    key={product.id}
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => handleRowClick(product)}
-                  >
-                    <TableCell>
-                      <div className="max-w-md">
-                        <p className="font-medium text-foreground truncate">{product.title ?? "Untitled"}</p>
-                        <p className="text-sm text-muted-foreground">{product.brand ?? "Unknown Brand"}</p>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right font-medium">
-                      ${(product.price ?? 0).toFixed(2)}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                        <span>{(product.rating ?? 0).toFixed(1)}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right text-muted-foreground">
-                      {(product.reviews ?? 0).toLocaleString()}
-                    </TableCell>
-                    <TableCell className="text-right text-muted-foreground">
-                      {product.monthly_sales?.toLocaleString() ?? "-"}
-                    </TableCell>
-                    <TableCell className="text-right font-medium text-green-600">
-                      {product.monthly_revenue 
-                        ? `$${product.monthly_revenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
-                        : "-"}
-                    </TableCell>
-                    <TableCell className="text-right text-muted-foreground">
-                      {product.bsr_current?.toLocaleString() ?? "-"}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex items-center justify-center gap-1 text-muted-foreground">
-                        <Calendar className="w-3 h-3" />
-                        <span>{product.age_months != null ? `${product.age_months}mo` : "-"}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {product.lqs != null ? (
-                        <Badge 
-                          variant="outline" 
-                          className={
-                            product.lqs >= 80 
-                              ? "border-green-500/50 text-green-600 bg-green-500/10" 
-                              : product.lqs >= 50 
-                                ? "border-yellow-500/50 text-yellow-600 bg-yellow-500/10"
-                                : "border-red-500/50 text-red-600 bg-red-500/10"
-                          }
+                {filteredProducts.slice(0, 50).map((product) => {
+                  const isSelected = selectedProductIds.has(product.id);
+                  const isDisabled = !isSelected && selectedProductIds.size >= MAX_COMPARISON_PRODUCTS;
+                  
+                  return (
+                    <TableRow
+                      key={product.id}
+                      className={`cursor-pointer hover:bg-muted/50 ${isSelected ? "bg-primary/5" : ""}`}
+                      onClick={() => handleRowClick(product)}
+                    >
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={isSelected}
+                          disabled={isDisabled}
+                          onCheckedChange={(checked) => handleCheckboxChange(product.id, checked as boolean)}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <div className="max-w-md">
+                          <p className="font-medium text-foreground truncate">{product.title ?? "Untitled"}</p>
+                          <p className="text-sm text-muted-foreground">{product.brand ?? "Unknown Brand"}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        ${(product.price ?? 0).toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                          <span>{(product.rating ?? 0).toFixed(1)}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {(product.reviews ?? 0).toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {product.monthly_sales?.toLocaleString() ?? "-"}
+                      </TableCell>
+                      <TableCell className="text-right font-medium text-green-600">
+                        {product.monthly_revenue 
+                          ? `$${product.monthly_revenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                          : "-"}
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {product.bsr_current?.toLocaleString() ?? "-"}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center gap-1 text-muted-foreground">
+                          <Calendar className="w-3 h-3" />
+                          <span>{product.age_months != null ? `${product.age_months}mo` : "-"}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {product.lqs != null ? (
+                          <Badge 
+                            variant="outline" 
+                            className={
+                              product.lqs >= 80 
+                                ? "border-green-500/50 text-green-600 bg-green-500/10" 
+                                : product.lqs >= 50 
+                                  ? "border-yellow-500/50 text-yellow-600 bg-yellow-500/10"
+                                  : "border-red-500/50 text-red-600 bg-red-500/10"
+                            }
+                          >
+                            {product.lqs}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center text-muted-foreground">
+                        {product.servings_per_container ?? "-"}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          {product.bestseller && (
+                            <Badge variant="default" className="bg-accent text-xs">
+                              Bestseller
+                            </Badge>
+                          )}
+                          {product.amazon_choice && (
+                            <Badge variant="secondary" className="text-xs">
+                              Choice
+                            </Badge>
+                          )}
+                          {product.is_young_competitor && (
+                            <TrendingUp className="w-4 h-4 text-green-500" />
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRowClick(product);
+                          }}
                         >
-                          {product.lqs}
-                        </Badge>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-center text-muted-foreground">
-                      {product.servings_per_container ?? "-"}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        {product.bestseller && (
-                          <Badge variant="default" className="bg-accent text-xs">
-                            Bestseller
-                          </Badge>
-                        )}
-                        {product.amazon_choice && (
-                          <Badge variant="secondary" className="text-xs">
-                            Choice
-                          </Badge>
-                        )}
-                        {product.is_young_competitor && (
-                          <TrendingUp className="w-4 h-4 text-green-500" />
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRowClick(product);
-                        }}
-                      >
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
@@ -269,6 +333,13 @@ export default function ProductExplorer() {
           </div>
         </CardContent>
       </Card>
+
+      <BenchmarkComparison
+        selectedProducts={selectedProducts}
+        analysis={categoryAnalysis ?? null}
+        onRemoveProduct={handleRemoveProduct}
+        onClearAll={handleClearAll}
+      />
 
       <ProductDetailModal
         product={selectedProduct}

@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { useCategoryAnalyses } from "@/hooks/useCategoryAnalyses";
+import { useRecentCategories } from "@/hooks/useCategoryAnalyses";
 import { formatDistanceToNow } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -49,15 +49,15 @@ export default function NewAnalysis() {
   const [asin, setAsin] = useState("");
   const [amazonCategories, setAmazonCategories] = useState<string[]>([]);
 
-  const { data: recentAnalyses, isLoading: analysesLoading } = useCategoryAnalyses();
+  const { data: recentCategories, isLoading: categoriesLoading } = useRecentCategories();
 
-  // Get unique analyses by category name (most recent first)
-  const uniqueAnalyses = recentAnalyses?.reduce((acc, analysis) => {
-    if (!acc.find(a => a.category_name === analysis.category_name)) {
-      acc.push(analysis);
+  // Get unique categories by name (most recent first)
+  const uniqueCategories = recentCategories?.reduce((acc, cat) => {
+    if (!acc.find(a => a.name === cat.name)) {
+      acc.push(cat);
     }
     return acc;
-  }, [] as typeof recentAnalyses) ?? [];
+  }, [] as typeof recentCategories) ?? [];
 
   const handleCategoryToggle = (categoryLabel: string, checked: boolean) => {
     if (checked) {
@@ -235,71 +235,61 @@ export default function NewAnalysis() {
           </CardDescription>
         </CardHeader>
       <CardContent>
-          {analysesLoading && !recentAnalyses ? (
+          {categoriesLoading && !recentCategories ? (
             <div className="space-y-3">
               {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-24 w-full rounded-lg" />
+                <Skeleton key={i} className="h-20 w-full rounded-lg" />
               ))}
             </div>
-          ) : uniqueAnalyses.length === 0 ? (
+          ) : uniqueCategories.length === 0 ? (
             <p className="text-muted-foreground text-center py-8">
-              No analyses yet. Start your first analysis above!
+              No categories yet. Start your first analysis above!
             </p>
           ) : (
             <div className="space-y-3">
-              {uniqueAnalyses.slice(0, 5).map((analysis) => (
+              {uniqueCategories.slice(0, 5).map((category) => (
                 <div
-                  key={analysis.id}
-                  onClick={() => handleAnalysisClick(analysis.category_name)}
-                  className="p-4 rounded-lg border bg-secondary/30 hover:bg-secondary/50 cursor-pointer transition-colors space-y-3"
+                  key={category.id}
+                  onClick={() => handleAnalysisClick(category.name)}
+                  className="p-4 rounded-lg border bg-secondary/30 hover:bg-secondary/50 cursor-pointer transition-colors"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-foreground truncate">
-                        {analysis.category_name}
+                        {category.name}
                       </h3>
                       <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
-                        {analysis.opportunity_index && (
-                          <span className="flex items-center gap-1">
-                            <Target className="w-3.5 h-3.5" />
-                            {Number(analysis.opportunity_index).toFixed(1)}/10
-                          </span>
-                        )}
-                        {analysis.products_analyzed != null && (
+                        {category.total_products != null && category.total_products > 0 && (
                           <span className="flex items-center gap-1">
                             <Package className="w-3.5 h-3.5" />
-                            {analysis.products_analyzed} products
+                            {category.total_products} products
                           </span>
                         )}
-                        {analysis.reviews_analyzed != null && (
-                          <span className="flex items-center gap-1">
-                            <MessageSquare className="w-3.5 h-3.5" />
-                            {analysis.reviews_analyzed.toLocaleString()} reviews
+                        {category.search_term && (
+                          <span className="truncate max-w-[200px]">
+                            {category.search_term}
                           </span>
                         )}
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-2">
-                      {analysis.recommendation && (
-                        <Badge 
-                          variant="outline" 
-                          className={`text-xs whitespace-nowrap ${getRecommendationStyle(analysis.recommendation)}`}
-                        >
-                          {analysis.recommendation}
-                        </Badge>
-                      )}
-                      {analysis.created_at && (
+                      <Badge 
+                        variant="outline" 
+                        className={`text-xs whitespace-nowrap ${
+                          category.total_products && category.total_products > 0 
+                            ? "bg-green-500/10 text-green-600 border-green-500/20" 
+                            : "bg-amber-500/10 text-amber-600 border-amber-500/20"
+                        }`}
+                      >
+                        {category.total_products && category.total_products > 0 ? "Complete" : "Processing"}
+                      </Badge>
+                      {category.created_at && (
                         <span className="text-xs text-muted-foreground">
-                          {formatDistanceToNow(new Date(analysis.created_at), { addSuffix: true })}
+                          {formatDistanceToNow(new Date(category.created_at), { addSuffix: true })}
                         </span>
                       )}
                     </div>
                   </div>
-                  {analysis.executive_summary && (
-                    <p className="text-sm text-muted-foreground line-clamp-2">
-                      {analysis.executive_summary}
-                    </p>
-                  )}
                 </div>
               ))}
             </div>

@@ -318,13 +318,14 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 pb-8">
-      {/* SECTION 1: Hero Header */}
+      {/* SECTION 1: Hero Header with Executive Summary */}
       <HeroHeader
         categoryName={categoryName}
         recommendation={analysis?.recommendation || null}
         opportunityIndex={analysis?.opportunity_index || 0}
         opportunityTier={analysis?.opportunity_tier || null}
         opportunityTierLabel={analysis?.opportunity_tier_label || null}
+        executiveSummary={analysis?.executive_summary || null}
         topProducts={products?.slice(0, 5).map(p => ({
           main_image_url: p.main_image_url,
           brand: p.brand,

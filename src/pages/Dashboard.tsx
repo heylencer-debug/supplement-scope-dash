@@ -437,6 +437,59 @@ export default function Dashboard() {
     { name: "90th %", value: categorySales.sales_90th_percentile || 0, fill: "hsl(var(--chart-4))" },
   ] : [];
 
+  // Brand market share data
+  const brandMarketShare = useMemo(() => {
+    if (!products || products.length === 0) return [];
+
+    const brandRevenue = new Map<string, number>();
+    let totalRevenue = 0;
+
+    products.forEach(product => {
+      const brand = product.brand || "Unknown";
+      const revenue = product.monthly_revenue || product.estimated_revenue || 0;
+      brandRevenue.set(brand, (brandRevenue.get(brand) || 0) + revenue);
+      totalRevenue += revenue;
+    });
+
+    if (totalRevenue === 0) return [];
+
+    const CHART_COLORS = [
+      "hsl(var(--chart-1))",
+      "hsl(var(--chart-2))",
+      "hsl(var(--chart-3))",
+      "hsl(var(--chart-4))",
+      "hsl(var(--chart-5))",
+      "hsl(var(--muted-foreground))",
+    ];
+
+    // Sort by revenue and take top brands
+    const sortedBrands = Array.from(brandRevenue.entries())
+      .sort((a, b) => b[1] - a[1]);
+
+    const topBrands = sortedBrands.slice(0, 5);
+    const otherRevenue = sortedBrands.slice(5).reduce((sum, [_, rev]) => sum + rev, 0);
+
+    const result = topBrands.map(([brand, revenue], idx) => ({
+      name: brand.length > 15 ? brand.substring(0, 15) + "..." : brand,
+      fullName: brand,
+      value: Math.round((revenue / totalRevenue) * 100),
+      revenue,
+      fill: CHART_COLORS[idx % CHART_COLORS.length],
+    }));
+
+    if (otherRevenue > 0) {
+      result.push({
+        name: "Others",
+        fullName: `${sortedBrands.length - 5} other brands`,
+        value: Math.round((otherRevenue / totalRevenue) * 100),
+        revenue: otherRevenue,
+        fill: CHART_COLORS[5],
+      });
+    }
+
+    return result;
+  }, [products]);
+
   const getOpportunityLabel = (score: number) => {
     if (score >= 70) return "High Opportunity";
     if (score >= 50) return "Medium Opportunity";
@@ -903,6 +956,83 @@ export default function Dashboard() {
                   </div>
                 </div>
               ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Brand Market Share */}
+      {brandMarketShare.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Building2 className="w-5 h-5 text-primary" />
+              Brand Market Share
+            </CardTitle>
+            <CardDescription>Revenue distribution across top brands in category</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid lg:grid-cols-2 gap-6">
+              <div className="flex items-center justify-center">
+                <ResponsiveContainer width="100%" height={280}>
+                  <PieChart>
+                    <Pie
+                      data={brandMarketShare}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={100}
+                      paddingAngle={2}
+                      dataKey="value"
+                      label={({ name, value }) => `${value}%`}
+                      labelLine={false}
+                    >
+                      {brandMarketShare.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      content={({ payload }) => {
+                        if (payload && payload.length > 0) {
+                          const data = payload[0].payload;
+                          return (
+                            <div className="bg-popover border border-border rounded-md p-2 shadow-md">
+                              <p className="font-medium text-sm">{data.fullName}</p>
+                              <p className="text-sm text-muted-foreground">Share: {data.value}%</p>
+                              <p className="text-sm text-muted-foreground">
+                                Revenue: ${(data.revenue / 1000).toFixed(1)}K/mo
+                              </p>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="space-y-3">
+                <p className="text-sm font-medium text-muted-foreground">Top Brands by Revenue</p>
+                {brandMarketShare.map((brand, idx) => (
+                  <div key={idx} className="flex items-center gap-3">
+                    <div 
+                      className="w-3 h-3 rounded-full shrink-0" 
+                      style={{ backgroundColor: brand.fill }} 
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-foreground truncate">
+                          {brand.fullName}
+                        </span>
+                        <span className="text-sm font-bold text-foreground ml-2">
+                          {brand.value}%
+                        </span>
+                      </div>
+                      <Progress value={brand.value} className="h-1.5 mt-1" />
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </CardContent>
         </Card>

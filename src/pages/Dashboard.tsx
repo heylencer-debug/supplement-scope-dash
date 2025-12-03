@@ -16,7 +16,7 @@ import { InvestmentReturnChart } from "@/components/dashboard/InvestmentReturnCh
 import { CustomerVoice } from "@/components/dashboard/CustomerVoice";
 import { ActionPlanTimeline } from "@/components/dashboard/ActionPlanTimeline";
 import { FinancialProjections } from "@/components/dashboard/FinancialProjections";
-import { GoToMarketStrategy } from "@/components/dashboard/GoToMarketStrategy";
+
 import { RiskAnalysis } from "@/components/dashboard/RiskAnalysis";
 import { LaunchStrategyCard } from "@/components/dashboard/LaunchStrategyCard";
 import CustomerIntelligence from "@/components/dashboard/CustomerIntelligence";
@@ -540,7 +540,6 @@ export default function Dashboard() {
       {/* Extended Analysis Sections */}
       <div className="space-y-6">
         <FinancialProjections financials={dashboardData.financials as Record<string, unknown> | null} />
-        <GoToMarketStrategy goToMarket={dashboardData.goToMarket as Record<string, unknown> | null} />
         <RiskAnalysis risks={dashboardData.risks as Record<string, unknown> | null} />
       </div>
     </div>

@@ -3,7 +3,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Star, TrendingUp, TrendingDown, AlertCircle, CheckCircle, Target, Users, Beaker } from "lucide-react";
+import { Star, TrendingUp, TrendingDown, AlertCircle, CheckCircle, Target, Users, Beaker, Lightbulb, ShoppingCart } from "lucide-react";
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 import type { Product } from "@/hooks/useProducts";
 
 interface ProductDetailModalProps {
@@ -19,31 +20,54 @@ interface MarketingAnalysis {
     parity_features?: string[];
   };
   copy_effectiveness?: {
-    title_analysis?: { clarity_score?: number };
+    title_analysis?: { clarity_score?: number; keyword_presence?: boolean };
     bullet_analysis?: { benefit_count?: number; feature_count?: number };
   };
   target_demographics?: string;
   overall_score?: number;
+  opportunities?: string[];
+  positioning_suggestions?: string[];
 }
 
 interface ReviewAnalysis {
-  pain_points?: Array<{ theme: string; frequency: number; severity?: string }>;
+  pain_points?: Array<{ theme: string; frequency: number; severity?: string; quotes?: string[] }>;
   positive_themes?: Array<{ theme: string; frequency: number; impact?: string }>;
   feature_requests?: Array<{ request: string; frequency: number; priority?: string }>;
   key_insights?: string[];
   sentiment_distribution?: { positive: number; neutral: number; negative: number };
   demographics_insights?: { buyer_types?: string[]; use_cases?: string[] };
+  summary?: string;
 }
+
+interface Nutrient {
+  name: string;
+  amount?: string;
+  daily_value?: string;
+  unit?: string;
+}
+
+interface ProprietaryBlend {
+  name: string;
+  total_amount?: string;
+  ingredients?: string[];
+}
+
+const SENTIMENT_COLORS = {
+  positive: "hsl(var(--chart-2))",
+  neutral: "hsl(var(--chart-4))",
+  negative: "hsl(var(--destructive))"
+};
 
 export default function ProductDetailModal({ product, open, onOpenChange }: ProductDetailModalProps) {
   if (!product) return null;
 
   const marketingAnalysis = product.marketing_analysis as MarketingAnalysis | null;
   const reviewAnalysis = product.review_analysis as ReviewAnalysis | null;
+  const allNutrients = product.all_nutrients as unknown as Nutrient[] | null;
+  const proprietaryBlends = product.proprietary_blends as unknown as ProprietaryBlend[] | null;
 
   const getOverallScore = () => {
     if (marketingAnalysis?.overall_score) return marketingAnalysis.overall_score;
-    // Calculate a basic score if not provided
     const rating = product.rating ?? 0;
     const reviews = product.reviews ?? 0;
     return Math.min(100, Math.round((rating / 5) * 50 + Math.min(reviews / 100, 50)));
@@ -65,6 +89,14 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
     }
   };
 
+  const sentimentData = reviewAnalysis?.sentiment_distribution
+    ? [
+        { name: "Positive", value: reviewAnalysis.sentiment_distribution.positive, color: SENTIMENT_COLORS.positive },
+        { name: "Neutral", value: reviewAnalysis.sentiment_distribution.neutral, color: SENTIMENT_COLORS.neutral },
+        { name: "Negative", value: reviewAnalysis.sentiment_distribution.negative, color: SENTIMENT_COLORS.negative }
+      ]
+    : [];
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -72,7 +104,7 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
           <DialogTitle className="text-xl font-bold pr-8">
             {product.title ?? "Product Details"}
           </DialogTitle>
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
             <span>{product.brand}</span>
             <span>•</span>
             <span>${(product.price ?? 0).toFixed(2)}</span>
@@ -83,6 +115,12 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
             </div>
             <span>•</span>
             <span>{(product.reviews ?? 0).toLocaleString()} reviews</span>
+            {product.bsr_current && (
+              <>
+                <span>•</span>
+                <span>BSR #{product.bsr_current.toLocaleString()}</span>
+              </>
+            )}
           </div>
         </DialogHeader>
 
@@ -116,7 +154,7 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                       <circle cx="50" cy="50" r="40" fill="none" stroke="hsl(var(--secondary))" strokeWidth="10" />
                       <circle
                         cx="50" cy="50" r="40" fill="none"
-                        stroke="hsl(var(--accent))" strokeWidth="10" strokeLinecap="round"
+                        stroke="hsl(var(--primary))" strokeWidth="10" strokeLinecap="round"
                         strokeDasharray={`${getOverallScore() * 2.51} 251`}
                       />
                     </svg>
@@ -134,7 +172,8 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
             </Card>
 
             {/* Unique Selling Points */}
-            {marketingAnalysis?.competitive_analysis?.unique_selling_points && (
+            {marketingAnalysis?.competitive_analysis?.unique_selling_points && 
+             marketingAnalysis.competitive_analysis.unique_selling_points.length > 0 && (
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -156,7 +195,8 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
             )}
 
             {/* Weaknesses */}
-            {marketingAnalysis?.competitive_analysis?.weaknesses_vs_competitors && (
+            {marketingAnalysis?.competitive_analysis?.weaknesses_vs_competitors && 
+             marketingAnalysis.competitive_analysis.weaknesses_vs_competitors.length > 0 && (
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -170,6 +210,28 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                       <li key={idx} className="flex items-start gap-2 text-sm">
                         <TrendingDown className="w-4 h-4 text-destructive mt-0.5 shrink-0" />
                         {weakness}
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Opportunities */}
+            {marketingAnalysis?.opportunities && marketingAnalysis.opportunities.length > 0 && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium flex items-center gap-2">
+                    <Lightbulb className="w-4 h-4 text-yellow-500" />
+                    Market Opportunities
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-2">
+                    {marketingAnalysis.opportunities.map((opp, idx) => (
+                      <li key={idx} className="flex items-start gap-2 text-sm">
+                        <span className="text-yellow-500 shrink-0">•</span>
+                        {opp}
                       </li>
                     ))}
                   </ul>
@@ -218,30 +280,84 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
 
           {/* Reviews Tab */}
           <TabsContent value="reviews" className="space-y-4 mt-4">
-            {/* Sentiment Distribution */}
-            {reviewAnalysis?.sentiment_distribution && (
+            {/* Review Summary */}
+            {reviewAnalysis?.summary && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Review Summary</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">{reviewAnalysis.summary}</p>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Sentiment Distribution Pie Chart */}
+            {sentimentData.length > 0 && (
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium">Sentiment Distribution</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <span className="w-20 text-sm">Positive</span>
-                      <Progress value={reviewAnalysis.sentiment_distribution.positive} className="flex-1" />
-                      <span className="w-12 text-sm text-right">{reviewAnalysis.sentiment_distribution.positive}%</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="w-20 text-sm">Neutral</span>
-                      <Progress value={reviewAnalysis.sentiment_distribution.neutral} className="flex-1" />
-                      <span className="w-12 text-sm text-right">{reviewAnalysis.sentiment_distribution.neutral}%</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="w-20 text-sm">Negative</span>
-                      <Progress value={reviewAnalysis.sentiment_distribution.negative} className="flex-1" />
-                      <span className="w-12 text-sm text-right">{reviewAnalysis.sentiment_distribution.negative}%</span>
-                    </div>
+                  <div className="h-48">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={sentimentData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={40}
+                          outerRadius={70}
+                          paddingAngle={2}
+                          dataKey="value"
+                          label={({ name, value }) => `${name}: ${value}%`}
+                          labelLine={false}
+                        >
+                          {sentimentData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(value) => `${value}%`} />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
                   </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Demographics Insights */}
+            {reviewAnalysis?.demographics_insights && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium flex items-center gap-2">
+                    <ShoppingCart className="w-4 h-4 text-primary" />
+                    Customer Demographics
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {reviewAnalysis.demographics_insights.buyer_types && 
+                   reviewAnalysis.demographics_insights.buyer_types.length > 0 && (
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground mb-2">Buyer Types</p>
+                      <div className="flex flex-wrap gap-2">
+                        {reviewAnalysis.demographics_insights.buyer_types.map((type, idx) => (
+                          <Badge key={idx} variant="secondary">{type}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {reviewAnalysis.demographics_insights.use_cases && 
+                   reviewAnalysis.demographics_insights.use_cases.length > 0 && (
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground mb-2">Common Use Cases</p>
+                      <div className="flex flex-wrap gap-2">
+                        {reviewAnalysis.demographics_insights.use_cases.map((useCase, idx) => (
+                          <Badge key={idx} variant="outline">{useCase}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}
@@ -258,16 +374,21 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                 <CardContent>
                   <div className="space-y-3">
                     {reviewAnalysis.pain_points.map((point, idx) => (
-                      <div key={idx} className="flex items-center justify-between">
-                        <span className={`text-sm ${getSeverityColor(point.severity)}`}>{point.theme}</span>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="text-xs">{point.frequency} mentions</Badge>
-                          {point.severity && (
-                            <Badge variant={point.severity === "high" ? "destructive" : "secondary"} className="text-xs">
-                              {point.severity}
-                            </Badge>
-                          )}
+                      <div key={idx} className="border-b border-border pb-2 last:border-0 last:pb-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className={`text-sm font-medium ${getSeverityColor(point.severity)}`}>{point.theme}</span>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-xs">{point.frequency} mentions</Badge>
+                            {point.severity && (
+                              <Badge variant={point.severity === "high" ? "destructive" : "secondary"} className="text-xs">
+                                {point.severity}
+                              </Badge>
+                            )}
+                          </div>
                         </div>
+                        {point.quotes && point.quotes.length > 0 && (
+                          <p className="text-xs text-muted-foreground italic">"{point.quotes[0]}"</p>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -289,7 +410,12 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                     {reviewAnalysis.positive_themes.map((theme, idx) => (
                       <div key={idx} className="flex items-center justify-between">
                         <span className="text-sm text-foreground">{theme.theme}</span>
-                        <Badge variant="outline" className="text-xs">{theme.frequency} mentions</Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-xs">{theme.frequency} mentions</Badge>
+                          {theme.impact && (
+                            <Badge variant="secondary" className="text-xs">{theme.impact}</Badge>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -323,12 +449,18 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
             {reviewAnalysis?.key_insights && reviewAnalysis.key_insights.length > 0 && (
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">Key Insights</CardTitle>
+                  <CardTitle className="text-sm font-medium flex items-center gap-2">
+                    <Lightbulb className="w-4 h-4 text-yellow-500" />
+                    Key Insights
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ul className="space-y-2">
                     {reviewAnalysis.key_insights.map((insight, idx) => (
-                      <li key={idx} className="text-sm text-muted-foreground">• {insight}</li>
+                      <li key={idx} className="text-sm text-muted-foreground flex items-start gap-2">
+                        <span className="text-yellow-500 shrink-0">•</span>
+                        {insight}
+                      </li>
                     ))}
                   </ul>
                 </CardContent>
@@ -384,6 +516,75 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm">{product.serving_size}</p>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Nutrients Table */}
+            {allNutrients && allNutrients.length > 0 && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Supplement Facts</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="border rounded-md overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted">
+                        <tr>
+                          <th className="text-left px-3 py-2 font-medium">Nutrient</th>
+                          <th className="text-right px-3 py-2 font-medium">Amount</th>
+                          <th className="text-right px-3 py-2 font-medium">% DV</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {allNutrients.slice(0, 15).map((nutrient, idx) => (
+                          <tr key={idx} className="border-t border-border">
+                            <td className="px-3 py-2">{nutrient.name}</td>
+                            <td className="text-right px-3 py-2 text-muted-foreground">
+                              {nutrient.amount ?? "-"}{nutrient.unit ?? ""}
+                            </td>
+                            <td className="text-right px-3 py-2 text-muted-foreground">
+                              {nutrient.daily_value ?? "-"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {allNutrients.length > 15 && (
+                      <p className="text-xs text-muted-foreground text-center py-2">
+                        +{allNutrients.length - 15} more nutrients
+                      </p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Proprietary Blends */}
+            {proprietaryBlends && proprietaryBlends.length > 0 && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-yellow-500" />
+                    Proprietary Blends
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {proprietaryBlends.map((blend, idx) => (
+                    <div key={idx} className="border-b border-border pb-3 last:border-0 last:pb-0">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="font-medium text-sm">{blend.name}</span>
+                        {blend.total_amount && (
+                          <Badge variant="outline">{blend.total_amount}</Badge>
+                        )}
+                      </div>
+                      {blend.ingredients && blend.ingredients.length > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          {blend.ingredients.join(", ")}
+                        </p>
+                      )}
+                    </div>
+                  ))}
                 </CardContent>
               </Card>
             )}
@@ -454,7 +655,7 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
               </Card>
             )}
 
-            {!product.ingredients && !product.serving_size && (
+            {!product.ingredients && !product.serving_size && !allNutrients && (
               <Card>
                 <CardContent className="py-8 text-center text-muted-foreground">
                   No formula data available for this product.

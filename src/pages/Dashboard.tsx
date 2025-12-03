@@ -5,7 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { 
   TrendingUp, TrendingDown, Target, DollarSign, Star, Package, Loader2, RefreshCw,
-  Zap, AlertTriangle, Crown, ShoppingCart, BarChart3, Users, CheckCircle2, Circle, Clock
+  Zap, AlertTriangle, Crown, ShoppingCart, BarChart3, Users, CheckCircle2, Circle, Clock,
+  ThumbsUp, ThumbsDown, MessageSquare
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -188,6 +189,64 @@ export default function Dashboard() {
       { name: "Neutral", value: Math.round((avgNeutral / total) * 100), fill: "hsl(var(--chart-4))" },
       { name: "Negative", value: Math.round((avgNegative / total) * 100), fill: "hsl(var(--destructive))" },
     ];
+  }, [products]);
+
+  // Aggregated pain points and positive themes from review_analysis
+  const { painPoints, positiveThemes } = useMemo(() => {
+    const painPointsMap = new Map<string, { count: number; quotes: string[] }>();
+    const positiveThemesMap = new Map<string, { count: number; quotes: string[] }>();
+
+    if (!products || products.length === 0) {
+      return { painPoints: [], positiveThemes: [] };
+    }
+
+    products.forEach(product => {
+      const reviewAnalysis = product.review_analysis as Record<string, unknown> | null;
+      if (!reviewAnalysis) return;
+
+      // Extract pain points
+      const productPainPoints = reviewAnalysis.pain_points as Array<{ theme?: string; issue?: string; quote?: string; representative_quotes?: string[] }> | null;
+      if (productPainPoints && Array.isArray(productPainPoints)) {
+        productPainPoints.forEach(pp => {
+          const theme = pp.theme || pp.issue || "Unknown";
+          const existing = painPointsMap.get(theme) || { count: 0, quotes: [] };
+          existing.count++;
+          if (pp.quote && existing.quotes.length < 2) existing.quotes.push(pp.quote);
+          if (pp.representative_quotes) {
+            pp.representative_quotes.slice(0, 2 - existing.quotes.length).forEach(q => existing.quotes.push(q));
+          }
+          painPointsMap.set(theme, existing);
+        });
+      }
+
+      // Extract positive themes
+      const productPositiveThemes = reviewAnalysis.positive_themes as Array<{ theme?: string; strength?: string; quote?: string; representative_quotes?: string[] }> | null;
+      if (productPositiveThemes && Array.isArray(productPositiveThemes)) {
+        productPositiveThemes.forEach(pt => {
+          const theme = pt.theme || pt.strength || "Unknown";
+          const existing = positiveThemesMap.get(theme) || { count: 0, quotes: [] };
+          existing.count++;
+          if (pt.quote && existing.quotes.length < 2) existing.quotes.push(pt.quote);
+          if (pt.representative_quotes) {
+            pt.representative_quotes.slice(0, 2 - existing.quotes.length).forEach(q => existing.quotes.push(q));
+          }
+          positiveThemesMap.set(theme, existing);
+        });
+      }
+    });
+
+    // Convert to sorted arrays (top 5)
+    const painPoints = Array.from(painPointsMap.entries())
+      .map(([theme, data]) => ({ theme, ...data }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    const positiveThemes = Array.from(positiveThemesMap.entries())
+      .map(([theme, data]) => ({ theme, ...data }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    return { painPoints, positiveThemes };
   }, [products]);
 
   // Radar chart data from category_scores
@@ -607,6 +666,91 @@ export default function Dashboard() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Category Pain Points & Positive Themes */}
+      {(painPoints.length > 0 || positiveThemes.length > 0) && (
+        <div className="grid lg:grid-cols-2 gap-6">
+          {/* Pain Points */}
+          <Card className="border-red-500/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ThumbsDown className="w-5 h-5 text-red-500" />
+                Top Pain Points
+                <Badge variant="outline" className="ml-2">{painPoints.length} issues</Badge>
+              </CardTitle>
+              <CardDescription>Common customer complaints across all products</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {painPoints.length > 0 ? (
+                <div className="space-y-4">
+                  {painPoints.map((pp, idx) => (
+                    <div key={idx} className="p-3 bg-red-500/5 border border-red-500/20 rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="font-medium text-foreground">{pp.theme}</p>
+                        <Badge variant="outline" className="text-red-500">
+                          {pp.count} product{pp.count > 1 ? "s" : ""}
+                        </Badge>
+                      </div>
+                      {pp.quotes.length > 0 && (
+                        <div className="space-y-1">
+                          {pp.quotes.slice(0, 2).map((quote, qIdx) => (
+                            <p key={qIdx} className="text-xs text-muted-foreground italic flex items-start gap-1">
+                              <MessageSquare className="w-3 h-3 mt-0.5 shrink-0" />
+                              "{quote.substring(0, 100)}{quote.length > 100 ? "..." : ""}"
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-center text-muted-foreground py-4">No pain points data available</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Positive Themes */}
+          <Card className="border-green-500/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ThumbsUp className="w-5 h-5 text-green-500" />
+                Top Strengths
+                <Badge variant="outline" className="ml-2">{positiveThemes.length} themes</Badge>
+              </CardTitle>
+              <CardDescription>Positive feedback themes across all products</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {positiveThemes.length > 0 ? (
+                <div className="space-y-4">
+                  {positiveThemes.map((pt, idx) => (
+                    <div key={idx} className="p-3 bg-green-500/5 border border-green-500/20 rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="font-medium text-foreground">{pt.theme}</p>
+                        <Badge variant="outline" className="text-green-500">
+                          {pt.count} product{pt.count > 1 ? "s" : ""}
+                        </Badge>
+                      </div>
+                      {pt.quotes.length > 0 && (
+                        <div className="space-y-1">
+                          {pt.quotes.slice(0, 2).map((quote, qIdx) => (
+                            <p key={qIdx} className="text-xs text-muted-foreground italic flex items-start gap-1">
+                              <MessageSquare className="w-3 h-3 mt-0.5 shrink-0" />
+                              "{quote.substring(0, 100)}{quote.length > 100 ? "..." : ""}"
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-center text-muted-foreground py-4">No positive themes data available</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* Recommendations / Insights */}

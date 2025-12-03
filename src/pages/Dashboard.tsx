@@ -6,7 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { 
   TrendingUp, TrendingDown, Target, DollarSign, Star, Package, Loader2, RefreshCw,
   Zap, AlertTriangle, Crown, ShoppingCart, BarChart3, Users, CheckCircle2, Circle, Clock,
-  ThumbsUp, ThumbsDown, MessageSquare, Building2, Crosshair, Shield
+  ThumbsUp, ThumbsDown, MessageSquare, Building2, Crosshair, Shield, Lightbulb
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -247,6 +247,52 @@ export default function Dashboard() {
       .slice(0, 5);
 
     return { painPoints, positiveThemes };
+  }, [products]);
+
+  // Aggregated feature requests from review_analysis
+  const featureRequests = useMemo(() => {
+    const featureMap = new Map<string, { count: number; priority: string; quotes: string[] }>();
+
+    if (!products || products.length === 0) {
+      return [];
+    }
+
+    products.forEach(product => {
+      const reviewAnalysis = product.review_analysis as Record<string, unknown> | null;
+      if (!reviewAnalysis) return;
+
+      const productFeatureRequests = reviewAnalysis.feature_requests as Array<{
+        request?: string;
+        feature?: string;
+        priority?: string;
+        frequency?: string;
+        quote?: string;
+        representative_quotes?: string[];
+      }> | null;
+
+      if (productFeatureRequests && Array.isArray(productFeatureRequests)) {
+        productFeatureRequests.forEach(fr => {
+          const feature = fr.request || fr.feature || "Unknown";
+          const existing = featureMap.get(feature) || { count: 0, priority: "medium", quotes: [] };
+          existing.count++;
+          if (fr.priority === "high" || fr.frequency === "high") existing.priority = "high";
+          if (fr.quote && existing.quotes.length < 2) existing.quotes.push(fr.quote);
+          if (fr.representative_quotes) {
+            fr.representative_quotes.slice(0, 2 - existing.quotes.length).forEach(q => existing.quotes.push(q));
+          }
+          featureMap.set(feature, existing);
+        });
+      }
+    });
+
+    return Array.from(featureMap.entries())
+      .map(([feature, data]) => ({ feature, ...data }))
+      .sort((a, b) => {
+        if (a.priority === "high" && b.priority !== "high") return -1;
+        if (b.priority === "high" && a.priority !== "high") return 1;
+        return b.count - a.count;
+      })
+      .slice(0, 8);
   }, [products]);
 
   // Radar chart data from category_scores
@@ -851,6 +897,49 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* Feature Request Tracker */}
+      {featureRequests.length > 0 && (
+        <Card className="border-purple-500/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Lightbulb className="w-5 h-5 text-purple-500" />
+              Feature Requests
+              <Badge variant="outline" className="ml-2">{featureRequests.length} ideas</Badge>
+            </CardTitle>
+            <CardDescription>Customer-requested features and improvements aggregated from reviews</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {featureRequests.map((fr, idx) => (
+                <div 
+                  key={idx} 
+                  className={`p-3 rounded-lg border ${
+                    fr.priority === "high" 
+                      ? "bg-purple-500/10 border-purple-500/30" 
+                      : "bg-secondary/50 border-border"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <p className="text-sm font-medium text-foreground line-clamp-2">{fr.feature}</p>
+                    {fr.priority === "high" && (
+                      <Badge className="shrink-0 bg-purple-500 text-white text-xs">High</Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span>{fr.count} product{fr.count > 1 ? "s" : ""}</span>
+                  </div>
+                  {fr.quotes.length > 0 && (
+                    <p className="text-xs text-muted-foreground italic mt-2 line-clamp-2">
+                      "{fr.quotes[0].substring(0, 80)}{fr.quotes[0].length > 80 ? "..." : ""}"
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Recommendations / Insights */}

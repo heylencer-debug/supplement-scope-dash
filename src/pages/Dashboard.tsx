@@ -25,11 +25,14 @@ import { useCategoryAnalysis } from "@/hooks/useCategoryAnalyses";
 import { useProducts } from "@/hooks/useProducts";
 import { useCategoryContext } from "@/contexts/CategoryContext";
 import { Skeleton } from "@/components/ui/skeleton";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function Dashboard() {
   const [searchParams] = useSearchParams();
   const urlCategoryName = searchParams.get("category");
   const { setCategoryContext, currentCategoryId, categoryName: contextCategoryName } = useCategoryContext();
+  const queryClient = useQueryClient();
 
   // Use URL param or context as fallback
   const categoryName = urlCategoryName || contextCategoryName;
@@ -49,6 +52,57 @@ export default function Dashboard() {
       setCategoryContext(null, categoryName);
     }
   }, [category, categoryName, categoryLoading, setCategoryContext]);
+
+  // Real-time subscriptions for automatic updates
+  useEffect(() => {
+    if (!categoryName) return;
+
+    const channel = supabase
+      .channel('dashboard-realtime')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'categories' },
+        (payload) => {
+          console.log('New category:', payload);
+          queryClient.invalidateQueries({ queryKey: ['category_by_name', categoryName] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'category_analyses' },
+        (payload) => {
+          console.log('New analysis:', payload);
+          if (category?.id) {
+            queryClient.invalidateQueries({ queryKey: ['category_analysis', category.id] });
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'products' },
+        (payload) => {
+          console.log('New product:', payload);
+          if (category?.id) {
+            queryClient.invalidateQueries({ queryKey: ['products', category.id] });
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'category_analyses' },
+        (payload) => {
+          console.log('Analysis updated:', payload);
+          if (category?.id) {
+            queryClient.invalidateQueries({ queryKey: ['category_analysis', category.id] });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [categoryName, category?.id, queryClient]);
 
   // Fetch analysis for this category (auto-refresh every 30s if not found)
   const { data: analysis, isLoading: analysisLoading } = useCategoryAnalysis(category?.id);

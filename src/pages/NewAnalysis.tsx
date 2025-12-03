@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { ArrowRight, Clock, TrendingUp, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +33,7 @@ const trendingCategories = [
 
 export default function NewAnalysis() {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [category, setCategory] = useState("");
   const [asin, setAsin] = useState("");
@@ -81,10 +83,8 @@ export default function NewAnalysis() {
         description: "Check your email in 5-10 minutes.",
       });
 
-      // Reset form
-      setCategory("");
-      setAsin("");
-      setAmazonCategories([]);
+      // Navigate to dashboard with category parameter
+      navigate(`/dashboard?category=${encodeURIComponent(category.trim())}`);
     } catch (error) {
       console.error("Analysis request failed:", error);
       toast({

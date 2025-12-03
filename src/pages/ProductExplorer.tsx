@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, Filter, Download, ChevronDown, Star, TrendingUp, Loader2 } from "lucide-react";
+import { Search, Filter, Download, Star, TrendingUp, Loader2, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -19,20 +19,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useProducts } from "@/hooks/useProducts";
+import { useProducts, Product } from "@/hooks/useProducts";
 import { useCategories } from "@/hooks/useCategories";
+import { useCategoryContext } from "@/contexts/CategoryContext";
+import ProductDetailModal from "@/components/ProductDetailModal";
 
 export default function ProductExplorer() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("current");
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
 
-  const { data: products, isLoading: productsLoading } = useProducts();
+  const { currentCategoryId, categoryName } = useCategoryContext();
+
+  // Determine which category ID to use for filtering
+  const effectiveCategoryId = categoryFilter === "current" && currentCategoryId
+    ? currentCategoryId
+    : categoryFilter === "all" || categoryFilter === "current"
+      ? undefined
+      : categoryFilter;
+
+  const { data: products, isLoading: productsLoading } = useProducts(effectiveCategoryId);
   const { data: categories, isLoading: categoriesLoading } = useCategories();
 
   const isLoading = productsLoading || categoriesLoading;
@@ -40,16 +47,14 @@ export default function ProductExplorer() {
   const filteredProducts = (products ?? []).filter((product) => {
     const matchesSearch =
       (product.title?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false) ||
-      (product.brand?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
-    const matchesCategory =
-      categoryFilter === "all" || product.category_id === categoryFilter;
-    return matchesSearch && matchesCategory;
+      (product.brand?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false) ||
+      (product.asin?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
+    return matchesSearch;
   });
 
-  const getScoreBadgeVariant = (score: number) => {
-    if (score >= 80) return "default";
-    if (score >= 60) return "secondary";
-    return "outline";
+  const handleRowClick = (product: Product) => {
+    setSelectedProduct(product);
+    setModalOpen(true);
   };
 
   if (isLoading) {
@@ -65,7 +70,11 @@ export default function ProductExplorer() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Product Explorer</h1>
-          <p className="text-muted-foreground">Browse and analyze products in detail</p>
+          <p className="text-muted-foreground">
+            {currentCategoryId && categoryName
+              ? `Browsing products in: ${categoryName}`
+              : "Browse and analyze products in detail"}
+          </p>
         </div>
         <Button variant="outline" className="gap-2">
           <Download className="w-4 h-4" />
@@ -79,18 +88,23 @@ export default function ProductExplorer() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
               <Input
-                placeholder="Search products or brands..."
+                placeholder="Search products, brands, or ASINs..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
               />
             </div>
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-48">
+              <SelectTrigger className="w-56">
                 <Filter className="w-4 h-4 mr-2" />
-                <SelectValue placeholder="All Categories" />
+                <SelectValue placeholder="Filter by Category" />
               </SelectTrigger>
               <SelectContent>
+                {currentCategoryId && (
+                  <SelectItem value="current">
+                    Current: {categoryName || "Selected Category"}
+                  </SelectItem>
+                )}
                 <SelectItem value="all">All Categories</SelectItem>
                 {categories?.map((cat) => (
                   <SelectItem key={cat.id} value={cat.id}>
@@ -112,12 +126,16 @@ export default function ProductExplorer() {
                   <TableHead className="text-right">Reviews</TableHead>
                   <TableHead className="text-right">BSR</TableHead>
                   <TableHead className="text-center">Status</TableHead>
-                  <TableHead></TableHead>
+                  <TableHead className="text-center">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredProducts.slice(0, 50).map((product) => (
-                  <TableRow key={product.id} className="cursor-pointer hover:bg-muted/50">
+                  <TableRow
+                    key={product.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => handleRowClick(product)}
+                  >
                     <TableCell>
                       <div className="max-w-md">
                         <p className="font-medium text-foreground truncate">{product.title ?? "Untitled"}</p>
@@ -156,19 +174,17 @@ export default function ProductExplorer() {
                         )}
                       </div>
                     </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <ChevronDown className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>View Details</DropdownMenuItem>
-                          <DropdownMenuItem>Add to Analysis</DropdownMenuItem>
-                          <DropdownMenuItem>Export Data</DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                    <TableCell className="text-center">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRowClick(product);
+                        }}
+                      >
+                        <Eye className="w-4 h-4" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -190,6 +206,12 @@ export default function ProductExplorer() {
           </div>
         </CardContent>
       </Card>
+
+      <ProductDetailModal
+        product={selectedProduct}
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+      />
     </div>
   );
 }

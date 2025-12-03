@@ -5,6 +5,12 @@ import { Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const DISMISSED_TABS_KEY = "dismissed_analysis_tabs";
+const PENDING_ANALYSES_KEY = "pending_analyses";
+
+interface PendingAnalysis {
+  categoryName: string;
+  startedAt: string;
+}
 
 export function AnalysisTabs() {
   const navigate = useNavigate();
@@ -12,6 +18,7 @@ export function AnalysisTabs() {
   const [searchParams] = useSearchParams();
   const currentCategory = searchParams.get("category");
   const [dismissedTabs, setDismissedTabs] = useState<string[]>([]);
+  const [pendingAnalyses, setPendingAnalyses] = useState<PendingAnalysis[]>([]);
   
   const { data: analyses } = useCategoryAnalyses();
   
@@ -22,6 +29,33 @@ export function AnalysisTabs() {
       setDismissedTabs(JSON.parse(stored));
     }
   }, []);
+
+  // Load and sync pending analyses from localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem(PENDING_ANALYSES_KEY);
+    if (stored) {
+      setPendingAnalyses(JSON.parse(stored));
+    }
+  }, []);
+
+  // Clean up pending analyses once they appear in DB or are too old
+  useEffect(() => {
+    if (!pendingAnalyses.length) return;
+
+    const cleaned = pendingAnalyses.filter(p => {
+      // Remove if now exists in DB
+      if (analyses?.find(a => a.category_name === p.categoryName)) return false;
+      // Remove if older than 30 minutes
+      const age = Date.now() - new Date(p.startedAt).getTime();
+      if (age > 30 * 60 * 1000) return false;
+      return true;
+    });
+
+    if (cleaned.length !== pendingAnalyses.length) {
+      setPendingAnalyses(cleaned);
+      localStorage.setItem(PENDING_ANALYSES_KEY, JSON.stringify(cleaned));
+    }
+  }, [analyses, pendingAnalyses]);
   
   // Get unique analyses (most recent per category), limited to 10, excluding dismissed
   const uniqueAnalyses = analyses?.reduce((acc: typeof analyses, analysis) => {
@@ -31,6 +65,28 @@ export function AnalysisTabs() {
     }
     return acc;
   }, []).slice(0, 10) ?? [];
+
+  // Get pending analyses that aren't yet in DB and not dismissed
+  const pendingNotInDb = pendingAnalyses.filter(
+    p => !analyses?.find(a => a.category_name === p.categoryName) && 
+         !dismissedTabs.includes(p.categoryName)
+  );
+
+  // Combined tabs: real analyses + pending ones
+  const allTabs = [
+    ...uniqueAnalyses.map(a => ({
+      id: a.id,
+      category_name: a.category_name,
+      products_analyzed: a.products_analyzed,
+      isPending: false as const,
+    })),
+    ...pendingNotInDb.map(p => ({
+      id: `pending-${p.categoryName}`,
+      category_name: p.categoryName,
+      products_analyzed: 0,
+      isPending: true as const,
+    }))
+  ];
   
   const isNewAnalysisActive = location.pathname === "/" && !currentCategory;
   
@@ -39,6 +95,13 @@ export function AnalysisTabs() {
     const newDismissed = [...dismissedTabs, categoryName];
     setDismissedTabs(newDismissed);
     localStorage.setItem(DISMISSED_TABS_KEY, JSON.stringify(newDismissed));
+
+    // Also remove from pending if it's there
+    const newPending = pendingAnalyses.filter(p => p.categoryName !== categoryName);
+    if (newPending.length !== pendingAnalyses.length) {
+      setPendingAnalyses(newPending);
+      localStorage.setItem(PENDING_ANALYSES_KEY, JSON.stringify(newPending));
+    }
     
     // If dismissing the current tab, navigate to New Analysis
     if (currentCategory === categoryName) {
@@ -64,19 +127,19 @@ export function AnalysisTabs() {
             New
           </button>
           
-          {uniqueAnalyses.length > 0 && (
+          {allTabs.length > 0 && (
             <>
               {/* Divider */}
               <div className="h-4 w-px bg-border mx-1 flex-shrink-0" />
               
               {/* Analysis Tabs */}
-              {uniqueAnalyses.map((analysis) => {
-                const isActive = currentCategory === analysis.category_name;
-                const isComplete = (analysis.products_analyzed ?? 0) > 0;
+              {allTabs.map((tab) => {
+                const isActive = currentCategory === tab.category_name;
+                const isComplete = (tab.products_analyzed ?? 0) > 0;
                 
                 return (
                   <div
-                    key={analysis.id}
+                    key={tab.id}
                     className={cn(
                       "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors group flex-shrink-0",
                       isActive 
@@ -85,7 +148,7 @@ export function AnalysisTabs() {
                     )}
                   >
                     <button
-                      onClick={() => navigate(`/dashboard?category=${encodeURIComponent(analysis.category_name)}`)}
+                      onClick={() => navigate(`/dashboard?category=${encodeURIComponent(tab.category_name)}`)}
                       className="flex items-center gap-2 whitespace-nowrap"
                     >
                       <span 
@@ -94,10 +157,10 @@ export function AnalysisTabs() {
                           isComplete ? "bg-green-500" : "bg-amber-500 animate-pulse"
                         )} 
                       />
-                      <span className="max-w-[150px] truncate">{analysis.category_name}</span>
+                      <span className="max-w-[150px] truncate">{tab.category_name}</span>
                     </button>
                     <button
-                      onClick={(e) => handleDismissTab(e, analysis.category_name)}
+                      onClick={(e) => handleDismissTab(e, tab.category_name)}
                       className="opacity-0 group-hover:opacity-100 hover:bg-destructive/20 rounded p-0.5 transition-opacity flex-shrink-0"
                       title="Close tab"
                     >

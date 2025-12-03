@@ -30,33 +30,42 @@ export default function StrategyBrief() {
     topCompetitors: categoryData?.unique_brands ?? 0,
   };
 
+  // Helper to safely convert JSONB to array
+  const toArray = (value: unknown): string[] => {
+    if (Array.isArray(value)) return value;
+    if (typeof value === "object" && value !== null) {
+      return Object.values(value).filter((v): v is string => typeof v === "string");
+    }
+    return [];
+  };
+
   // Parse key insights from the analysis
-  const keyInsights = latestAnalysis?.key_insights as string[] | null;
-  const topStrengths = latestAnalysis?.top_strengths as string[] | null;
-  const topWeaknesses = latestAnalysis?.top_weaknesses as string[] | null;
+  const keyInsights = toArray(latestAnalysis?.key_insights);
+  const topStrengths = toArray(latestAnalysis?.top_strengths);
+  const topWeaknesses = toArray(latestAnalysis?.top_weaknesses);
 
   const recommendations = [
-    ...(topStrengths?.slice(0, 2).map((s) => ({
+    ...topStrengths.slice(0, 2).map((s) => ({
       type: "opportunity",
       icon: CheckCircle,
       title: "Strength",
       description: s,
       priority: "high" as const,
-    })) ?? []),
-    ...(topWeaknesses?.slice(0, 1).map((w) => ({
+    })),
+    ...topWeaknesses.slice(0, 1).map((w) => ({
       type: "caution",
       icon: AlertTriangle,
       title: "Area for Improvement",
       description: w,
       priority: "medium" as const,
-    })) ?? []),
-    ...(keyInsights?.slice(0, 1).map((i) => ({
+    })),
+    ...keyInsights.slice(0, 1).map((i) => ({
       type: "info",
       icon: Info,
       title: "Key Insight",
       description: i,
       priority: "low" as const,
-    })) ?? []),
+    })),
   ];
 
   const keyFindings = [
@@ -87,8 +96,8 @@ export default function StrategyBrief() {
   ];
 
   const reviewSummary = {
-    positiveThemes: topStrengths?.slice(0, 4) ?? ["No data available"],
-    negativeThemes: topWeaknesses?.slice(0, 3) ?? ["No data available"],
+    positiveThemes: topStrengths.length > 0 ? topStrengths.slice(0, 4) : ["No data available"],
+    negativeThemes: topWeaknesses.length > 0 ? topWeaknesses.slice(0, 3) : ["No data available"],
     sentimentScore: categoryData?.avg_rating ?? 0,
   };
 

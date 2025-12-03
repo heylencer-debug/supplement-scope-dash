@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { 
   Zap, TrendingUp, TrendingDown, Star, Target, Users, Calendar, 
-  Loader2, AlertTriangle, BarChart3, Activity, Award
+  Loader2, AlertTriangle, BarChart3, Activity, Award, Radio
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -26,6 +26,7 @@ import { useCategoryContext } from "@/contexts/CategoryContext";
 import { useBreakoutCompetitors, BreakoutCompetitor } from "@/hooks/useBreakoutCompetitors";
 import { useCompetitorsByCategory } from "@/hooks/useCompetitors";
 import { useProducts } from "@/hooks/useProducts";
+import { useCompetitorRealtime } from "@/hooks/useCompetitorRealtime";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
@@ -47,6 +48,9 @@ export default function Competitors() {
   }, [category, categoryName, categoryLoading, setCategoryContext]);
 
   const effectiveCategoryId = currentCategoryId || category?.id;
+
+  // Real-time updates
+  const { isConnected, lastUpdate } = useCompetitorRealtime(effectiveCategoryId);
 
   // Data fetching
   const { data: breakoutCompetitors, isLoading: breakoutLoading } = useBreakoutCompetitors(categoryName || undefined, 20);
@@ -127,9 +131,20 @@ export default function Competitors() {
         <div className="flex items-center gap-3 mb-2">
           <Users className="w-8 h-8 text-primary" />
           <h1 className="text-2xl font-bold text-foreground">Competitors</h1>
+          {isConnected && (
+            <Badge variant="outline" className="ml-2 flex items-center gap-1.5 border-green-500/50 text-green-600">
+              <Radio className="w-3 h-3 animate-pulse" />
+              Live
+            </Badge>
+          )}
         </div>
         <p className="text-muted-foreground">
           Competitive intelligence and tracking for {categoryName}
+          {lastUpdate && (
+            <span className="text-xs ml-2">
+              · Updated {lastUpdate.toLocaleTimeString()}
+            </span>
+          )}
         </p>
       </div>
 

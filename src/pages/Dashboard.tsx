@@ -5,8 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { 
   TrendingUp, TrendingDown, Target, DollarSign, Star, Package, Loader2, RefreshCw,
-  Zap, AlertTriangle, Crown, ShoppingCart, BarChart3, Users, CheckCircle2, Circle, Clock,
-  ThumbsUp, ThumbsDown, MessageSquare, Building2, Crosshair, Shield, Lightbulb
+  Zap, AlertTriangle, Crown, BarChart3, Users, CheckCircle2, Circle, Clock,
+  ThumbsUp, ThumbsDown, MessageSquare, Building2, Crosshair, Shield, Lightbulb,
+  Database, FileBarChart, Calendar, Boxes, Scale, Gauge
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -37,6 +38,62 @@ import { useFormulaBrief } from "@/hooks/useFormulaBrief";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
+
+interface ProductsSnapshot {
+  data_completeness?: {
+    total_products?: number;
+    total_reviews?: number;
+    products_with_ocr?: number;
+    products_with_keepa?: number;
+    products_with_rainforest?: number;
+    ocr_success_rate?: number;
+    reviews_per_product?: number;
+  };
+  snapshot_timestamp?: string;
+  top_performers?: Array<{
+    asin: string;
+    brand: string;
+    title: string;
+    price?: number;
+    bsr_current?: number;
+    rating?: number;
+    reviews?: number;
+  }>;
+}
+
+interface ReviewsSnapshot {
+  total_reviews?: number;
+  sample_size?: number;
+  sampling_strategy?: string;
+  snapshot_timestamp?: string;
+  review_distribution?: {
+    positive?: number;
+    neutral?: number;
+    negative?: number;
+  };
+}
+
+interface CategoryContribution {
+  category: string;
+  revenue?: number;
+  products?: number;
+  percentage?: number;
+}
+
+interface WeightedScore {
+  category: string;
+  score: number;
+  weight: number;
+  weighted_score: number;
+}
+
+interface OpportunityScore {
+  market_size?: number;
+  profit_potential?: number;
+  competition_intensity?: number;
+  barriers_to_entry?: number;
+  reasoning?: string;
+}
 
 export default function Dashboard() {
   const [searchParams] = useSearchParams();
@@ -295,6 +352,59 @@ export default function Dashboard() {
       .slice(0, 8);
   }, [products]);
 
+  // Parse snapshots and market data from analysis
+  const { productsSnapshot, reviewsSnapshot, categoryContributions, weightedScoring, opportunityBreakdown } = useMemo(() => {
+    const parseProductsSnapshot = (value: unknown): ProductsSnapshot | null => {
+      if (!value || typeof value !== 'object') return null;
+      return value as ProductsSnapshot;
+    };
+
+    const parseReviewsSnapshot = (value: unknown): ReviewsSnapshot | null => {
+      if (!value || typeof value !== 'object') return null;
+      return value as ReviewsSnapshot;
+    };
+
+    const parseCategoryContributions = (value: unknown): CategoryContribution[] => {
+      if (!value) return [];
+      if (Array.isArray(value)) {
+        return value.filter((item): item is CategoryContribution => 
+          typeof item === "object" && item !== null && "category" in item
+        );
+      }
+      return [];
+    };
+
+    const parseWeightedScoring = (value: unknown): WeightedScore[] => {
+      if (!value) return [];
+      if (Array.isArray(value)) {
+        return value.filter((item): item is WeightedScore => 
+          typeof item === "object" && item !== null && "category" in item && "score" in item
+        );
+      }
+      return [];
+    };
+
+    const analysis1 = analysis?.analysis_1_category_scores as Record<string, unknown> | null;
+    const opportunityScore = analysis1?.opportunity_score as OpportunityScore | null;
+
+    return {
+      productsSnapshot: parseProductsSnapshot(analysis?.products_snapshot),
+      reviewsSnapshot: parseReviewsSnapshot(analysis?.reviews_snapshot),
+      categoryContributions: parseCategoryContributions(analysis?.category_contributions),
+      weightedScoring: parseWeightedScoring(analysis?.weighted_scoring),
+      opportunityBreakdown: opportunityScore,
+    };
+  }, [analysis]);
+
+  // Build bar chart data for weighted scoring
+  const weightedBarData = weightedScoring.length > 0
+    ? weightedScoring.map(ws => ({
+        name: ws.category.length > 12 ? ws.category.substring(0, 12) + "..." : ws.category,
+        score: ws.weighted_score,
+        weight: ws.weight,
+      }))
+    : [];
+
   // Radar chart data from category_scores
   const radarData = categoryScores ? [
     { criteria: "Demand", score: Number(categoryScores.demand_score) || 0, fullMark: 10 },
@@ -501,6 +611,299 @@ export default function Dashboard() {
                 </BarChart>
               </ResponsiveContainer>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Data Foundation - Snapshots */}
+      {(productsSnapshot || reviewsSnapshot) && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Database className="w-5 h-5 text-primary" />
+              Data Foundation
+            </CardTitle>
+            <CardDescription>Source data and sampling methodology used for this analysis</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* Products Snapshot */}
+              {productsSnapshot && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <FileBarChart className="w-4 h-4 text-primary" />
+                    <h4 className="font-medium text-sm">Products Data</h4>
+                    {productsSnapshot.snapshot_timestamp && (
+                      <Badge variant="outline" className="ml-auto text-xs">
+                        <Calendar className="w-3 h-3 mr-1" />
+                        {new Date(productsSnapshot.snapshot_timestamp).toLocaleDateString()}
+                      </Badge>
+                    )}
+                  </div>
+                  
+                  {productsSnapshot.data_completeness && (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="p-3 bg-secondary rounded-lg text-center">
+                          <p className="text-lg font-bold text-foreground">
+                            {productsSnapshot.data_completeness.total_products?.toLocaleString() ?? "N/A"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">Products Analyzed</p>
+                        </div>
+                        <div className="p-3 bg-secondary rounded-lg text-center">
+                          <p className="text-lg font-bold text-foreground">
+                            {productsSnapshot.data_completeness.total_reviews?.toLocaleString() ?? "N/A"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">Total Reviews</p>
+                        </div>
+                      </div>
+
+                      {(productsSnapshot.data_completeness.ocr_success_rate !== undefined || 
+                        productsSnapshot.data_completeness.products_with_keepa !== undefined) && (
+                        <div className="space-y-2">
+                          <p className="text-xs font-medium text-muted-foreground">Data Completeness</p>
+                          {productsSnapshot.data_completeness.ocr_success_rate !== undefined && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground w-24">OCR Success</span>
+                              <Progress 
+                                value={productsSnapshot.data_completeness.ocr_success_rate * 100} 
+                                className="h-2 flex-1" 
+                              />
+                              <span className="text-xs font-medium w-12 text-right">
+                                {(productsSnapshot.data_completeness.ocr_success_rate * 100).toFixed(0)}%
+                              </span>
+                            </div>
+                          )}
+                          {productsSnapshot.data_completeness.products_with_keepa !== undefined && 
+                           productsSnapshot.data_completeness.total_products && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground w-24">Keepa Data</span>
+                              <Progress 
+                                value={(productsSnapshot.data_completeness.products_with_keepa / productsSnapshot.data_completeness.total_products) * 100} 
+                                className="h-2 flex-1" 
+                              />
+                              <span className="text-xs font-medium w-12 text-right">
+                                {productsSnapshot.data_completeness.products_with_keepa}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Reviews Snapshot */}
+              {reviewsSnapshot && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="w-4 h-4 text-primary" />
+                    <h4 className="font-medium text-sm">Reviews Data</h4>
+                    {reviewsSnapshot.snapshot_timestamp && (
+                      <Badge variant="outline" className="ml-auto text-xs">
+                        <Calendar className="w-3 h-3 mr-1" />
+                        {new Date(reviewsSnapshot.snapshot_timestamp).toLocaleDateString()}
+                      </Badge>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 bg-secondary rounded-lg text-center">
+                      <p className="text-lg font-bold text-foreground">
+                        {reviewsSnapshot.total_reviews?.toLocaleString() ?? "N/A"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Total in Category</p>
+                    </div>
+                    <div className="p-3 bg-secondary rounded-lg text-center">
+                      <p className="text-lg font-bold text-foreground">
+                        {reviewsSnapshot.sample_size?.toLocaleString() ?? "N/A"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Sample Analyzed</p>
+                    </div>
+                  </div>
+
+                  {reviewsSnapshot.sampling_strategy && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Sampling Strategy</span>
+                      <Badge variant="outline">{reviewsSnapshot.sampling_strategy}</Badge>
+                    </div>
+                  )}
+
+                  {/* Review Distribution */}
+                  {reviewsSnapshot.review_distribution && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground">Sentiment Distribution</p>
+                      <div className="space-y-2">
+                        {reviewsSnapshot.review_distribution.positive !== undefined && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-green-600 w-16">Positive</span>
+                            <Progress 
+                              value={reviewsSnapshot.review_distribution.positive} 
+                              className="h-2 flex-1 [&>div]:bg-green-500" 
+                            />
+                            <span className="text-xs font-medium w-10 text-right">
+                              {reviewsSnapshot.review_distribution.positive}%
+                            </span>
+                          </div>
+                        )}
+                        {reviewsSnapshot.review_distribution.neutral !== undefined && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-yellow-600 w-16">Neutral</span>
+                            <Progress 
+                              value={reviewsSnapshot.review_distribution.neutral} 
+                              className="h-2 flex-1 [&>div]:bg-yellow-500" 
+                            />
+                            <span className="text-xs font-medium w-10 text-right">
+                              {reviewsSnapshot.review_distribution.neutral}%
+                            </span>
+                          </div>
+                        )}
+                        {reviewsSnapshot.review_distribution.negative !== undefined && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-red-600 w-16">Negative</span>
+                            <Progress 
+                              value={reviewsSnapshot.review_distribution.negative} 
+                              className="h-2 flex-1 [&>div]:bg-red-500" 
+                            />
+                            <span className="text-xs font-medium w-10 text-right">
+                              {reviewsSnapshot.review_distribution.negative}%
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Opportunity Breakdown */}
+      {opportunityBreakdown && (
+        <Card className="border-primary/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Gauge className="w-5 h-5 text-primary" />
+              Opportunity Breakdown
+            </CardTitle>
+            <CardDescription>Detailed opportunity scoring factors</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+              {opportunityBreakdown.market_size !== undefined && (
+                <div className="p-4 bg-secondary rounded-lg text-center">
+                  <p className="text-2xl font-bold text-foreground">{opportunityBreakdown.market_size}/10</p>
+                  <p className="text-xs text-muted-foreground">Market Size</p>
+                </div>
+              )}
+              {opportunityBreakdown.profit_potential !== undefined && (
+                <div className="p-4 bg-green-500/10 rounded-lg text-center">
+                  <p className="text-2xl font-bold text-green-600">{opportunityBreakdown.profit_potential}/10</p>
+                  <p className="text-xs text-muted-foreground">Profit Potential</p>
+                </div>
+              )}
+              {opportunityBreakdown.competition_intensity !== undefined && (
+                <div className="p-4 bg-yellow-500/10 rounded-lg text-center">
+                  <p className="text-2xl font-bold text-yellow-600">{opportunityBreakdown.competition_intensity}/10</p>
+                  <p className="text-xs text-muted-foreground">Competition</p>
+                </div>
+              )}
+              {opportunityBreakdown.barriers_to_entry !== undefined && (
+                <div className="p-4 bg-red-500/10 rounded-lg text-center">
+                  <p className="text-2xl font-bold text-red-600">{opportunityBreakdown.barriers_to_entry}/10</p>
+                  <p className="text-xs text-muted-foreground">Barriers to Entry</p>
+                </div>
+              )}
+            </div>
+            {opportunityBreakdown.reasoning && (
+              <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
+                <p className="text-sm font-medium text-foreground mb-1">Analysis Reasoning</p>
+                <p className="text-sm text-muted-foreground">{opportunityBreakdown.reasoning}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Weighted Scoring */}
+      {weightedBarData.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Scale className="w-5 h-5 text-primary" />
+              Weighted Scoring Breakdown
+            </CardTitle>
+            <CardDescription>How each category contributes to the overall score</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={weightedBarData} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis type="number" domain={[0, 10]} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                  <YAxis dataKey="name" type="category" width={100} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                  <Tooltip 
+                    content={({ payload }) => {
+                      if (payload && payload.length > 0) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-popover border border-border rounded-md p-2 shadow-md">
+                            <p className="font-medium text-sm">{data.name}</p>
+                            <p className="text-sm text-muted-foreground">Score: {data.score}</p>
+                            <p className="text-sm text-muted-foreground">Weight: {data.weight}x</p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Bar dataKey="score" radius={[0, 4, 4, 0]}>
+                    {weightedBarData.map((_, index) => (
+                      <Cell key={`cell-${index}`} fill={`hsl(var(--chart-${(index % 5) + 1}))`} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Category Contributions */}
+      {categoryContributions.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Boxes className="w-5 h-5 text-primary" />
+              Amazon Category Contributions
+            </CardTitle>
+            <CardDescription>Revenue and product distribution by Amazon category</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {categoryContributions.map((contrib, idx) => (
+                <div key={idx} className="flex items-center justify-between p-3 border rounded-lg">
+                  <span className="font-medium text-sm">{contrib.category}</span>
+                  <div className="flex items-center gap-4">
+                    {contrib.products && (
+                      <Badge variant="outline">{contrib.products} products</Badge>
+                    )}
+                    {contrib.revenue && (
+                      <Badge variant="secondary">${contrib.revenue.toLocaleString()}</Badge>
+                    )}
+                    {contrib.percentage && (
+                      <div className="flex items-center gap-2 w-32">
+                        <Progress value={contrib.percentage} className="h-2" />
+                        <span className="text-xs text-muted-foreground">{contrib.percentage}%</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
       )}

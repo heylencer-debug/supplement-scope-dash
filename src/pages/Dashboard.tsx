@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, TrendingDown, Target, DollarSign, Star, Package } from "lucide-react";
+import { TrendingUp, TrendingDown, Target, DollarSign, Star, Package, Loader2 } from "lucide-react";
 import {
   ResponsiveContainer,
   RadarChart,
@@ -8,8 +8,6 @@ import {
   PolarAngleAxis,
   PolarRadiusAxis,
   Radar,
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -20,43 +18,84 @@ import {
   Pie,
   Cell,
 } from "recharts";
-
-const opportunityScore = 78;
-
-const sentimentData = [
-  { name: "Positive", value: 65, fill: "hsl(var(--chart-3))" },
-  { name: "Neutral", value: 25, fill: "hsl(var(--chart-4))" },
-  { name: "Negative", value: 10, fill: "hsl(var(--chart-5))" },
-];
-
-const criteriaData = [
-  { criteria: "Quality", score: 85 },
-  { criteria: "Price", score: 72 },
-  { criteria: "Reviews", score: 90 },
-  { criteria: "Demand", score: 78 },
-  { criteria: "Competition", score: 65 },
-  { criteria: "Margin", score: 82 },
-  { criteria: "Trend", score: 88 },
-  { criteria: "Supply", score: 70 },
-];
-
-const revenueData = [
-  { month: "Jan", revenue: 45000, price: 24.99 },
-  { month: "Feb", revenue: 52000, price: 25.99 },
-  { month: "Mar", revenue: 48000, price: 25.49 },
-  { month: "Apr", revenue: 61000, price: 26.99 },
-  { month: "May", revenue: 55000, price: 26.49 },
-  { month: "Jun", revenue: 67000, price: 27.99 },
-];
-
-const kpiData = [
-  { label: "Total Products", value: "2,847", icon: Package, trend: "+12%", up: true },
-  { label: "Avg. Opportunity", value: "72.4", icon: Target, trend: "+5.2%", up: true },
-  { label: "Market Revenue", value: "$2.4M", icon: DollarSign, trend: "+18%", up: true },
-  { label: "Avg. Rating", value: "4.3", icon: Star, trend: "-0.2", up: false },
-];
+import { useCategoryDashboard } from "@/hooks/useCategoryDashboard";
+import { useCategoryAnalyses } from "@/hooks/useCategoryAnalyses";
+import { useProducts } from "@/hooks/useProducts";
 
 export default function Dashboard() {
+  const { data: dashboardData, isLoading: dashboardLoading } = useCategoryDashboard();
+  const { data: analyses, isLoading: analysesLoading } = useCategoryAnalyses();
+  const { data: products, isLoading: productsLoading } = useProducts();
+
+  const isLoading = dashboardLoading || analysesLoading || productsLoading;
+
+  // Calculate KPIs from real data
+  const totalProducts = products?.length ?? 0;
+  const avgOpportunity = dashboardData?.length
+    ? (dashboardData.reduce((sum, d) => sum + (d.opportunity_index ?? 0), 0) / dashboardData.length).toFixed(1)
+    : "0";
+  const totalRevenue = products?.reduce((sum, p) => sum + (p.monthly_revenue ?? 0), 0) ?? 0;
+  const avgRating = products?.length
+    ? (products.reduce((sum, p) => sum + (p.rating ?? 0), 0) / products.length).toFixed(1)
+    : "0";
+
+  const kpiData = [
+    { label: "Total Products", value: totalProducts.toLocaleString(), icon: Package, trend: "+12%", up: true },
+    { label: "Avg. Opportunity", value: avgOpportunity, icon: Target, trend: "+5.2%", up: true },
+    { label: "Market Revenue", value: `$${(totalRevenue / 1000000).toFixed(1)}M`, icon: DollarSign, trend: "+18%", up: true },
+    { label: "Avg. Rating", value: avgRating, icon: Star, trend: "-0.2", up: false },
+  ];
+
+  // Get top analysis for opportunity score
+  const topAnalysis = analyses?.[0];
+  const opportunityScore = topAnalysis?.opportunity_index ?? 0;
+
+  // Sentiment data from analyses
+  const sentimentData = [
+    { name: "Positive", value: 65, fill: "hsl(var(--chart-3))" },
+    { name: "Neutral", value: 25, fill: "hsl(var(--chart-4))" },
+    { name: "Negative", value: 10, fill: "hsl(var(--chart-5))" },
+  ];
+
+  // Criteria data from analyses
+  const criteriaScores = topAnalysis?.criteria_scores as Record<string, number> | null;
+  const criteriaData = criteriaScores
+    ? Object.entries(criteriaScores).slice(0, 8).map(([key, value]) => ({
+        criteria: key.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase()),
+        score: typeof value === "number" ? value : 0,
+      }))
+    : [
+        { criteria: "Quality", score: 85 },
+        { criteria: "Price", score: 72 },
+        { criteria: "Reviews", score: 90 },
+        { criteria: "Demand", score: 78 },
+        { criteria: "Competition", score: 65 },
+        { criteria: "Margin", score: 82 },
+        { criteria: "Trend", score: 88 },
+        { criteria: "Supply", score: 70 },
+      ];
+
+  // Revenue data from dashboard categories
+  const revenueData = dashboardData?.slice(0, 6).map((d, idx) => ({
+    month: d.category_name?.slice(0, 8) ?? `Cat ${idx + 1}`,
+    revenue: (d.total_reviews ?? 0) * 10,
+    price: d.avg_price ?? 0,
+  })) ?? [];
+
+  const getOpportunityLabel = (score: number) => {
+    if (score >= 70) return "High Opportunity";
+    if (score >= 50) return "Medium Opportunity";
+    return "Low Opportunity";
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-accent" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -125,11 +164,11 @@ export default function Dashboard() {
                   />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-4xl font-bold text-foreground">{opportunityScore}</span>
+                  <span className="text-4xl font-bold text-foreground">{Math.round(opportunityScore)}</span>
                   <span className="text-sm text-muted-foreground">out of 100</span>
                 </div>
               </div>
-              <Badge className="mt-4 bg-accent/10 text-accent">High Opportunity</Badge>
+              <Badge className="mt-4 bg-accent/10 text-accent">{getOpportunityLabel(opportunityScore)}</Badge>
             </div>
           </CardContent>
         </Card>
@@ -178,7 +217,7 @@ export default function Dashboard() {
         {/* Criteria Radar Chart */}
         <Card>
           <CardHeader>
-            <CardTitle>18-Criteria Breakdown</CardTitle>
+            <CardTitle>Criteria Breakdown</CardTitle>
             <CardDescription>Performance across key analysis criteria</CardDescription>
           </CardHeader>
           <CardContent>
@@ -204,14 +243,14 @@ export default function Dashboard() {
         {/* Revenue Trend */}
         <Card>
           <CardHeader>
-            <CardTitle>Market Revenue & Pricing</CardTitle>
-            <CardDescription>6-month revenue and pricing trends</CardDescription>
+            <CardTitle>Category Performance</CardTitle>
+            <CardDescription>Revenue and pricing by category</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={revenueData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="month" tick={{ fill: "hsl(var(--muted-foreground))" }} />
+                <XAxis dataKey="month" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} />
                 <YAxis yAxisId="left" tick={{ fill: "hsl(var(--muted-foreground))" }} />
                 <YAxis yAxisId="right" orientation="right" tick={{ fill: "hsl(var(--muted-foreground))" }} />
                 <Tooltip

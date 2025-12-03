@@ -30,11 +30,29 @@ export default function StrategyBrief() {
     topCompetitors: categoryData?.unique_brands ?? 0,
   };
 
-  // Helper to safely convert JSONB to array
+  // Helper to safely convert JSONB to array of strings
   const toArray = (value: unknown): string[] => {
-    if (Array.isArray(value)) return value;
+    if (!value) return [];
+    
+    const extractString = (item: unknown): string | null => {
+      if (typeof item === "string") return item;
+      if (typeof item === "object" && item !== null) {
+        // Handle objects with common text fields
+        const obj = item as Record<string, unknown>;
+        if (typeof obj.criterion === "string") return obj.criterion;
+        if (typeof obj.justification === "string") return obj.justification;
+        if (typeof obj.description === "string") return obj.description;
+        if (typeof obj.name === "string") return obj.name;
+        if (typeof obj.text === "string") return obj.text;
+      }
+      return null;
+    };
+
+    if (Array.isArray(value)) {
+      return value.map(extractString).filter((v): v is string => v !== null);
+    }
     if (typeof value === "object" && value !== null) {
-      return Object.values(value).filter((v): v is string => typeof v === "string");
+      return Object.values(value).map(extractString).filter((v): v is string => v !== null);
     }
     return [];
   };

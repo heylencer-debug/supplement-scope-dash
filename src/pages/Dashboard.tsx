@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { 
   Loader2, RefreshCw, CheckCircle2, Circle, Clock,
-  Crown, Star, Zap, TrendingUp, Building2
+  Crown, Star, TrendingUp, Building2
 } from "lucide-react";
 
 // New high-fidelity components
@@ -33,7 +33,6 @@ import { useCategoryContext } from "@/contexts/CategoryContext";
 import { useCategoryScores } from "@/hooks/useCategoryScores";
 import { useCategorySales } from "@/hooks/useCategorySales";
 import { useTopProducts } from "@/hooks/useTopProducts";
-import { useBreakoutCompetitors } from "@/hooks/useBreakoutCompetitors";
 import { useFormulaBrief } from "@/hooks/useFormulaBrief";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
@@ -115,7 +114,6 @@ export default function Dashboard() {
   const { data: categoryScores } = useCategoryScores(category?.id);
   const { data: categorySales } = useCategorySales(categoryName || undefined);
   const { data: topProducts, isLoading: topProductsLoading } = useTopProducts(categoryName || undefined, 5);
-  const { data: breakoutCompetitors } = useBreakoutCompetitors(categoryName || undefined, 5);
   const { data: formulaBrief } = useFormulaBrief(category?.id);
 
   const hasCategory = !!category;
@@ -500,48 +498,6 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Breakout Competitors */}
-      {breakoutCompetitors && breakoutCompetitors.length > 0 && (
-        <Card className="border-amber-500/30 bg-amber-500/5">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg font-semibold text-[#1e3a5f]">
-              <Zap className="w-5 h-5 text-amber-500" />
-              Breakout Competitors
-              <Badge variant="outline" className="ml-2">{breakoutCompetitors.length}</Badge>
-            </CardTitle>
-            <CardDescription>Fast-growing competitors gaining market share</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {breakoutCompetitors.map((competitor, idx) => (
-                <div key={idx} className="p-4 bg-background rounded-lg border border-amber-200/50">
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-foreground truncate">{competitor.brand || "Unknown"}</p>
-                      <p className="text-xs text-muted-foreground truncate">{competitor.title?.substring(0, 35)}...</p>
-                    </div>
-                    <Badge variant="outline" className="shrink-0 ml-2 bg-amber-100 text-amber-700 border-amber-300">
-                      <TrendingUp className="w-3 h-3 mr-1" />
-                      Hot
-                    </Badge>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 mt-3">
-                    <div className="text-center p-2 bg-secondary/50 rounded">
-                      <p className="text-lg font-bold">{competitor.reviews_per_day?.toFixed(1) || "0"}</p>
-                      <p className="text-xs text-muted-foreground">Rev/Day</p>
-                    </div>
-                    <div className="text-center p-2 bg-secondary/50 rounded">
-                      <p className="text-lg font-bold">{competitor.reviews_gained || 0}</p>
-                      <p className="text-xs text-muted-foreground">Gained</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Extended Analysis Sections */}
       <div className="space-y-6">

@@ -249,11 +249,28 @@ export function EnhancedBenchmarkComparison({
 
                     <div>
                       <p className="text-[10px] font-semibold mb-1 flex items-center gap-1">
+                        <Star className="w-3 h-3 text-amber-500" />
+                        USPs
+                      </p>
+                      <div className="space-y-0.5">
+                        {getUSPs(product).length > 0 ? getUSPs(product).map((usp, i) => (
+                          <div key={i} className="flex items-start gap-1 text-[10px] text-muted-foreground">
+                            <span className="w-1 h-1 rounded-full bg-amber-500 mt-1.5 shrink-0" />
+                            <span className="line-clamp-2">{usp}</span>
+                          </div>
+                        )) : (
+                          <p className="text-[10px] text-muted-foreground italic">No data</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-[10px] font-semibold mb-1 flex items-center gap-1">
                         <Pill className="w-3 h-3 text-emerald-500" />
                         Ingredients
                       </p>
                       <div className="space-y-0.5">
-                        {parseIngredients(product.ingredients).slice(0, 3).map((ing, i) => (
+                        {parseIngredients(product.ingredients).slice(0, 4).map((ing, i) => (
                           <div key={i} className="flex items-start gap-1 text-[10px] text-muted-foreground">
                             <span className="w-1 h-1 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
                             <span className="line-clamp-1">{ing}</span>

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Star, TrendingUp, Pill, Target, MessageSquare, Package, Users, Megaphone, AlertTriangle } from "lucide-react";
+import { Star, TrendingUp, Pill, Target, MessageSquare, Package, Users, Megaphone, AlertTriangle, CheckCircle, XCircle } from "lucide-react";
 import { useProducts, Product } from "@/hooks/useProducts";
 import ProductDetailModal from "@/components/ProductDetailModal";
 import { useToast } from "@/hooks/use-toast";
@@ -215,6 +215,34 @@ export function EnhancedBenchmarkComparison({
     return painPoints.slice(0, 2).map(pp => ({
       issue: pp.issue || pp.pain_point || 'Unknown issue'
     }));
+  };
+
+  const getCompetitorUSPs = (product: Product): string[] | null => {
+    const marketingAnalysis = product.marketing_analysis as Record<string, unknown> | null;
+    if (!marketingAnalysis) return null;
+    
+    const competitiveAnalysis = marketingAnalysis.competitive_analysis as Record<string, unknown> | undefined;
+    const usps = competitiveAnalysis?.unique_selling_points as string[] | undefined;
+    
+    if (usps && usps.length > 0) {
+      return usps.slice(0, 2);
+    }
+    
+    return null;
+  };
+
+  const getCompetitorWeaknesses = (product: Product): string[] | null => {
+    const marketingAnalysis = product.marketing_analysis as Record<string, unknown> | null;
+    if (!marketingAnalysis) return null;
+    
+    const competitiveAnalysis = marketingAnalysis.competitive_analysis as Record<string, unknown> | undefined;
+    const weaknesses = competitiveAnalysis?.weaknesses_vs_competitors as string[] | undefined;
+    
+    if (weaknesses && weaknesses.length > 0) {
+      return weaknesses.slice(0, 2);
+    }
+    
+    return null;
   };
 
   return (
@@ -441,6 +469,58 @@ export function EnhancedBenchmarkComparison({
                           <p className="text-[10px] text-muted-foreground line-clamp-2">
                             {getCompetitorAudience(product) || 'Not specified'}
                           </p>
+                        ) : (
+                          <span className="text-[10px] px-1.5 py-0.5 bg-muted rounded text-muted-foreground">Analysis Pending</span>
+                        )}
+                      </div>
+
+                      {/* Unique Selling Points */}
+                      <div>
+                        <p className="text-[10px] font-semibold mb-1 flex items-center gap-1">
+                          <CheckCircle className="w-3 h-3 text-emerald-500" />
+                          USPs
+                        </p>
+                        {hasMarketingAnalysis(product) ? (
+                          <div className="space-y-0.5">
+                            {(() => {
+                              const usps = getCompetitorUSPs(product);
+                              if (!usps || usps.length === 0) {
+                                return <p className="text-[10px] text-muted-foreground">Not specified</p>;
+                              }
+                              return usps.map((usp, i) => (
+                                <div key={i} className="flex items-start gap-1 text-[10px] text-muted-foreground">
+                                  <span className="w-1 h-1 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
+                                  <span className="line-clamp-1">{usp}</span>
+                                </div>
+                              ));
+                            })()}
+                          </div>
+                        ) : (
+                          <span className="text-[10px] px-1.5 py-0.5 bg-muted rounded text-muted-foreground">Analysis Pending</span>
+                        )}
+                      </div>
+
+                      {/* Weaknesses vs Competitors */}
+                      <div>
+                        <p className="text-[10px] font-semibold mb-1 flex items-center gap-1">
+                          <XCircle className="w-3 h-3 text-orange-500" />
+                          Weaknesses
+                        </p>
+                        {hasMarketingAnalysis(product) ? (
+                          <div className="space-y-0.5">
+                            {(() => {
+                              const weaknesses = getCompetitorWeaknesses(product);
+                              if (!weaknesses || weaknesses.length === 0) {
+                                return <p className="text-[10px] text-muted-foreground">Not specified</p>;
+                              }
+                              return weaknesses.map((weakness, i) => (
+                                <div key={i} className="flex items-start gap-1 text-[10px] text-muted-foreground">
+                                  <span className="w-1 h-1 rounded-full bg-orange-500 mt-1.5 shrink-0" />
+                                  <span className="line-clamp-1">{weakness}</span>
+                                </div>
+                              ));
+                            })()}
+                          </div>
                         ) : (
                           <span className="text-[10px] px-1.5 py-0.5 bg-muted rounded text-muted-foreground">Analysis Pending</span>
                         )}

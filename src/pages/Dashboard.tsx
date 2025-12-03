@@ -307,6 +307,11 @@ export default function Dashboard() {
         opportunityIndex={analysis?.opportunity_index || 0}
         opportunityTier={analysis?.opportunity_tier || null}
         opportunityTierLabel={analysis?.opportunity_tier_label || null}
+        topProducts={products?.slice(0, 5).map(p => ({
+          main_image_url: p.main_image_url,
+          brand: p.brand,
+          title: p.title
+        }))}
         isLoading={analysisLoading && !hasAnalysis}
       />
 

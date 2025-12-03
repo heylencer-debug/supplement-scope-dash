@@ -10,7 +10,7 @@ import {
   Lightbulb, ShoppingCart, Package, Image, BarChart3, DollarSign, Calendar, 
   ExternalLink, Play, Award, Info, ChevronDown, Truck, FileText, Box, Link2
 } from "lucide-react";
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis } from "recharts";
 import type { Product } from "@/hooks/useProducts";
 
 interface ProductDetailModalProps {
@@ -390,25 +390,71 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
               </div>
               <Card>
                 <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><TrendingUp className="w-4 h-4" />Best Seller Rank (BSR)</CardTitle></CardHeader>
-                <CardContent>
+                <CardContent className="space-y-4">
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div><p className="text-xs text-muted-foreground">Current BSR</p><p className="text-xl font-bold">#{product.bsr_current?.toLocaleString() ?? "-"}</p></div>
                     <div><p className="text-xs text-muted-foreground">Primary BSR</p><p className="text-xl font-bold">#{product.bsr_primary?.toLocaleString() ?? "-"}</p></div>
                     <div><p className="text-xs text-muted-foreground">30-Day Avg</p><p className="text-xl font-bold flex items-center gap-1">#{product.bsr_30_days_avg?.toLocaleString() ?? "-"}{product.bsr_current && product.bsr_30_days_avg && (product.bsr_current < product.bsr_30_days_avg ? <TrendingUp className="w-4 h-4 text-green-500" /> : product.bsr_current > product.bsr_30_days_avg ? <TrendingDown className="w-4 h-4 text-red-500" /> : null)}</p></div>
                     <div><p className="text-xs text-muted-foreground">90-Day Avg</p><p className="text-xl font-bold">#{product.bsr_90_days_avg?.toLocaleString() ?? "-"}</p></div>
                   </div>
-                  {product.bsr_category && <p className="text-xs text-muted-foreground mt-3">Category: {product.bsr_category}</p>}
+                  {(product.bsr_current || product.bsr_30_days_avg || product.bsr_90_days_avg) && (
+                    <div className="pt-2">
+                      <p className="text-xs text-muted-foreground mb-2">BSR Trend (lower is better)</p>
+                      <ResponsiveContainer width="100%" height={120}>
+                        <BarChart data={[
+                          { name: "90-Day Avg", value: product.bsr_90_days_avg ?? 0, fill: "hsl(var(--chart-4))" },
+                          { name: "30-Day Avg", value: product.bsr_30_days_avg ?? 0, fill: "hsl(var(--chart-3))" },
+                          { name: "Current", value: product.bsr_current ?? 0, fill: "hsl(var(--primary))" },
+                        ].filter(d => d.value > 0)} layout="vertical">
+                          <XAxis type="number" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} tickFormatter={(v) => v.toLocaleString()} />
+                          <YAxis dataKey="name" type="category" width={70} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} />
+                          <Tooltip formatter={(value: number) => [`#${value.toLocaleString()}`, "BSR"]} contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }} />
+                          <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                            {[
+                              { fill: "hsl(var(--chart-4))" },
+                              { fill: "hsl(var(--chart-3))" },
+                              { fill: "hsl(var(--primary))" },
+                            ].map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+                  {product.bsr_category && <p className="text-xs text-muted-foreground">Category: {product.bsr_category}</p>}
                 </CardContent>
               </Card>
               <Card>
                 <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><DollarSign className="w-4 h-4" />Price Metrics</CardTitle></CardHeader>
-                <CardContent>
+                <CardContent className="space-y-4">
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div><p className="text-xs text-muted-foreground">Current Price</p><p className="text-xl font-bold text-green-600">${(product.price_current ?? product.current_price ?? product.price ?? 0).toFixed(2)}</p></div>
                     <div><p className="text-xs text-muted-foreground">30-Day Avg</p><p className="text-xl font-bold">${product.price_30_days_avg?.toFixed(2) ?? "-"}</p></div>
                     <div><p className="text-xs text-muted-foreground">90-Day Avg</p><p className="text-xl font-bold">${product.price_90_days_avg?.toFixed(2) ?? "-"}</p></div>
                     <div><p className="text-xs text-muted-foreground">Unit Price</p><p className="text-xl font-bold">{product.unit_price_value ? `$${product.unit_price_value.toFixed(2)}` : product.unit_price_text ?? "-"}</p></div>
                   </div>
+                  {(product.price || product.price_30_days_avg || product.price_90_days_avg) && (
+                    <div className="pt-2">
+                      <p className="text-xs text-muted-foreground mb-2">Price Trend</p>
+                      <ResponsiveContainer width="100%" height={120}>
+                        <BarChart data={[
+                          { name: "90-Day Avg", value: product.price_90_days_avg ?? 0, fill: "hsl(var(--chart-4))" },
+                          { name: "30-Day Avg", value: product.price_30_days_avg ?? 0, fill: "hsl(var(--chart-3))" },
+                          { name: "Current", value: product.price_current ?? product.current_price ?? product.price ?? 0, fill: "hsl(var(--chart-2))" },
+                        ].filter(d => d.value > 0)} layout="vertical">
+                          <XAxis type="number" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} tickFormatter={(v) => `$${v.toFixed(0)}`} domain={['dataMin - 5', 'dataMax + 5']} />
+                          <YAxis dataKey="name" type="category" width={70} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} />
+                          <Tooltip formatter={(value: number) => [`$${value.toFixed(2)}`, "Price"]} contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }} />
+                          <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                            {[
+                              { fill: "hsl(var(--chart-4))" },
+                              { fill: "hsl(var(--chart-3))" },
+                              { fill: "hsl(var(--chart-2))" },
+                            ].map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
               <Card>

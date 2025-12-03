@@ -19,6 +19,7 @@ import { FinancialProjections } from "@/components/dashboard/FinancialProjection
 import { GoToMarketStrategy } from "@/components/dashboard/GoToMarketStrategy";
 import { RiskAnalysis } from "@/components/dashboard/RiskAnalysis";
 import { LaunchStrategyCard } from "@/components/dashboard/LaunchStrategyCard";
+import CustomerIntelligence from "@/components/dashboard/CustomerIntelligence";
 
 import {
   ResponsiveContainer,
@@ -145,10 +146,13 @@ export default function Dashboard() {
     const analysis2 = analysis?.analysis_2_opportunity_calculation as Record<string, unknown> | null;
     const keyInsights = analysis?.key_insights as Record<string, unknown> | null;
     
-    // Customer insights for pain points
+    // Customer insights for pain points and intelligence
     const customerInsights = analysis1?.customer_insights as Record<string, unknown> | null;
     const primaryPainPoints = (customerInsights?.primary_pain_points as PainPoint[]) || [];
     const unmetNeeds = (customerInsights?.unmet_needs as string[]) || [];
+    const loveMost = (customerInsights?.love_most as string[]) || [];
+    const buyerProfile = customerInsights?.buyer_profile as string | null;
+    const decisionDrivers = (customerInsights?.decision_drivers as string[]) || [];
 
     // Criteria breakdown for radar chart
     const weightedScoring = analysis2?.weighted_scoring as Record<string, unknown> | null;
@@ -216,6 +220,13 @@ export default function Dashboard() {
       criticalRisks,
       primaryPainPoints,
       unmetNeeds,
+      customerIntelligence: {
+        buyer_profile: buyerProfile || undefined,
+        primary_pain_points: primaryPainPoints,
+        unmet_needs: unmetNeeds,
+        love_most: loveMost,
+        decision_drivers: decisionDrivers,
+      },
       investmentBreakdown: investmentBreakdown?.breakdown as Record<string, number> | null,
       totalInvestment,
       revenueTargets,
@@ -409,7 +420,13 @@ export default function Dashboard() {
         isLoading={analysisLoading && !hasAnalysis}
       />
 
-      {/* SECTION 6: Action Plan Roadmap */}
+      {/* SECTION 6: Customer Intelligence */}
+      <CustomerIntelligence
+        customerInsights={dashboardData.customerIntelligence}
+        isLoading={analysisLoading && !hasAnalysis}
+      />
+
+      {/* SECTION 7: Action Plan Roadmap */}
       <ActionPlanTimeline
         actionItems={dashboardData.actionItems}
         isLoading={analysisLoading && !hasAnalysis}

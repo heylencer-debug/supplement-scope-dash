@@ -64,17 +64,18 @@ export default function NewAnalysis() {
     };
 
     try {
-      // Using no-cors mode since n8n workflows may not have Respond to Webhook node
-      await fetch(WEBHOOK_URL, {
+      const response = await fetch(WEBHOOK_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        mode: "no-cors",
         body: JSON.stringify(payload),
       });
 
-      // With no-cors, we can't read the response, but the request was sent
+      if (!response.ok) {
+        throw new Error(`Request failed with status ${response.status}`);
+      }
+
       toast({
         title: "Analysis started!",
         description: "Check your email in 5-10 minutes.",

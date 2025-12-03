@@ -1,9 +1,10 @@
-import { CheckCircle2, AlertTriangle, Info } from "lucide-react";
+import { useState, useMemo } from "react";
+import { CheckCircle2, AlertTriangle, Info, Filter } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
+import { CriteriaCard } from "./CriteriaCard";
 import {
   Tooltip,
   TooltipContent,
@@ -80,18 +81,6 @@ const getScoreColor = (score: number): string => {
   if (score >= 7) return "text-emerald-600 dark:text-emerald-400";
   if (score >= 5) return "text-amber-600 dark:text-amber-400";
   return "text-red-600 dark:text-red-400";
-};
-
-const getScoreBadgeVariant = (score: number): "default" | "secondary" | "destructive" => {
-  if (score >= 7) return "default";
-  if (score >= 5) return "secondary";
-  return "destructive";
-};
-
-const getProgressColor = (score: number): string => {
-  if (score >= 7) return "bg-emerald-500";
-  if (score >= 5) return "bg-amber-500";
-  return "bg-red-500";
 };
 
 export function DeepDiveSection({
@@ -293,9 +282,53 @@ export function DeepDiveSection({
       </div>
 
       {/* Bottom: Criteria Breakdown Panel */}
-      {sortedBreakdown.length > 0 && (
-        <Card>
-          <CardHeader>
+      <CriteriaBreakdownPanel 
+        breakdown={sortedBreakdown} 
+        isLoading={isLoading} 
+      />
+    </div>
+  );
+}
+
+type FilterType = "all" | "high" | "medium" | "low";
+
+function CriteriaBreakdownPanel({ 
+  breakdown, 
+  isLoading 
+}: { 
+  breakdown: CriteriaBreakdown[]; 
+  isLoading: boolean;
+}) {
+  const [filter, setFilter] = useState<FilterType>("all");
+
+  const counts = useMemo(() => {
+    let high = 0, medium = 0, low = 0;
+    breakdown.forEach(item => {
+      const score = item.raw_score || item.score || 0;
+      if (score >= 7) high++;
+      else if (score >= 5) medium++;
+      else low++;
+    });
+    return { high, medium, low, total: breakdown.length };
+  }, [breakdown]);
+
+  const filteredBreakdown = useMemo(() => {
+    if (filter === "all") return breakdown;
+    return breakdown.filter(item => {
+      const score = item.raw_score || item.score || 0;
+      if (filter === "high") return score >= 7;
+      if (filter === "medium") return score >= 5 && score < 7;
+      return score < 5;
+    });
+  }, [breakdown, filter]);
+
+  if (breakdown.length === 0) return null;
+
+  return (
+    <Card>
+      <CardHeader className="pb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
             <CardTitle className="text-lg font-semibold text-[#1e3a5f] flex items-center gap-2">
               Criteria Breakdown
               <Tooltip>
@@ -309,80 +342,96 @@ export function DeepDiveSection({
                 </TooltipContent>
               </Tooltip>
             </CardTitle>
-            <CardDescription>
-              Detailed analysis and justification for each scoring criterion
+            <CardDescription className="mt-1">
+              Click any card to view detailed analysis
             </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[400px] pr-4">
-              <div className="space-y-4">
-                {sortedBreakdown.map((item, idx) => {
-                  const name = item.name || item.criterion || item.category || "Unknown";
-                  const score = item.raw_score || item.score || 0;
-                  const weight = item.weight || 1;
-                  const weightedScore = item.weighted_score || score * weight;
-                  const contribution = item.contribution || 0;
-                  
-                  return (
-                    <div 
-                      key={idx} 
-                      className="p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-2">
-                            <h4 className="font-medium text-sm text-foreground capitalize">
-                              {name.replace(/_/g, ' ')}
-                            </h4>
-                            <Badge variant={getScoreBadgeVariant(score)} className="text-xs">
-                              {score}/10
-                            </Badge>
-                            <span className="text-xs text-muted-foreground">
-                              ({weight}x weight)
-                            </span>
-                          </div>
-                          
-                          {/* Score Progress Bar */}
-                          <div className="mb-2">
-                            <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                              <div 
-                                className={`h-full rounded-full transition-all ${getProgressColor(score)}`}
-                                style={{ width: `${(score / 10) * 100}%` }}
-                              />
-                            </div>
-                          </div>
-                          
-                          {/* Justification */}
-                          {item.justification && (
-                            <p className="text-sm text-muted-foreground leading-relaxed">
-                              {item.justification}
-                            </p>
-                          )}
-                        </div>
-                        
-                        {/* Weighted Score Badge */}
-                        <div className="text-right shrink-0">
-                          <div className={`text-lg font-bold ${getScoreColor(score)}`}>
-                            {weightedScore.toFixed(1)}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            weighted
-                          </div>
-                          {contribution > 0 && (
-                            <div className="text-xs text-muted-foreground mt-1">
-                              {contribution.toFixed(1)}% contrib.
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
-      )}
-    </div>
+          </div>
+
+          {/* Score Distribution Summary */}
+          <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-100 dark:bg-emerald-900/30">
+              <div className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">{counts.high}</span>
+            </div>
+            <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-amber-100 dark:bg-amber-900/30">
+              <div className="w-2 h-2 rounded-full bg-amber-500" />
+              <span className="text-xs font-medium text-amber-700 dark:text-amber-400">{counts.medium}</span>
+            </div>
+            <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-red-100 dark:bg-red-900/30">
+              <div className="w-2 h-2 rounded-full bg-red-500" />
+              <span className="text-xs font-medium text-red-700 dark:text-red-400">{counts.low}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Filter Chips */}
+        <div className="flex flex-wrap items-center gap-2 mt-4">
+          <Filter className="w-4 h-4 text-muted-foreground" />
+          <Button
+            variant={filter === "all" ? "default" : "outline"}
+            size="sm"
+            className="h-7 text-xs"
+            onClick={() => setFilter("all")}
+          >
+            All ({counts.total})
+          </Button>
+          <Button
+            variant={filter === "high" ? "default" : "outline"}
+            size="sm"
+            className="h-7 text-xs border-emerald-200 hover:bg-emerald-50 dark:border-emerald-800 dark:hover:bg-emerald-950/50"
+            onClick={() => setFilter("high")}
+          >
+            Strengths ({counts.high})
+          </Button>
+          <Button
+            variant={filter === "medium" ? "default" : "outline"}
+            size="sm"
+            className="h-7 text-xs border-amber-200 hover:bg-amber-50 dark:border-amber-800 dark:hover:bg-amber-950/50"
+            onClick={() => setFilter("medium")}
+          >
+            Moderate ({counts.medium})
+          </Button>
+          <Button
+            variant={filter === "low" ? "default" : "outline"}
+            size="sm"
+            className="h-7 text-xs border-red-200 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950/50"
+            onClick={() => setFilter("low")}
+          >
+            Weaknesses ({counts.low})
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {[...Array(6)].map((_, i) => (
+              <Skeleton key={i} className="h-24 rounded-lg" />
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {filteredBreakdown.map((item, idx) => {
+              const name = item.name || item.criterion || item.category || "Unknown";
+              const score = item.raw_score || item.score || 0;
+              const weight = item.weight || 1;
+              const weightedScore = item.weighted_score || score * weight;
+              const contribution = item.contribution || 0;
+
+              return (
+                <CriteriaCard
+                  key={idx}
+                  name={name}
+                  score={score}
+                  weight={weight}
+                  weightedScore={weightedScore}
+                  contribution={contribution}
+                  justification={item.justification}
+                />
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

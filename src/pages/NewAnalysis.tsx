@@ -11,6 +11,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useCategoryAnalyses } from "@/hooks/useCategoryAnalyses";
 import { formatDistanceToNow } from "date-fns";
+import { useQueryClient } from "@tanstack/react-query";
+
+const PENDING_ANALYSES_KEY = "pending_analyses";
 
 const WEBHOOK_URL = "https://n8n.srv1075172.hstgr.cloud/webhook/bd007464-71c5-452a-8e4c-a8fc716d4316";
 
@@ -40,6 +43,7 @@ const getRecommendationStyle = (recommendation: string | null) => {
 export default function NewAnalysis() {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
   const [category, setCategory] = useState("");
   const [asin, setAsin] = useState("");
@@ -93,6 +97,17 @@ export default function NewAnalysis() {
       if (!response.ok) {
         throw new Error(`Request failed with status ${response.status}`);
       }
+
+      // Add to pending analyses in localStorage
+      const pending = JSON.parse(localStorage.getItem(PENDING_ANALYSES_KEY) || '[]');
+      pending.push({ 
+        categoryName: category.trim(), 
+        startedAt: new Date().toISOString() 
+      });
+      localStorage.setItem(PENDING_ANALYSES_KEY, JSON.stringify(pending));
+
+      // Invalidate the analyses query cache
+      queryClient.invalidateQueries({ queryKey: ['category_analyses'] });
 
       toast({
         title: "Analysis started!",

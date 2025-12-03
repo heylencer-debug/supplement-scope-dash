@@ -16,6 +16,7 @@ export function useCategoryAnalyses() {
       if (error) throw error;
       return data as CategoryAnalysis[];
     },
+    refetchInterval: 30000, // Refetch every 30 seconds to detect completed analyses
   });
 }
 

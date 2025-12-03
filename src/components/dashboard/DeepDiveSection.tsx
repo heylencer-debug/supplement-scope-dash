@@ -26,6 +26,35 @@ interface DeepDiveSectionProps {
   isLoading?: boolean;
 }
 
+const abbreviateLabel = (name: string): string => {
+  const abbreviations: Record<string, string> = {
+    "demand": "DMD",
+    "profitability": "PROF",
+    "competition": "COMP",
+    "market_size": "SIZE",
+    "breakout_potential": "BKOUT",
+    "economic_viability": "ECON",
+    "pain_points": "PAIN",
+    "market_gaps": "GAPS",
+    "entry_difficulty": "ENTRY",
+    "review_quality": "REVW",
+    "pricing_power": "PRICE",
+    "growth_trajectory": "GRWTH",
+    "brand_concentration": "BRAND",
+    "innovation_opportunity": "INNOV",
+    "customer_satisfaction": "CSAT",
+    "supply_stability": "SUPLY",
+    "regulatory_risk": "REG",
+    "seasonality": "SEAS",
+    "differentiation": "DIFF",
+    "consumer_fit": "FIT",
+    "trust_level": "TRST",
+  };
+  
+  const key = name.toLowerCase().replace(/\s+/g, '_');
+  return abbreviations[key] || name.substring(0, 4).toUpperCase();
+};
+
 export function DeepDiveSection({
   criteriaScores,
   executiveSummary,
@@ -33,9 +62,9 @@ export function DeepDiveSection({
   criticalRisks,
   isLoading = false,
 }: DeepDiveSectionProps) {
-  // Transform criteria scores for radar chart
-  const radarData = criteriaScores.slice(0, 12).map((cs) => ({
-    criteria: cs.name.length > 12 ? cs.name.substring(0, 12) + "…" : cs.name,
+  // Transform all criteria scores for radar chart (no limit)
+  const radarData = criteriaScores.map((cs) => ({
+    criteria: abbreviateLabel(cs.name),
     fullName: cs.name,
     score: cs.score,
     fullMark: 10,
@@ -59,12 +88,12 @@ export function DeepDiveSection({
               <Skeleton className="w-72 h-72 rounded-full" />
             </div>
           ) : radarData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={350}>
-              <RadarChart data={radarData} margin={{ top: 20, right: 30, bottom: 20, left: 30 }}>
+            <ResponsiveContainer width="100%" height={400}>
+              <RadarChart data={radarData} margin={{ top: 30, right: 40, bottom: 30, left: 40 }}>
                 <PolarGrid stroke="hsl(var(--border))" />
                 <PolarAngleAxis
                   dataKey="criteria"
-                  tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+                  tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 8 }}
                 />
                 <PolarRadiusAxis
                   angle={30}

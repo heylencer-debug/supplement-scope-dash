@@ -125,8 +125,9 @@ export default function StrategyBrief() {
         const existing = ingredientMap.get(name) || { dosages: [], forms: [] };
         
         // Parse dosage value
-        if (nutrient.amount) {
-          const numValue = parseFloat(nutrient.amount.replace(/[^0-9.]/g, ''));
+        if (nutrient.amount != null) {
+          const amountStr = String(nutrient.amount);
+          const numValue = parseFloat(amountStr.replace(/[^0-9.]/g, ''));
           if (!isNaN(numValue) && numValue > 0) {
             existing.dosages.push(numValue);
           }

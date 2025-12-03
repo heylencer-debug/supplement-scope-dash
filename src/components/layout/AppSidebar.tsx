@@ -1,4 +1,4 @@
-import { Search, LayoutDashboard, Table, FileText } from "lucide-react";
+import { Search, LayoutDashboard, Table, FileText, Users } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useCategoryContext } from "@/contexts/CategoryContext";
 import {
@@ -16,6 +16,7 @@ const menuItems = [
   { title: "New Analysis", url: "/", icon: Search, preserveCategory: false },
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, preserveCategory: true },
   { title: "Product Explorer", url: "/products", icon: Table, preserveCategory: true },
+  { title: "Competitors", url: "/competitors", icon: Users, preserveCategory: true },
   { title: "Strategy Brief", url: "/strategy", icon: FileText, preserveCategory: true },
 ];
 

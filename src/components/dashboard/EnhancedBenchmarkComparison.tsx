@@ -66,7 +66,15 @@ export function EnhancedBenchmarkComparison({
 
   const getPositioning = (product: Product): string => {
     const marketingAnalysis = product.marketing_analysis as Record<string, unknown> | null;
-    return (marketingAnalysis?.lifestyle_positioning as string) || 
+    const lifestyle = marketingAnalysis?.lifestyle_positioning;
+    // Handle case where lifestyle_positioning is an object
+    if (lifestyle && typeof lifestyle === 'object') {
+      const lifestyleObj = lifestyle as Record<string, unknown>;
+      return (lifestyleObj.primary_lifestyle as string) || 
+             (marketingAnalysis?.competitive_positioning as string) || 
+             'Standard positioning';
+    }
+    return (lifestyle as string) || 
            (marketingAnalysis?.competitive_positioning as string) || 
            'Standard positioning';
   };

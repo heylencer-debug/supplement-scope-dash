@@ -44,12 +44,34 @@ interface MarketingAnalysis {
 }
 
 interface ReviewAnalysis {
-  pain_points?: Array<{ theme: string; frequency: number; severity?: string; quotes?: string[] }>;
-  positive_themes?: Array<{ theme: string; frequency: number; impact?: string }>;
+  pain_points?: Array<{ category?: string; theme?: string; issue?: string; frequency: number; severity?: string; quotes?: string[]; representative_quotes?: string[]; affected_percentage?: number }>;
+  positive_themes?: Array<{ theme: string; frequency: number; impact?: string; representative_quotes?: string[]; mentioned_by_percentage?: number }>;
   feature_requests?: Array<{ request: string; frequency: number; priority?: string }>;
   key_insights?: string[];
-  sentiment_distribution?: { positive: number; neutral: number; negative: number };
-  demographics_insights?: { buyer_types?: string[]; use_cases?: string[] };
+  sentiment_distribution?: { 
+    positive?: number; 
+    neutral?: number; 
+    negative?: number;
+    very_positive_5star?: { percentage: number; count: number; key_themes?: string[] };
+    positive_4star?: { percentage: number; count: number; key_themes?: string[] };
+    neutral_3star?: { percentage: number; count: number; key_themes?: string[] };
+    negative_2star?: { percentage: number; count: number; key_themes?: string[] };
+    very_negative_1star?: { percentage: number; count: number; key_themes?: string[] };
+  };
+  demographics_insights?: { buyer_types?: string[]; use_cases?: string[]; age_groups_mentioned?: string[] };
+  product_experience_breakdown?: {
+    taste_feedback?: { positive_count?: number; negative_count?: number; neutral_count?: number; common_descriptors?: string[]; key_insights?: string };
+    efficacy_feedback?: { works_count?: number; no_effect_count?: number; mixed_count?: number; time_to_see_results?: string; key_insights?: string };
+    value_perception?: { good_value_count?: number; overpriced_count?: number; fair_price_count?: number; key_insights?: string };
+    packaging_quality?: { positive_count?: number; negative_count?: number; specific_issues?: string[]; key_insights?: string };
+  };
+  competitor_comparisons?: {
+    brands_mentioned?: string[];
+    wins_against_competitors?: string[];
+    loses_against_competitors?: string[];
+  };
+  actionable_recommendations?: Array<{ area: string; recommendation: string; priority: string; rationale?: string }>;
+  analysis_metadata?: { total_reviews_analyzed?: number; verified_purchase_rate?: number; average_helpful_votes?: number; analysis_quality?: string };
   summary?: string;
 }
 
@@ -129,12 +151,21 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
     return new Date(date).toLocaleDateString();
   };
 
+  // Build sentiment data - support both simple and detailed 5-star formats
   const sentimentData = reviewAnalysis?.sentiment_distribution
-    ? [
-        { name: "Positive", value: reviewAnalysis.sentiment_distribution.positive, color: SENTIMENT_COLORS.positive },
-        { name: "Neutral", value: reviewAnalysis.sentiment_distribution.neutral, color: SENTIMENT_COLORS.neutral },
-        { name: "Negative", value: reviewAnalysis.sentiment_distribution.negative, color: SENTIMENT_COLORS.negative }
-      ]
+    ? reviewAnalysis.sentiment_distribution.very_positive_5star
+      ? [
+          { name: "5★", value: reviewAnalysis.sentiment_distribution.very_positive_5star?.percentage ?? 0, color: "hsl(var(--chart-2))" },
+          { name: "4★", value: reviewAnalysis.sentiment_distribution.positive_4star?.percentage ?? 0, color: "hsl(var(--chart-3))" },
+          { name: "3★", value: reviewAnalysis.sentiment_distribution.neutral_3star?.percentage ?? 0, color: "hsl(var(--chart-4))" },
+          { name: "2★", value: reviewAnalysis.sentiment_distribution.negative_2star?.percentage ?? 0, color: "hsl(var(--chart-5))" },
+          { name: "1★", value: reviewAnalysis.sentiment_distribution.very_negative_1star?.percentage ?? 0, color: "hsl(var(--destructive))" }
+        ].filter(d => d.value > 0)
+      : [
+          { name: "Positive", value: reviewAnalysis.sentiment_distribution.positive ?? 0, color: SENTIMENT_COLORS.positive },
+          { name: "Neutral", value: reviewAnalysis.sentiment_distribution.neutral ?? 0, color: SENTIMENT_COLORS.neutral },
+          { name: "Negative", value: reviewAnalysis.sentiment_distribution.negative ?? 0, color: SENTIMENT_COLORS.negative }
+        ].filter(d => d.value > 0)
     : [];
 
   const scrollableContentClass = "overflow-y-auto pr-2";
@@ -429,11 +460,22 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                         typeof marketingAnalysis.target_demographics === 'string' ? (
                           <p className="text-sm text-muted-foreground">{marketingAnalysis.target_demographics}</p>
                         ) : (
-                          <div className="grid grid-cols-2 gap-2 text-sm">
-                            {marketingAnalysis.target_demographics.primary_audience && <div><span className="text-muted-foreground">Audience:</span> {marketingAnalysis.target_demographics.primary_audience}</div>}
-                            {marketingAnalysis.target_demographics.age_range && <div><span className="text-muted-foreground">Age:</span> {marketingAnalysis.target_demographics.age_range}</div>}
-                            {marketingAnalysis.target_demographics.gender_representation && <div><span className="text-muted-foreground">Gender:</span> {marketingAnalysis.target_demographics.gender_representation}</div>}
-                            {marketingAnalysis.target_demographics.fitness_level_shown && <div><span className="text-muted-foreground">Fitness:</span> {marketingAnalysis.target_demographics.fitness_level_shown}</div>}
+                          <div className="space-y-3">
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+                              {marketingAnalysis.target_demographics.primary_audience && <div><span className="text-muted-foreground">Audience:</span> {marketingAnalysis.target_demographics.primary_audience}</div>}
+                              {marketingAnalysis.target_demographics.age_range && <div><span className="text-muted-foreground">Age:</span> {marketingAnalysis.target_demographics.age_range}</div>}
+                              {marketingAnalysis.target_demographics.gender_representation && <div><span className="text-muted-foreground">Gender:</span> {marketingAnalysis.target_demographics.gender_representation}</div>}
+                              {marketingAnalysis.target_demographics.fitness_level_shown && <div><span className="text-muted-foreground">Fitness Level:</span> {marketingAnalysis.target_demographics.fitness_level_shown}</div>}
+                              {marketingAnalysis.target_demographics.body_types_shown && <div><span className="text-muted-foreground">Body Types:</span> {marketingAnalysis.target_demographics.body_types_shown}</div>}
+                              {marketingAnalysis.target_demographics.ethnicity_representation && <div><span className="text-muted-foreground">Diversity:</span> {marketingAnalysis.target_demographics.ethnicity_representation}</div>}
+                            </div>
+                            {marketingAnalysis.target_demographics.relatability_score !== undefined && (
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-muted-foreground">Relatability:</span>
+                                <Progress value={marketingAnalysis.target_demographics.relatability_score * 10} className="w-24 h-2" />
+                                <span className="text-xs font-medium">{marketingAnalysis.target_demographics.relatability_score}/10</span>
+                              </div>
+                            )}
                           </div>
                         )
                       ) : (
@@ -497,6 +539,17 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
           <TabsContent value="reviews" className={`mt-4 ${scrollableContentClass} ${maxContentHeight}`}>
             <div className="space-y-4">
               {reviewAnalysis?.summary && <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Review Summary</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">{reviewAnalysis.summary}</p></CardContent></Card>}
+              
+              {/* Analysis Metadata */}
+              {reviewAnalysis?.analysis_metadata && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <Card><CardContent className="pt-3 pb-3 text-center"><p className="text-lg font-bold">{reviewAnalysis.analysis_metadata.total_reviews_analyzed ?? "-"}</p><p className="text-xs text-muted-foreground">Reviews Analyzed</p></CardContent></Card>
+                  <Card><CardContent className="pt-3 pb-3 text-center"><p className="text-lg font-bold">{reviewAnalysis.analysis_metadata.verified_purchase_rate ? `${reviewAnalysis.analysis_metadata.verified_purchase_rate}%` : "-"}</p><p className="text-xs text-muted-foreground">Verified Rate</p></CardContent></Card>
+                  <Card><CardContent className="pt-3 pb-3 text-center"><p className="text-lg font-bold">{reviewAnalysis.analysis_metadata.average_helpful_votes?.toFixed(1) ?? "-"}</p><p className="text-xs text-muted-foreground">Avg Helpful Votes</p></CardContent></Card>
+                  <Card><CardContent className="pt-3 pb-3 text-center"><Badge variant={reviewAnalysis.analysis_metadata.analysis_quality === "high" ? "default" : "secondary"}>{reviewAnalysis.analysis_metadata.analysis_quality ?? "-"}</Badge><p className="text-xs text-muted-foreground mt-1">Analysis Quality</p></CardContent></Card>
+                </div>
+              )}
+
               {sentimentData.length > 0 && (
                 <Card>
                   <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Sentiment Distribution</CardTitle></CardHeader>
@@ -515,10 +568,100 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                   </CardContent>
                 </Card>
               )}
+
+              {/* Product Experience Breakdown */}
+              {reviewAnalysis?.product_experience_breakdown && (
+                <Card>
+                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><BarChart3 className="w-4 h-4 text-primary" />Product Experience Breakdown</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      {reviewAnalysis.product_experience_breakdown.taste_feedback && (
+                        <div className="border rounded-lg p-3">
+                          <p className="text-xs font-medium mb-2">Taste Feedback</p>
+                          <div className="flex gap-3 mb-2 text-xs">
+                            <span className="text-green-600">👍 {reviewAnalysis.product_experience_breakdown.taste_feedback.positive_count ?? 0}</span>
+                            <span className="text-yellow-600">😐 {reviewAnalysis.product_experience_breakdown.taste_feedback.neutral_count ?? 0}</span>
+                            <span className="text-red-600">👎 {reviewAnalysis.product_experience_breakdown.taste_feedback.negative_count ?? 0}</span>
+                          </div>
+                          {reviewAnalysis.product_experience_breakdown.taste_feedback.common_descriptors && reviewAnalysis.product_experience_breakdown.taste_feedback.common_descriptors.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mb-2">{reviewAnalysis.product_experience_breakdown.taste_feedback.common_descriptors.map((d, i) => <Badge key={i} variant="outline" className="text-xs">{d}</Badge>)}</div>
+                          )}
+                          {reviewAnalysis.product_experience_breakdown.taste_feedback.key_insights && <p className="text-xs text-muted-foreground">{reviewAnalysis.product_experience_breakdown.taste_feedback.key_insights}</p>}
+                        </div>
+                      )}
+                      {reviewAnalysis.product_experience_breakdown.efficacy_feedback && (
+                        <div className="border rounded-lg p-3">
+                          <p className="text-xs font-medium mb-2">Efficacy Feedback</p>
+                          <div className="flex gap-3 mb-2 text-xs">
+                            <span className="text-green-600">Works: {reviewAnalysis.product_experience_breakdown.efficacy_feedback.works_count ?? 0}</span>
+                            <span className="text-yellow-600">Mixed: {reviewAnalysis.product_experience_breakdown.efficacy_feedback.mixed_count ?? 0}</span>
+                            <span className="text-red-600">No Effect: {reviewAnalysis.product_experience_breakdown.efficacy_feedback.no_effect_count ?? 0}</span>
+                          </div>
+                          {reviewAnalysis.product_experience_breakdown.efficacy_feedback.time_to_see_results && <p className="text-xs text-muted-foreground mb-1">Time to results: {reviewAnalysis.product_experience_breakdown.efficacy_feedback.time_to_see_results}</p>}
+                          {reviewAnalysis.product_experience_breakdown.efficacy_feedback.key_insights && <p className="text-xs text-muted-foreground">{reviewAnalysis.product_experience_breakdown.efficacy_feedback.key_insights}</p>}
+                        </div>
+                      )}
+                      {reviewAnalysis.product_experience_breakdown.value_perception && (
+                        <div className="border rounded-lg p-3">
+                          <p className="text-xs font-medium mb-2">Value Perception</p>
+                          <div className="flex gap-3 mb-2 text-xs">
+                            <span className="text-green-600">Good Value: {reviewAnalysis.product_experience_breakdown.value_perception.good_value_count ?? 0}</span>
+                            <span className="text-yellow-600">Fair: {reviewAnalysis.product_experience_breakdown.value_perception.fair_price_count ?? 0}</span>
+                            <span className="text-red-600">Overpriced: {reviewAnalysis.product_experience_breakdown.value_perception.overpriced_count ?? 0}</span>
+                          </div>
+                          {reviewAnalysis.product_experience_breakdown.value_perception.key_insights && <p className="text-xs text-muted-foreground">{reviewAnalysis.product_experience_breakdown.value_perception.key_insights}</p>}
+                        </div>
+                      )}
+                      {reviewAnalysis.product_experience_breakdown.packaging_quality && (
+                        <div className="border rounded-lg p-3">
+                          <p className="text-xs font-medium mb-2">Packaging Quality</p>
+                          <div className="flex gap-3 mb-2 text-xs">
+                            <span className="text-green-600">👍 {reviewAnalysis.product_experience_breakdown.packaging_quality.positive_count ?? 0}</span>
+                            <span className="text-red-600">👎 {reviewAnalysis.product_experience_breakdown.packaging_quality.negative_count ?? 0}</span>
+                          </div>
+                          {reviewAnalysis.product_experience_breakdown.packaging_quality.specific_issues && reviewAnalysis.product_experience_breakdown.packaging_quality.specific_issues.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mb-2">{reviewAnalysis.product_experience_breakdown.packaging_quality.specific_issues.map((issue, i) => <Badge key={i} variant="destructive" className="text-xs">{issue}</Badge>)}</div>
+                          )}
+                          {reviewAnalysis.product_experience_breakdown.packaging_quality.key_insights && <p className="text-xs text-muted-foreground">{reviewAnalysis.product_experience_breakdown.packaging_quality.key_insights}</p>}
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Competitor Comparisons */}
+              {reviewAnalysis?.competitor_comparisons && (reviewAnalysis.competitor_comparisons.brands_mentioned?.length || reviewAnalysis.competitor_comparisons.wins_against_competitors?.length || reviewAnalysis.competitor_comparisons.loses_against_competitors?.length) && (
+                <Card>
+                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Target className="w-4 h-4 text-primary" />Competitor Comparisons</CardTitle></CardHeader>
+                  <CardContent className="space-y-4">
+                    {reviewAnalysis.competitor_comparisons.brands_mentioned && reviewAnalysis.competitor_comparisons.brands_mentioned.length > 0 && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-2">Brands Mentioned by Customers</p>
+                        <div className="flex flex-wrap gap-2">{reviewAnalysis.competitor_comparisons.brands_mentioned.map((brand, idx) => <Badge key={idx} variant="outline">{brand}</Badge>)}</div>
+                      </div>
+                    )}
+                    {reviewAnalysis.competitor_comparisons.wins_against_competitors && reviewAnalysis.competitor_comparisons.wins_against_competitors.length > 0 && (
+                      <div>
+                        <p className="text-xs font-medium text-green-600 mb-2">Why Customers Choose This Product</p>
+                        <ul className="space-y-1">{reviewAnalysis.competitor_comparisons.wins_against_competitors.map((win, idx) => <li key={idx} className="text-sm text-muted-foreground flex items-start gap-2"><CheckCircle className="w-3 h-3 text-green-500 mt-1 shrink-0" />{win}</li>)}</ul>
+                      </div>
+                    )}
+                    {reviewAnalysis.competitor_comparisons.loses_against_competitors && reviewAnalysis.competitor_comparisons.loses_against_competitors.length > 0 && (
+                      <div>
+                        <p className="text-xs font-medium text-red-600 mb-2">Where Competitors Win</p>
+                        <ul className="space-y-1">{reviewAnalysis.competitor_comparisons.loses_against_competitors.map((lose, idx) => <li key={idx} className="text-sm text-muted-foreground flex items-start gap-2"><AlertCircle className="w-3 h-3 text-red-500 mt-1 shrink-0" />{lose}</li>)}</ul>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
               {reviewAnalysis?.demographics_insights && (
                 <Card>
                   <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><ShoppingCart className="w-4 h-4 text-primary" />Customer Demographics</CardTitle></CardHeader>
                   <CardContent className="space-y-4">
+                    {reviewAnalysis.demographics_insights.age_groups_mentioned && reviewAnalysis.demographics_insights.age_groups_mentioned.length > 0 && <div><p className="text-xs font-medium text-muted-foreground mb-2">Age Groups</p><div className="flex flex-wrap gap-2">{reviewAnalysis.demographics_insights.age_groups_mentioned.map((age, idx) => <Badge key={idx} variant="outline">{age}</Badge>)}</div></div>}
                     {reviewAnalysis.demographics_insights.buyer_types && reviewAnalysis.demographics_insights.buyer_types.length > 0 && <div><p className="text-xs font-medium text-muted-foreground mb-2">Buyer Types</p><div className="flex flex-wrap gap-2">{reviewAnalysis.demographics_insights.buyer_types.map((type, idx) => <Badge key={idx} variant="secondary">{type}</Badge>)}</div></div>}
                     {reviewAnalysis.demographics_insights.use_cases && reviewAnalysis.demographics_insights.use_cases.length > 0 && <div><p className="text-xs font-medium text-muted-foreground mb-2">Common Use Cases</p><div className="flex flex-wrap gap-2">{reviewAnalysis.demographics_insights.use_cases.map((useCase, idx) => <Badge key={idx} variant="outline">{useCase}</Badge>)}</div></div>}
                   </CardContent>
@@ -532,13 +675,17 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                       {reviewAnalysis.pain_points.map((point, idx) => (
                         <div key={idx} className="border-b border-border pb-2 last:border-0 last:pb-0">
                           <div className="flex items-center justify-between mb-1">
-                            <span className={`text-sm font-medium ${getSeverityColor(point.severity)}`}>{point.theme}</span>
+                            <div className="flex items-center gap-2">
+                              {point.category && <Badge variant="outline" className="text-xs">{point.category}</Badge>}
+                              <span className={`text-sm font-medium ${getSeverityColor(point.severity)}`}>{point.theme ?? point.issue}</span>
+                            </div>
                             <div className="flex items-center gap-2">
                               <Badge variant="outline" className="text-xs">{point.frequency} mentions</Badge>
+                              {point.affected_percentage && <Badge variant="secondary" className="text-xs">{point.affected_percentage}% affected</Badge>}
                               {point.severity && <Badge variant={point.severity === "high" ? "destructive" : "secondary"} className="text-xs">{point.severity}</Badge>}
                             </div>
                           </div>
-                          {point.quotes && point.quotes.length > 0 && <p className="text-xs text-muted-foreground italic">"{point.quotes[0]}"</p>}
+                          {(point.quotes?.length || point.representative_quotes?.length) && <p className="text-xs text-muted-foreground italic">"{(point.quotes ?? point.representative_quotes)?.[0]}"</p>}
                         </div>
                       ))}
                     </div>
@@ -551,12 +698,16 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                   <CardContent>
                     <div className="space-y-3">
                       {reviewAnalysis.positive_themes.map((theme, idx) => (
-                        <div key={idx} className="flex items-center justify-between">
-                          <span className="text-sm text-foreground">{theme.theme}</span>
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="text-xs">{theme.frequency} mentions</Badge>
-                            {theme.impact && <Badge variant="secondary" className="text-xs">{theme.impact}</Badge>}
+                        <div key={idx} className="border-b border-border pb-2 last:border-0 last:pb-0">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm text-foreground">{theme.theme}</span>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="text-xs">{theme.frequency} mentions</Badge>
+                              {theme.mentioned_by_percentage && <Badge variant="secondary" className="text-xs">{theme.mentioned_by_percentage}%</Badge>}
+                              {theme.impact && <Badge variant="secondary" className="text-xs">{theme.impact}</Badge>}
+                            </div>
                           </div>
+                          {theme.representative_quotes && theme.representative_quotes.length > 0 && <p className="text-xs text-muted-foreground italic">"{theme.representative_quotes[0]}"</p>}
                         </div>
                       ))}
                     </div>
@@ -578,6 +729,30 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                   </CardContent>
                 </Card>
               )}
+
+              {/* Actionable Recommendations */}
+              {reviewAnalysis?.actionable_recommendations && reviewAnalysis.actionable_recommendations.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Target className="w-4 h-4 text-primary" />Actionable Recommendations</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {reviewAnalysis.actionable_recommendations.map((rec, idx) => (
+                        <div key={idx} className="border rounded-lg p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="text-xs capitalize">{rec.area}</Badge>
+                              {getPriorityBadge(rec.priority)}
+                            </div>
+                          </div>
+                          <p className="text-sm font-medium mb-1">{rec.recommendation}</p>
+                          {rec.rationale && <p className="text-xs text-muted-foreground">{rec.rationale}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {reviewAnalysis?.key_insights && reviewAnalysis.key_insights.length > 0 && (
                 <Card>
                   <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Lightbulb className="w-4 h-4 text-yellow-500" />Key Insights</CardTitle></CardHeader>
@@ -597,6 +772,31 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                 <Card><CardContent className="pt-4 pb-4 text-center"><p className="text-2xl font-bold text-foreground">{product.nutrients_count ?? "-"}</p><p className="text-xs text-muted-foreground">Nutrients</p></CardContent></Card>
                 <Card><CardContent className="pt-4 pb-4 text-center"><p className="text-2xl font-bold text-foreground">{product.has_proprietary_blends ? "Yes" : "No"}</p><p className="text-xs text-muted-foreground">Proprietary Blends</p></CardContent></Card>
               </div>
+              
+              {/* OCR Metadata */}
+              {product.ocr_extracted && (
+                <Card className="border-primary/30 bg-primary/5">
+                  <CardContent className="pt-3 pb-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4 text-green-500" />
+                        <span className="text-sm font-medium">Label Data Extracted via OCR</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {product.ocr_confidence && (
+                          <Badge variant={product.ocr_confidence === "high" ? "default" : product.ocr_confidence === "medium" ? "secondary" : "outline"}>
+                            {product.ocr_confidence} confidence
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    {product.extraction_notes && (
+                      <p className="text-xs text-muted-foreground mt-2">{product.extraction_notes}</p>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
               {product.serving_size && <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Serving Size</CardTitle></CardHeader><CardContent><p className="text-sm">{product.serving_size}</p></CardContent></Card>}
               {allNutrients && allNutrients.length > 0 && (
                 <Card>

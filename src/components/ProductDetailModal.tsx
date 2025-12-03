@@ -29,7 +29,15 @@ interface MarketingAnalysis {
     title_analysis?: { clarity_score?: number; keyword_presence?: boolean };
     bullet_analysis?: { benefit_count?: number; feature_count?: number };
   };
-  target_demographics?: string;
+  target_demographics?: {
+    age_range?: string;
+    primary_audience?: string;
+    gender_representation?: string;
+    ethnicity_representation?: string;
+    body_types_shown?: string;
+    fitness_level_shown?: string;
+    relatability_score?: number;
+  } | string;
   overall_score?: number;
   opportunities?: string[];
   positioning_suggestions?: string[];
@@ -416,7 +424,22 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                       </svg>
                       <div className="absolute inset-0 flex items-center justify-center"><span className="text-2xl font-bold">{getOverallScore()}</span></div>
                     </div>
-                    <div className="flex-1 space-y-2"><p className="text-sm text-muted-foreground">{marketingAnalysis?.target_demographics ?? "Target demographic data not available"}</p></div>
+                    <div className="flex-1 space-y-2">
+                      {marketingAnalysis?.target_demographics ? (
+                        typeof marketingAnalysis.target_demographics === 'string' ? (
+                          <p className="text-sm text-muted-foreground">{marketingAnalysis.target_demographics}</p>
+                        ) : (
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            {marketingAnalysis.target_demographics.primary_audience && <div><span className="text-muted-foreground">Audience:</span> {marketingAnalysis.target_demographics.primary_audience}</div>}
+                            {marketingAnalysis.target_demographics.age_range && <div><span className="text-muted-foreground">Age:</span> {marketingAnalysis.target_demographics.age_range}</div>}
+                            {marketingAnalysis.target_demographics.gender_representation && <div><span className="text-muted-foreground">Gender:</span> {marketingAnalysis.target_demographics.gender_representation}</div>}
+                            {marketingAnalysis.target_demographics.fitness_level_shown && <div><span className="text-muted-foreground">Fitness:</span> {marketingAnalysis.target_demographics.fitness_level_shown}</div>}
+                          </div>
+                        )
+                      ) : (
+                        <p className="text-sm text-muted-foreground">Target demographic data not available</p>
+                      )}
+                    </div>
                   </div>
                 </CardContent>
               </Card>

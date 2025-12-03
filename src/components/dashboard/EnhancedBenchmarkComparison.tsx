@@ -260,7 +260,7 @@ export function EnhancedBenchmarkComparison({
         <CardContent className="px-2 md:px-6">
           <div className="flex gap-2 md:gap-3">
             {/* Our Concept Column - Fixed */}
-            <div className="w-[200px] md:w-[240px] shrink-0 rounded-lg border-2 border-amber-500/50 bg-gradient-to-b from-amber-50/50 to-background dark:from-amber-950/20 overflow-hidden">
+            <div className="w-[280px] md:w-[320px] shrink-0 rounded-lg border-2 border-amber-500/50 bg-gradient-to-b from-amber-50/50 to-background dark:from-amber-950/20 overflow-hidden">
               <div className="bg-gradient-to-r from-amber-500 to-amber-600 px-3 py-2">
                 <div className="flex items-center gap-2">
                   <div className="w-6 h-6 md:w-7 md:h-7 rounded-full bg-white/20 flex items-center justify-center">
@@ -287,7 +287,7 @@ export function EnhancedBenchmarkComparison({
                     <MessageSquare className="w-3 h-3 text-primary" />
                     Positioning
                   </p>
-                  <p className="text-[10px] text-muted-foreground line-clamp-3">
+                  <p className="text-[10px] text-muted-foreground">
                     {getOurPositioning()}
                   </p>
                 </div>
@@ -302,7 +302,7 @@ export function EnhancedBenchmarkComparison({
                     {getOurIngredients().map((ing, i) => (
                       <div key={i} className="flex items-start gap-1 text-[10px] text-muted-foreground">
                         <span className="w-1 h-1 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
-                        <span className="line-clamp-1">{ing}</span>
+                        <span>{ing}</span>
                       </div>
                     ))}
                   </div>
@@ -314,7 +314,7 @@ export function EnhancedBenchmarkComparison({
                     <Megaphone className="w-3 h-3 text-blue-500" />
                     Marketing Strategy
                   </p>
-                  <p className="text-[10px] text-muted-foreground line-clamp-2">
+                  <p className="text-[10px] text-muted-foreground">
                     {getOurMessaging()}
                   </p>
                 </div>
@@ -325,7 +325,7 @@ export function EnhancedBenchmarkComparison({
                     <Users className="w-3 h-3 text-violet-500" />
                     Target Audience
                   </p>
-                  <p className="text-[10px] text-muted-foreground line-clamp-2">
+                  <p className="text-[10px] text-muted-foreground">
                     {getOurBuyerProfile()}
                   </p>
                 </div>
@@ -338,7 +338,7 @@ export function EnhancedBenchmarkComparison({
                 {displayedProducts.map((product, idx) => (
                   <div 
                     key={product.id} 
-                    className="w-[200px] md:w-[240px] shrink-0 rounded-lg border border-border bg-card overflow-hidden cursor-pointer transition-all hover:border-primary hover:shadow-md"
+                    className="w-[280px] md:w-[320px] shrink-0 rounded-lg border border-border bg-card overflow-hidden cursor-pointer transition-all hover:border-primary hover:shadow-md"
                     onClick={() => handleProductClick(product)}
                   >
                     <div className="bg-gradient-to-r from-muted to-muted/80 px-3 py-2">
@@ -406,7 +406,7 @@ export function EnhancedBenchmarkComparison({
                           Positioning
                         </p>
                         {hasMarketingAnalysis(product) ? (
-                          <p className="text-[10px] text-muted-foreground line-clamp-2">
+                          <p className="text-[10px] text-muted-foreground">
                             {getCompetitorPositioning(product) || 'Not specified'}
                           </p>
                         ) : (
@@ -423,10 +423,10 @@ export function EnhancedBenchmarkComparison({
                         <div className="space-y-0.5">
                           {(() => {
                             const { items, fallback } = parseCompetitorIngredients(product);
-                            return items.map((ing, i) => (
+                              return items.map((ing, i) => (
                               <div key={i} className={`flex items-start gap-1 text-[10px] ${fallback ? 'text-primary' : 'text-muted-foreground'}`}>
                                 <span className="w-1 h-1 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
-                                <span className="line-clamp-1">{ing}</span>
+                                <span>{ing}</span>
                               </div>
                             ));
                           })()}
@@ -449,7 +449,7 @@ export function EnhancedBenchmarkComparison({
                               return marketing.map((item, i) => (
                                 <div key={i} className="flex items-start gap-1 text-[10px] text-muted-foreground">
                                   <span className="w-1 h-1 rounded-full bg-blue-500 mt-1.5 shrink-0" />
-                                  <span className="line-clamp-1">{item}</span>
+                                  <span>{item}</span>
                                 </div>
                               ));
                             })()}
@@ -466,7 +466,7 @@ export function EnhancedBenchmarkComparison({
                           Target Audience
                         </p>
                         {hasMarketingAnalysis(product) ? (
-                          <p className="text-[10px] text-muted-foreground line-clamp-2">
+                          <p className="text-[10px] text-muted-foreground">
                             {getCompetitorAudience(product) || 'Not specified'}
                           </p>
                         ) : (
@@ -490,7 +490,7 @@ export function EnhancedBenchmarkComparison({
                               return usps.map((usp, i) => (
                                 <div key={i} className="flex items-start gap-1 text-[10px] text-muted-foreground">
                                   <span className="w-1 h-1 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
-                                  <span className="line-clamp-1">{usp}</span>
+                                  <span>{usp}</span>
                                 </div>
                               ));
                             })()}
@@ -516,7 +516,7 @@ export function EnhancedBenchmarkComparison({
                               return weaknesses.map((weakness, i) => (
                                 <div key={i} className="flex items-start gap-1 text-[10px] text-muted-foreground">
                                   <span className="w-1 h-1 rounded-full bg-orange-500 mt-1.5 shrink-0" />
-                                  <span className="line-clamp-1">{weakness}</span>
+                                  <span>{weakness}</span>
                                 </div>
                               ));
                             })()}
@@ -542,7 +542,7 @@ export function EnhancedBenchmarkComparison({
                               return painPoints.map((pp, i) => (
                                  <div key={i} className="flex items-start gap-1 text-[10px] text-muted-foreground">
                                   <span className="w-1 h-1 rounded-full bg-rose-500 mt-1.5 shrink-0" />
-                                  <span className="line-clamp-1">{pp.issue}</span>
+                                  <span>{pp.issue}</span>
                                 </div>
                               ));
                             })()}
@@ -557,7 +557,7 @@ export function EnhancedBenchmarkComparison({
 
                 {/* Empty slots to show capacity */}
                 {Array.from({ length: Math.max(0, MAX_COMPETITORS - displayedProducts.length) }).map((_, idx) => (
-                  <div key={`empty-${idx}`} className="w-[200px] md:w-[240px] shrink-0 rounded-lg border border-dashed border-border bg-muted/20 flex items-center justify-center min-h-[480px]">
+                  <div key={`empty-${idx}`} className="w-[280px] md:w-[320px] shrink-0 rounded-lg border border-dashed border-border bg-muted/20 flex items-center justify-center min-h-[480px]">
                     <p className="text-xs text-muted-foreground">No data</p>
                   </div>
                 ))}

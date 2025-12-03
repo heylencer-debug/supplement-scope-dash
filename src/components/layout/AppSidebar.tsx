@@ -1,5 +1,6 @@
 import { Search, LayoutDashboard, Table, FileText } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
+import { useCategoryContext } from "@/contexts/CategoryContext";
 import {
   Sidebar,
   SidebarContent,
@@ -12,13 +13,22 @@ import {
 } from "@/components/ui/sidebar";
 
 const menuItems = [
-  { title: "New Analysis", url: "/", icon: Search },
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Product Explorer", url: "/products", icon: Table },
-  { title: "Strategy Brief", url: "/strategy", icon: FileText },
+  { title: "New Analysis", url: "/", icon: Search, preserveCategory: false },
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, preserveCategory: true },
+  { title: "Product Explorer", url: "/products", icon: Table, preserveCategory: true },
+  { title: "Strategy Brief", url: "/strategy", icon: FileText, preserveCategory: true },
 ];
 
 export function AppSidebar() {
+  const { categoryName } = useCategoryContext();
+
+  const getUrl = (item: typeof menuItems[0]) => {
+    if (item.preserveCategory && categoryName) {
+      return `${item.url}?category=${encodeURIComponent(categoryName)}`;
+    }
+    return item.url;
+  };
+
   return (
     <Sidebar>
       <SidebarHeader className="p-6 border-b border-sidebar-border">
@@ -40,7 +50,7 @@ export function AppSidebar() {
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink
-                      to={item.url}
+                      to={getUrl(item)}
                       end={item.url === "/"}
                       className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
                       activeClassName="bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground"

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Search, Filter, Download, Star, TrendingUp, Loader2, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,19 +23,41 @@ import {
 import { useProducts, Product } from "@/hooks/useProducts";
 import { useCategories } from "@/hooks/useCategories";
 import { useCategoryContext } from "@/contexts/CategoryContext";
+import { useCategoryByName } from "@/hooks/useCategoryByName";
 import ProductDetailModal from "@/components/ProductDetailModal";
 
 export default function ProductExplorer() {
+  const [searchParams] = useSearchParams();
+  const urlCategoryName = searchParams.get("category");
+  
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("current");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
-  const { currentCategoryId, categoryName } = useCategoryContext();
+  const { currentCategoryId, categoryName: contextCategoryName, setCategoryContext } = useCategoryContext();
+  
+  // Use URL param or context as fallback
+  const categoryName = urlCategoryName || contextCategoryName;
+  
+  // Look up category by name if we have a name but no ID
+  const { data: categoryFromName } = useCategoryByName(
+    categoryName && !currentCategoryId ? categoryName : undefined
+  );
+
+  // Update context when we find category from URL
+  useEffect(() => {
+    if (categoryFromName && !currentCategoryId) {
+      setCategoryContext(categoryFromName.id, categoryFromName.name);
+    } else if (urlCategoryName && !currentCategoryId && !categoryFromName) {
+      // Store name even if category not found yet
+      setCategoryContext(null, urlCategoryName);
+    }
+  }, [categoryFromName, currentCategoryId, urlCategoryName, setCategoryContext]);
 
   // Determine which category ID to use for filtering
-  const effectiveCategoryId = categoryFilter === "current" && currentCategoryId
-    ? currentCategoryId
+  const effectiveCategoryId = categoryFilter === "current" && (currentCategoryId || categoryFromName?.id)
+    ? currentCategoryId || categoryFromName?.id
     : categoryFilter === "all" || categoryFilter === "current"
       ? undefined
       : categoryFilter;
@@ -71,7 +94,7 @@ export default function ProductExplorer() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Product Explorer</h1>
           <p className="text-muted-foreground">
-            {currentCategoryId && categoryName
+            {categoryName
               ? `Browsing products in: ${categoryName}`
               : "Browse and analyze products in detail"}
           </p>
@@ -100,7 +123,7 @@ export default function ProductExplorer() {
                 <SelectValue placeholder="Filter by Category" />
               </SelectTrigger>
               <SelectContent>
-                {currentCategoryId && (
+                {(currentCategoryId || categoryName) && (
                   <SelectItem value="current">
                     Current: {categoryName || "Selected Category"}
                   </SelectItem>

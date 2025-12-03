@@ -1,7 +1,13 @@
-import { CheckCircle2, Circle, AlertCircle } from "lucide-react";
+import { CheckCircle2, Circle, AlertCircle, ArrowRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface ActionItem {
   step?: number | string;
@@ -27,27 +33,31 @@ export function ActionPlanTimeline({
     if (p === "critical" || p === "urgent") {
       return {
         color: "bg-red-500",
-        badge: "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/50 dark:text-red-300",
+        ring: "ring-red-500/20",
+        badge: "bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300",
         label: "Critical",
       };
     }
     if (p === "high") {
       return {
         color: "bg-amber-500",
-        badge: "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/50 dark:text-amber-300",
+        ring: "ring-amber-500/20",
+        badge: "bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300",
         label: "High",
       };
     }
     if (p === "medium" || p === "moderate") {
       return {
         color: "bg-[#0ea5e9]",
-        badge: "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/50 dark:text-blue-300",
+        ring: "ring-[#0ea5e9]/20",
+        badge: "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300",
         label: "Medium",
       };
     }
     return {
       color: "bg-gray-400",
-      badge: "bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-900/50 dark:text-gray-300",
+      ring: "ring-gray-400/20",
+      badge: "bg-gray-100 text-gray-700 dark:bg-gray-900/50 dark:text-gray-300",
       label: "Low",
     };
   };
@@ -70,103 +80,141 @@ export function ActionPlanTimeline({
     return null;
   }
 
+  const phaseColors = [
+    "from-[#0ea5e9] to-[#0284c7]",
+    "from-emerald-500 to-emerald-600",
+    "from-violet-500 to-violet-600",
+    "from-amber-500 to-amber-600",
+    "from-rose-500 to-rose-600",
+    "from-cyan-500 to-cyan-600",
+  ];
+
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="pb-3">
         <CardTitle className="text-lg font-semibold text-[#1e3a5f]">
           Action Plan Roadmap
         </CardTitle>
         <CardDescription>
-          Step-by-step execution plan with priorities
+          {timelineKeys.length} phases • {actionItems.length} total actions
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pb-4">
         {isLoading ? (
-          <div className="space-y-4">
-            <Skeleton className="h-24 w-full" />
-            <Skeleton className="h-24 w-full" />
+          <div className="flex gap-4">
+            <Skeleton className="h-32 w-64 shrink-0" />
+            <Skeleton className="h-32 w-64 shrink-0" />
+            <Skeleton className="h-32 w-64 shrink-0" />
           </div>
         ) : (
-          <div className="relative">
-            {/* Timeline visualization */}
-            <div className="flex flex-col space-y-6">
-              {timelineKeys.map((timeline, timelineIdx) => (
-                <div key={timeline} className="relative">
-                  {/* Timeline header */}
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[#1e3a5f] text-white text-sm font-bold">
-                      {timelineIdx + 1}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-foreground">{timeline}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {groupedItems[timeline].length} action{groupedItems[timeline].length !== 1 ? "s" : ""}
-                      </p>
-                    </div>
-                  </div>
+          <ScrollArea className="w-full">
+            <div className="flex gap-2 pb-4">
+              {timelineKeys.map((timeline, timelineIdx) => {
+                const items = groupedItems[timeline];
+                const completedCount = items.filter(
+                  (i) => i.status?.toLowerCase() === "completed"
+                ).length;
+                const hasCritical = items.some(
+                  (i) => i.priority?.toLowerCase() === "critical" || i.priority?.toLowerCase() === "urgent"
+                );
+                const gradientColor = phaseColors[timelineIdx % phaseColors.length];
 
-                  {/* Action items grid */}
-                  <div className="ml-5 pl-8 border-l-2 border-border">
-                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {groupedItems[timeline].map((item, idx) => {
-                        const priorityConfig = getPriorityConfig(item.priority);
-                        const isCompleted = item.status?.toLowerCase() === "completed";
-
-                        return (
-                          <div
-                            key={idx}
-                            className={`relative p-4 rounded-lg border ${
-                              isCompleted
-                                ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900"
-                                : "bg-card border-border"
-                            }`}
-                          >
-                            {/* Priority indicator */}
+                return (
+                  <div key={timeline} className="flex items-center">
+                    {/* Phase Card */}
+                    <div className="w-56 shrink-0">
+                      {/* Phase Header */}
+                      <div className={`bg-gradient-to-r ${gradientColor} rounded-t-lg px-3 py-2`}>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-white text-xs font-bold">
+                              {timelineIdx + 1}
+                            </div>
+                            <span className="text-white text-sm font-semibold truncate">
+                              {timeline}
+                            </span>
+                          </div>
+                          {hasCritical && (
+                            <AlertCircle className="w-4 h-4 text-white/80" />
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <div className="flex-1 h-1 bg-white/20 rounded-full overflow-hidden">
                             <div
-                              className={`absolute top-0 left-0 w-1 h-full rounded-l-lg ${priorityConfig.color}`}
+                              className="h-full bg-white/60 rounded-full transition-all"
+                              style={{
+                                width: `${items.length > 0 ? (completedCount / items.length) * 100 : 0}%`,
+                              }}
                             />
+                          </div>
+                          <span className="text-white/80 text-xs">
+                            {completedCount}/{items.length}
+                          </span>
+                        </div>
+                      </div>
 
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 mb-1">
+                      {/* Actions List */}
+                      <div className="border border-t-0 border-border rounded-b-lg bg-card p-2 space-y-1.5 max-h-36 overflow-y-auto">
+                        {items.slice(0, 4).map((item, idx) => {
+                          const priorityConfig = getPriorityConfig(item.priority);
+                          const isCompleted = item.status?.toLowerCase() === "completed";
+                          const actionText = item.action || item.description || "Action item";
+
+                          return (
+                            <Tooltip key={idx}>
+                              <TooltipTrigger asChild>
+                                <div
+                                  className={`flex items-center gap-2 p-1.5 rounded text-xs transition-colors hover:bg-accent/50 cursor-default ${
+                                    isCompleted ? "opacity-60" : ""
+                                  }`}
+                                >
+                                  <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${priorityConfig.color}`} />
                                   {isCompleted ? (
-                                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                                  ) : item.priority?.toLowerCase() === "critical" ? (
-                                    <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+                                    <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
                                   ) : (
-                                    <Circle className="w-4 h-4 text-muted-foreground shrink-0" />
+                                    <Circle className="w-3 h-3 text-muted-foreground shrink-0" />
                                   )}
-                                  <span className="text-sm font-medium text-foreground truncate">
-                                    {item.action || item.description || "Action item"}
+                                  <span className={`truncate ${isCompleted ? "line-through" : ""}`}>
+                                    {actionText}
                                   </span>
                                 </div>
-                                {item.step && (
-                                  <p className="text-xs text-muted-foreground ml-6 line-clamp-2">
-                                    Step {item.step}
-                                  </p>
-                                )}
-                              </div>
-                              <Badge
-                                variant="outline"
-                                className={`shrink-0 text-xs ${priorityConfig.badge}`}
-                              >
-                                {priorityConfig.label}
-                              </Badge>
-                            </div>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom" className="max-w-xs">
+                                <p className="font-medium">{actionText}</p>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <Badge className={`text-xs ${priorityConfig.badge}`}>
+                                    {priorityConfig.label}
+                                  </Badge>
+                                  {isCompleted && (
+                                    <Badge variant="outline" className="text-xs text-emerald-600">
+                                      Completed
+                                    </Badge>
+                                  )}
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          );
+                        })}
+                        {items.length > 4 && (
+                          <div className="text-xs text-muted-foreground text-center py-1">
+                            +{items.length - 4} more
                           </div>
-                        );
-                      })}
+                        )}
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Connector line to next timeline */}
-                  {timelineIdx < timelineKeys.length - 1 && (
-                    <div className="absolute left-5 top-14 bottom-0 w-0.5 bg-border" />
-                  )}
-                </div>
-              ))}
+                    {/* Connector Arrow */}
+                    {timelineIdx < timelineKeys.length - 1 && (
+                      <div className="px-1 shrink-0">
+                        <ArrowRight className="w-4 h-4 text-muted-foreground/50" />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-          </div>
+            <ScrollBar orientation="horizontal" />
+          </ScrollArea>
         )}
       </CardContent>
     </Card>

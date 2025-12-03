@@ -1,10 +1,11 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { 
   TrendingUp, TrendingDown, Target, DollarSign, Star, Package, Loader2, RefreshCw,
-  Zap, AlertTriangle, Crown, ShoppingCart, BarChart3, Users
+  Zap, AlertTriangle, Crown, ShoppingCart, BarChart3, Users, CheckCircle2, Circle, Clock
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -31,6 +32,7 @@ import { useCategoryScores } from "@/hooks/useCategoryScores";
 import { useCategorySales } from "@/hooks/useCategorySales";
 import { useTopProducts } from "@/hooks/useTopProducts";
 import { useBreakoutCompetitors } from "@/hooks/useBreakoutCompetitors";
+import { useFormulaBrief } from "@/hooks/useFormulaBrief";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -83,10 +85,29 @@ export default function Dashboard() {
   const { data: categorySales, isLoading: salesLoading } = useCategorySales(categoryName || undefined);
   const { data: topProducts, isLoading: topProductsLoading } = useTopProducts(categoryName || undefined, 5);
   const { data: breakoutCompetitors, isLoading: breakoutLoading } = useBreakoutCompetitors(categoryName || undefined, 5);
+  const { data: formulaBrief } = useFormulaBrief(category?.id);
 
   const hasCategory = !!category;
   const hasAnalysis = !!analysis;
   const hasProducts = products && products.length > 0;
+
+  // Progress calculation
+  const progress = useMemo(() => {
+    const steps = [
+      { name: "Category Created", done: hasCategory },
+      { name: "Products Scraped", done: hasProducts || (category?.total_products ?? 0) > 0 },
+      { name: "Reviews Analyzed", done: (analysis?.reviews_analyzed ?? 0) > 0 },
+      { name: "Scores Calculated", done: !!categoryScores },
+      { name: "Analysis Complete", done: !!analysis?.executive_summary && !!analysis?.opportunity_index },
+      { name: "Formula Brief Ready", done: !!formulaBrief },
+    ];
+    const completed = steps.filter(s => s.done).length;
+    return { 
+      percentage: Math.round((completed / steps.length) * 100), 
+      steps, 
+      completed 
+    };
+  }, [hasCategory, hasProducts, category?.total_products, analysis, categoryScores, formulaBrief]);
 
   // KPI calculations
   const totalProducts = products?.length ?? 0;
@@ -175,20 +196,50 @@ export default function Dashboard() {
         </p>
       </div>
 
-      {/* Processing Banner */}
-      {(!hasCategory || !hasAnalysis) && (
+      {/* Progress Banner */}
+      {progress.percentage < 100 && (
         <Card className="border-primary/50 bg-primary/5">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <RefreshCw className="h-5 w-5 text-primary animate-spin" />
-              <div>
-                <p className="font-medium text-foreground">Analysis in Progress</p>
-                <p className="text-sm text-muted-foreground">
-                  {!hasCategory 
-                    ? "Waiting for category data to be created..."
-                    : "Waiting for analysis results. Data will appear automatically."}
-                </p>
+          <CardContent className="p-6">
+            <div className="space-y-4">
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <RefreshCw className="h-5 w-5 text-primary animate-spin" />
+                  <div>
+                    <p className="font-medium text-foreground">Analysis in Progress</p>
+                    <p className="text-sm text-muted-foreground">
+                      {progress.percentage}% Complete • {6 - progress.completed} steps remaining
+                    </p>
+                  </div>
+                </div>
+                <Badge variant="outline">{progress.completed}/6 Steps</Badge>
               </div>
+              
+              {/* Progress Bar */}
+              <Progress value={progress.percentage} className="h-3" />
+              
+              {/* Step Indicators */}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                {progress.steps.map((step, idx) => (
+                  <div 
+                    key={idx} 
+                    className={`flex items-center gap-2 text-sm ${step.done ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}
+                  >
+                    {step.done ? (
+                      <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+                    ) : (
+                      <Circle className="w-4 h-4 flex-shrink-0" />
+                    )}
+                    <span className="truncate">{step.name}</span>
+                  </div>
+                ))}
+              </div>
+              
+              {/* Time Estimate */}
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                Estimated time remaining: ~{Math.max(1, Math.round((6 - progress.completed) * 1.5))} minutes
+              </p>
             </div>
           </CardContent>
         </Card>

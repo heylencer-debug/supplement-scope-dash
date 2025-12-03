@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TrendingUp, TrendingDown, Target, DollarSign, Star, Package, Loader2 } from "lucide-react";
@@ -18,22 +20,61 @@ import {
   Pie,
   Cell,
 } from "recharts";
-import { useCategoryDashboard } from "@/hooks/useCategoryDashboard";
-import { useCategoryAnalyses } from "@/hooks/useCategoryAnalyses";
+import { useCategoryByName } from "@/hooks/useCategoryByName";
+import { useCategoryAnalysis } from "@/hooks/useCategoryAnalyses";
 import { useProducts } from "@/hooks/useProducts";
+import { useCategoryContext } from "@/contexts/CategoryContext";
+import ProcessingScreen from "@/components/ProcessingScreen";
 
 export default function Dashboard() {
-  const { data: dashboardData, isLoading: dashboardLoading } = useCategoryDashboard();
-  const { data: analyses, isLoading: analysesLoading } = useCategoryAnalyses();
-  const { data: products, isLoading: productsLoading } = useProducts();
+  const [searchParams] = useSearchParams();
+  const categoryName = searchParams.get("category");
+  const { setCategoryContext, currentCategoryId } = useCategoryContext();
 
-  const isLoading = dashboardLoading || analysesLoading || productsLoading;
+  // Find the category by name
+  const { 
+    data: category, 
+    isLoading: categoryLoading, 
+    refetch: refetchCategory,
+    isRefetching: isCategoryRefetching
+  } = useCategoryByName(categoryName || undefined);
+
+  // Set category context when category is found
+  useEffect(() => {
+    if (category) {
+      setCategoryContext(category.id, category.name);
+    }
+  }, [category, setCategoryContext]);
+
+  // Fetch analysis for this category
+  const { data: analysis, isLoading: analysisLoading } = useCategoryAnalysis(category?.id);
+
+  // Fetch products for this category
+  const { data: products, isLoading: productsLoading } = useProducts(category?.id);
+
+  const isLoading = categoryLoading || analysisLoading || productsLoading;
+
+  // Check if data is fresh (within last 24 hours)
+  const isDataFresh = analysis && analysis.created_at && 
+    new Date(analysis.created_at).getTime() > Date.now() - 24 * 60 * 60 * 1000;
+
+  // Show processing screen if:
+  // 1. Category name is provided but no category found in DB
+  // 2. Category found but no analysis yet
+  // 3. Analysis exists but is stale
+  if (categoryName && !isLoading && (!category || !analysis || !isDataFresh)) {
+    return (
+      <ProcessingScreen
+        categoryName={categoryName}
+        onRefresh={() => refetchCategory()}
+        isRefetching={isCategoryRefetching}
+      />
+    );
+  }
 
   // Calculate KPIs from real data
   const totalProducts = products?.length ?? 0;
-  const avgOpportunity = dashboardData?.length
-    ? (dashboardData.reduce((sum, d) => sum + (d.opportunity_index ?? 0), 0) / dashboardData.length).toFixed(1)
-    : "0";
+  const opportunityScore = analysis?.opportunity_index ?? 0;
   const totalRevenue = products?.reduce((sum, p) => sum + (p.monthly_revenue ?? 0), 0) ?? 0;
   const avgRating = products?.length
     ? (products.reduce((sum, p) => sum + (p.rating ?? 0), 0) / products.length).toFixed(1)
@@ -41,24 +82,20 @@ export default function Dashboard() {
 
   const kpiData = [
     { label: "Total Products", value: totalProducts.toLocaleString(), icon: Package, trend: "+12%", up: true },
-    { label: "Avg. Opportunity", value: avgOpportunity, icon: Target, trend: "+5.2%", up: true },
+    { label: "Opportunity Score", value: Math.round(opportunityScore).toString(), icon: Target, trend: "+5.2%", up: true },
     { label: "Market Revenue", value: `$${(totalRevenue / 1000000).toFixed(1)}M`, icon: DollarSign, trend: "+18%", up: true },
     { label: "Avg. Rating", value: avgRating, icon: Star, trend: "-0.2", up: false },
   ];
 
-  // Get top analysis for opportunity score
-  const topAnalysis = analyses?.[0];
-  const opportunityScore = topAnalysis?.opportunity_index ?? 0;
-
-  // Sentiment data from analyses
+  // Sentiment data from analysis
   const sentimentData = [
     { name: "Positive", value: 65, fill: "hsl(var(--chart-3))" },
     { name: "Neutral", value: 25, fill: "hsl(var(--chart-4))" },
     { name: "Negative", value: 10, fill: "hsl(var(--chart-5))" },
   ];
 
-  // Criteria data from analyses
-  const criteriaScores = topAnalysis?.criteria_scores as Record<string, number> | null;
+  // Criteria data from analysis
+  const criteriaScores = analysis?.criteria_scores as Record<string, number> | null;
   const criteriaData = criteriaScores
     ? Object.entries(criteriaScores).slice(0, 8).map(([key, value]) => ({
         criteria: key.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase()),
@@ -75,11 +112,11 @@ export default function Dashboard() {
         { criteria: "Supply", score: 70 },
       ];
 
-  // Revenue data from dashboard categories
-  const revenueData = dashboardData?.slice(0, 6).map((d, idx) => ({
-    month: d.category_name?.slice(0, 8) ?? `Cat ${idx + 1}`,
-    revenue: (d.total_reviews ?? 0) * 10,
-    price: d.avg_price ?? 0,
+  // Revenue data
+  const revenueData = products?.slice(0, 6).map((p, idx) => ({
+    month: p.brand?.slice(0, 8) ?? `Product ${idx + 1}`,
+    revenue: (p.monthly_revenue ?? 0) / 1000,
+    price: p.price ?? 0,
   })) ?? [];
 
   const getOpportunityLabel = (score: number) => {
@@ -99,8 +136,12 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-        <p className="text-muted-foreground">Market analysis results and insights</p>
+        <h1 className="text-2xl font-bold text-foreground">
+          {categoryName ? `Dashboard: ${categoryName}` : "Dashboard"}
+        </h1>
+        <p className="text-muted-foreground">
+          {analysis?.executive_summary || "Market analysis results and insights"}
+        </p>
       </div>
 
       {/* KPI Cards */}
@@ -243,8 +284,8 @@ export default function Dashboard() {
         {/* Revenue Trend */}
         <Card>
           <CardHeader>
-            <CardTitle>Category Performance</CardTitle>
-            <CardDescription>Revenue and pricing by category</CardDescription>
+            <CardTitle>Product Performance</CardTitle>
+            <CardDescription>Revenue and pricing by top products</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -281,11 +322,11 @@ export default function Dashboard() {
             <div className="flex justify-center gap-6 mt-4">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-accent" />
-                <span className="text-sm text-muted-foreground">Revenue</span>
+                <span className="text-sm text-muted-foreground">Revenue ($K)</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full" style={{ backgroundColor: "hsl(var(--chart-2))" }} />
-                <span className="text-sm text-muted-foreground">Avg. Price</span>
+                <span className="text-sm text-muted-foreground">Price ($)</span>
               </div>
             </div>
           </CardContent>

@@ -212,6 +212,7 @@ export default function Dashboard() {
 
     return {
       criteriaScores,
+      criteriaBreakdown,
       topOpportunities: topStrengths,
       criticalRisks,
       primaryPainPoints,
@@ -366,6 +367,7 @@ export default function Dashboard() {
       {/* SECTION 3: Deep Dive - Radar Chart + Strategy */}
       <DeepDiveSection
         criteriaScores={dashboardData.criteriaScores}
+        criteriaBreakdown={dashboardData.criteriaBreakdown}
         executiveSummary={analysis?.executive_summary || null}
         topOpportunities={dashboardData.topOpportunities}
         criticalRisks={dashboardData.criticalRisks}

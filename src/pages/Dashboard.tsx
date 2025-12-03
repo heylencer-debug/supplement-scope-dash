@@ -18,6 +18,7 @@ import { ActionPlanTimeline } from "@/components/dashboard/ActionPlanTimeline";
 import { FinancialProjections } from "@/components/dashboard/FinancialProjections";
 import { GoToMarketStrategy } from "@/components/dashboard/GoToMarketStrategy";
 import { RiskAnalysis } from "@/components/dashboard/RiskAnalysis";
+import { LaunchStrategyCard } from "@/components/dashboard/LaunchStrategyCard";
 
 import {
   ResponsiveContainer,
@@ -393,7 +394,22 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* SECTION 5: Action Plan Roadmap */}
+      {/* SECTION 5: Launch Strategy */}
+      <LaunchStrategyCard
+        goToMarket={dashboardData.goToMarket as {
+          positioning?: string;
+          messaging?: string[];
+          differentiation?: string[];
+          launch_strategy?: {
+            pricing_approach?: string;
+            review_strategy?: string;
+            advertising?: string;
+          };
+        } | null}
+        isLoading={analysisLoading && !hasAnalysis}
+      />
+
+      {/* SECTION 6: Action Plan Roadmap */}
       <ActionPlanTimeline
         actionItems={dashboardData.actionItems}
         isLoading={analysisLoading && !hasAnalysis}

@@ -236,12 +236,24 @@ export default function Dashboard() {
       financials,
       goToMarket,
       risks,
-      // For benchmark
+      // For benchmark - pass raw analysis objects
       benchmarkData: {
-        recommended_price: recommendedPrice,
-        positioning: goToMarket?.positioning as string | undefined,
-        key_differentiators: keyDifferentiators,
-        primary_pain_points: primaryPainPoints,
+        key_insights: keyInsights as {
+          go_to_market?: {
+            positioning?: string;
+            messaging?: string[];
+          };
+        } | null,
+        analysis_1_category_scores: analysis1 as {
+          product_development?: {
+            formulation?: {
+              recommended_ingredients?: Array<{ ingredient?: string; name?: string }>;
+            };
+          };
+          customer_insights?: {
+            buyer_profile?: string;
+          };
+        } | null,
       },
     };
   }, [analysis]);

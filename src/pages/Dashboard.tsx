@@ -124,12 +124,71 @@ export default function Dashboard() {
     { label: "Avg. Rating", value: avgRating, icon: Star, trend: "-0.2", up: false },
   ];
 
-  // Sentiment data
-  const sentimentData = [
-    { name: "Positive", value: 65, fill: "hsl(var(--chart-2))" },
-    { name: "Neutral", value: 25, fill: "hsl(var(--chart-4))" },
-    { name: "Negative", value: 10, fill: "hsl(var(--destructive))" },
-  ];
+  // Aggregated sentiment data from review_analysis across all products
+  const sentimentData = useMemo(() => {
+    if (!products || products.length === 0) {
+      return [
+        { name: "Positive", value: 0, fill: "hsl(var(--chart-2))" },
+        { name: "Neutral", value: 0, fill: "hsl(var(--chart-4))" },
+        { name: "Negative", value: 0, fill: "hsl(var(--destructive))" },
+      ];
+    }
+
+    let totalPositive = 0;
+    let totalNeutral = 0;
+    let totalNegative = 0;
+    let productCount = 0;
+
+    products.forEach(product => {
+      const reviewAnalysis = product.review_analysis as Record<string, unknown> | null;
+      if (!reviewAnalysis) return;
+
+      const sentiment = reviewAnalysis.sentiment_distribution as Record<string, unknown> | null;
+      if (sentiment) {
+        // Handle both simple (positive/neutral/negative) and detailed (5-star) formats
+        if (typeof sentiment.positive === 'number') {
+          totalPositive += sentiment.positive;
+          totalNeutral += (sentiment.neutral as number) || 0;
+          totalNegative += (sentiment.negative as number) || 0;
+          productCount++;
+        } else if (typeof sentiment['5_star'] === 'number') {
+          // Convert 5-star to positive/neutral/negative
+          totalPositive += ((sentiment['5_star'] as number) || 0) + ((sentiment['4_star'] as number) || 0);
+          totalNeutral += (sentiment['3_star'] as number) || 0;
+          totalNegative += ((sentiment['2_star'] as number) || 0) + ((sentiment['1_star'] as number) || 0);
+          productCount++;
+        }
+      }
+    });
+
+    if (productCount === 0) {
+      return [
+        { name: "Positive", value: 0, fill: "hsl(var(--chart-2))" },
+        { name: "Neutral", value: 0, fill: "hsl(var(--chart-4))" },
+        { name: "Negative", value: 0, fill: "hsl(var(--destructive))" },
+      ];
+    }
+
+    // Calculate averages and normalize to percentages
+    const avgPositive = totalPositive / productCount;
+    const avgNeutral = totalNeutral / productCount;
+    const avgNegative = totalNegative / productCount;
+    const total = avgPositive + avgNeutral + avgNegative;
+
+    if (total === 0) {
+      return [
+        { name: "Positive", value: 0, fill: "hsl(var(--chart-2))" },
+        { name: "Neutral", value: 0, fill: "hsl(var(--chart-4))" },
+        { name: "Negative", value: 0, fill: "hsl(var(--destructive))" },
+      ];
+    }
+
+    return [
+      { name: "Positive", value: Math.round((avgPositive / total) * 100), fill: "hsl(var(--chart-2))" },
+      { name: "Neutral", value: Math.round((avgNeutral / total) * 100), fill: "hsl(var(--chart-4))" },
+      { name: "Negative", value: Math.round((avgNegative / total) * 100), fill: "hsl(var(--destructive))" },
+    ];
+  }, [products]);
 
   // Radar chart data from category_scores
   const radarData = categoryScores ? [

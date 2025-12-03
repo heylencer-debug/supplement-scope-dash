@@ -31,12 +31,13 @@ export function AnalysisTabs() {
   }, []);
 
   // Load and sync pending analyses from localStorage
+  // Re-read when route changes (e.g., after submitting new analysis)
   useEffect(() => {
     const stored = localStorage.getItem(PENDING_ANALYSES_KEY);
     if (stored) {
       setPendingAnalyses(JSON.parse(stored));
     }
-  }, []);
+  }, [location.pathname, currentCategory]);
 
   // Clean up pending analyses once they appear in DB or are too old
   useEffect(() => {

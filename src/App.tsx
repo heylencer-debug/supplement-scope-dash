@@ -9,7 +9,6 @@ import NewAnalysis from "./pages/NewAnalysis";
 import Dashboard from "./pages/Dashboard";
 import ProductExplorer from "./pages/ProductExplorer";
 import StrategyBrief from "./pages/StrategyBrief";
-import Competitors from "./pages/Competitors";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,7 +25,6 @@ const App = () => (
               <Route path="/" element={<NewAnalysis />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/products" element={<ProductExplorer />} />
-              <Route path="/competitors" element={<Competitors />} />
               <Route path="/strategy" element={<StrategyBrief />} />
               <Route path="*" element={<NotFound />} />
             </Routes>

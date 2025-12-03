@@ -250,6 +250,7 @@ export default function Dashboard() {
               recommended_ingredients?: Array<string | { ingredient?: string; name?: string }>;
               form_factor?: string;
               key_features?: string[];
+              serving_size?: string;
             };
           };
           customer_insights?: {

@@ -26,6 +26,7 @@ interface EnhancedBenchmarkComparisonProps {
           recommended_ingredients?: Array<string | { ingredient?: string; name?: string }>;
           form_factor?: string;
           key_features?: string[];
+          serving_size?: string;
         };
       };
       customer_insights?: {
@@ -144,11 +145,20 @@ export function EnhancedBenchmarkComparison({
   };
 
   const getOurFormFactor = (): string => {
-    const formFactor = analysisData?.analysis_1_category_scores?.product_development?.formulation?.form_factor;
+    const formulation = analysisData?.analysis_1_category_scores?.product_development?.formulation;
+    const servingSize = formulation?.serving_size;
+    const formFactor = formulation?.form_factor;
+    
+    // Priority 1: Check serving_size for "scoop" (indicates powder)
+    if (servingSize && servingSize.toLowerCase().includes('scoop')) {
+      return `Powder (${servingSize})`;
+    }
+    
+    // Priority 2: Use form_factor if available
     if (formFactor) return formFactor;
     
-    // Fallback: Search key_features for flavor/taste related items
-    const keyFeatures = analysisData?.analysis_1_category_scores?.product_development?.formulation?.key_features;
+    // Priority 3: Search key_features for flavor/taste related items
+    const keyFeatures = formulation?.key_features;
     if (keyFeatures && Array.isArray(keyFeatures)) {
       const flavorFeature = keyFeatures.find(f => 
         f.toLowerCase().includes('flavor') || f.toLowerCase().includes('taste')

@@ -248,6 +248,8 @@ export default function Dashboard() {
           product_development?: {
             formulation?: {
               recommended_ingredients?: Array<string | { ingredient?: string; name?: string }>;
+              form_factor?: string;
+              key_features?: string[];
             };
           };
           customer_insights?: {

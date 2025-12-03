@@ -120,9 +120,17 @@ export function EnhancedBenchmarkComparison({
   };
 
   // Helper functions for Competitor data
-  const getCompetitorPositioning = (product: Product): string => {
+  const hasMarketingAnalysis = (product: Product): boolean => {
+    return !!product.marketing_analysis;
+  };
+
+  const hasReviewAnalysis = (product: Product): boolean => {
+    return !!product.review_analysis;
+  };
+
+  const getCompetitorPositioning = (product: Product): string | null => {
     const marketingAnalysis = product.marketing_analysis as Record<string, unknown> | null;
-    if (!marketingAnalysis) return 'No data';
+    if (!marketingAnalysis) return null;
     
     // Try lifestyle_positioning.primary_lifestyle first
     const lifestylePos = marketingAnalysis.lifestyle_positioning as Record<string, unknown> | undefined;
@@ -136,51 +144,65 @@ export function EnhancedBenchmarkComparison({
       return targetDemo.primary_audience as string;
     }
     
-    return 'No data';
+    return null;
   };
 
-  const parseCompetitorIngredients = (ingredientsStr: string | null): string[] => {
-    if (!ingredientsStr) return [];
-    // Split by comma and take first 3, or truncate to 80 chars
-    const parts = ingredientsStr.split(/[,;]/).map(i => i.trim()).filter(Boolean);
-    if (parts.length >= 3) {
-      return parts.slice(0, 3);
+  const parseCompetitorIngredients = (product: Product): { items: string[]; fallback: boolean } => {
+    // Primary: product.ingredients
+    if (product.ingredients) {
+      const parts = product.ingredients.split(/[,;]/).map(i => i.trim()).filter(Boolean);
+      if (parts.length > 0) {
+        return { items: parts.slice(0, 3), fallback: false };
+      }
     }
-    // If less than 3 parts, truncate original string
-    const truncated = ingredientsStr.substring(0, 80);
-    return [truncated + (ingredientsStr.length > 80 ? '...' : '')];
+    
+    // Fallback: specifications.Ingredients or specifications.Material
+    const specs = product.specifications as Record<string, unknown> | null;
+    if (specs) {
+      const ingredientsSpec = specs.Ingredients || specs.ingredients || specs.Material || specs.material;
+      if (ingredientsSpec && typeof ingredientsSpec === 'string') {
+        const parts = ingredientsSpec.split(/[,;]/).map(i => i.trim()).filter(Boolean);
+        if (parts.length > 0) {
+          return { items: parts.slice(0, 3), fallback: false };
+        }
+      }
+    }
+    
+    // Final fallback
+    return { items: ['See full detail view'], fallback: true };
   };
 
-  const getCompetitorMessaging = (product: Product): string => {
+  const getCompetitorMarketing = (product: Product): string[] | null => {
     const marketingAnalysis = product.marketing_analysis as Record<string, unknown> | null;
-    if (!marketingAnalysis) return 'No data';
+    if (!marketingAnalysis) return null;
     
+    // Primary: lifestyle_positioning.values_communicated
+    const lifestylePos = marketingAnalysis.lifestyle_positioning as Record<string, unknown> | undefined;
+    const valuesCommunicated = lifestylePos?.values_communicated as string[] | undefined;
+    if (valuesCommunicated && valuesCommunicated.length > 0) {
+      return valuesCommunicated.slice(0, 2);
+    }
+    
+    // Fallback: messaging_analysis.key_claims_shown
     const messagingAnalysis = marketingAnalysis.messaging_analysis as Record<string, unknown> | undefined;
     const keyClaims = messagingAnalysis?.key_claims_shown as string[] | undefined;
-    
     if (keyClaims && keyClaims.length > 0) {
-      return keyClaims[0];
+      return keyClaims.slice(0, 2);
     }
     
-    // Fallback to USPs
-    const usps = marketingAnalysis.usps as string[] | undefined;
-    if (usps && usps.length > 0) {
-      return usps[0];
-    }
-    
-    return 'No data';
+    return null;
   };
 
-  const getCompetitorAudience = (product: Product): string => {
+  const getCompetitorAudience = (product: Product): string | null => {
     const marketingAnalysis = product.marketing_analysis as Record<string, unknown> | null;
-    if (!marketingAnalysis) return 'No data';
+    if (!marketingAnalysis) return null;
     
     const targetDemo = marketingAnalysis.target_demographics as Record<string, unknown> | undefined;
     if (targetDemo?.primary_audience) {
       return targetDemo.primary_audience as string;
     }
     
-    return 'No data';
+    return null;
   };
 
   const getCompetitorPainPoints = (product: Product): Array<{ issue: string }> => {
@@ -355,7 +377,13 @@ export function EnhancedBenchmarkComparison({
                           <MessageSquare className="w-3 h-3 text-primary" />
                           Positioning
                         </p>
-                        <p className="text-[10px] text-muted-foreground line-clamp-2">{getCompetitorPositioning(product)}</p>
+                        {hasMarketingAnalysis(product) ? (
+                          <p className="text-[10px] text-muted-foreground line-clamp-2">
+                            {getCompetitorPositioning(product) || 'Not specified'}
+                          </p>
+                        ) : (
+                          <span className="text-[10px] px-1.5 py-0.5 bg-muted rounded text-muted-foreground">Analysis Pending</span>
+                        )}
                       </div>
 
                       {/* Ingredients */}
@@ -365,15 +393,15 @@ export function EnhancedBenchmarkComparison({
                           Ingredients
                         </p>
                         <div className="space-y-0.5">
-                          {parseCompetitorIngredients(product.ingredients).map((ing, i) => (
-                            <div key={i} className="flex items-start gap-1 text-[10px] text-muted-foreground">
-                              <span className="w-1 h-1 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
-                              <span className="line-clamp-1">{ing}</span>
-                            </div>
-                          ))}
-                          {parseCompetitorIngredients(product.ingredients).length === 0 && (
-                            <p className="text-[10px] text-muted-foreground italic">No data</p>
-                          )}
+                          {(() => {
+                            const { items, fallback } = parseCompetitorIngredients(product);
+                            return items.map((ing, i) => (
+                              <div key={i} className={`flex items-start gap-1 text-[10px] ${fallback ? 'text-primary' : 'text-muted-foreground'}`}>
+                                <span className="w-1 h-1 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
+                                <span className="line-clamp-1">{ing}</span>
+                              </div>
+                            ));
+                          })()}
                         </div>
                       </div>
 
@@ -383,7 +411,24 @@ export function EnhancedBenchmarkComparison({
                           <Megaphone className="w-3 h-3 text-blue-500" />
                           Marketing
                         </p>
-                        <p className="text-[10px] text-muted-foreground line-clamp-2">{getCompetitorMessaging(product)}</p>
+                        {hasMarketingAnalysis(product) ? (
+                          <div className="space-y-0.5">
+                            {(() => {
+                              const marketing = getCompetitorMarketing(product);
+                              if (!marketing || marketing.length === 0) {
+                                return <p className="text-[10px] text-muted-foreground">Not specified</p>;
+                              }
+                              return marketing.map((item, i) => (
+                                <div key={i} className="flex items-start gap-1 text-[10px] text-muted-foreground">
+                                  <span className="w-1 h-1 rounded-full bg-blue-500 mt-1.5 shrink-0" />
+                                  <span className="line-clamp-1">{item}</span>
+                                </div>
+                              ));
+                            })()}
+                          </div>
+                        ) : (
+                          <span className="text-[10px] px-1.5 py-0.5 bg-muted rounded text-muted-foreground">Analysis Pending</span>
+                        )}
                       </div>
 
                       {/* Target Audience */}
@@ -392,7 +437,13 @@ export function EnhancedBenchmarkComparison({
                           <Users className="w-3 h-3 text-violet-500" />
                           Target Audience
                         </p>
-                        <p className="text-[10px] text-muted-foreground line-clamp-2">{getCompetitorAudience(product)}</p>
+                        {hasMarketingAnalysis(product) ? (
+                          <p className="text-[10px] text-muted-foreground line-clamp-2">
+                            {getCompetitorAudience(product) || 'Not specified'}
+                          </p>
+                        ) : (
+                          <span className="text-[10px] px-1.5 py-0.5 bg-muted rounded text-muted-foreground">Analysis Pending</span>
+                        )}
                       </div>
 
                       {/* Pain Points */}
@@ -401,17 +452,24 @@ export function EnhancedBenchmarkComparison({
                           <AlertTriangle className="w-3 h-3 text-rose-500" />
                           Suffers From
                         </p>
-                        <div className="space-y-0.5">
-                          {getCompetitorPainPoints(product).map((pp, i) => (
-                            <div key={i} className="flex items-start gap-1 text-[10px] text-muted-foreground">
-                              <span className="w-1 h-1 rounded-full bg-rose-500 mt-1.5 shrink-0" />
-                              <span className="line-clamp-1">{pp.issue}</span>
-                            </div>
-                          ))}
-                          {getCompetitorPainPoints(product).length === 0 && (
-                            <p className="text-[10px] text-muted-foreground italic">No data</p>
-                          )}
-                        </div>
+                        {hasReviewAnalysis(product) ? (
+                          <div className="space-y-0.5">
+                            {(() => {
+                              const painPoints = getCompetitorPainPoints(product);
+                              if (painPoints.length === 0) {
+                                return <p className="text-[10px] text-muted-foreground">No issues reported</p>;
+                              }
+                              return painPoints.map((pp, i) => (
+                                 <div key={i} className="flex items-start gap-1 text-[10px] text-muted-foreground">
+                                  <span className="w-1 h-1 rounded-full bg-rose-500 mt-1.5 shrink-0" />
+                                  <span className="line-clamp-1">{pp.issue}</span>
+                                </div>
+                              ));
+                            })()}
+                          </div>
+                        ) : (
+                          <span className="text-[10px] px-1.5 py-0.5 bg-muted rounded text-muted-foreground">Analysis Pending</span>
+                        )}
                       </div>
                     </div>
                   </div>

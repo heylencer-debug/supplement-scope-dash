@@ -33,13 +33,20 @@ interface AnalysisScores {
 }
 
 interface ReviewAnalysis {
-  pain_points?: Array<{ theme: string; affected_percentage?: number }>;
+  pain_points?: Array<{ issue: string; affected_percentage?: number; category?: string; severity?: string }>;
 }
 
 interface MarketingAnalysis {
   competitive_positioning?: string;
   lifestyle_positioning?: {
     primary_lifestyle?: string;
+  };
+}
+
+interface KeyInsights {
+  go_to_market?: {
+    positioning?: string;
+    messaging?: string[];
   };
 }
 
@@ -54,6 +61,7 @@ export default function BenchmarkComparison({
   }
 
   const analysisScores = analysis?.analysis_1_category_scores as AnalysisScores | null;
+  const keyInsights = analysis?.key_insights as KeyInsights | null;
 
   const getRecommendedPrice = () => {
     return analysisScores?.product_development?.pricing?.recommended_price;
@@ -76,7 +84,9 @@ export default function BenchmarkComparison({
   };
 
   const getPositioning = () => {
-    return analysisScores?.go_to_market?.positioning || "Premium Quality Focus";
+    return keyInsights?.go_to_market?.positioning 
+      || analysisScores?.go_to_market?.positioning 
+      || "Premium Quality Focus";
   };
 
   const getOurPainPoints = () => {
@@ -89,7 +99,7 @@ export default function BenchmarkComparison({
     const reviewAnalysis = product.review_analysis as ReviewAnalysis | null;
     const painPoints = reviewAnalysis?.pain_points;
     if (!painPoints || !Array.isArray(painPoints)) return [];
-    return painPoints.slice(0, 2).map(p => typeof p === 'string' ? p : p.theme);
+    return painPoints.slice(0, 2).map(p => typeof p === 'string' ? p : p.issue);
   };
 
   const getCompetitorPositioning = (product: Product) => {
@@ -106,7 +116,11 @@ export default function BenchmarkComparison({
 
   const getFeatureBullets = (product: Product) => {
     if (product.feature_bullets && Array.isArray(product.feature_bullets)) {
-      return product.feature_bullets.slice(0, 3);
+      return product.feature_bullets.slice(0, 3).map(bullet => 
+        typeof bullet === 'string' && bullet.length > 60 
+          ? bullet.slice(0, 60) + '...' 
+          : bullet
+      );
     }
     return [];
   };
@@ -128,35 +142,35 @@ export default function BenchmarkComparison({
       <CardContent>
         <ScrollArea className="w-full">
           <div className="flex min-w-max">
-            {/* Our Concept Column - Fixed */}
-            <div className="w-64 flex-shrink-0 border-r-2 border-amber-500/30">
+            {/* Our Concept Column - Fixed with Gold/Orange styling */}
+            <div className="w-64 flex-shrink-0 border-r-2 border-amber-400 bg-gradient-to-b from-amber-50/80 to-orange-50/30 dark:from-amber-950/30 dark:to-orange-950/20">
               {/* Header */}
-              <div className="bg-gradient-to-r from-amber-500 to-amber-600 text-white p-4 rounded-tl-lg border-l-4 border-[#1e3a5f]">
+              <div className="bg-gradient-to-r from-amber-500 via-amber-500 to-orange-500 text-white p-4 rounded-tl-lg shadow-lg border-l-4 border-amber-700">
                 <div className="flex items-center gap-2">
-                  <Trophy className="w-5 h-5" />
-                  <span className="font-bold">OUR CONCEPT</span>
+                  <Trophy className="w-5 h-5 drop-shadow" />
+                  <span className="font-bold tracking-wide">OUR CONCEPT</span>
                 </div>
                 <p className="text-xs text-amber-100 mt-1">Winning Strategy</p>
               </div>
 
               {/* Price & Value Row */}
-              <div className="p-4 border-b bg-emerald-50/50 dark:bg-emerald-950/20">
-                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
+              <div className="p-4 border-b border-amber-200/50 dark:border-amber-800/30 bg-amber-50/60 dark:bg-amber-950/30">
+                <div className="flex items-center gap-2 text-sm font-medium text-amber-800 dark:text-amber-300 mb-2">
                   <DollarSign className="w-4 h-4" />
                   PRICE & VALUE
                 </div>
                 <div className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-600" />
-                  <span className="font-bold text-lg">
+                  <Check className="w-4 h-4 text-amber-600" />
+                  <span className="font-bold text-lg text-amber-900 dark:text-amber-100">
                     ${getRecommendedPrice()?.toFixed(2) || "TBD"}
                   </span>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">{getPricingTier()}</p>
+                <p className="text-xs text-amber-700/70 dark:text-amber-400/70 mt-1">{getPricingTier()}</p>
               </div>
 
               {/* Core Formula Row */}
-              <div className="p-4 border-b bg-emerald-50/50 dark:bg-emerald-950/20">
-                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
+              <div className="p-4 border-b border-amber-200/50 dark:border-amber-800/30 bg-amber-50/60 dark:bg-amber-950/30">
+                <div className="flex items-center gap-2 text-sm font-medium text-amber-800 dark:text-amber-300 mb-2">
                   <FlaskConical className="w-4 h-4" />
                   CORE FORMULA
                 </div>
@@ -164,52 +178,52 @@ export default function BenchmarkComparison({
                   {getRecommendedIngredients().length > 0 ? (
                     getRecommendedIngredients().map((ing, idx) => (
                       <div key={idx} className="flex items-start gap-2 text-sm">
-                        <Check className="w-3 h-3 text-emerald-600 mt-0.5 flex-shrink-0" />
-                        <span className="truncate">{typeof ing === 'string' ? ing : ing.ingredient}</span>
+                        <Check className="w-3 h-3 text-amber-600 mt-0.5 flex-shrink-0" />
+                        <span className="truncate text-amber-900 dark:text-amber-100">{typeof ing === 'string' ? ing : ing.ingredient}</span>
                       </div>
                     ))
                   ) : (
-                    <span className="text-sm text-muted-foreground">Analysis pending</span>
+                    <span className="text-sm text-amber-700/70 dark:text-amber-400/70">Analysis pending</span>
                   )}
                 </div>
               </div>
 
               {/* Marketing Strategy Row */}
-              <div className="p-4 border-b bg-emerald-50/50 dark:bg-emerald-950/20">
-                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
+              <div className="p-4 border-b border-amber-200/50 dark:border-amber-800/30 bg-amber-50/60 dark:bg-amber-950/30">
+                <div className="flex items-center gap-2 text-sm font-medium text-amber-800 dark:text-amber-300 mb-2">
                   <Megaphone className="w-4 h-4" />
                   MARKETING
                 </div>
                 <div className="flex items-start gap-2 text-sm">
-                  <Check className="w-3 h-3 text-emerald-600 mt-0.5 flex-shrink-0" />
-                  <span>{getPositioning()}</span>
+                  <Check className="w-3 h-3 text-amber-600 mt-0.5 flex-shrink-0" />
+                  <span className="text-amber-900 dark:text-amber-100 italic">"{getPositioning()}"</span>
                 </div>
               </div>
 
               {/* Pain Gap Row */}
-              <div className="p-4 border-b bg-emerald-50/50 dark:bg-emerald-950/20">
-                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
+              <div className="p-4 border-b border-amber-200/50 dark:border-amber-800/30 bg-amber-50/60 dark:bg-amber-950/30">
+                <div className="flex items-center gap-2 text-sm font-medium text-amber-800 dark:text-amber-300 mb-2">
                   <HeartCrack className="w-4 h-4" />
                   PAIN GAP
                 </div>
-                <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400 mb-1">Solves For:</p>
+                <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1">Solves For:</p>
                 <div className="space-y-1">
                   {getOurPainPoints().length > 0 ? (
                     getOurPainPoints().map((point, idx) => (
                       <div key={idx} className="flex items-start gap-2 text-xs">
-                        <Check className="w-3 h-3 text-emerald-600 mt-0.5 flex-shrink-0" />
-                        <span className="line-clamp-2">{point}</span>
+                        <Check className="w-3 h-3 text-amber-600 mt-0.5 flex-shrink-0" />
+                        <span className="line-clamp-2 text-amber-900 dark:text-amber-100">{point}</span>
                       </div>
                     ))
                   ) : (
-                    <span className="text-xs text-muted-foreground">Analysis pending</span>
+                    <span className="text-xs text-amber-700/70 dark:text-amber-400/70">Analysis pending</span>
                   )}
                 </div>
               </div>
 
               {/* Key Features Row */}
-              <div className="p-4 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-bl-lg">
-                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
+              <div className="p-4 bg-amber-50/60 dark:bg-amber-950/30 rounded-bl-lg">
+                <div className="flex items-center gap-2 text-sm font-medium text-amber-800 dark:text-amber-300 mb-2">
                   <Sparkles className="w-4 h-4" />
                   KEY FEATURES
                 </div>
@@ -217,12 +231,12 @@ export default function BenchmarkComparison({
                   {getKeyFeatures().length > 0 ? (
                     getKeyFeatures().map((feature, idx) => (
                       <div key={idx} className="flex items-start gap-2 text-xs">
-                        <Check className="w-3 h-3 text-emerald-600 mt-0.5 flex-shrink-0" />
-                        <span className="line-clamp-2">{feature}</span>
+                        <Check className="w-3 h-3 text-amber-600 mt-0.5 flex-shrink-0" />
+                        <span className="line-clamp-2 text-amber-900 dark:text-amber-100">{feature}</span>
                       </div>
                     ))
                   ) : (
-                    <span className="text-xs text-muted-foreground">Analysis pending</span>
+                    <span className="text-xs text-amber-700/70 dark:text-amber-400/70">Analysis pending</span>
                   )}
                 </div>
               </div>
@@ -286,7 +300,7 @@ export default function BenchmarkComparison({
                         </div>
                       ))
                     ) : (
-                      <span className="text-xs text-muted-foreground">No data</span>
+                      <span className="text-xs text-muted-foreground italic">No specific complaints found</span>
                     )}
                   </div>
                 </div>
@@ -298,7 +312,7 @@ export default function BenchmarkComparison({
                     {getFeatureBullets(product).length > 0 ? (
                       getFeatureBullets(product).map((bullet, idx) => (
                         <p key={idx} className="text-xs text-muted-foreground line-clamp-2">
-                          • {typeof bullet === 'string' ? bullet.slice(0, 50) : bullet}...
+                          • {bullet}
                         </p>
                       ))
                     ) : (

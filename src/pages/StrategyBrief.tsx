@@ -4,12 +4,11 @@ import {
   FileText, Download, Printer, CheckCircle, AlertTriangle, Target, 
   TrendingUp, DollarSign, Users, Loader2, Lightbulb, Package, Beaker,
   Factory, ShieldCheck, Clock, Boxes, AlertCircle, FlaskConical, 
-  Pill, Leaf, Heart, ShoppingBag, XCircle
+  Pill, Heart, XCircle, Scale
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { useCategoryAnalysis } from "@/hooks/useCategoryAnalyses";
 import { useCategoryDashboard } from "@/hooks/useCategoryDashboard";
@@ -17,6 +16,17 @@ import { useCategoryContext } from "@/contexts/CategoryContext";
 import { useCategoryByName } from "@/hooks/useCategoryByName";
 import { useFormulaBrief } from "@/hooks/useFormulaBrief";
 import { useCategoryScores } from "@/hooks/useCategoryScores";
+import { useProducts } from "@/hooks/useProducts";
+
+interface IngredientComparison {
+  name: string;
+  recommendedDosage?: string;
+  recommendedForm?: string;
+  competitorMin?: string;
+  competitorMax?: string;
+  competitorAvg?: string;
+  competitorCount: number;
+}
 
 interface ProductDevelopment {
   formulation?: {
@@ -74,8 +84,9 @@ export default function StrategyBrief() {
   const { data: dashboardData, isLoading: dashboardLoading } = useCategoryDashboard();
   const { data: formulaBrief, isLoading: formulaLoading } = useFormulaBrief(effectiveCategoryId);
   const { data: categoryScores, isLoading: scoresLoading } = useCategoryScores(effectiveCategoryId);
+  const { data: products, isLoading: productsLoading } = useProducts(effectiveCategoryId);
 
-  const isLoading = categoryLoading || analysisLoading || dashboardLoading || formulaLoading || scoresLoading;
+  const isLoading = categoryLoading || analysisLoading || dashboardLoading || formulaLoading || scoresLoading || productsLoading;
   const categoryData = dashboardData?.find((d) => d.id === effectiveCategoryId);
 
   // Parse analysis_1_category_scores for formulation data
@@ -92,6 +103,91 @@ export default function StrategyBrief() {
     const analysis3 = analysis?.analysis_3_formula_brief as FormulaBriefContent | null;
     return analysis3?.formula_brief_content || null;
   }, [analysis]);
+
+  // Aggregate ingredient dosages from competitor products
+  const ingredientComparison = useMemo((): IngredientComparison[] => {
+    if (!products || products.length === 0) return [];
+
+    // Get recommended ingredients from product development
+    const recommendedIngredients = productDevelopment?.formulation?.recommended_ingredients || [];
+    
+    // Build a map of ingredient names to their dosages across products
+    const ingredientMap = new Map<string, { dosages: number[]; forms: string[] }>();
+
+    products.forEach(product => {
+      const nutrients = product.all_nutrients as Array<{ name?: string; amount?: string; unit?: string; form?: string }> | null;
+      if (!nutrients || !Array.isArray(nutrients)) return;
+
+      nutrients.forEach(nutrient => {
+        if (!nutrient.name) return;
+        
+        const name = nutrient.name.toLowerCase().trim();
+        const existing = ingredientMap.get(name) || { dosages: [], forms: [] };
+        
+        // Parse dosage value
+        if (nutrient.amount) {
+          const numValue = parseFloat(nutrient.amount.replace(/[^0-9.]/g, ''));
+          if (!isNaN(numValue) && numValue > 0) {
+            existing.dosages.push(numValue);
+          }
+        }
+        
+        if (nutrient.form && !existing.forms.includes(nutrient.form)) {
+          existing.forms.push(nutrient.form);
+        }
+        
+        ingredientMap.set(name, existing);
+      });
+    });
+
+    // Build comparison data
+    const comparisons: IngredientComparison[] = [];
+
+    // Process recommended ingredients first
+    recommendedIngredients.forEach(ingredient => {
+      const name = typeof ingredient === 'string' ? ingredient : ingredient.name;
+      const normalizedName = name.toLowerCase().trim();
+      const competitorData = ingredientMap.get(normalizedName);
+
+      const comparison: IngredientComparison = {
+        name,
+        recommendedDosage: typeof ingredient === 'object' ? ingredient.dosage : undefined,
+        recommendedForm: typeof ingredient === 'object' ? ingredient.form : undefined,
+        competitorCount: competitorData?.dosages.length || 0,
+      };
+
+      if (competitorData && competitorData.dosages.length > 0) {
+        const sorted = [...competitorData.dosages].sort((a, b) => a - b);
+        comparison.competitorMin = sorted[0].toString();
+        comparison.competitorMax = sorted[sorted.length - 1].toString();
+        comparison.competitorAvg = (sorted.reduce((a, b) => a + b, 0) / sorted.length).toFixed(1);
+      }
+
+      comparisons.push(comparison);
+      ingredientMap.delete(normalizedName);
+    });
+
+    // Add top competitor ingredients not in recommendations
+    const topCompetitorIngredients = Array.from(ingredientMap.entries())
+      .filter(([_, data]) => data.dosages.length >= 3)
+      .sort((a, b) => b[1].dosages.length - a[1].dosages.length)
+      .slice(0, 10);
+
+    topCompetitorIngredients.forEach(([name, data]) => {
+      if (data.dosages.length > 0) {
+        const sorted = [...data.dosages].sort((a, b) => a - b);
+        comparisons.push({
+          name: name.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
+          competitorMin: sorted[0].toString(),
+          competitorMax: sorted[sorted.length - 1].toString(),
+          competitorAvg: (sorted.reduce((a, b) => a + b, 0) / sorted.length).toFixed(1),
+          competitorCount: data.dosages.length,
+        });
+      }
+    });
+
+    return comparisons;
+  }, [products, productDevelopment]);
 
   // Helper to safely convert JSONB to array
   const toArray = (value: unknown): string[] => {
@@ -397,6 +493,107 @@ export default function StrategyBrief() {
                   )}
                 </div>
               ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Ingredient Dosage Comparison Table */}
+      {ingredientComparison.length > 0 && (
+        <Card className="border-orange-500/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Scale className="w-5 h-5 text-orange-500" />
+              Ingredient Dosage Comparison
+            </CardTitle>
+            <CardDescription>Recommended dosages vs competitor product ranges</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-3 px-2 font-medium text-foreground">Ingredient</th>
+                    <th className="text-center py-3 px-2 font-medium text-foreground">
+                      <div className="flex flex-col items-center">
+                        <span>Recommended</span>
+                        <span className="text-xs text-muted-foreground font-normal">Dosage</span>
+                      </div>
+                    </th>
+                    <th className="text-center py-3 px-2 font-medium text-foreground">
+                      <div className="flex flex-col items-center">
+                        <span>Competitor Range</span>
+                        <span className="text-xs text-muted-foreground font-normal">Min - Max</span>
+                      </div>
+                    </th>
+                    <th className="text-center py-3 px-2 font-medium text-foreground">
+                      <div className="flex flex-col items-center">
+                        <span>Competitor Avg</span>
+                        <span className="text-xs text-muted-foreground font-normal"># Products</span>
+                      </div>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ingredientComparison.map((item, idx) => (
+                    <tr key={idx} className={`border-b last:border-0 ${item.recommendedDosage ? 'bg-green-500/5' : ''}`}>
+                      <td className="py-3 px-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-foreground">{item.name}</span>
+                          {item.recommendedDosage && (
+                            <Badge variant="outline" className="text-xs border-green-500/50 text-green-600">
+                              Recommended
+                            </Badge>
+                          )}
+                        </div>
+                        {item.recommendedForm && (
+                          <p className="text-xs text-muted-foreground mt-1">Form: {item.recommendedForm}</p>
+                        )}
+                      </td>
+                      <td className="py-3 px-2 text-center">
+                        {item.recommendedDosage ? (
+                          <Badge className="bg-green-500 text-white">{item.recommendedDosage}</Badge>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-2 text-center">
+                        {item.competitorMin && item.competitorMax ? (
+                          <span className="text-muted-foreground">
+                            {item.competitorMin} - {item.competitorMax}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-2 text-center">
+                        <div className="flex flex-col items-center">
+                          {item.competitorAvg ? (
+                            <>
+                              <span className="font-medium text-foreground">{item.competitorAvg}</span>
+                              <span className="text-xs text-muted-foreground">
+                                ({item.competitorCount} products)
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="mt-4 flex items-center gap-4 text-xs text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded bg-green-500/20 border border-green-500/50" />
+                <span>Recommended ingredients</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded bg-secondary border" />
+                <span>Common competitor ingredients</span>
+              </div>
             </div>
           </CardContent>
         </Card>

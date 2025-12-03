@@ -41,6 +41,16 @@ interface MarketingAnalysis {
   overall_score?: number;
   opportunities?: string[];
   positioning_suggestions?: string[];
+  image_analysis?: {
+    overall_quality_score?: number;
+    main_image_assessment?: { clarity?: number; professionalism?: number; product_visibility?: number; background_quality?: string; lighting_quality?: string };
+    lifestyle_imagery?: { present?: boolean; effectiveness?: number; use_case_clarity?: string; emotional_appeal?: string };
+    infographic_usage?: { present?: boolean; information_clarity?: number; data_visualization?: string };
+    label_visibility?: { supplement_facts_visible?: boolean; ingredients_readable?: boolean; claims_prominent?: boolean };
+    image_count_assessment?: { total_images?: number; recommended?: number; variety_score?: number };
+    improvement_suggestions?: string[];
+    strengths?: string[];
+  };
 }
 
 interface ReviewAnalysis {
@@ -531,6 +541,166 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                   </CardContent>
                 </Card>
               )}
+              
+              {/* Image Analysis Section */}
+              {marketingAnalysis?.image_analysis && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      <Image className="w-4 h-4 text-primary" />
+                      Image Analysis
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {/* Overall Quality Score */}
+                    {marketingAnalysis.image_analysis.overall_quality_score !== undefined && (
+                      <div className="flex items-center gap-4">
+                        <div className="relative w-16 h-16">
+                          <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                            <circle cx="50" cy="50" r="40" fill="none" stroke="hsl(var(--secondary))" strokeWidth="10" />
+                            <circle cx="50" cy="50" r="40" fill="none" stroke="hsl(var(--primary))" strokeWidth="10" strokeLinecap="round" strokeDasharray={`${marketingAnalysis.image_analysis.overall_quality_score * 25.1} 251`} />
+                          </svg>
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <span className="text-lg font-bold">{marketingAnalysis.image_analysis.overall_quality_score}</span>
+                          </div>
+                        </div>
+                        <div>
+                          <p className="font-medium">Overall Image Quality</p>
+                          <p className="text-sm text-muted-foreground">Score out of 10</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Main Image Assessment */}
+                    {marketingAnalysis.image_analysis.main_image_assessment && (
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium">Main Image Assessment</p>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                          {marketingAnalysis.image_analysis.main_image_assessment.clarity !== undefined && (
+                            <div className="space-y-1">
+                              <div className="flex justify-between text-xs"><span className="text-muted-foreground">Clarity</span><span>{marketingAnalysis.image_analysis.main_image_assessment.clarity}/10</span></div>
+                              <Progress value={marketingAnalysis.image_analysis.main_image_assessment.clarity * 10} className="h-1.5" />
+                            </div>
+                          )}
+                          {marketingAnalysis.image_analysis.main_image_assessment.professionalism !== undefined && (
+                            <div className="space-y-1">
+                              <div className="flex justify-between text-xs"><span className="text-muted-foreground">Professionalism</span><span>{marketingAnalysis.image_analysis.main_image_assessment.professionalism}/10</span></div>
+                              <Progress value={marketingAnalysis.image_analysis.main_image_assessment.professionalism * 10} className="h-1.5" />
+                            </div>
+                          )}
+                          {marketingAnalysis.image_analysis.main_image_assessment.product_visibility !== undefined && (
+                            <div className="space-y-1">
+                              <div className="flex justify-between text-xs"><span className="text-muted-foreground">Product Visibility</span><span>{marketingAnalysis.image_analysis.main_image_assessment.product_visibility}/10</span></div>
+                              <Progress value={marketingAnalysis.image_analysis.main_image_assessment.product_visibility * 10} className="h-1.5" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {marketingAnalysis.image_analysis.main_image_assessment.background_quality && (
+                            <Badge variant="outline" className="text-xs">Background: {marketingAnalysis.image_analysis.main_image_assessment.background_quality}</Badge>
+                          )}
+                          {marketingAnalysis.image_analysis.main_image_assessment.lighting_quality && (
+                            <Badge variant="outline" className="text-xs">Lighting: {marketingAnalysis.image_analysis.main_image_assessment.lighting_quality}</Badge>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Lifestyle Imagery */}
+                    {marketingAnalysis.image_analysis.lifestyle_imagery && (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium">Lifestyle Imagery</p>
+                          <Badge variant={marketingAnalysis.image_analysis.lifestyle_imagery.present ? "default" : "secondary"} className="text-xs">
+                            {marketingAnalysis.image_analysis.lifestyle_imagery.present ? "Present" : "Missing"}
+                          </Badge>
+                        </div>
+                        {marketingAnalysis.image_analysis.lifestyle_imagery.present && (
+                          <div className="grid grid-cols-2 gap-3 text-sm">
+                            {marketingAnalysis.image_analysis.lifestyle_imagery.effectiveness !== undefined && (
+                              <div className="space-y-1">
+                                <div className="flex justify-between text-xs"><span className="text-muted-foreground">Effectiveness</span><span>{marketingAnalysis.image_analysis.lifestyle_imagery.effectiveness}/10</span></div>
+                                <Progress value={marketingAnalysis.image_analysis.lifestyle_imagery.effectiveness * 10} className="h-1.5" />
+                              </div>
+                            )}
+                            {marketingAnalysis.image_analysis.lifestyle_imagery.use_case_clarity && (
+                              <div><span className="text-xs text-muted-foreground">Use Case:</span> <span className="text-xs">{marketingAnalysis.image_analysis.lifestyle_imagery.use_case_clarity}</span></div>
+                            )}
+                            {marketingAnalysis.image_analysis.lifestyle_imagery.emotional_appeal && (
+                              <div><span className="text-xs text-muted-foreground">Emotional Appeal:</span> <span className="text-xs">{marketingAnalysis.image_analysis.lifestyle_imagery.emotional_appeal}</span></div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Label Visibility */}
+                    {marketingAnalysis.image_analysis.label_visibility && (
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium">Label Visibility</p>
+                        <div className="flex flex-wrap gap-2">
+                          <Badge variant={marketingAnalysis.image_analysis.label_visibility.supplement_facts_visible ? "default" : "outline"} className="text-xs">
+                            {marketingAnalysis.image_analysis.label_visibility.supplement_facts_visible ? "✓" : "✗"} Supplement Facts
+                          </Badge>
+                          <Badge variant={marketingAnalysis.image_analysis.label_visibility.ingredients_readable ? "default" : "outline"} className="text-xs">
+                            {marketingAnalysis.image_analysis.label_visibility.ingredients_readable ? "✓" : "✗"} Ingredients Readable
+                          </Badge>
+                          <Badge variant={marketingAnalysis.image_analysis.label_visibility.claims_prominent ? "default" : "outline"} className="text-xs">
+                            {marketingAnalysis.image_analysis.label_visibility.claims_prominent ? "✓" : "✗"} Claims Prominent
+                          </Badge>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Image Count */}
+                    {marketingAnalysis.image_analysis.image_count_assessment && (
+                      <div className="flex items-center gap-4 p-3 bg-secondary/50 rounded-lg">
+                        <div className="text-center">
+                          <p className="text-lg font-bold">{marketingAnalysis.image_analysis.image_count_assessment.total_images ?? product.images_count ?? allImages.length}</p>
+                          <p className="text-xs text-muted-foreground">Images</p>
+                        </div>
+                        {marketingAnalysis.image_analysis.image_count_assessment.recommended && (
+                          <div className="text-center">
+                            <p className="text-lg font-bold">{marketingAnalysis.image_analysis.image_count_assessment.recommended}</p>
+                            <p className="text-xs text-muted-foreground">Recommended</p>
+                          </div>
+                        )}
+                        {marketingAnalysis.image_analysis.image_count_assessment.variety_score !== undefined && (
+                          <div className="flex-1">
+                            <div className="flex justify-between text-xs mb-1"><span className="text-muted-foreground">Variety Score</span><span>{marketingAnalysis.image_analysis.image_count_assessment.variety_score}/10</span></div>
+                            <Progress value={marketingAnalysis.image_analysis.image_count_assessment.variety_score * 10} className="h-1.5" />
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Strengths */}
+                    {marketingAnalysis.image_analysis.strengths && marketingAnalysis.image_analysis.strengths.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium flex items-center gap-1"><CheckCircle className="w-4 h-4 text-green-500" /> Image Strengths</p>
+                        <ul className="space-y-1">
+                          {marketingAnalysis.image_analysis.strengths.map((s, idx) => (
+                            <li key={idx} className="text-sm text-muted-foreground flex items-start gap-2"><span className="text-green-500">•</span>{s}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Improvement Suggestions */}
+                    {marketingAnalysis.image_analysis.improvement_suggestions && marketingAnalysis.image_analysis.improvement_suggestions.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium flex items-center gap-1"><Lightbulb className="w-4 h-4 text-yellow-500" /> Improvement Suggestions</p>
+                        <ul className="space-y-1">
+                          {marketingAnalysis.image_analysis.improvement_suggestions.map((s, idx) => (
+                            <li key={idx} className="text-sm text-muted-foreground flex items-start gap-2"><span className="text-yellow-500">→</span>{s}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
               {!marketingAnalysis && <Card><CardContent className="py-8 text-center text-muted-foreground">No marketing analysis data available for this product.</CardContent></Card>}
             </div>
           </TabsContent>

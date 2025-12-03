@@ -163,13 +163,29 @@ export default function Dashboard() {
       weighted_score: cb.weighted_score || 0,
     }));
 
-    // Top strengths and weaknesses
-    const topStrengths = (analysis2?.top_strengths as string[]) || (analysis?.top_strengths as string[]) || [];
-    const topWeaknesses = (analysis2?.top_weaknesses as string[]) || (analysis?.top_weaknesses as string[]) || [];
+    // Top strengths and weaknesses - handle both string[] and object[] formats
+    const rawStrengths = (analysis2?.top_strengths as unknown[]) || (analysis?.top_strengths as unknown[]) || [];
+    const rawWeaknesses = (analysis2?.top_weaknesses as unknown[]) || (analysis?.top_weaknesses as unknown[]) || [];
+    
+    // Extract string values from potentially object arrays
+    const extractStrings = (arr: unknown[]): string[] => {
+      return arr.map(item => {
+        if (typeof item === 'string') return item;
+        if (item && typeof item === 'object') {
+          const obj = item as Record<string, unknown>;
+          return (obj.criterion || obj.justification || obj.name || String(obj.score || '')) as string;
+        }
+        return String(item);
+      }).filter(Boolean);
+    };
+    
+    const topStrengths = extractStrings(rawStrengths);
+    const topWeaknesses = extractStrings(rawWeaknesses);
     
     // Risks from key_insights
     const risks = keyInsights?.risks as Record<string, unknown> | null;
-    const categoryRisks = (risks?.category_challenges as string[]) || [];
+    const rawCategoryRisks = (risks?.category_challenges as unknown[]) || [];
+    const categoryRisks = extractStrings(rawCategoryRisks);
     const criticalRisks = [...topWeaknesses.slice(0, 2), ...categoryRisks.slice(0, 2)];
 
     // Financial data

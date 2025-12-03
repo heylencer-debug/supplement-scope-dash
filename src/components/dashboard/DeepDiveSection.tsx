@@ -1,8 +1,7 @@
 import { useState, useMemo } from "react";
-import { CheckCircle2, AlertTriangle, Info, Filter } from "lucide-react";
+import { Info, Filter } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CriteriaCard } from "./CriteriaCard";
 import {
@@ -86,9 +85,6 @@ const getScoreColor = (score: number): string => {
 export function DeepDiveSection({
   criteriaScores,
   criteriaBreakdown = [],
-  executiveSummary,
-  topOpportunities,
-  criticalRisks,
   isLoading = false,
 }: DeepDiveSectionProps) {
   // Create a map of justifications from criteriaBreakdown
@@ -122,171 +118,84 @@ export function DeepDiveSection({
   });
 
   return (
-    <div className="space-y-6">
-      {/* Top Row: Radar Chart + Strategy Column */}
-      <div className="grid lg:grid-cols-3 gap-6">
-        {/* Left: Radar Chart (2/3 width) */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold text-[#1e3a5f]">
-              18-Point Analysis
-            </CardTitle>
-            <CardDescription>
-              Performance across key market criteria (hover for details)
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="flex items-center justify-center h-[350px]">
-                <Skeleton className="w-72 h-72 rounded-full" />
-              </div>
-            ) : radarData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={400}>
-                <RadarChart data={radarData} margin={{ top: 30, right: 40, bottom: 30, left: 40 }}>
-                  <PolarGrid stroke="hsl(var(--border))" />
-                  <PolarAngleAxis
-                    dataKey="criteria"
-                    tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 8 }}
-                  />
-                  <PolarRadiusAxis
-                    angle={30}
-                    domain={[0, 10]}
-                    tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }}
-                  />
-                  <Radar
-                    name="Score"
-                    dataKey="score"
-                    stroke="#0ea5e9"
-                    fill="#0ea5e9"
-                    fillOpacity={0.25}
-                    strokeWidth={2}
-                  />
-                  <RechartsTooltip
-                    content={({ payload }) => {
-                      if (payload && payload.length > 0) {
-                        const data = payload[0].payload;
-                        return (
-                          <div className="bg-popover border border-border rounded-md p-3 shadow-lg max-w-xs">
-                            <p className="font-semibold text-sm text-foreground">{data.fullName}</p>
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className={`text-lg font-bold ${getScoreColor(data.score)}`}>
-                                {data.score}/10
-                              </span>
-                              <span className="text-xs text-muted-foreground">
-                                (weight: {data.weight}x)
-                              </span>
-                            </div>
-                            {data.justification && (
-                              <p className="text-xs text-muted-foreground mt-2 line-clamp-3">
-                                {data.justification}
-                              </p>
-                            )}
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                </RadarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex items-center justify-center h-[350px] text-muted-foreground">
-                No criteria scores available
-              </div>
-            )}
-          </CardContent>
-        </Card>
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg font-semibold text-[#1e3a5f]">
+          18-Point Analysis
+        </CardTitle>
+        <CardDescription>
+          Performance across key market criteria (hover for details)
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="flex items-center justify-center h-[300px]">
+            <Skeleton className="w-64 h-64 rounded-full" />
+          </div>
+        ) : radarData.length > 0 ? (
+          <ResponsiveContainer width="100%" height={350}>
+            <RadarChart data={radarData} margin={{ top: 20, right: 30, bottom: 20, left: 30 }}>
+              <PolarGrid stroke="hsl(var(--border))" />
+              <PolarAngleAxis
+                dataKey="criteria"
+                tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 8 }}
+              />
+              <PolarRadiusAxis
+                angle={30}
+                domain={[0, 10]}
+                tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }}
+              />
+              <Radar
+                name="Score"
+                dataKey="score"
+                stroke="#0ea5e9"
+                fill="#0ea5e9"
+                fillOpacity={0.25}
+                strokeWidth={2}
+              />
+              <RechartsTooltip
+                content={({ payload }) => {
+                  if (payload && payload.length > 0) {
+                    const data = payload[0].payload;
+                    return (
+                      <div className="bg-popover border border-border rounded-md p-3 shadow-lg max-w-xs">
+                        <p className="font-semibold text-sm text-foreground">{data.fullName}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className={`text-lg font-bold ${getScoreColor(data.score)}`}>
+                            {data.score}/10
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            (weight: {data.weight}x)
+                          </span>
+                        </div>
+                        {data.justification && (
+                          <p className="text-xs text-muted-foreground mt-2 line-clamp-3">
+                            {data.justification}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  }
+                  return null;
+                }}
+              />
+            </RadarChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+            No criteria scores available
+          </div>
+        )}
 
-        {/* Right: Strategy Column (1/3 width) */}
-        <div className="space-y-4">
-          {/* Executive Summary */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold text-[#1e3a5f]">
-                Executive Summary
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-3/4" />
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  {executiveSummary || "Executive summary not available yet."}
-                </p>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Top Opportunities */}
-          <Card className="border-emerald-200 bg-emerald-50/50 dark:bg-emerald-950/20 dark:border-emerald-900">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4" />
-                Top Opportunities
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-full" />
-                </div>
-              ) : topOpportunities.length > 0 ? (
-                <ul className="space-y-2">
-                  {topOpportunities.slice(0, 4).map((opp, idx) => (
-                    <li key={idx} className="flex items-start gap-2 text-sm text-emerald-800 dark:text-emerald-300">
-                      <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-emerald-600" />
-                      <span>{opp}</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-sm text-muted-foreground">No opportunities identified yet.</p>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Critical Risks */}
-          <Card className="border-red-200 bg-red-50/50 dark:bg-red-950/20 dark:border-red-900">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold text-red-700 dark:text-red-400 flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4" />
-                Critical Risks
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-full" />
-                </div>
-              ) : criticalRisks.length > 0 ? (
-                <ul className="space-y-2">
-                  {criticalRisks.slice(0, 4).map((risk, idx) => (
-                    <li key={idx} className="flex items-start gap-2 text-sm text-red-800 dark:text-red-300">
-                      <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-red-600" />
-                      <span>{risk}</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-sm text-muted-foreground">No critical risks identified yet.</p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* Bottom: Criteria Breakdown Panel */}
-      <CriteriaBreakdownPanel 
-        breakdown={sortedBreakdown} 
-        isLoading={isLoading} 
-      />
-    </div>
+        {/* Criteria Breakdown Panel - Inline */}
+        {sortedBreakdown.length > 0 && (
+          <CriteriaBreakdownPanel 
+            breakdown={sortedBreakdown} 
+            isLoading={isLoading} 
+          />
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -325,113 +234,107 @@ function CriteriaBreakdownPanel({
   if (breakdown.length === 0) return null;
 
   return (
-    <Card>
-      <CardHeader className="pb-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <CardTitle className="text-lg font-semibold text-[#1e3a5f] flex items-center gap-2">
-              Criteria Breakdown
-              <Tooltip>
-                <TooltipTrigger>
-                  <Info className="w-4 h-4 text-muted-foreground" />
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p className="max-w-xs text-xs">
-                    Detailed scoring breakdown for all 18 market analysis criteria with AI-generated justifications.
-                  </p>
-                </TooltipContent>
-              </Tooltip>
-            </CardTitle>
-            <CardDescription className="mt-1">
-              Click any card to view detailed analysis
-            </CardDescription>
-          </div>
-
-          {/* Score Distribution Summary */}
-          <div className="flex items-center gap-1.5">
-            <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-100 dark:bg-emerald-900/30">
-              <div className="w-2 h-2 rounded-full bg-emerald-500" />
-              <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">{counts.high}</span>
-            </div>
-            <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-amber-100 dark:bg-amber-900/30">
-              <div className="w-2 h-2 rounded-full bg-amber-500" />
-              <span className="text-xs font-medium text-amber-700 dark:text-amber-400">{counts.medium}</span>
-            </div>
-            <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-red-100 dark:bg-red-900/30">
-              <div className="w-2 h-2 rounded-full bg-red-500" />
-              <span className="text-xs font-medium text-red-700 dark:text-red-400">{counts.low}</span>
-            </div>
-          </div>
+    <div className="mt-6 pt-6 border-t">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+        <div className="flex items-center gap-2">
+          <h4 className="text-sm font-semibold text-[#1e3a5f]">
+            Criteria Breakdown
+          </h4>
+          <Tooltip>
+            <TooltipTrigger>
+              <Info className="w-4 h-4 text-muted-foreground" />
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="max-w-xs text-xs">
+                Detailed scoring for all market analysis criteria.
+              </p>
+            </TooltipContent>
+          </Tooltip>
         </div>
 
-        {/* Filter Chips */}
-        <div className="flex flex-wrap items-center gap-2 mt-4">
-          <Filter className="w-4 h-4 text-muted-foreground" />
-          <Button
-            variant={filter === "all" ? "default" : "outline"}
-            size="sm"
-            className="h-7 text-xs"
-            onClick={() => setFilter("all")}
-          >
-            All ({counts.total})
-          </Button>
-          <Button
-            variant={filter === "high" ? "default" : "outline"}
-            size="sm"
-            className="h-7 text-xs border-emerald-200 hover:bg-emerald-50 dark:border-emerald-800 dark:hover:bg-emerald-950/50"
-            onClick={() => setFilter("high")}
-          >
-            Strengths ({counts.high})
-          </Button>
-          <Button
-            variant={filter === "medium" ? "default" : "outline"}
-            size="sm"
-            className="h-7 text-xs border-amber-200 hover:bg-amber-50 dark:border-amber-800 dark:hover:bg-amber-950/50"
-            onClick={() => setFilter("medium")}
-          >
-            Moderate ({counts.medium})
-          </Button>
-          <Button
-            variant={filter === "low" ? "default" : "outline"}
-            size="sm"
-            className="h-7 text-xs border-red-200 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950/50"
-            onClick={() => setFilter("low")}
-          >
-            Weaknesses ({counts.low})
-          </Button>
+        {/* Score Distribution */}
+        <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-100 dark:bg-emerald-900/30">
+            <div className="w-2 h-2 rounded-full bg-emerald-500" />
+            <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">{counts.high}</span>
+          </div>
+          <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-amber-100 dark:bg-amber-900/30">
+            <div className="w-2 h-2 rounded-full bg-amber-500" />
+            <span className="text-xs font-medium text-amber-700 dark:text-amber-400">{counts.medium}</span>
+          </div>
+          <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-red-100 dark:bg-red-900/30">
+            <div className="w-2 h-2 rounded-full bg-red-500" />
+            <span className="text-xs font-medium text-red-700 dark:text-red-400">{counts.low}</span>
+          </div>
         </div>
-      </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {[...Array(6)].map((_, i) => (
-              <Skeleton key={i} className="h-24 rounded-lg" />
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {filteredBreakdown.map((item, idx) => {
-              const name = item.name || item.criterion || item.category || "Unknown";
-              const score = item.raw_score || item.score || 0;
-              const weight = item.weight || 1;
-              const weightedScore = item.weighted_score || score * weight;
-              const contribution = item.contribution || 0;
+      </div>
 
-              return (
-                <CriteriaCard
-                  key={idx}
-                  name={name}
-                  score={score}
-                  weight={weight}
-                  weightedScore={weightedScore}
-                  contribution={contribution}
-                  justification={item.justification}
-                />
-              );
-            })}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      {/* Filter Chips */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <Filter className="w-4 h-4 text-muted-foreground" />
+        <Button
+          variant={filter === "all" ? "default" : "outline"}
+          size="sm"
+          className="h-7 text-xs"
+          onClick={() => setFilter("all")}
+        >
+          All ({counts.total})
+        </Button>
+        <Button
+          variant={filter === "high" ? "default" : "outline"}
+          size="sm"
+          className="h-7 text-xs"
+          onClick={() => setFilter("high")}
+        >
+          Strengths ({counts.high})
+        </Button>
+        <Button
+          variant={filter === "medium" ? "default" : "outline"}
+          size="sm"
+          className="h-7 text-xs"
+          onClick={() => setFilter("medium")}
+        >
+          Moderate ({counts.medium})
+        </Button>
+        <Button
+          variant={filter === "low" ? "default" : "outline"}
+          size="sm"
+          className="h-7 text-xs"
+          onClick={() => setFilter("low")}
+        >
+          Weaknesses ({counts.low})
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+          {[...Array(6)].map((_, i) => (
+            <Skeleton key={i} className="h-20 rounded-lg" />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+          {filteredBreakdown.map((item, idx) => {
+            const name = item.name || item.criterion || item.category || "Unknown";
+            const score = item.raw_score || item.score || 0;
+            const weight = item.weight || 1;
+            const weightedScore = item.weighted_score || score * weight;
+            const contribution = item.contribution || 0;
+
+            return (
+              <CriteriaCard
+                key={idx}
+                name={name}
+                score={score}
+                weight={weight}
+                weightedScore={weightedScore}
+                contribution={contribution}
+                justification={item.justification}
+              />
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }

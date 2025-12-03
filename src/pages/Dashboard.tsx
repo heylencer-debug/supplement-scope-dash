@@ -393,29 +393,19 @@ export default function Dashboard() {
         isLoading={productsLoading}
       />
 
-      {/* SECTION 4: 18-Point Analysis & Brand Market Share */}
-      <div className="grid lg:grid-cols-2 gap-6">
-        <DeepDiveSection
-          criteriaScores={dashboardData.criteriaScores}
-          criteriaBreakdown={dashboardData.criteriaBreakdown}
-          executiveSummary={analysis?.executive_summary || null}
-          topOpportunities={dashboardData.topOpportunities}
-          criticalRisks={dashboardData.criticalRisks}
-          isLoading={analysisLoading && !hasAnalysis}
-        />
-
-        {/* Brand Market Share */}
-        {brandMarketShare.length > 0 ? (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg font-semibold text-[#1e3a5f]">
-                <Building2 className="w-5 h-5 text-[#0ea5e9]" />
-                Brand Market Share
-              </CardTitle>
-              <CardDescription>Revenue distribution across top brands</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col lg:flex-row items-center gap-6">
+      {/* SECTION 4: Brand Market Share */}
+      {brandMarketShare.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg font-semibold text-[#1e3a5f]">
+              <Building2 className="w-5 h-5 text-[#0ea5e9]" />
+              Brand Market Share
+            </CardTitle>
+            <CardDescription>Revenue distribution across top brands</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col md:flex-row items-center gap-6">
+              <div className="w-full md:w-1/2">
                 <ResponsiveContainer width="100%" height={220}>
                   <PieChart>
                     <Pie
@@ -450,36 +440,44 @@ export default function Dashboard() {
                     />
                   </PieChart>
                 </ResponsiveContainer>
-                <div className="space-y-2 w-full lg:w-auto">
-                  {brandMarketShare.slice(0, 6).map((brand, idx) => (
-                    <div key={idx} className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: brand.fill }} />
-                      <span className="text-sm text-foreground truncate max-w-[120px]">{brand.fullName}</span>
-                      <span className="text-sm font-bold ml-auto">{brand.value}%</span>
-                    </div>
-                  ))}
-                </div>
               </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg font-semibold text-[#1e3a5f]">
-                <Building2 className="w-5 h-5 text-[#0ea5e9]" />
-                Brand Market Share
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="flex items-center justify-center h-[280px]">
-              {productsLoading ? (
-                <Skeleton className="h-[200px] w-full" />
-              ) : (
-                <p className="text-muted-foreground">No brand data available</p>
-              )}
-            </CardContent>
-          </Card>
-        )}
-      </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 w-full md:w-1/2">
+                {brandMarketShare.slice(0, 6).map((brand, idx) => (
+                  <div key={idx} className="flex items-center gap-2 p-2 bg-secondary/50 rounded-lg">
+                    <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: brand.fill }} />
+                    <div className="min-w-0 flex-1">
+                      <span className="text-xs text-foreground truncate block">{brand.fullName}</span>
+                      <span className="text-sm font-bold">{brand.value}%</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : productsLoading ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg font-semibold text-[#1e3a5f]">
+              <Building2 className="w-5 h-5 text-[#0ea5e9]" />
+              Brand Market Share
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-[200px] w-full" />
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {/* SECTION 5: 18-Point Analysis */}
+      <DeepDiveSection
+        criteriaScores={dashboardData.criteriaScores}
+        criteriaBreakdown={dashboardData.criteriaBreakdown}
+        executiveSummary={analysis?.executive_summary || null}
+        topOpportunities={dashboardData.topOpportunities}
+        criticalRisks={dashboardData.criticalRisks}
+        isLoading={analysisLoading && !hasAnalysis}
+      />
 
       {/* SECTION 5: Customer Intelligence */}
       <CustomerIntelligence

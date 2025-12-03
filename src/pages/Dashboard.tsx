@@ -9,6 +9,10 @@ import {
   ThumbsUp, ThumbsDown, MessageSquare, Building2, Crosshair, Shield, Lightbulb,
   Database, FileBarChart, Calendar, Boxes, Scale, Gauge
 } from "lucide-react";
+import { FinancialProjections } from "@/components/dashboard/FinancialProjections";
+import { GoToMarketStrategy } from "@/components/dashboard/GoToMarketStrategy";
+import { RiskAnalysis } from "@/components/dashboard/RiskAnalysis";
+import { ActionItemsRoadmap } from "@/components/dashboard/ActionItemsRoadmap";
 import {
   ResponsiveContainer,
   RadarChart,
@@ -353,7 +357,7 @@ export default function Dashboard() {
   }, [products]);
 
   // Parse snapshots and market data from analysis
-  const { productsSnapshot, reviewsSnapshot, categoryContributions, weightedScoring, opportunityBreakdown } = useMemo(() => {
+  const { productsSnapshot, reviewsSnapshot, categoryContributions, weightedScoring, opportunityBreakdown, keyInsights } = useMemo(() => {
     const parseProductsSnapshot = (value: unknown): ProductsSnapshot | null => {
       if (!value || typeof value !== 'object') return null;
       return value as ProductsSnapshot;
@@ -386,6 +390,9 @@ export default function Dashboard() {
 
     const analysis1 = analysis?.analysis_1_category_scores as Record<string, unknown> | null;
     const opportunityScore = analysis1?.opportunity_score as OpportunityScore | null;
+    
+    // Parse key_insights from analysis
+    const rawKeyInsights = analysis?.key_insights as Record<string, unknown> | null;
 
     return {
       productsSnapshot: parseProductsSnapshot(analysis?.products_snapshot),
@@ -393,6 +400,7 @@ export default function Dashboard() {
       categoryContributions: parseCategoryContributions(analysis?.category_contributions),
       weightedScoring: parseWeightedScoring(analysis?.weighted_scoring),
       opportunityBreakdown: opportunityScore,
+      keyInsights: rawKeyInsights,
     };
   }, [analysis]);
 
@@ -1474,6 +1482,18 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       )}
+
+      {/* Financial Projections from key_insights */}
+      <FinancialProjections financials={keyInsights?.financials as Record<string, unknown> | null} />
+
+      {/* Go-To-Market Strategy from key_insights */}
+      <GoToMarketStrategy goToMarket={keyInsights?.go_to_market as Record<string, unknown> | null} />
+
+      {/* Risk Analysis from key_insights */}
+      <RiskAnalysis risks={keyInsights?.risks as Record<string, unknown> | null} />
+
+      {/* Action Items Roadmap from key_insights */}
+      <ActionItemsRoadmap actionItems={keyInsights?.action_items as unknown[] | null} />
 
       {/* Recommendations / Insights */}
       {analysis && (

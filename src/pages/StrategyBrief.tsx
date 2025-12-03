@@ -3,7 +3,8 @@ import { useSearchParams } from "react-router-dom";
 import { 
   FileText, Download, Printer, CheckCircle, AlertTriangle, Target, 
   TrendingUp, DollarSign, Users, Loader2, Lightbulb, Package, Beaker,
-  Factory, ShieldCheck, Clock, Boxes, AlertCircle
+  Factory, ShieldCheck, Clock, Boxes, AlertCircle, Database, Calendar,
+  FileBarChart, BarChart3
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,6 +41,40 @@ interface WeightedScore {
   score: number;
   weight: number;
   weighted_score: number;
+}
+
+interface ProductsSnapshot {
+  data_completeness?: {
+    total_products?: number;
+    total_reviews?: number;
+    products_with_ocr?: number;
+    products_with_keepa?: number;
+    products_with_rainforest?: number;
+    ocr_success_rate?: number;
+    reviews_per_product?: number;
+  };
+  snapshot_timestamp?: string;
+  top_performers?: Array<{
+    asin: string;
+    brand: string;
+    title: string;
+    price?: number;
+    bsr_current?: number;
+    rating?: number;
+    reviews?: number;
+  }>;
+}
+
+interface ReviewsSnapshot {
+  total_reviews?: number;
+  sample_size?: number;
+  sampling_strategy?: string;
+  snapshot_timestamp?: string;
+  review_distribution?: {
+    positive?: number;
+    neutral?: number;
+    negative?: number;
+  };
 }
 
 export default function StrategyBrief() {
@@ -137,12 +172,26 @@ export default function StrategyBrief() {
     return [];
   };
 
+  // Parse products snapshot
+  const parseProductsSnapshot = (value: unknown): ProductsSnapshot | null => {
+    if (!value || typeof value !== 'object') return null;
+    return value as ProductsSnapshot;
+  };
+
+  // Parse reviews snapshot
+  const parseReviewsSnapshot = (value: unknown): ReviewsSnapshot | null => {
+    if (!value || typeof value !== 'object') return null;
+    return value as ReviewsSnapshot;
+  };
+
   const keyInsights = toArray(analysis?.key_insights);
   const topStrengths = toArray(analysis?.top_strengths);
   const topWeaknesses = toArray(analysis?.top_weaknesses);
   const criteriaScores = parseCriteriaScores(analysis?.criteria_scores);
   const categoryContributions = parseCategoryContributions(analysis?.category_contributions);
   const weightedScoring = parseWeightedScoring(analysis?.weighted_scoring);
+  const productsSnapshot = parseProductsSnapshot(analysis?.products_snapshot);
+  const reviewsSnapshot = parseReviewsSnapshot(analysis?.reviews_snapshot);
 
   // Build radar chart data from criteria_scores or category_scores table
   const radarData = criteriaScores.length > 0 
@@ -306,6 +355,227 @@ export default function StrategyBrief() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Data Foundation - Snapshots */}
+      {(productsSnapshot || reviewsSnapshot) && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Database className="w-5 h-5 text-primary" />
+              Data Foundation
+            </CardTitle>
+            <CardDescription>Source data and sampling methodology used for this analysis</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* Products Snapshot */}
+              {productsSnapshot && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <FileBarChart className="w-4 h-4 text-primary" />
+                    <h4 className="font-medium text-sm">Products Data</h4>
+                    {productsSnapshot.snapshot_timestamp && (
+                      <Badge variant="outline" className="ml-auto text-xs">
+                        <Calendar className="w-3 h-3 mr-1" />
+                        {new Date(productsSnapshot.snapshot_timestamp).toLocaleDateString()}
+                      </Badge>
+                    )}
+                  </div>
+                  
+                  {productsSnapshot.data_completeness && (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="p-3 bg-secondary rounded-lg text-center">
+                          <p className="text-lg font-bold text-foreground">
+                            {productsSnapshot.data_completeness.total_products?.toLocaleString() ?? "N/A"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">Products Analyzed</p>
+                        </div>
+                        <div className="p-3 bg-secondary rounded-lg text-center">
+                          <p className="text-lg font-bold text-foreground">
+                            {productsSnapshot.data_completeness.total_reviews?.toLocaleString() ?? "N/A"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">Total Reviews</p>
+                        </div>
+                      </div>
+
+                      {(productsSnapshot.data_completeness.ocr_success_rate !== undefined || 
+                        productsSnapshot.data_completeness.products_with_keepa !== undefined) && (
+                        <div className="space-y-2">
+                          <p className="text-xs font-medium text-muted-foreground">Data Completeness</p>
+                          {productsSnapshot.data_completeness.ocr_success_rate !== undefined && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground w-24">OCR Success</span>
+                              <Progress 
+                                value={productsSnapshot.data_completeness.ocr_success_rate * 100} 
+                                className="h-2 flex-1" 
+                              />
+                              <span className="text-xs font-medium w-12 text-right">
+                                {(productsSnapshot.data_completeness.ocr_success_rate * 100).toFixed(0)}%
+                              </span>
+                            </div>
+                          )}
+                          {productsSnapshot.data_completeness.products_with_keepa !== undefined && 
+                           productsSnapshot.data_completeness.total_products && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground w-24">Keepa Data</span>
+                              <Progress 
+                                value={(productsSnapshot.data_completeness.products_with_keepa / productsSnapshot.data_completeness.total_products) * 100} 
+                                className="h-2 flex-1" 
+                              />
+                              <span className="text-xs font-medium w-12 text-right">
+                                {productsSnapshot.data_completeness.products_with_keepa}
+                              </span>
+                            </div>
+                          )}
+                          {productsSnapshot.data_completeness.products_with_rainforest !== undefined && 
+                           productsSnapshot.data_completeness.total_products && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground w-24">Rainforest</span>
+                              <Progress 
+                                value={(productsSnapshot.data_completeness.products_with_rainforest / productsSnapshot.data_completeness.total_products) * 100} 
+                                className="h-2 flex-1" 
+                              />
+                              <span className="text-xs font-medium w-12 text-right">
+                                {productsSnapshot.data_completeness.products_with_rainforest}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {productsSnapshot.data_completeness.reviews_per_product !== undefined && (
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">Avg Reviews/Product</span>
+                          <span className="font-medium">{productsSnapshot.data_completeness.reviews_per_product.toFixed(1)}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Top Performers Mini Table */}
+                  {productsSnapshot.top_performers && productsSnapshot.top_performers.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground">Top Performers</p>
+                      <div className="border rounded-lg overflow-hidden">
+                        <table className="w-full text-xs">
+                          <thead className="bg-muted/50">
+                            <tr>
+                              <th className="text-left p-2 font-medium">Product</th>
+                              <th className="text-right p-2 font-medium">Price</th>
+                              <th className="text-right p-2 font-medium">BSR</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {productsSnapshot.top_performers.slice(0, 5).map((product, idx) => (
+                              <tr key={idx} className="border-t">
+                                <td className="p-2">
+                                  <div className="font-medium truncate max-w-[150px]" title={product.title}>
+                                    {product.brand || "Unknown"}
+                                  </div>
+                                </td>
+                                <td className="p-2 text-right">
+                                  {product.price ? `$${product.price.toFixed(2)}` : "-"}
+                                </td>
+                                <td className="p-2 text-right">
+                                  {product.bsr_current?.toLocaleString() ?? "-"}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Reviews Snapshot */}
+              {reviewsSnapshot && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <BarChart3 className="w-4 h-4 text-primary" />
+                    <h4 className="font-medium text-sm">Reviews Data</h4>
+                    {reviewsSnapshot.snapshot_timestamp && (
+                      <Badge variant="outline" className="ml-auto text-xs">
+                        <Calendar className="w-3 h-3 mr-1" />
+                        {new Date(reviewsSnapshot.snapshot_timestamp).toLocaleDateString()}
+                      </Badge>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 bg-secondary rounded-lg text-center">
+                      <p className="text-lg font-bold text-foreground">
+                        {reviewsSnapshot.total_reviews?.toLocaleString() ?? "N/A"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Total in Category</p>
+                    </div>
+                    <div className="p-3 bg-secondary rounded-lg text-center">
+                      <p className="text-lg font-bold text-foreground">
+                        {reviewsSnapshot.sample_size?.toLocaleString() ?? "N/A"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Sample Analyzed</p>
+                    </div>
+                  </div>
+
+                  {reviewsSnapshot.sampling_strategy && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Sampling Strategy</span>
+                      <Badge variant="outline">{reviewsSnapshot.sampling_strategy}</Badge>
+                    </div>
+                  )}
+
+                  {/* Review Distribution */}
+                  {reviewsSnapshot.review_distribution && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground">Sentiment Distribution</p>
+                      <div className="space-y-2">
+                        {reviewsSnapshot.review_distribution.positive !== undefined && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-green-600 w-16">Positive</span>
+                            <Progress 
+                              value={reviewsSnapshot.review_distribution.positive} 
+                              className="h-2 flex-1 [&>div]:bg-green-500" 
+                            />
+                            <span className="text-xs font-medium w-10 text-right">
+                              {reviewsSnapshot.review_distribution.positive}%
+                            </span>
+                          </div>
+                        )}
+                        {reviewsSnapshot.review_distribution.neutral !== undefined && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-yellow-600 w-16">Neutral</span>
+                            <Progress 
+                              value={reviewsSnapshot.review_distribution.neutral} 
+                              className="h-2 flex-1 [&>div]:bg-yellow-500" 
+                            />
+                            <span className="text-xs font-medium w-10 text-right">
+                              {reviewsSnapshot.review_distribution.neutral}%
+                            </span>
+                          </div>
+                        )}
+                        {reviewsSnapshot.review_distribution.negative !== undefined && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-red-600 w-16">Negative</span>
+                            <Progress 
+                              value={reviewsSnapshot.review_distribution.negative} 
+                              className="h-2 flex-1 [&>div]:bg-red-500" 
+                            />
+                            <span className="text-xs font-medium w-10 text-right">
+                              {reviewsSnapshot.review_distribution.negative}%
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Criteria Scores Radar Chart */}
       {radarData.length > 0 && (

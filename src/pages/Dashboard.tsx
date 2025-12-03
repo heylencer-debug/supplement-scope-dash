@@ -247,7 +247,7 @@ export default function Dashboard() {
         analysis_1_category_scores: analysis1 as {
           product_development?: {
             formulation?: {
-              recommended_ingredients?: Array<{ ingredient?: string; name?: string }>;
+              recommended_ingredients?: Array<string | { ingredient?: string; name?: string }>;
             };
           };
           customer_insights?: {

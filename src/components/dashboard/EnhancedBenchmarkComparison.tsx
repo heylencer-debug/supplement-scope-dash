@@ -19,7 +19,7 @@ interface EnhancedBenchmarkComparisonProps {
     analysis_1_category_scores?: {
       product_development?: {
         formulation?: {
-          recommended_ingredients?: Array<{ ingredient?: string; name?: string }>;
+          recommended_ingredients?: Array<string | { ingredient?: string; name?: string }>;
         };
       };
       customer_insights?: {
@@ -102,7 +102,11 @@ export function EnhancedBenchmarkComparison({
   const getOurIngredients = (): string[] => {
     const ingredients = analysisData?.analysis_1_category_scores?.product_development?.formulation?.recommended_ingredients;
     if (!ingredients || !Array.isArray(ingredients)) return ['Pending analysis'];
-    return ingredients.slice(0, 3).map(ing => ing.ingredient || ing.name || 'Unknown');
+    return ingredients.slice(0, 5).map(ing => {
+      // Handle both string and object formats
+      if (typeof ing === 'string') return ing;
+      return ing.ingredient || ing.name || 'Unknown';
+    });
   };
 
   const getOurMessaging = (): string => {

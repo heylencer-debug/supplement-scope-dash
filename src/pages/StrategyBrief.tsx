@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { 
-  FileText, Download, Printer, CheckCircle, AlertTriangle, Info, Target, 
+  FileText, Download, Printer, CheckCircle, AlertTriangle, Target, 
   TrendingUp, DollarSign, Users, Loader2, Lightbulb, Package, Beaker,
   Factory, ShieldCheck, Clock, Boxes, AlertCircle
 } from "lucide-react";
@@ -526,6 +526,60 @@ export default function StrategyBrief() {
           </Card>
         )}
       </div>
+
+      {/* Difficulty Breakdown */}
+      {categoryScores && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-orange-500" />
+              Difficulty & Risk Assessment
+            </CardTitle>
+            <CardDescription>Complexity scores across different business dimensions (1-10 scale, higher = more difficult/risky)</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[
+                { label: "Production Complexity", value: categoryScores.production_complexity, icon: Factory, color: "text-blue-500" },
+                { label: "Formulation Difficulty", value: categoryScores.formulation_difficulty, icon: Beaker, color: "text-purple-500" },
+                { label: "Flavor Complexity", value: categoryScores.flavor_complexity, icon: Package, color: "text-pink-500" },
+                { label: "Quality Difficulty", value: categoryScores.quality_difficulty, icon: ShieldCheck, color: "text-green-500" },
+                { label: "Regulatory Risk", value: categoryScores.regulatory_risk, icon: AlertCircle, color: "text-red-500" },
+                { label: "Branding Difficulty", value: categoryScores.branding_difficulty, icon: Target, color: "text-indigo-500" },
+                { label: "Marketing Difficulty", value: categoryScores.marketing_difficulty, icon: Users, color: "text-cyan-500" },
+                { label: "Supply Chain Risk", value: categoryScores.supply_chain_risk, icon: Boxes, color: "text-orange-500" },
+                { label: "Operational Complexity", value: categoryScores.operational_complexity, icon: Clock, color: "text-yellow-600" },
+                { label: "Manufacturing Access", value: categoryScores.manufacturing_access, icon: Factory, color: "text-emerald-500", inverted: true },
+              ].map((metric, idx) => {
+                const score = Number(metric.value) || 0;
+                const displayScore = metric.inverted ? (10 - score) : score;
+                const riskLevel = displayScore >= 7 ? "High" : displayScore >= 4 ? "Medium" : "Low";
+                const riskColor = displayScore >= 7 ? "text-red-500" : displayScore >= 4 ? "text-yellow-500" : "text-green-500";
+                const bgColor = displayScore >= 7 ? "bg-red-500" : displayScore >= 4 ? "bg-yellow-500" : "bg-green-500";
+                
+                return (
+                  <div key={idx} className="p-4 border rounded-lg space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <metric.icon className={`w-4 h-4 ${metric.color}`} />
+                        <span className="text-sm font-medium">{metric.label}</span>
+                      </div>
+                      <Badge variant="outline" className={riskColor}>{riskLevel}</Badge>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Progress value={displayScore * 10} className={`h-2 flex-1 [&>div]:${bgColor}`} />
+                      <span className="text-lg font-bold text-foreground w-8 text-right">{score.toFixed(1)}</span>
+                    </div>
+                    {metric.inverted && (
+                      <p className="text-xs text-muted-foreground">Higher = easier access</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Formula Brief */}
       {formulaBrief && (

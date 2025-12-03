@@ -5,20 +5,17 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { 
   Loader2, RefreshCw, CheckCircle2, Circle, Clock,
-  Crown, Star, TrendingUp, Building2
+  Building2
 } from "lucide-react";
 
-// New high-fidelity components
+// Dashboard components
 import { HeroHeader } from "@/components/dashboard/HeroHeader";
 import { KPIMetricsGrid } from "@/components/dashboard/KPIMetricsGrid";
 import { DeepDiveSection } from "@/components/dashboard/DeepDiveSection";
-import { InvestmentReturnChart } from "@/components/dashboard/InvestmentReturnChart";
-import { CustomerVoice } from "@/components/dashboard/CustomerVoice";
-import { ActionPlanTimeline } from "@/components/dashboard/ActionPlanTimeline";
+import { EnhancedBenchmarkComparison } from "@/components/dashboard/EnhancedBenchmarkComparison";
 import { FinancialProjections } from "@/components/dashboard/FinancialProjections";
-
 import { RiskAnalysis } from "@/components/dashboard/RiskAnalysis";
-import { LaunchStrategyCard } from "@/components/dashboard/LaunchStrategyCard";
+import { LaunchPlanSection } from "@/components/dashboard/LaunchPlanSection";
 import CustomerIntelligence from "@/components/dashboard/CustomerIntelligence";
 
 import {
@@ -34,7 +31,6 @@ import { useProducts } from "@/hooks/useProducts";
 import { useCategoryContext } from "@/contexts/CategoryContext";
 import { useCategoryScores } from "@/hooks/useCategoryScores";
 import { useCategorySales } from "@/hooks/useCategorySales";
-import { useTopProducts } from "@/hooks/useTopProducts";
 import { useFormulaBrief } from "@/hooks/useFormulaBrief";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
@@ -115,7 +111,6 @@ export default function Dashboard() {
   const { data: products, isLoading: productsLoading } = useProducts(category?.id);
   const { data: categoryScores } = useCategoryScores(category?.id);
   const { data: categorySales } = useCategorySales(categoryName || undefined);
-  const { data: topProducts, isLoading: topProductsLoading } = useTopProducts(categoryName || undefined, 5);
   const { data: formulaBrief } = useFormulaBrief(category?.id);
 
   const hasCategory = !!category;
@@ -140,7 +135,7 @@ export default function Dashboard() {
     };
   }, [hasCategory, hasProducts, category?.total_products, analysis, categoryScores, formulaBrief]);
 
-  // Parse analysis data for new components
+  // Parse analysis data for components
   const dashboardData = useMemo(() => {
     const analysis1 = analysis?.analysis_1_category_scores as Record<string, unknown> | null;
     const analysis2 = analysis?.analysis_2_opportunity_calculation as Record<string, unknown> | null;
@@ -166,11 +161,10 @@ export default function Dashboard() {
       weighted_score: cb.weighted_score || 0,
     }));
 
-    // Top strengths and weaknesses - handle both string[] and object[] formats
+    // Top strengths and weaknesses
     const rawStrengths = (analysis2?.top_strengths as unknown[]) || (analysis?.top_strengths as unknown[]) || [];
     const rawWeaknesses = (analysis2?.top_weaknesses as unknown[]) || (analysis?.top_weaknesses as unknown[]) || [];
     
-    // Extract string values from potentially object arrays
     const extractStrings = (arr: unknown[]): string[] => {
       return arr.map(item => {
         if (typeof item === 'string') return item;
@@ -185,7 +179,7 @@ export default function Dashboard() {
     const topStrengths = extractStrings(rawStrengths);
     const topWeaknesses = extractStrings(rawWeaknesses);
     
-    // Risks from key_insights
+    // Risks
     const risks = keyInsights?.risks as Record<string, unknown> | null;
     const rawCategoryRisks = (risks?.category_challenges as unknown[]) || [];
     const categoryRisks = extractStrings(rawCategoryRisks);
@@ -213,6 +207,11 @@ export default function Dashboard() {
     // Go to market
     const goToMarket = keyInsights?.go_to_market as Record<string, unknown> | null;
 
+    // For benchmark comparison
+    const recommendedPrice = analysis?.recommended_price;
+    const keyDifferentiators = (keyInsights?.key_differentiators as string[]) || 
+                               (analysis1?.key_differentiators as string[]) || [];
+
     return {
       criteriaScores,
       criteriaBreakdown,
@@ -237,6 +236,13 @@ export default function Dashboard() {
       financials,
       goToMarket,
       risks,
+      // For benchmark
+      benchmarkData: {
+        recommended_price: recommendedPrice,
+        positioning: goToMarket?.positioning as string | undefined,
+        key_differentiators: keyDifferentiators,
+        primary_pain_points: primaryPainPoints,
+      },
     };
   }, [analysis]);
 
@@ -369,7 +375,7 @@ export default function Dashboard() {
         </Card>
       )}
 
-      {/* SECTION 2: KPI Metrics Grid */}
+      {/* SECTION 2: KPI Metrics Grid (Scoreboards) */}
       <KPIMetricsGrid
         marketSize={totalRevenue}
         profitMargin={dashboardData.margins?.year_1 || null}
@@ -379,63 +385,26 @@ export default function Dashboard() {
         isLoading={isDataLoading && !hasAnalysis}
       />
 
-      {/* SECTION 3: Deep Dive - Radar Chart + Strategy */}
-      <DeepDiveSection
-        criteriaScores={dashboardData.criteriaScores}
-        criteriaBreakdown={dashboardData.criteriaBreakdown}
-        executiveSummary={analysis?.executive_summary || null}
-        topOpportunities={dashboardData.topOpportunities}
-        criticalRisks={dashboardData.criticalRisks}
-        isLoading={analysisLoading && !hasAnalysis}
+      {/* SECTION 3: Benchmark Comparison - Top 5 Competitors */}
+      <EnhancedBenchmarkComparison
+        categoryId={category?.id}
+        analysisData={dashboardData.benchmarkData}
+        isLoading={productsLoading}
       />
 
-      {/* SECTION 4: Financial & Market Intelligence */}
+      {/* SECTION 4: 18-Point Analysis & Brand Market Share */}
       <div className="grid lg:grid-cols-2 gap-6">
-        <InvestmentReturnChart
-          investmentBreakdown={dashboardData.investmentBreakdown}
-          revenueTargets={dashboardData.revenueTargets}
-          totalInvestment={dashboardData.totalInvestment}
+        <DeepDiveSection
+          criteriaScores={dashboardData.criteriaScores}
+          criteriaBreakdown={dashboardData.criteriaBreakdown}
+          executiveSummary={analysis?.executive_summary || null}
+          topOpportunities={dashboardData.topOpportunities}
+          criticalRisks={dashboardData.criticalRisks}
           isLoading={analysisLoading && !hasAnalysis}
         />
 
-        <CustomerVoice
-          painPoints={dashboardData.primaryPainPoints}
-          unmetNeeds={dashboardData.unmetNeeds}
-          isLoading={analysisLoading && !hasAnalysis}
-        />
-      </div>
-
-      {/* SECTION 5: Launch Strategy */}
-      <LaunchStrategyCard
-        goToMarket={dashboardData.goToMarket as {
-          positioning?: string;
-          messaging?: string[];
-          differentiation?: string[];
-          launch_strategy?: {
-            pricing_approach?: string;
-            review_strategy?: string;
-            advertising?: string;
-          };
-        } | null}
-        isLoading={analysisLoading && !hasAnalysis}
-      />
-
-      {/* SECTION 6: Customer Intelligence */}
-      <CustomerIntelligence
-        customerInsights={dashboardData.customerIntelligence}
-        isLoading={analysisLoading && !hasAnalysis}
-      />
-
-      {/* SECTION 7: Action Plan Roadmap */}
-      <ActionPlanTimeline
-        actionItems={dashboardData.actionItems}
-        isLoading={analysisLoading && !hasAnalysis}
-      />
-
-      {/* Additional Sections Grid */}
-      <div className="grid lg:grid-cols-2 gap-6">
         {/* Brand Market Share */}
-        {brandMarketShare.length > 0 && (
+        {brandMarketShare.length > 0 ? (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg font-semibold text-[#1e3a5f]">
@@ -481,7 +450,7 @@ export default function Dashboard() {
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="space-y-2 w-full lg:w-auto">
-                  {brandMarketShare.slice(0, 5).map((brand, idx) => (
+                  {brandMarketShare.slice(0, 6).map((brand, idx) => (
                     <div key={idx} className="flex items-center gap-2">
                       <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: brand.fill }} />
                       <span className="text-sm text-foreground truncate max-w-[120px]">{brand.fullName}</span>
@@ -492,56 +461,52 @@ export default function Dashboard() {
               </div>
             </CardContent>
           </Card>
+        ) : (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg font-semibold text-[#1e3a5f]">
+                <Building2 className="w-5 h-5 text-[#0ea5e9]" />
+                Brand Market Share
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex items-center justify-center h-[280px]">
+              {productsLoading ? (
+                <Skeleton className="h-[200px] w-full" />
+              ) : (
+                <p className="text-muted-foreground">No brand data available</p>
+              )}
+            </CardContent>
+          </Card>
         )}
-
-        {/* Top Products */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg font-semibold text-[#1e3a5f]">
-              <Crown className="w-5 h-5 text-amber-500" />
-              Top Products
-            </CardTitle>
-            <CardDescription>Best performing products in category</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {topProductsLoading ? (
-              <div className="space-y-3">
-                {[1, 2, 3].map(i => <Skeleton key={i} className="h-14 w-full" />)}
-              </div>
-            ) : topProducts && topProducts.length > 0 ? (
-              <div className="space-y-2">
-                {topProducts.slice(0, 5).map((product, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-[#0ea5e9]">#{idx + 1}</span>
-                        <p className="text-sm font-medium text-foreground truncate">{product.brand || "Unknown"}</p>
-                        {product.bestseller && <Badge variant="default" className="text-xs h-5">Best</Badge>}
-                      </div>
-                      <p className="text-xs text-muted-foreground truncate">{product.title?.substring(0, 40)}...</p>
-                    </div>
-                    <div className="text-right shrink-0 ml-3">
-                      <p className="text-sm font-bold">${product.price?.toFixed(2) || "N/A"}</p>
-                      <div className="flex items-center justify-end gap-1">
-                        <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                        <span className="text-xs">{product.rating?.toFixed(1)}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center text-muted-foreground py-8">No data available</div>
-            )}
-          </CardContent>
-        </Card>
       </div>
 
-      {/* Extended Analysis Sections */}
-      <div className="space-y-6">
-        <FinancialProjections financials={dashboardData.financials as Record<string, unknown> | null} />
-        <RiskAnalysis risks={dashboardData.risks as Record<string, unknown> | null} />
-      </div>
+      {/* SECTION 5: Customer Intelligence */}
+      <CustomerIntelligence
+        customerInsights={dashboardData.customerIntelligence}
+        isLoading={analysisLoading && !hasAnalysis}
+      />
+
+      {/* SECTION 6: Financial Projections */}
+      <FinancialProjections financials={dashboardData.financials as Record<string, unknown> | null} />
+
+      {/* SECTION 7: Launch Strategy + Action Plan */}
+      <LaunchPlanSection
+        goToMarket={dashboardData.goToMarket as {
+          positioning?: string;
+          messaging?: string[];
+          differentiation?: string[];
+          launch_strategy?: {
+            pricing_approach?: string;
+            review_strategy?: string;
+            advertising?: string;
+          };
+        } | null}
+        actionItems={dashboardData.actionItems}
+        isLoading={analysisLoading && !hasAnalysis}
+      />
+
+      {/* SECTION 8: Risk Analysis */}
+      <RiskAnalysis risks={dashboardData.risks as Record<string, unknown> | null} />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Search, Filter, Download, Star, TrendingUp, Loader2, Eye } from "lucide-react";
+import { Search, Filter, Download, Star, TrendingUp, Loader2, Eye, Calendar, DollarSign, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -147,7 +147,12 @@ export default function ProductExplorer() {
                   <TableHead className="text-right">Price</TableHead>
                   <TableHead className="text-center">Rating</TableHead>
                   <TableHead className="text-right">Reviews</TableHead>
+                  <TableHead className="text-right">Mo. Sales</TableHead>
+                  <TableHead className="text-right">Mo. Revenue</TableHead>
                   <TableHead className="text-right">BSR</TableHead>
+                  <TableHead className="text-center">Age</TableHead>
+                  <TableHead className="text-center">LQS</TableHead>
+                  <TableHead className="text-center">Servings</TableHead>
                   <TableHead className="text-center">Status</TableHead>
                   <TableHead className="text-center">Actions</TableHead>
                 </TableRow>
@@ -178,7 +183,42 @@ export default function ProductExplorer() {
                       {(product.reviews ?? 0).toLocaleString()}
                     </TableCell>
                     <TableCell className="text-right text-muted-foreground">
+                      {product.monthly_sales?.toLocaleString() ?? "-"}
+                    </TableCell>
+                    <TableCell className="text-right font-medium text-green-600">
+                      {product.monthly_revenue 
+                        ? `$${product.monthly_revenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                        : "-"}
+                    </TableCell>
+                    <TableCell className="text-right text-muted-foreground">
                       {product.bsr_current?.toLocaleString() ?? "-"}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <div className="flex items-center justify-center gap-1 text-muted-foreground">
+                        <Calendar className="w-3 h-3" />
+                        <span>{product.age_months != null ? `${product.age_months}mo` : "-"}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {product.lqs != null ? (
+                        <Badge 
+                          variant="outline" 
+                          className={
+                            product.lqs >= 80 
+                              ? "border-green-500/50 text-green-600 bg-green-500/10" 
+                              : product.lqs >= 50 
+                                ? "border-yellow-500/50 text-yellow-600 bg-yellow-500/10"
+                                : "border-red-500/50 text-red-600 bg-red-500/10"
+                          }
+                        >
+                          {product.lqs}
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-center text-muted-foreground">
+                      {product.servings_per_container ?? "-"}
                     </TableCell>
                     <TableCell className="text-center">
                       <div className="flex items-center justify-center gap-1">

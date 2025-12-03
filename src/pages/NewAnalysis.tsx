@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 
-const WEBHOOK_URL = "[PASTE_YOUR_N8N_WEBHOOK_URL_HERE]";
+const WEBHOOK_URL = "https://n8n.srv1075172.hstgr.cloud/webhook/bd007464-71c5-452a-8e4c-a8fc716d4316";
 
 const amazonCategoryOptions = [
   { id: "health-household", label: "Health & Household" },

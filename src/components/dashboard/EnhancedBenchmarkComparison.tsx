@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Star, TrendingUp, Pill, Target, MessageSquare, Package, Users, Megaphone, AlertTriangle, CheckCircle, XCircle } from "lucide-react";
+import { Star, TrendingUp, Pill, Target, MessageSquare, Package, Users, Megaphone, AlertTriangle, CheckCircle, XCircle, Palette } from "lucide-react";
 import { useProducts, Product } from "@/hooks/useProducts";
 import ProductDetailModal from "@/components/ProductDetailModal";
 import { useToast } from "@/hooks/use-toast";
@@ -20,6 +20,8 @@ interface EnhancedBenchmarkComparisonProps {
       product_development?: {
         formulation?: {
           recommended_ingredients?: Array<string | { ingredient?: string; name?: string }>;
+          form_factor?: string;
+          key_features?: string[];
         };
       };
       customer_insights?: {
@@ -121,6 +123,36 @@ export function EnhancedBenchmarkComparison({
     // Truncate to first sentence
     const firstSentence = profile.split(/[.!?]/)[0];
     return firstSentence ? firstSentence + '.' : profile.substring(0, 100) + '...';
+  };
+
+  const getOurFormFactor = (): string => {
+    const formFactor = analysisData?.analysis_1_category_scores?.product_development?.formulation?.form_factor;
+    if (formFactor) return formFactor;
+    
+    // Fallback: Search key_features for flavor/taste related items
+    const keyFeatures = analysisData?.analysis_1_category_scores?.product_development?.formulation?.key_features;
+    if (keyFeatures && Array.isArray(keyFeatures)) {
+      const flavorFeature = keyFeatures.find(f => 
+        f.toLowerCase().includes('flavor') || f.toLowerCase().includes('taste')
+      );
+      if (flavorFeature) return flavorFeature;
+    }
+    
+    return 'Pending analysis';
+  };
+
+  const getCompetitorFlavors = (product: Product): { flavors: string[]; count: number } => {
+    const flavorOptions = product.flavor_options as string[] | null;
+    const variationsCount = product.variations_count || 0;
+    
+    if (flavorOptions && flavorOptions.length > 0) {
+      return { 
+        flavors: flavorOptions.slice(0, 3),
+        count: flavorOptions.length 
+      };
+    }
+    
+    return { flavors: [], count: variationsCount };
   };
 
   // Helper functions for Competitor data
@@ -312,6 +344,17 @@ export function EnhancedBenchmarkComparison({
                   </div>
                 </div>
 
+                {/* Flavors & Form Factor */}
+                <div>
+                  <p className="text-[10px] font-semibold mb-1 flex items-center gap-1">
+                    <Palette className="w-3 h-3 text-pink-500" />
+                    Flavors & Form
+                  </p>
+                  <span className="inline-flex items-center px-2 py-0.5 text-[10px] rounded-full bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300">
+                    {getOurFormFactor()}
+                  </span>
+                </div>
+
                 {/* Marketing Strategy */}
                 <div>
                   <p className="text-[10px] font-semibold mb-1 flex items-center gap-1">
@@ -435,6 +478,41 @@ export function EnhancedBenchmarkComparison({
                             ));
                           })()}
                         </div>
+                      </div>
+
+                      {/* Flavors & Variants */}
+                      <div>
+                        <p className="text-[10px] font-semibold mb-1 flex items-center gap-1">
+                          <Palette className="w-3 h-3 text-pink-500" />
+                          Flavors & Variants
+                        </p>
+                        {(() => {
+                          const flavorData = getCompetitorFlavors(product);
+                          if (flavorData.flavors.length === 0 && flavorData.count === 0) {
+                            return <p className="text-[10px] text-muted-foreground">Single variant</p>;
+                          }
+                          if (flavorData.flavors.length > 0) {
+                            return (
+                              <div className="flex flex-wrap gap-1">
+                                {flavorData.flavors.map((flavor, i) => (
+                                  <span key={i} className="inline-flex items-center px-1.5 py-0.5 text-[9px] rounded-full bg-secondary text-muted-foreground">
+                                    {flavor}
+                                  </span>
+                                ))}
+                                {flavorData.count > 3 && (
+                                  <span className="inline-flex items-center px-1.5 py-0.5 text-[9px] rounded-full bg-muted text-muted-foreground font-medium">
+                                    +{flavorData.count - 3}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          }
+                          return (
+                            <span className="inline-flex items-center px-1.5 py-0.5 text-[9px] rounded-full bg-secondary text-muted-foreground">
+                              {flavorData.count} variants
+                            </span>
+                          );
+                        })()}
                       </div>
 
                       {/* Marketing Strategy */}

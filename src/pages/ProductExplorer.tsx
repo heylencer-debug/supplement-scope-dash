@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { Search, Filter, Download, ChevronDown, Star, TrendingUp } from "lucide-react";
+import { Search, Filter, Download, ChevronDown, Star, TrendingUp, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -25,84 +25,24 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-
-const mockProducts = [
-  {
-    id: 1,
-    name: "Vitamin D3 5000 IU",
-    brand: "Nature's Best",
-    category: "Vitamins",
-    price: 24.99,
-    rating: 4.7,
-    reviews: 12453,
-    opportunityScore: 85,
-    trend: "up",
-  },
-  {
-    id: 2,
-    name: "Omega-3 Fish Oil 1000mg",
-    brand: "Pure Health",
-    category: "Supplements",
-    price: 32.99,
-    rating: 4.5,
-    reviews: 8921,
-    opportunityScore: 78,
-    trend: "up",
-  },
-  {
-    id: 3,
-    name: "Probiotic 50 Billion CFU",
-    brand: "GutBalance",
-    category: "Digestive Health",
-    price: 39.99,
-    rating: 4.8,
-    reviews: 6234,
-    opportunityScore: 92,
-    trend: "up",
-  },
-  {
-    id: 4,
-    name: "Magnesium Glycinate 400mg",
-    brand: "MineralPro",
-    category: "Minerals",
-    price: 19.99,
-    rating: 4.6,
-    reviews: 4567,
-    opportunityScore: 71,
-    trend: "stable",
-  },
-  {
-    id: 5,
-    name: "Ashwagandha Root Extract",
-    brand: "HerbalLife",
-    category: "Herbs",
-    price: 22.99,
-    rating: 4.4,
-    reviews: 9876,
-    opportunityScore: 88,
-    trend: "up",
-  },
-  {
-    id: 6,
-    name: "Zinc Picolinate 50mg",
-    brand: "Immunity Plus",
-    category: "Minerals",
-    price: 15.99,
-    rating: 4.3,
-    reviews: 3421,
-    opportunityScore: 65,
-    trend: "down",
-  },
-];
+import { useProducts } from "@/hooks/useProducts";
+import { useCategories } from "@/hooks/useCategories";
 
 export default function ProductExplorer() {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
 
-  const filteredProducts = mockProducts.filter((product) => {
-    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      product.brand.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = categoryFilter === "all" || product.category === categoryFilter;
+  const { data: products, isLoading: productsLoading } = useProducts();
+  const { data: categories, isLoading: categoriesLoading } = useCategories();
+
+  const isLoading = productsLoading || categoriesLoading;
+
+  const filteredProducts = (products ?? []).filter((product) => {
+    const matchesSearch =
+      (product.title?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false) ||
+      (product.brand?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
+    const matchesCategory =
+      categoryFilter === "all" || product.category_id === categoryFilter;
     return matchesSearch && matchesCategory;
   });
 
@@ -111,6 +51,14 @@ export default function ProductExplorer() {
     if (score >= 60) return "secondary";
     return "outline";
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-accent" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -144,72 +92,69 @@ export default function ProductExplorer() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
-                <SelectItem value="Vitamins">Vitamins</SelectItem>
-                <SelectItem value="Supplements">Supplements</SelectItem>
-                <SelectItem value="Minerals">Minerals</SelectItem>
-                <SelectItem value="Digestive Health">Digestive Health</SelectItem>
-                <SelectItem value="Herbs">Herbs</SelectItem>
+                {categories?.map((cat) => (
+                  <SelectItem key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border">
+          <div className="rounded-md border overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Product</TableHead>
-                  <TableHead>Category</TableHead>
                   <TableHead className="text-right">Price</TableHead>
                   <TableHead className="text-center">Rating</TableHead>
                   <TableHead className="text-right">Reviews</TableHead>
-                  <TableHead className="text-center">Opportunity</TableHead>
-                  <TableHead className="text-center">Trend</TableHead>
+                  <TableHead className="text-right">BSR</TableHead>
+                  <TableHead className="text-center">Status</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredProducts.map((product) => (
+                {filteredProducts.slice(0, 50).map((product) => (
                   <TableRow key={product.id} className="cursor-pointer hover:bg-muted/50">
                     <TableCell>
-                      <div>
-                        <p className="font-medium text-foreground">{product.name}</p>
-                        <p className="text-sm text-muted-foreground">{product.brand}</p>
+                      <div className="max-w-md">
+                        <p className="font-medium text-foreground truncate">{product.title ?? "Untitled"}</p>
+                        <p className="text-sm text-muted-foreground">{product.brand ?? "Unknown Brand"}</p>
                       </div>
                     </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{product.category}</Badge>
-                    </TableCell>
                     <TableCell className="text-right font-medium">
-                      ${product.price.toFixed(2)}
+                      ${(product.price ?? 0).toFixed(2)}
                     </TableCell>
                     <TableCell className="text-center">
                       <div className="flex items-center justify-center gap-1">
                         <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                        <span>{product.rating}</span>
+                        <span>{(product.rating ?? 0).toFixed(1)}</span>
                       </div>
                     </TableCell>
                     <TableCell className="text-right text-muted-foreground">
-                      {product.reviews.toLocaleString()}
+                      {(product.reviews ?? 0).toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-right text-muted-foreground">
+                      {product.bsr_current?.toLocaleString() ?? "-"}
                     </TableCell>
                     <TableCell className="text-center">
-                      <Badge
-                        variant={getScoreBadgeVariant(product.opportunityScore)}
-                        className={product.opportunityScore >= 80 ? "bg-accent text-accent-foreground" : ""}
-                      >
-                        {product.opportunityScore}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <TrendingUp
-                        className={`w-4 h-4 mx-auto ${
-                          product.trend === "up"
-                            ? "text-green-500"
-                            : product.trend === "down"
-                            ? "text-red-500 rotate-180"
-                            : "text-muted-foreground rotate-90"
-                        }`}
-                      />
+                      <div className="flex items-center justify-center gap-1">
+                        {product.bestseller && (
+                          <Badge variant="default" className="bg-accent text-xs">
+                            Bestseller
+                          </Badge>
+                        )}
+                        {product.amazon_choice && (
+                          <Badge variant="secondary" className="text-xs">
+                            Choice
+                          </Badge>
+                        )}
+                        {product.is_young_competitor && (
+                          <TrendingUp className="w-4 h-4 text-green-500" />
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>
@@ -232,13 +177,13 @@ export default function ProductExplorer() {
           </div>
           <div className="flex items-center justify-between mt-4">
             <p className="text-sm text-muted-foreground">
-              Showing {filteredProducts.length} of {mockProducts.length} products
+              Showing {Math.min(filteredProducts.length, 50)} of {filteredProducts.length} products
             </p>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" disabled>
                 Previous
               </Button>
-              <Button variant="outline" size="sm" disabled>
+              <Button variant="outline" size="sm" disabled={filteredProducts.length <= 50}>
                 Next
               </Button>
             </div>

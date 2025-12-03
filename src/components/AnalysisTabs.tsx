@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { useCategoryAnalyses } from "@/hooks/useCategoryAnalyses";
-import { Plus, X } from "lucide-react";
+import { Plus, X, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const DISMISSED_TABS_KEY = "dismissed_analysis_tabs";
@@ -152,12 +152,16 @@ export function AnalysisTabs() {
                       onClick={() => navigate(`/dashboard?category=${encodeURIComponent(tab.category_name)}`)}
                       className="flex items-center gap-2 whitespace-nowrap"
                     >
-                      <span 
-                        className={cn(
-                          "w-2 h-2 rounded-full flex-shrink-0",
-                          isComplete ? "bg-green-500" : "bg-amber-500 animate-pulse"
-                        )} 
-                      />
+                      {tab.isPending ? (
+                        <Loader2 className="w-3.5 h-3.5 text-amber-500 animate-spin flex-shrink-0" />
+                      ) : (
+                        <span 
+                          className={cn(
+                            "w-2 h-2 rounded-full flex-shrink-0",
+                            isComplete ? "bg-green-500" : "bg-amber-500 animate-pulse"
+                          )} 
+                        />
+                      )}
                       <span className="max-w-[150px] truncate">{tab.category_name}</span>
                     </button>
                     <button

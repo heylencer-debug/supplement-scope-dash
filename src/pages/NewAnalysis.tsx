@@ -234,8 +234,8 @@ export default function NewAnalysis() {
             Click to view the full analysis dashboard
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          {analysesLoading ? (
+      <CardContent>
+          {analysesLoading && !recentAnalyses ? (
             <div className="space-y-3">
               {[1, 2, 3].map((i) => (
                 <Skeleton key={i} className="h-24 w-full rounded-lg" />

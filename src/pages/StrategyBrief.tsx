@@ -1,10 +1,10 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { 
   FileText, Download, Printer, CheckCircle, AlertTriangle, Target, 
   TrendingUp, DollarSign, Users, Loader2, Lightbulb, Package, Beaker,
-  Factory, ShieldCheck, Clock, Boxes, AlertCircle, Database, Calendar,
-  FileBarChart, BarChart3
+  Factory, ShieldCheck, Clock, Boxes, AlertCircle, FlaskConical, 
+  Pill, Leaf, Heart, ShoppingBag, XCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,64 +17,36 @@ import { useCategoryContext } from "@/contexts/CategoryContext";
 import { useCategoryByName } from "@/hooks/useCategoryByName";
 import { useFormulaBrief } from "@/hooks/useFormulaBrief";
 import { useCategoryScores } from "@/hooks/useCategoryScores";
-import { 
-  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, 
-  ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, Cell
-} from "recharts";
 
-interface CriteriaScore {
-  criterion: string;
-  score: number;
-  weight?: number;
-  justification?: string;
-}
-
-interface CategoryContribution {
-  category: string;
-  revenue?: number;
-  products?: number;
-  percentage?: number;
-}
-
-interface WeightedScore {
-  category: string;
-  score: number;
-  weight: number;
-  weighted_score: number;
-}
-
-interface ProductsSnapshot {
-  data_completeness?: {
-    total_products?: number;
-    total_reviews?: number;
-    products_with_ocr?: number;
-    products_with_keepa?: number;
-    products_with_rainforest?: number;
-    ocr_success_rate?: number;
-    reviews_per_product?: number;
+interface ProductDevelopment {
+  formulation?: {
+    recommended_ingredients?: Array<{ name: string; dosage?: string; form?: string; rationale?: string }> | string[];
+    key_features?: string[];
+    serving_size?: string;
+    form_factor?: string;
   };
-  snapshot_timestamp?: string;
-  top_performers?: Array<{
-    asin: string;
-    brand: string;
-    title: string;
-    price?: number;
-    bsr_current?: number;
-    rating?: number;
-    reviews?: number;
-  }>;
+  avoid?: string[];
+  packaging?: {
+    type?: string;
+    design_elements?: string[];
+    quantity?: string | number;
+  };
+  pricing?: {
+    recommended_price?: number;
+    positioning?: string;
+    justification?: string;
+  };
 }
 
-interface ReviewsSnapshot {
-  total_reviews?: number;
-  sample_size?: number;
-  sampling_strategy?: string;
-  snapshot_timestamp?: string;
-  review_distribution?: {
-    positive?: number;
-    neutral?: number;
-    negative?: number;
-  };
+interface CustomerInsights {
+  buyer_profile?: string;
+  what_they_love_most?: string;
+  primary_pain_points?: Array<{ issue: string; evidence?: string; frequency?: string }> | string[];
+  unmet_needs?: string[];
+}
+
+interface FormulaBriefContent {
+  formula_brief_content?: string;
 }
 
 export default function StrategyBrief() {
@@ -106,6 +78,21 @@ export default function StrategyBrief() {
   const isLoading = categoryLoading || analysisLoading || dashboardLoading || formulaLoading || scoresLoading;
   const categoryData = dashboardData?.find((d) => d.id === effectiveCategoryId);
 
+  // Parse analysis_1_category_scores for formulation data
+  const { productDevelopment, customerInsights } = useMemo(() => {
+    const analysis1 = analysis?.analysis_1_category_scores as Record<string, unknown> | null;
+    return {
+      productDevelopment: (analysis1?.product_development as ProductDevelopment) || null,
+      customerInsights: (analysis1?.customer_insights as CustomerInsights) || null,
+    };
+  }, [analysis]);
+
+  // Parse analysis_3_formula_brief for full manufacturing spec
+  const formulaBriefContent = useMemo(() => {
+    const analysis3 = analysis?.analysis_3_formula_brief as FormulaBriefContent | null;
+    return analysis3?.formula_brief_content || null;
+  }, [analysis]);
+
   // Helper to safely convert JSONB to array
   const toArray = (value: unknown): string[] => {
     if (!value) return [];
@@ -133,135 +120,19 @@ export default function StrategyBrief() {
     return [];
   };
 
-  // Parse criteria scores for radar chart
-  const parseCriteriaScores = (value: unknown): CriteriaScore[] => {
-    if (!value) return [];
-    if (Array.isArray(value)) {
-      return value.filter((item): item is CriteriaScore => 
-        typeof item === "object" && item !== null && "criterion" in item && "score" in item
-      );
-    }
-    if (typeof value === "object" && value !== null) {
-      return Object.entries(value).map(([key, val]) => ({
-        criterion: key.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase()),
-        score: typeof val === "number" ? val : (typeof val === "object" && val !== null && "score" in val ? (val as {score: number}).score : 0),
-      }));
-    }
-    return [];
-  };
-
-  // Parse category contributions
-  const parseCategoryContributions = (value: unknown): CategoryContribution[] => {
-    if (!value) return [];
-    if (Array.isArray(value)) {
-      return value.filter((item): item is CategoryContribution => 
-        typeof item === "object" && item !== null && "category" in item
-      );
-    }
-    return [];
-  };
-
-  // Parse weighted scoring
-  const parseWeightedScoring = (value: unknown): WeightedScore[] => {
-    if (!value) return [];
-    if (Array.isArray(value)) {
-      return value.filter((item): item is WeightedScore => 
-        typeof item === "object" && item !== null && "category" in item && "score" in item
-      );
-    }
-    return [];
-  };
-
-  // Parse products snapshot
-  const parseProductsSnapshot = (value: unknown): ProductsSnapshot | null => {
-    if (!value || typeof value !== 'object') return null;
-    return value as ProductsSnapshot;
-  };
-
-  // Parse reviews snapshot
-  const parseReviewsSnapshot = (value: unknown): ReviewsSnapshot | null => {
-    if (!value || typeof value !== 'object') return null;
-    return value as ReviewsSnapshot;
-  };
-
-  const keyInsights = toArray(analysis?.key_insights);
   const topStrengths = toArray(analysis?.top_strengths);
   const topWeaknesses = toArray(analysis?.top_weaknesses);
-  const criteriaScores = parseCriteriaScores(analysis?.criteria_scores);
-  const categoryContributions = parseCategoryContributions(analysis?.category_contributions);
-  const weightedScoring = parseWeightedScoring(analysis?.weighted_scoring);
-  const productsSnapshot = parseProductsSnapshot(analysis?.products_snapshot);
-  const reviewsSnapshot = parseReviewsSnapshot(analysis?.reviews_snapshot);
-
-  // Build radar chart data from criteria_scores or category_scores table
-  const radarData = criteriaScores.length > 0 
-    ? criteriaScores.map(cs => ({
-        subject: cs.criterion.length > 15 ? cs.criterion.substring(0, 15) + "..." : cs.criterion,
-        fullName: cs.criterion,
-        score: cs.score,
-        fullMark: 10,
-      }))
-    : categoryScores 
-    ? [
-        { subject: "Demand", fullName: "Demand Score", score: Number(categoryScores.demand_score) || 0, fullMark: 10 },
-        { subject: "Competition", fullName: "Competition Score", score: Number(categoryScores.competition_score) || 0, fullMark: 10 },
-        { subject: "Breakout", fullName: "Breakout Score", score: Number(categoryScores.breakout_score) || 0, fullMark: 10 },
-        { subject: "Differentiation", fullName: "Differentiation Potential", score: Number(categoryScores.differentiation_potential) || 0, fullMark: 10 },
-        { subject: "Profitability", fullName: "Profitability", score: Number(categoryScores.profitability) || 0, fullMark: 10 },
-        { subject: "Pain Points", fullName: "Pain Points Score", score: Number(categoryScores.pain_points_score) || 0, fullMark: 10 },
-        { subject: "Consumer Fit", fullName: "Consumer Fit", score: Number(categoryScores.consumer_fit) || 0, fullMark: 10 },
-        { subject: "Trust", fullName: "Trust Level", score: Number(categoryScores.trust_level) || 0, fullMark: 10 },
-      ].filter(d => d.score > 0)
-    : [];
-
-  // Build bar chart data for weighted scoring
-  const barData = weightedScoring.length > 0
-    ? weightedScoring.map(ws => ({
-        name: ws.category.length > 12 ? ws.category.substring(0, 12) + "..." : ws.category,
-        score: ws.weighted_score,
-        weight: ws.weight,
-      }))
-    : [];
 
   const analysisMetrics = {
     category: analysis?.category_name ?? categoryName ?? "No Analysis Available",
     date: analysis?.created_at
       ? new Date(analysis.created_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
       : "N/A",
-    overallScore: analysis?.overall_score ?? analysis?.opportunity_index ?? 0,
     opportunityIndex: analysis?.opportunity_index ?? 0,
-    marketSize: categoryData?.total_products ? `${categoryData.total_products} Products` : "N/A",
-    avgPrice: categoryData?.avg_price ? `$${categoryData.avg_price.toFixed(2)}` : "N/A",
-    uniqueBrands: categoryData?.unique_brands ?? 0,
+    opportunityTier: analysis?.opportunity_tier_label ?? analysis?.opportunity_tier ?? "N/A",
+    recommendation: analysis?.recommendation ?? "No recommendation available",
     confidence: analysis?.confidence ?? "N/A",
   };
-
-  const keyFindings = [
-    {
-      icon: Target,
-      label: "Opportunity Tier",
-      value: analysis?.opportunity_tier_label ?? analysis?.opportunity_tier ?? "N/A",
-      detail: analysis?.recommendation ?? "No recommendation available",
-    },
-    {
-      icon: TrendingUp,
-      label: "Products Analyzed",
-      value: analysis?.products_analyzed?.toString() ?? "0",
-      detail: "Total products in analysis",
-    },
-    {
-      icon: DollarSign,
-      label: "Recommended Price",
-      value: analysis?.recommended_price ? `$${Number(analysis.recommended_price).toFixed(2)}` : "N/A",
-      detail: `Est. margin: ${analysis?.estimated_profit_margin ? `${Number(analysis.estimated_profit_margin).toFixed(0)}%` : "N/A"}`,
-    },
-    {
-      icon: Users,
-      label: "Reviews Analyzed",
-      value: analysis?.reviews_analyzed?.toString() ?? "0",
-      detail: "Customer feedback processed",
-    },
-  ];
 
   if (isLoading) {
     return (
@@ -297,14 +168,14 @@ export default function StrategyBrief() {
       <div className="flex items-start justify-between">
         <div>
           <div className="flex items-center gap-3 mb-2">
-            <FileText className="w-8 h-8 text-primary" />
-            <h1 className="text-2xl font-bold text-foreground">Strategy Brief</h1>
+            <Beaker className="w-8 h-8 text-primary" />
+            <h1 className="text-2xl font-bold text-foreground">Formulation Strategy Brief</h1>
             {analysis.confidence && (
               <Badge variant="outline">{analysis.confidence} confidence</Badge>
             )}
           </div>
           <p className="text-muted-foreground">
-            Factory specification and strategic recommendations for {analysisMetrics.category}
+            Product development specifications and formulation recommendations for {analysisMetrics.category}
           </p>
         </div>
         <div className="flex gap-2">
@@ -319,432 +190,211 @@ export default function StrategyBrief() {
         </div>
       </div>
 
-      {/* Executive Summary */}
+      {/* Executive Summary - Simplified for Formulation Focus */}
       <Card className="border-l-4 border-l-primary">
         <CardHeader>
-          <CardTitle>Executive Summary</CardTitle>
+          <CardTitle>Formulation Recommendation</CardTitle>
           <CardDescription>Analysis completed on {analysisMetrics.date}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {analysis.executive_summary && (
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              {analysis.executive_summary}
-            </p>
-          )}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 pt-2">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center p-4 bg-primary/10 rounded-lg">
-              <p className="text-2xl font-bold text-primary">{Math.round(analysisMetrics.overallScore)}</p>
-              <p className="text-xs text-muted-foreground">Overall Score</p>
-            </div>
-            <div className="text-center p-4 bg-secondary rounded-lg">
-              <p className="text-2xl font-bold text-foreground">{Math.round(analysisMetrics.opportunityIndex)}</p>
+              <p className="text-2xl font-bold text-primary">{Math.round(analysisMetrics.opportunityIndex)}</p>
               <p className="text-xs text-muted-foreground">Opportunity Index</p>
             </div>
             <div className="text-center p-4 bg-secondary rounded-lg">
-              <p className="text-2xl font-bold text-foreground">{analysisMetrics.marketSize}</p>
-              <p className="text-xs text-muted-foreground">Market Size</p>
+              <p className="text-lg font-bold text-foreground">{analysisMetrics.opportunityTier}</p>
+              <p className="text-xs text-muted-foreground">Opportunity Tier</p>
             </div>
             <div className="text-center p-4 bg-secondary rounded-lg">
-              <p className="text-2xl font-bold text-foreground">{analysisMetrics.avgPrice}</p>
-              <p className="text-xs text-muted-foreground">Avg Price</p>
+              <p className="text-lg font-bold text-foreground">
+                ${analysis.recommended_price ? Number(analysis.recommended_price).toFixed(2) : "N/A"}
+              </p>
+              <p className="text-xs text-muted-foreground">Target Price</p>
             </div>
             <div className="text-center p-4 bg-secondary rounded-lg">
-              <p className="text-2xl font-bold text-foreground">{analysisMetrics.uniqueBrands}</p>
-              <p className="text-xs text-muted-foreground">Unique Brands</p>
+              <p className="text-lg font-bold text-foreground">
+                {analysis.estimated_profit_margin ? `${Number(analysis.estimated_profit_margin).toFixed(0)}%` : "N/A"}
+              </p>
+              <p className="text-xs text-muted-foreground">Est. Margin</p>
             </div>
+          </div>
+          <div className="p-4 bg-secondary/50 rounded-lg">
+            <p className="text-sm font-medium text-foreground mb-1">Recommendation</p>
+            <p className="text-sm text-muted-foreground">{analysisMetrics.recommendation}</p>
           </div>
         </CardContent>
       </Card>
 
-      {/* Data Foundation - Snapshots */}
-      {(productsSnapshot || reviewsSnapshot) && (
-        <Card>
+      {/* Target Buyer Profile - NEW */}
+      {customerInsights && (
+        <Card className="border-purple-500/20 bg-purple-500/5">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Database className="w-5 h-5 text-primary" />
-              Data Foundation
+              <Users className="w-5 h-5 text-purple-500" />
+              Target Buyer Profile
             </CardTitle>
-            <CardDescription>Source data and sampling methodology used for this analysis</CardDescription>
+            <CardDescription>Customer insights to guide product development</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="grid md:grid-cols-2 gap-6">
-              {/* Products Snapshot */}
-              {productsSnapshot && (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <FileBarChart className="w-4 h-4 text-primary" />
-                    <h4 className="font-medium text-sm">Products Data</h4>
-                    {productsSnapshot.snapshot_timestamp && (
-                      <Badge variant="outline" className="ml-auto text-xs">
-                        <Calendar className="w-3 h-3 mr-1" />
-                        {new Date(productsSnapshot.snapshot_timestamp).toLocaleDateString()}
-                      </Badge>
-                    )}
-                  </div>
-                  
-                  {productsSnapshot.data_completeness && (
-                    <div className="space-y-3">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="p-3 bg-secondary rounded-lg text-center">
-                          <p className="text-lg font-bold text-foreground">
-                            {productsSnapshot.data_completeness.total_products?.toLocaleString() ?? "N/A"}
-                          </p>
-                          <p className="text-xs text-muted-foreground">Products Analyzed</p>
-                        </div>
-                        <div className="p-3 bg-secondary rounded-lg text-center">
-                          <p className="text-lg font-bold text-foreground">
-                            {productsSnapshot.data_completeness.total_reviews?.toLocaleString() ?? "N/A"}
-                          </p>
-                          <p className="text-xs text-muted-foreground">Total Reviews</p>
-                        </div>
-                      </div>
+          <CardContent className="space-y-4">
+            {customerInsights.buyer_profile && (
+              <div className="p-4 bg-background rounded-lg border">
+                <p className="text-sm font-medium text-foreground mb-1">Ideal Customer</p>
+                <p className="text-sm text-muted-foreground">{customerInsights.buyer_profile}</p>
+              </div>
+            )}
 
-                      {(productsSnapshot.data_completeness.ocr_success_rate !== undefined || 
-                        productsSnapshot.data_completeness.products_with_keepa !== undefined) && (
-                        <div className="space-y-2">
-                          <p className="text-xs font-medium text-muted-foreground">Data Completeness</p>
-                          {productsSnapshot.data_completeness.ocr_success_rate !== undefined && (
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-muted-foreground w-24">OCR Success</span>
-                              <Progress 
-                                value={productsSnapshot.data_completeness.ocr_success_rate * 100} 
-                                className="h-2 flex-1" 
-                              />
-                              <span className="text-xs font-medium w-12 text-right">
-                                {(productsSnapshot.data_completeness.ocr_success_rate * 100).toFixed(0)}%
-                              </span>
-                            </div>
-                          )}
-                          {productsSnapshot.data_completeness.products_with_keepa !== undefined && 
-                           productsSnapshot.data_completeness.total_products && (
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-muted-foreground w-24">Keepa Data</span>
-                              <Progress 
-                                value={(productsSnapshot.data_completeness.products_with_keepa / productsSnapshot.data_completeness.total_products) * 100} 
-                                className="h-2 flex-1" 
-                              />
-                              <span className="text-xs font-medium w-12 text-right">
-                                {productsSnapshot.data_completeness.products_with_keepa}
-                              </span>
-                            </div>
-                          )}
-                          {productsSnapshot.data_completeness.products_with_rainforest !== undefined && 
-                           productsSnapshot.data_completeness.total_products && (
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-muted-foreground w-24">Rainforest</span>
-                              <Progress 
-                                value={(productsSnapshot.data_completeness.products_with_rainforest / productsSnapshot.data_completeness.total_products) * 100} 
-                                className="h-2 flex-1" 
-                              />
-                              <span className="text-xs font-medium w-12 text-right">
-                                {productsSnapshot.data_completeness.products_with_rainforest}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      )}
+            {customerInsights.what_they_love_most && (
+              <div className="p-4 bg-green-500/10 rounded-lg border border-green-500/20">
+                <p className="text-sm font-medium text-foreground mb-1 flex items-center gap-2">
+                  <Heart className="w-4 h-4 text-green-500" />
+                  What They Love Most
+                </p>
+                <p className="text-sm text-muted-foreground">{customerInsights.what_they_love_most}</p>
+              </div>
+            )}
 
-                      {productsSnapshot.data_completeness.reviews_per_product !== undefined && (
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Avg Reviews/Product</span>
-                          <span className="font-medium">{productsSnapshot.data_completeness.reviews_per_product.toFixed(1)}</span>
-                        </div>
+            {/* Primary Pain Points */}
+            {customerInsights.primary_pain_points && customerInsights.primary_pain_points.length > 0 && (
+              <div>
+                <p className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-yellow-500" />
+                  Primary Pain Points to Solve
+                </p>
+                <div className="space-y-2">
+                  {customerInsights.primary_pain_points.map((pain, idx) => (
+                    <div key={idx} className="p-3 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
+                      {typeof pain === "string" ? (
+                        <p className="text-sm text-muted-foreground">{pain}</p>
+                      ) : (
+                        <>
+                          <p className="text-sm font-medium text-foreground">{pain.issue}</p>
+                          {pain.evidence && <p className="text-xs text-muted-foreground mt-1">{pain.evidence}</p>}
+                          {pain.frequency && (
+                            <Badge variant="outline" className="mt-2 text-xs">{pain.frequency}</Badge>
+                          )}
+                        </>
                       )}
                     </div>
-                  )}
-
-                  {/* Top Performers Mini Table */}
-                  {productsSnapshot.top_performers && productsSnapshot.top_performers.length > 0 && (
-                    <div className="space-y-2">
-                      <p className="text-xs font-medium text-muted-foreground">Top Performers</p>
-                      <div className="border rounded-lg overflow-hidden">
-                        <table className="w-full text-xs">
-                          <thead className="bg-muted/50">
-                            <tr>
-                              <th className="text-left p-2 font-medium">Product</th>
-                              <th className="text-right p-2 font-medium">Price</th>
-                              <th className="text-right p-2 font-medium">BSR</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {productsSnapshot.top_performers.slice(0, 5).map((product, idx) => (
-                              <tr key={idx} className="border-t">
-                                <td className="p-2">
-                                  <div className="font-medium truncate max-w-[150px]" title={product.title}>
-                                    {product.brand || "Unknown"}
-                                  </div>
-                                </td>
-                                <td className="p-2 text-right">
-                                  {product.price ? `$${product.price.toFixed(2)}` : "-"}
-                                </td>
-                                <td className="p-2 text-right">
-                                  {product.bsr_current?.toLocaleString() ?? "-"}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Reviews Snapshot */}
-              {reviewsSnapshot && (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <BarChart3 className="w-4 h-4 text-primary" />
-                    <h4 className="font-medium text-sm">Reviews Data</h4>
-                    {reviewsSnapshot.snapshot_timestamp && (
-                      <Badge variant="outline" className="ml-auto text-xs">
-                        <Calendar className="w-3 h-3 mr-1" />
-                        {new Date(reviewsSnapshot.snapshot_timestamp).toLocaleDateString()}
-                      </Badge>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="p-3 bg-secondary rounded-lg text-center">
-                      <p className="text-lg font-bold text-foreground">
-                        {reviewsSnapshot.total_reviews?.toLocaleString() ?? "N/A"}
-                      </p>
-                      <p className="text-xs text-muted-foreground">Total in Category</p>
-                    </div>
-                    <div className="p-3 bg-secondary rounded-lg text-center">
-                      <p className="text-lg font-bold text-foreground">
-                        {reviewsSnapshot.sample_size?.toLocaleString() ?? "N/A"}
-                      </p>
-                      <p className="text-xs text-muted-foreground">Sample Analyzed</p>
-                    </div>
-                  </div>
-
-                  {reviewsSnapshot.sampling_strategy && (
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Sampling Strategy</span>
-                      <Badge variant="outline">{reviewsSnapshot.sampling_strategy}</Badge>
-                    </div>
-                  )}
-
-                  {/* Review Distribution */}
-                  {reviewsSnapshot.review_distribution && (
-                    <div className="space-y-2">
-                      <p className="text-xs font-medium text-muted-foreground">Sentiment Distribution</p>
-                      <div className="space-y-2">
-                        {reviewsSnapshot.review_distribution.positive !== undefined && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-green-600 w-16">Positive</span>
-                            <Progress 
-                              value={reviewsSnapshot.review_distribution.positive} 
-                              className="h-2 flex-1 [&>div]:bg-green-500" 
-                            />
-                            <span className="text-xs font-medium w-10 text-right">
-                              {reviewsSnapshot.review_distribution.positive}%
-                            </span>
-                          </div>
-                        )}
-                        {reviewsSnapshot.review_distribution.neutral !== undefined && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-yellow-600 w-16">Neutral</span>
-                            <Progress 
-                              value={reviewsSnapshot.review_distribution.neutral} 
-                              className="h-2 flex-1 [&>div]:bg-yellow-500" 
-                            />
-                            <span className="text-xs font-medium w-10 text-right">
-                              {reviewsSnapshot.review_distribution.neutral}%
-                            </span>
-                          </div>
-                        )}
-                        {reviewsSnapshot.review_distribution.negative !== undefined && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-red-600 w-16">Negative</span>
-                            <Progress 
-                              value={reviewsSnapshot.review_distribution.negative} 
-                              className="h-2 flex-1 [&>div]:bg-red-500" 
-                            />
-                            <span className="text-xs font-medium w-10 text-right">
-                              {reviewsSnapshot.review_distribution.negative}%
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Criteria Scores Radar Chart */}
-      {radarData.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Target className="w-5 h-5 text-primary" />
-              Category Scores Analysis
-            </CardTitle>
-            <CardDescription>Multi-dimensional scoring across key criteria</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <RadarChart data={radarData}>
-                  <PolarGrid stroke="hsl(var(--border))" />
-                  <PolarAngleAxis 
-                    dataKey="subject" 
-                    tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
-                  />
-                  <PolarRadiusAxis 
-                    angle={30} 
-                    domain={[0, 10]} 
-                    tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }}
-                  />
-                  <Radar
-                    name="Score"
-                    dataKey="score"
-                    stroke="hsl(var(--primary))"
-                    fill="hsl(var(--primary))"
-                    fillOpacity={0.3}
-                  />
-                  <Tooltip 
-                    content={({ payload }) => {
-                      if (payload && payload.length > 0) {
-                        const data = payload[0].payload;
-                        return (
-                          <div className="bg-popover border border-border rounded-md p-2 shadow-md">
-                            <p className="font-medium text-sm">{data.fullName}</p>
-                            <p className="text-sm text-muted-foreground">Score: {data.score}/10</p>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                </RadarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Key Findings */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Key Findings</CardTitle>
-          <CardDescription>Critical metrics and insights</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid md:grid-cols-2 gap-4">
-            {keyFindings.map((finding, idx) => (
-              <div key={idx} className="flex items-start gap-4 p-4 border rounded-lg">
-                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <finding.icon className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">{finding.label}</p>
-                  <p className="text-xl font-bold text-foreground">{finding.value}</p>
-                  <p className="text-sm text-muted-foreground">{finding.detail}</p>
+                  ))}
                 </div>
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+            )}
 
-      {/* Key Insights */}
-      {keyInsights.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Lightbulb className="w-5 h-5 text-yellow-500" />
-              Key Insights
-            </CardTitle>
-            <CardDescription>Actionable intelligence from analysis</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-3">
-              {keyInsights.map((insight, idx) => (
-                <li key={idx} className="flex items-start gap-3 p-3 bg-secondary/50 rounded-lg">
-                  <span className="text-yellow-500 font-bold">{idx + 1}.</span>
-                  <span className="text-sm text-foreground">{insight}</span>
-                </li>
-              ))}
-            </ul>
+            {/* Unmet Needs */}
+            {customerInsights.unmet_needs && customerInsights.unmet_needs.length > 0 && (
+              <div>
+                <p className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
+                  <Lightbulb className="w-4 h-4 text-primary" />
+                  Unmet Needs (Opportunities)
+                </p>
+                <div className="grid md:grid-cols-2 gap-2">
+                  {customerInsights.unmet_needs.map((need, idx) => (
+                    <div key={idx} className="p-3 bg-primary/10 rounded-lg border border-primary/20">
+                      <p className="text-sm text-muted-foreground">{need}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
 
-      {/* Weighted Scoring */}
-      {barData.length > 0 && (
-        <Card>
+      {/* Product Development Specification - NEW */}
+      {productDevelopment && (
+        <Card className="border-blue-500/20">
           <CardHeader>
-            <CardTitle>Weighted Scoring Breakdown</CardTitle>
-            <CardDescription>How each category contributes to the overall score</CardDescription>
+            <CardTitle className="flex items-center gap-2">
+              <FlaskConical className="w-5 h-5 text-blue-500" />
+              Product Development Specification
+            </CardTitle>
+            <CardDescription>Formulation and product design recommendations</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={barData} layout="vertical">
-                  <XAxis type="number" domain={[0, 10]} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
-                  <YAxis dataKey="name" type="category" width={100} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
-                  <Tooltip 
-                    content={({ payload }) => {
-                      if (payload && payload.length > 0) {
-                        const data = payload[0].payload;
-                        return (
-                          <div className="bg-popover border border-border rounded-md p-2 shadow-md">
-                            <p className="font-medium text-sm">{data.name}</p>
-                            <p className="text-sm text-muted-foreground">Score: {data.score}</p>
-                            <p className="text-sm text-muted-foreground">Weight: {data.weight}x</p>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                  <Bar dataKey="score" radius={[0, 4, 4, 0]}>
-                    {barData.map((_, index) => (
-                      <Cell key={`cell-${index}`} fill={`hsl(var(--chart-${(index % 5) + 1}))`} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+          <CardContent className="space-y-6">
+            {/* Form Factor & Serving */}
+            {productDevelopment.formulation && (
+              <div className="grid md:grid-cols-2 gap-4">
+                {productDevelopment.formulation.form_factor && (
+                  <div className="p-4 bg-secondary rounded-lg">
+                    <p className="text-xs text-muted-foreground mb-1">Recommended Form Factor</p>
+                    <p className="text-lg font-bold text-foreground">{productDevelopment.formulation.form_factor}</p>
+                  </div>
+                )}
+                {productDevelopment.formulation.serving_size && (
+                  <div className="p-4 bg-secondary rounded-lg">
+                    <p className="text-xs text-muted-foreground mb-1">Serving Size</p>
+                    <p className="text-lg font-bold text-foreground">{productDevelopment.formulation.serving_size}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Key Features */}
+            {productDevelopment.formulation?.key_features && productDevelopment.formulation.key_features.length > 0 && (
+              <div>
+                <p className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-green-500" />
+                  Key Features to Include
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {productDevelopment.formulation.key_features.map((feature, idx) => (
+                    <Badge key={idx} variant="secondary" className="text-sm py-1 px-3">{feature}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Things to Avoid */}
+            {productDevelopment.avoid && productDevelopment.avoid.length > 0 && (
+              <div>
+                <p className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
+                  <XCircle className="w-4 h-4 text-destructive" />
+                  Things to AVOID
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {productDevelopment.avoid.map((item, idx) => (
+                    <Badge key={idx} variant="outline" className="text-sm py-1 px-3 border-destructive/50 text-destructive">{item}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
 
-      {/* Category Contributions */}
-      {categoryContributions.length > 0 && (
-        <Card>
+      {/* Recommended Ingredients - NEW */}
+      {productDevelopment?.formulation?.recommended_ingredients && productDevelopment.formulation.recommended_ingredients.length > 0 && (
+        <Card className="border-green-500/20">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Boxes className="w-5 h-5 text-primary" />
-              Amazon Category Contributions
+              <Pill className="w-5 h-5 text-green-500" />
+              Recommended Ingredients
             </CardTitle>
-            <CardDescription>Revenue and product distribution by Amazon category</CardDescription>
+            <CardDescription>Formulation ingredients based on market analysis</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {categoryContributions.map((contrib, idx) => (
-                <div key={idx} className="flex items-center justify-between p-3 border rounded-lg">
-                  <span className="font-medium text-sm">{contrib.category}</span>
-                  <div className="flex items-center gap-4">
-                    {contrib.products && (
-                      <Badge variant="outline">{contrib.products} products</Badge>
-                    )}
-                    {contrib.revenue && (
-                      <Badge variant="secondary">${contrib.revenue.toLocaleString()}</Badge>
-                    )}
-                    {contrib.percentage && (
-                      <div className="flex items-center gap-2 w-32">
-                        <Progress value={contrib.percentage} className="h-2" />
-                        <span className="text-xs text-muted-foreground">{contrib.percentage}%</span>
+              {productDevelopment.formulation.recommended_ingredients.map((ingredient, idx) => (
+                <div key={idx} className="p-4 border rounded-lg">
+                  {typeof ingredient === "string" ? (
+                    <p className="text-sm font-medium text-foreground">{ingredient}</p>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className="font-medium text-foreground">{ingredient.name}</p>
+                        {ingredient.dosage && (
+                          <Badge variant="secondary">{ingredient.dosage}</Badge>
+                        )}
                       </div>
-                    )}
-                  </div>
+                      {ingredient.form && (
+                        <p className="text-xs text-muted-foreground">Form: {ingredient.form}</p>
+                      )}
+                      {ingredient.rationale && (
+                        <p className="text-sm text-muted-foreground">{ingredient.rationale}</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -752,14 +402,85 @@ export default function StrategyBrief() {
         </Card>
       )}
 
-      {/* Strengths & Weaknesses */}
+      {/* Packaging Specification - NEW */}
+      {productDevelopment?.packaging && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Package className="w-5 h-5 text-primary" />
+              Packaging Specification
+            </CardTitle>
+            <CardDescription>Recommended packaging design and elements</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              {productDevelopment.packaging.type && (
+                <div className="p-4 bg-secondary rounded-lg">
+                  <p className="text-xs text-muted-foreground mb-1">Package Type</p>
+                  <p className="text-lg font-bold text-foreground">{productDevelopment.packaging.type}</p>
+                </div>
+              )}
+              {productDevelopment.packaging.quantity && (
+                <div className="p-4 bg-secondary rounded-lg">
+                  <p className="text-xs text-muted-foreground mb-1">Quantity</p>
+                  <p className="text-lg font-bold text-foreground">{productDevelopment.packaging.quantity}</p>
+                </div>
+              )}
+            </div>
+            {productDevelopment.packaging.design_elements && productDevelopment.packaging.design_elements.length > 0 && (
+              <div>
+                <p className="text-sm font-medium text-foreground mb-2">Design Elements</p>
+                <div className="flex flex-wrap gap-2">
+                  {productDevelopment.packaging.design_elements.map((element, idx) => (
+                    <Badge key={idx} variant="outline">{element}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Pricing Strategy - NEW */}
+      {productDevelopment?.pricing && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <DollarSign className="w-5 h-5 text-green-500" />
+              Pricing Strategy
+            </CardTitle>
+            <CardDescription>Recommended pricing and market positioning</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              {productDevelopment.pricing.recommended_price && (
+                <div className="p-4 bg-green-500/10 rounded-lg border border-green-500/20">
+                  <p className="text-xs text-muted-foreground mb-1">Recommended Price</p>
+                  <p className="text-2xl font-bold text-green-600">${productDevelopment.pricing.recommended_price.toFixed(2)}</p>
+                </div>
+              )}
+              {productDevelopment.pricing.positioning && (
+                <div className="p-4 bg-secondary rounded-lg">
+                  <p className="text-xs text-muted-foreground mb-1">Market Positioning</p>
+                  <p className="text-lg font-bold text-foreground capitalize">{productDevelopment.pricing.positioning}</p>
+                </div>
+              )}
+            </div>
+            {productDevelopment.pricing.justification && (
+              <p className="text-sm text-muted-foreground">{productDevelopment.pricing.justification}</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Strengths & Weaknesses - Keep for formulation context */}
       <div className="grid md:grid-cols-2 gap-6">
         {topStrengths.length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <CheckCircle className="w-5 h-5 text-green-500" />
-                Top Strengths
+                Market Strengths to Leverage
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -780,7 +501,7 @@ export default function StrategyBrief() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <AlertTriangle className="w-5 h-5 text-yellow-500" />
-                Top Weaknesses / Opportunities
+                Gaps to Exploit
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -851,15 +572,15 @@ export default function StrategyBrief() {
         </Card>
       )}
 
-      {/* Formula Brief */}
+      {/* Formula Brief from formula_briefs table */}
       {formulaBrief && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Beaker className="w-5 h-5 text-primary" />
-              Formula Brief
+              Manufacturing Specification
             </CardTitle>
-            <CardDescription>Product development specifications and recommendations</CardDescription>
+            <CardDescription>Detailed product development specifications</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Product Positioning */}
@@ -968,24 +689,6 @@ export default function StrategyBrief() {
               </div>
             )}
 
-            {/* Consumer Pain Points */}
-            {formulaBrief.consumer_pain_points && formulaBrief.consumer_pain_points.length > 0 && (
-              <div className="space-y-2">
-                <h4 className="font-medium text-sm text-foreground flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-yellow-500" />
-                  Consumer Pain Points to Address
-                </h4>
-                <ul className="space-y-1">
-                  {formulaBrief.consumer_pain_points.map((pain, idx) => (
-                    <li key={idx} className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <span className="text-yellow-500">•</span>
-                      {pain}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
             {/* Manufacturing */}
             {(formulaBrief.moq_estimate || formulaBrief.lead_time_weeks || formulaBrief.manufacturing_notes) && (
               <div className="space-y-2">
@@ -1052,94 +755,29 @@ export default function StrategyBrief() {
                 </ul>
               </div>
             )}
-
-            {/* Market Summary */}
-            {formulaBrief.market_summary && (
-              <div className="space-y-2">
-                <h4 className="font-medium text-sm text-foreground">Market Summary</h4>
-                <p className="text-sm text-muted-foreground">{formulaBrief.market_summary}</p>
-              </div>
-            )}
-
-            {/* Opportunity Insights */}
-            {formulaBrief.opportunity_insights && (
-              <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
-                <h4 className="font-medium text-sm text-foreground flex items-center gap-2 mb-2">
-                  <Lightbulb className="w-4 h-4 text-primary" />
-                  Opportunity Insights
-                </h4>
-                <p className="text-sm text-muted-foreground">{formulaBrief.opportunity_insights}</p>
-              </div>
-            )}
           </CardContent>
         </Card>
       )}
 
-      {/* Customer Review Summary */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="w-5 h-5 text-primary" />
-            Customer Review Analysis
-          </CardTitle>
-          <CardDescription>Aggregated insights from customer feedback</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between mb-6">
-            <span className="text-sm text-muted-foreground">Overall Category Rating</span>
-            <div className="flex items-center gap-2">
-              <div className="flex">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <span
-                    key={star}
-                    className={`text-lg ${
-                      star <= Math.floor(categoryData?.avg_rating ?? 0)
-                        ? "text-yellow-400"
-                        : "text-muted"
-                    }`}
-                  >
-                    ★
-                  </span>
-                ))}
-              </div>
-              <span className="font-bold text-foreground">
-                {categoryData?.avg_rating?.toFixed(1) ?? "N/A"}/5
-              </span>
+      {/* Full Manufacturing Document - NEW */}
+      {formulaBriefContent && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-primary" />
+              Full Manufacturing Document
+            </CardTitle>
+            <CardDescription>Complete formula brief specification document</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="prose prose-sm max-w-none dark:prose-invert">
+              <pre className="whitespace-pre-wrap text-sm text-muted-foreground bg-secondary/50 p-4 rounded-lg overflow-auto">
+                {formulaBriefContent}
+              </pre>
             </div>
-          </div>
-          <Separator className="my-4" />
-          <div className="grid md:grid-cols-2 gap-6">
-            <div>
-              <h4 className="font-medium text-foreground mb-3 flex items-center gap-2">
-                <CheckCircle className="w-4 h-4 text-green-500" />
-                What Customers Love
-              </h4>
-              <ul className="space-y-2">
-                {(topStrengths.length > 0 ? topStrengths.slice(0, 4) : ["No data available"]).map((theme, idx) => (
-                  <li key={idx} className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                    {theme}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-medium text-foreground mb-3 flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-yellow-500" />
-                Common Complaints
-              </h4>
-              <ul className="space-y-2">
-                {(topWeaknesses.length > 0 ? topWeaknesses.slice(0, 3) : ["No data available"]).map((theme, idx) => (
-                  <li key={idx} className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <div className="w-1.5 h-1.5 rounded-full bg-yellow-500" />
-                    {theme}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

@@ -14,8 +14,10 @@ export function Layout({ children }: LayoutProps) {
           <header className="h-14 border-b border-border bg-card flex items-center px-4 gap-4">
             <SidebarTrigger />
           </header>
-          <div className="flex-1 p-6 bg-background overflow-auto">
-            {children}
+          <div className="flex-1 p-6 bg-background overflow-y-auto overflow-x-hidden flex justify-center">
+            <div className="w-full max-w-[70vw]">
+              {children}
+            </div>
           </div>
         </main>
       </div>

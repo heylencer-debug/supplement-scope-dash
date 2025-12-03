@@ -1,0 +1,108 @@
+import { TrendingUp, DollarSign, Users, Shield } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+
+interface KPIMetricsGridProps {
+  marketSize: number | null;
+  profitMargin: number | null;
+  competitionLevel: string | null;
+  brandCount: number | null;
+  riskScore: number | null;
+  isLoading?: boolean;
+}
+
+export function KPIMetricsGrid({
+  marketSize,
+  profitMargin,
+  competitionLevel,
+  brandCount,
+  riskScore,
+  isLoading = false,
+}: KPIMetricsGridProps) {
+  const formatMarketSize = (value: number | null) => {
+    if (!value) return "N/A";
+    if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+    if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
+    return `$${value.toFixed(0)}`;
+  };
+
+  const getRiskLevel = (score: number | null) => {
+    if (!score) return { label: "Unknown", color: "text-muted-foreground" };
+    if (score <= 30) return { label: "Low Risk", color: "text-emerald-600" };
+    if (score <= 60) return { label: "Moderate", color: "text-amber-600" };
+    return { label: "High Risk", color: "text-red-600" };
+  };
+
+  const kpis = [
+    {
+      label: "Market Size",
+      value: formatMarketSize(marketSize),
+      subtext: "/ month",
+      icon: TrendingUp,
+      iconBg: "bg-[#0ea5e9]/10",
+      iconColor: "text-[#0ea5e9]",
+    },
+    {
+      label: "Profit Margin",
+      value: profitMargin ? `${profitMargin}%` : "N/A",
+      subtext: "Avg",
+      icon: DollarSign,
+      iconBg: "bg-emerald-500/10",
+      iconColor: "text-emerald-600",
+    },
+    {
+      label: "Competition",
+      value: competitionLevel || "N/A",
+      subtext: brandCount ? `${brandCount} Brands` : "",
+      icon: Users,
+      iconBg: "bg-amber-500/10",
+      iconColor: "text-amber-600",
+    },
+    {
+      label: "Risk Score",
+      value: riskScore !== null ? `${riskScore.toFixed(0)}/100` : "N/A",
+      subtext: getRiskLevel(riskScore).label,
+      subtextColor: getRiskLevel(riskScore).color,
+      icon: Shield,
+      iconBg: "bg-purple-500/10",
+      iconColor: "text-purple-600",
+    },
+  ];
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {kpis.map((kpi, idx) => (
+        <Card key={idx} className="border-border/50 hover:shadow-md transition-shadow">
+          <CardContent className="p-5">
+            {isLoading ? (
+              <div className="space-y-3">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-8 w-20" />
+                <Skeleton className="h-3 w-16" />
+              </div>
+            ) : (
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground mb-1">
+                    {kpi.label}
+                  </p>
+                  <p className="text-2xl font-bold text-foreground">
+                    {kpi.value}
+                  </p>
+                  {kpi.subtext && (
+                    <p className={`text-xs mt-1 ${kpi.subtextColor || "text-muted-foreground"}`}>
+                      {kpi.subtext}
+                    </p>
+                  )}
+                </div>
+                <div className={`p-3 rounded-full ${kpi.iconBg}`}>
+                  <kpi.icon className={`w-5 h-5 ${kpi.iconColor}`} />
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}

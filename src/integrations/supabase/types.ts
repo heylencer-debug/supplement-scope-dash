@@ -74,8 +74,12 @@ export type Database = {
           estimated_profit_margin: number | null
           executive_summary: string | null
           formula_brief: Json | null
+          formula_brief_html: string | null
+          formula_brief_pdf_url: string | null
           id: string
           key_insights: Json | null
+          market_analysis_html: string | null
+          market_analysis_pdf_url: string | null
           opportunity_index: number | null
           opportunity_tier: string | null
           opportunity_tier_label: string | null
@@ -108,8 +112,12 @@ export type Database = {
           estimated_profit_margin?: number | null
           executive_summary?: string | null
           formula_brief?: Json | null
+          formula_brief_html?: string | null
+          formula_brief_pdf_url?: string | null
           id?: string
           key_insights?: Json | null
+          market_analysis_html?: string | null
+          market_analysis_pdf_url?: string | null
           opportunity_index?: number | null
           opportunity_tier?: string | null
           opportunity_tier_label?: string | null
@@ -142,8 +150,12 @@ export type Database = {
           estimated_profit_margin?: number | null
           executive_summary?: string | null
           formula_brief?: Json | null
+          formula_brief_html?: string | null
+          formula_brief_pdf_url?: string | null
           id?: string
           key_insights?: Json | null
+          market_analysis_html?: string | null
+          market_analysis_pdf_url?: string | null
           opportunity_index?: number | null
           opportunity_tier?: string | null
           opportunity_tier_label?: string | null

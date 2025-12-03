@@ -1,13 +1,16 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, Clock, TrendingUp, Loader2 } from "lucide-react";
+import { ArrowRight, Clock, TrendingUp, Loader2, Target, FileText, Package, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { useCategoryAnalyses } from "@/hooks/useCategoryAnalyses";
+import { formatDistanceToNow } from "date-fns";
 
 const WEBHOOK_URL = "https://n8n.srv1075172.hstgr.cloud/webhook/bd007464-71c5-452a-8e4c-a8fc716d4316";
 
@@ -18,18 +21,21 @@ const amazonCategoryOptions = [
   { id: "pet-supplies", label: "Pet Supplies" },
 ];
 
-const recentSearches = [
-  { query: "Vitamin D3 5000 IU", category: "Vitamins", date: "2 hours ago" },
-  { query: "Omega-3 Fish Oil", category: "Supplements", date: "Yesterday" },
-  { query: "Probiotic 50 Billion", category: "Digestive Health", date: "2 days ago" },
-];
-
 const trendingCategories = [
   { name: "Immunity Boosters", growth: "+24%" },
   { name: "Sleep Support", growth: "+18%" },
   { name: "Joint Health", growth: "+15%" },
   { name: "Energy & Focus", growth: "+12%" },
 ];
+
+const getRecommendationStyle = (recommendation: string | null) => {
+  if (!recommendation) return "bg-muted text-muted-foreground border-border";
+  const rec = recommendation.toUpperCase();
+  if (rec.includes('PROCEED')) return "bg-green-500/10 text-green-600 border-green-500/20";
+  if (rec.includes('CONSIDER') || rec.includes('CAUTION')) return "bg-amber-500/10 text-amber-600 border-amber-500/20";
+  if (rec.includes('SKIP') || rec.includes('AVOID')) return "bg-destructive/10 text-destructive border-destructive/20";
+  return "bg-muted text-muted-foreground border-border";
+};
 
 export default function NewAnalysis() {
   const { toast } = useToast();
@@ -38,6 +44,16 @@ export default function NewAnalysis() {
   const [category, setCategory] = useState("");
   const [asin, setAsin] = useState("");
   const [amazonCategories, setAmazonCategories] = useState<string[]>([]);
+
+  const { data: recentAnalyses, isLoading: analysesLoading } = useCategoryAnalyses();
+
+  // Get unique analyses by category name (most recent first)
+  const uniqueAnalyses = recentAnalyses?.reduce((acc, analysis) => {
+    if (!acc.find(a => a.category_name === analysis.category_name)) {
+      acc.push(analysis);
+    }
+    return acc;
+  }, [] as typeof recentAnalyses) ?? [];
 
   const handleCategoryToggle = (categoryLabel: string, checked: boolean) => {
     if (checked) {
@@ -95,6 +111,10 @@ export default function NewAnalysis() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleAnalysisClick = (categoryName: string) => {
+    navigate(`/dashboard?category=${encodeURIComponent(categoryName)}`);
   };
 
   return (
@@ -188,17 +208,105 @@ export default function NewAnalysis() {
         </CardContent>
       </Card>
 
+      {/* Recently Analyzed Categories */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <FileText className="w-4 h-4 text-accent" />
+            Recently Analyzed Categories
+          </CardTitle>
+          <CardDescription>
+            Click to view the full analysis dashboard
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {analysesLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-24 w-full rounded-lg" />
+              ))}
+            </div>
+          ) : uniqueAnalyses.length === 0 ? (
+            <p className="text-muted-foreground text-center py-8">
+              No analyses yet. Start your first analysis above!
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {uniqueAnalyses.slice(0, 5).map((analysis) => (
+                <div
+                  key={analysis.id}
+                  onClick={() => handleAnalysisClick(analysis.category_name)}
+                  className="p-4 rounded-lg border bg-secondary/30 hover:bg-secondary/50 cursor-pointer transition-colors space-y-3"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-foreground truncate">
+                        {analysis.category_name}
+                      </h3>
+                      <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
+                        {analysis.opportunity_index && (
+                          <span className="flex items-center gap-1">
+                            <Target className="w-3.5 h-3.5" />
+                            {Number(analysis.opportunity_index).toFixed(1)}/10
+                          </span>
+                        )}
+                        {analysis.products_analyzed != null && (
+                          <span className="flex items-center gap-1">
+                            <Package className="w-3.5 h-3.5" />
+                            {analysis.products_analyzed} products
+                          </span>
+                        )}
+                        {analysis.reviews_analyzed != null && (
+                          <span className="flex items-center gap-1">
+                            <MessageSquare className="w-3.5 h-3.5" />
+                            {analysis.reviews_analyzed.toLocaleString()} reviews
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                      {analysis.recommendation && (
+                        <Badge 
+                          variant="outline" 
+                          className={`text-xs whitespace-nowrap ${getRecommendationStyle(analysis.recommendation)}`}
+                        >
+                          {analysis.recommendation}
+                        </Badge>
+                      )}
+                      {analysis.created_at && (
+                        <span className="text-xs text-muted-foreground">
+                          {formatDistanceToNow(new Date(analysis.created_at), { addSuffix: true })}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {analysis.executive_summary && (
+                    <p className="text-sm text-muted-foreground line-clamp-2">
+                      {analysis.executive_summary}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <div className="grid md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <Clock className="w-4 h-4 text-muted-foreground" />
-              Recent Searches
+              Quick Start
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {recentSearches.map((search, idx) => (
+              {[
+                { query: "Vitamin D3 5000 IU", category: "Vitamins" },
+                { query: "Omega-3 Fish Oil", category: "Supplements" },
+                { query: "Probiotic 50 Billion", category: "Digestive Health" },
+              ].map((search, idx) => (
                 <div
                   key={idx}
                   className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 hover:bg-secondary cursor-pointer transition-colors"
@@ -208,7 +316,6 @@ export default function NewAnalysis() {
                     <p className="font-medium text-foreground">{search.query}</p>
                     <p className="text-sm text-muted-foreground">{search.category}</p>
                   </div>
-                  <span className="text-xs text-muted-foreground">{search.date}</span>
                 </div>
               ))}
             </div>

@@ -6,7 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { 
   TrendingUp, TrendingDown, Target, DollarSign, Star, Package, Loader2, RefreshCw,
   Zap, AlertTriangle, Crown, ShoppingCart, BarChart3, Users, CheckCircle2, Circle, Clock,
-  ThumbsUp, ThumbsDown, MessageSquare
+  ThumbsUp, ThumbsDown, MessageSquare, Building2, Crosshair, Shield
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -667,6 +667,106 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       )}
+
+      {/* Competitive Landscape Section */}
+      {(() => {
+        const analysis1 = analysis?.analysis_1_category_scores as Record<string, unknown> | null;
+        const competitiveLandscape = analysis1?.competitive_landscape as Record<string, unknown> | null;
+        
+        if (!competitiveLandscape) return null;
+
+        const dominantPlayers = competitiveLandscape.dominant_players as Array<{ name?: string; market_share?: string; strength?: string }> | null;
+        const marketGaps = competitiveLandscape.market_gaps as string[] | null;
+        const weaknesses = competitiveLandscape.weaknesses as Array<{ player?: string; weakness?: string; exploitability?: string }> | string[] | null;
+
+        if (!dominantPlayers?.length && !marketGaps?.length && !weaknesses?.length) return null;
+
+        return (
+          <Card className="border-primary/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Building2 className="w-5 h-5 text-primary" />
+                Competitive Landscape
+              </CardTitle>
+              <CardDescription>Market structure, dominant players, and exploitable opportunities</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid md:grid-cols-3 gap-6">
+                {/* Dominant Players */}
+                {dominantPlayers && dominantPlayers.length > 0 && (
+                  <div>
+                    <h4 className="font-medium text-foreground flex items-center gap-2 mb-3">
+                      <Crown className="w-4 h-4 text-yellow-500" />
+                      Dominant Players
+                    </h4>
+                    <div className="space-y-2">
+                      {dominantPlayers.slice(0, 5).map((player, idx) => (
+                        <div key={idx} className="p-2 bg-secondary/50 rounded-lg">
+                          <p className="text-sm font-medium text-foreground">{player.name || `Player ${idx + 1}`}</p>
+                          {player.market_share && (
+                            <p className="text-xs text-muted-foreground">Share: {player.market_share}</p>
+                          )}
+                          {player.strength && (
+                            <p className="text-xs text-muted-foreground">{player.strength}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Market Gaps */}
+                {marketGaps && marketGaps.length > 0 && (
+                  <div>
+                    <h4 className="font-medium text-foreground flex items-center gap-2 mb-3">
+                      <Crosshair className="w-4 h-4 text-green-500" />
+                      Market Gaps
+                    </h4>
+                    <div className="space-y-2">
+                      {marketGaps.slice(0, 5).map((gap, idx) => (
+                        <div key={idx} className="p-2 bg-green-500/5 border border-green-500/20 rounded-lg">
+                          <p className="text-sm text-foreground">{gap}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Exploitable Weaknesses */}
+                {weaknesses && weaknesses.length > 0 && (
+                  <div>
+                    <h4 className="font-medium text-foreground flex items-center gap-2 mb-3">
+                      <Shield className="w-4 h-4 text-orange-500" />
+                      Exploitable Weaknesses
+                    </h4>
+                    <div className="space-y-2">
+                      {weaknesses.slice(0, 5).map((weakness, idx) => (
+                        <div key={idx} className="p-2 bg-orange-500/5 border border-orange-500/20 rounded-lg">
+                          {typeof weakness === 'string' ? (
+                            <p className="text-sm text-foreground">{weakness}</p>
+                          ) : (
+                            <>
+                              {weakness.player && (
+                                <p className="text-xs font-medium text-muted-foreground">{weakness.player}</p>
+                              )}
+                              <p className="text-sm text-foreground">{weakness.weakness}</p>
+                              {weakness.exploitability && (
+                                <Badge variant="outline" className="mt-1 text-xs">
+                                  {weakness.exploitability}
+                                </Badge>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Category Pain Points & Positive Themes */}
       {(painPoints.length > 0 || positiveThemes.length > 0) && (

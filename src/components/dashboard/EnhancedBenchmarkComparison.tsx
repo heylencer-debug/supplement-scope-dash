@@ -1,12 +1,16 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Star, TrendingUp, Pill, Target, MessageSquare, Package, Users, Megaphone, AlertTriangle, CheckCircle, XCircle, Palette } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { Star, TrendingUp, Pill, Target, MessageSquare, Package, Users, Megaphone, AlertTriangle, CheckCircle, XCircle, Palette, Search, Filter, X } from "lucide-react";
 import { useProducts, Product } from "@/hooks/useProducts";
 import ProductDetailModal from "@/components/ProductDetailModal";
 import { useToast } from "@/hooks/use-toast";
-
 interface EnhancedBenchmarkComparisonProps {
   categoryId?: string;
   analysisData?: {
@@ -43,17 +47,31 @@ export function EnhancedBenchmarkComparison({
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterOpen, setFilterOpen] = useState(false);
   const { toast } = useToast();
   
-  // Get top products by reviews for selection
-  const topProducts = products
-    ?.sort((a, b) => (b.reviews || 0) - (a.reviews || 0))
-    .slice(0, 10) || [];
+  // All products sorted by reviews for selection pool
+  const allProductsSorted = useMemo(() => 
+    [...(products || [])].sort((a, b) => (b.reviews || 0) - (a.reviews || 0)),
+    [products]
+  );
+
+  // Filtered products based on search query
+  const filteredProducts = useMemo(() => {
+    if (!searchQuery.trim()) return allProductsSorted;
+    const query = searchQuery.toLowerCase();
+    return allProductsSorted.filter(p => 
+      p.brand?.toLowerCase().includes(query) ||
+      p.title?.toLowerCase().includes(query) ||
+      p.asin?.toLowerCase().includes(query)
+    );
+  }, [allProductsSorted, searchQuery]);
 
   // Get selected products or default to top 3
   const displayedProducts = selectedIds.length > 0 
-    ? topProducts.filter(p => selectedIds.includes(p.id))
-    : topProducts.slice(0, MAX_COMPETITORS);
+    ? allProductsSorted.filter(p => selectedIds.includes(p.id))
+    : allProductsSorted.slice(0, MAX_COMPETITORS);
 
   const loading = isLoading || productsLoading;
 
@@ -281,17 +299,111 @@ export function EnhancedBenchmarkComparison({
     return null;
   };
 
+  const clearSelection = () => {
+    setSelectedIds([]);
+  };
+
   return (
     <>
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-base md:text-lg">
-            <Package className="w-4 h-4 md:w-5 md:h-5 text-primary" />
-            Benchmark Comparison
-          </CardTitle>
-          <CardDescription className="text-xs md:text-sm">
-            Compare your concept against top {MAX_COMPETITORS} competitors • Click any product for details
-          </CardDescription>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+                <Package className="w-4 h-4 md:w-5 md:h-5 text-primary" />
+                Benchmark Comparison
+              </CardTitle>
+              <CardDescription className="text-xs md:text-sm">
+                Compare your concept against competitors • Click any product for details
+              </CardDescription>
+            </div>
+            
+            {/* Filter/Select Competitors Button */}
+            <div className="flex items-center gap-2">
+              {selectedIds.length > 0 && (
+                <Button variant="ghost" size="sm" onClick={clearSelection} className="h-8 px-2 text-xs">
+                  <X className="w-3 h-3 mr-1" />
+                  Clear
+                </Button>
+              )}
+              <Popover open={filterOpen} onOpenChange={setFilterOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-8 gap-1.5">
+                    <Filter className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Select Competitors</span>
+                    {selectedIds.length > 0 && (
+                      <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px]">
+                        {selectedIds.length}
+                      </Badge>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 p-0" align="end">
+                  <div className="p-3 border-b">
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search by brand, title, or ASIN..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-8 h-9"
+                      />
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-2">
+                      Select up to {MAX_COMPETITORS} products to compare
+                    </p>
+                  </div>
+                  <ScrollArea className="h-[300px]">
+                    <div className="p-2 space-y-1">
+                      {filteredProducts.map((product, idx) => {
+                        const isSelected = selectedIds.includes(product.id);
+                        const isDisabled = !isSelected && selectedIds.length >= MAX_COMPETITORS;
+                        return (
+                          <div
+                            key={product.id}
+                            className={`flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors ${
+                              isSelected ? 'bg-primary/10' : isDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-muted'
+                            }`}
+                            onClick={() => !isDisabled && handleProductSelect(product.id)}
+                          >
+                            <Checkbox
+                              checked={isSelected}
+                              disabled={isDisabled}
+                              className="pointer-events-none"
+                            />
+                            <div className="w-8 h-8 rounded bg-muted overflow-hidden shrink-0">
+                              {product.main_image_url ? (
+                                <img src={product.main_image_url} alt="" className="w-full h-full object-contain" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <Package className="w-4 h-4 text-muted-foreground/30" />
+                                </div>
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-medium truncate">{product.brand || 'Unknown'}</p>
+                              <p className="text-[10px] text-muted-foreground truncate">{product.title?.substring(0, 40)}...</p>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span className="text-[10px] text-muted-foreground">${product.price?.toFixed(2)}</span>
+                                <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                                  <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />
+                                  {product.rating?.toFixed(1)}
+                                </span>
+                                <span className="text-[10px] text-muted-foreground">{(product.reviews || 0).toLocaleString()} reviews</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {filteredProducts.length === 0 && (
+                        <p className="text-xs text-muted-foreground text-center py-4">No products found</p>
+                      )}
+                    </div>
+                  </ScrollArea>
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="px-2 md:px-6">
           <div className="flex gap-2 md:gap-3">

@@ -4,14 +4,15 @@ import type { Tables } from "@/integrations/supabase/types";
 
 export type CategoryAnalysis = Tables<"category_analyses">;
 
-export function useCategoryAnalyses() {
+export function useCategoryAnalyses(limit: number = 20) {
   return useQuery({
-    queryKey: ["category_analyses"],
+    queryKey: ["category_analyses", limit],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("category_analyses")
-        .select("*")
-        .order("created_at", { ascending: false });
+        .select("id, category_id, category_name, overall_score, opportunity_index, recommendation, products_analyzed, reviews_analyzed, executive_summary, created_at")
+        .order("created_at", { ascending: false })
+        .limit(limit);
 
       if (error) throw error;
       return data as CategoryAnalysis[];

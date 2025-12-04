@@ -176,7 +176,7 @@ export default function ProductExplorer() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Product Explorer</h1>
@@ -193,7 +193,7 @@ export default function ProductExplorer() {
       </div>
 
       <Card>
-        <CardHeader className="pb-4">
+        <CardHeader>
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
@@ -370,7 +370,7 @@ export default function ProductExplorer() {
               </TableBody>
             </Table>
           </div>
-          <div className="flex items-center justify-between mt-4">
+          <div className="flex items-center justify-between mt-6">
             <p className="text-sm text-muted-foreground">
               Showing {Math.min(filteredProducts.length, 50)} of {filteredProducts.length} products
             </p>

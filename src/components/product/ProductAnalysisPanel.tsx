@@ -191,14 +191,25 @@ export default function ProductAnalysisPanel({
   const ma = marketingAnalysis || {};
   const ra = reviewAnalysis || {};
 
-  // Extract scores
-  const overallScore = typeof ma.overall_marketing_score === 'object' 
-    ? ma.overall_marketing_score 
-    : { overall_score: ma.overall_marketing_score };
+  // Extract scores from score_card (correct path)
+  const scoreCard = ma.score_card || {};
+  const grade = scoreCard.overall_grade;
+  const score = scoreCard.overall_score ?? 0;
+  const scoreColor = scoreCard.score_color;
+  const summary = scoreCard.summary_text;
   
-  const grade = overallScore?.grade;
-  const score = overallScore?.overall_score ?? 0;
-  const summary = overallScore?.summary || ma.score_card?.summary_text;
+  // Get metrics array from score_card
+  const scoreMetrics = scoreCard.metrics || [];
+  
+  // Get visual gallery data
+  const visualGallery = ma.visual_gallery || {};
+  const galleryImages = visualGallery.images || [];
+  const galleryDemographics = visualGallery.demographics || {};
+  
+  // Get details for customer sentiment and copy analysis
+  const details = ma.details || {};
+  const customerSentiment = details.customer_sentiment || {};
+  const copyAnalysis = details.copy_analysis || {};
 
   // Prepare sentiment data - handle nested object structure from DB
   const sentimentData = ra.sentiment_distribution 
@@ -211,7 +222,6 @@ export default function ProductAnalysisPanel({
         }))
         .filter(d => d.value > 0)
         .sort((a, b) => {
-          // Sort by star rating (5 star first)
           const getStarNum = (name: string) => {
             const match = name.match(/(\d)/);
             return match ? parseInt(match[1]) : 0;
@@ -229,8 +239,9 @@ export default function ProductAnalysisPanel({
   // Get product experience
   const productExperience = ra.product_experience_breakdown || {};
   
-  // Get optimization opportunities
-  const optimizationOpps = ma.optimization_opportunities || [];
+  // Get optimization opportunities from details.action_plan or fallback
+  const actionPlan = details.action_plan || [];
+  const optimizationOpps = ma.optimization_opportunities || actionPlan;
   const actionableRecs = ra.actionable_recommendations || [];
   
   // Combine and sort by priority
@@ -279,7 +290,7 @@ export default function ProductAnalysisPanel({
               </CardContent>
             </Card>
 
-            {/* Score Metrics */}
+            {/* Score Metrics from score_card.metrics */}
             <Card className="lg:col-span-2">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
@@ -287,66 +298,103 @@ export default function ProductAnalysisPanel({
                   Score Breakdown
                 </CardTitle>
               </CardHeader>
-              <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-3">
-                  <ScoreGauge 
-                    score={overallScore?.copy_score ?? ma.copy_effectiveness?.overall_copy_score ?? 0} 
-                    label="Copy Strength" 
-                  />
-                  <ScoreGauge 
-                    score={ma.visual_marketing?.lifestyle_imagery_score ?? 0} 
-                    label="Visual Appeal" 
-                  />
-                  <ScoreGauge 
-                    score={overallScore?.trust_score ?? ma.trust_signals?.trust_score ?? 0} 
-                    label="Trust Score" 
-                  />
-                </div>
-                <div className="space-y-3">
-                  <ScoreGauge 
-                    score={overallScore?.positioning_score ?? 0} 
-                    label="Positioning" 
-                  />
-                  <ScoreGauge 
-                    score={overallScore?.audience_targeting_score ?? ma.target_demographics?.relatability_score ?? 0} 
-                    label="Audience Targeting" 
-                  />
-                  <ScoreGauge 
-                    score={overallScore?.message_consistency_score ?? 0} 
-                    label="Message Consistency" 
-                  />
-                </div>
+              <CardContent>
+                {scoreMetrics.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-3">
+                      {scoreMetrics.slice(0, Math.ceil(scoreMetrics.length / 2)).map((metric: any, i: number) => (
+                        <ScoreGauge 
+                          key={i}
+                          score={metric.score ?? 0} 
+                          label={metric.name || metric.metric} 
+                        />
+                      ))}
+                    </div>
+                    <div className="space-y-3">
+                      {scoreMetrics.slice(Math.ceil(scoreMetrics.length / 2)).map((metric: any, i: number) => (
+                        <ScoreGauge 
+                          key={i}
+                          score={metric.score ?? 0} 
+                          label={metric.name || metric.metric} 
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-3">
+                      <ScoreGauge score={copyAnalysis.clarity ?? 0} label="Copy Clarity" />
+                      <ScoreGauge score={0} label="Visual Appeal" />
+                      <ScoreGauge score={0} label="Trust Score" />
+                    </div>
+                    <div className="space-y-3">
+                      <ScoreGauge score={0} label="Positioning" />
+                      <ScoreGauge score={galleryDemographics.relatability_score ?? 0} label="Audience Targeting" />
+                      <ScoreGauge score={0} label="Message Consistency" />
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
         </TabsContent>
 
-        {/* SECTION 2: VISUAL GALLERY */}
+        {/* SECTION 2: VISUAL GALLERY - uses visual_gallery.images */}
         <TabsContent value="gallery" className="mt-4">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <Card className="lg:col-span-2">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
                   <ImageIcon className="w-4 h-4" />
-                  Product Images
+                  Product Images Analysis
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {imageUrls && imageUrls.length > 0 ? (
+                {galleryImages.length > 0 ? (
+                  <Carousel className="w-full">
+                    <CarouselContent>
+                      {galleryImages.map((img: any, index: number) => (
+                        <CarouselItem key={index} className="md:basis-1/2 lg:basis-1/3">
+                          <Card className="overflow-hidden">
+                            <img 
+                              src={img.url || imageUrls?.[index]} 
+                              alt={img.purpose || `Product image ${index + 1}`}
+                              className="w-full h-40 object-contain bg-white"
+                            />
+                            <CardContent className="p-2 space-y-1">
+                              <div className="flex items-center justify-between">
+                                <Badge variant="outline" className="text-xs">
+                                  {img.purpose || `Image ${index + 1}`}
+                                </Badge>
+                                {img.score && (
+                                  <Badge 
+                                    variant="secondary" 
+                                    className={`text-xs ${img.score >= 7 ? 'bg-green-500/10 text-green-600' : img.score >= 5 ? 'bg-yellow-500/10 text-yellow-600' : 'bg-red-500/10 text-red-600'}`}
+                                  >
+                                    {img.score}/10
+                                  </Badge>
+                                )}
+                              </div>
+                              {img.analysis && (
+                                <p className="text-xs text-muted-foreground line-clamp-2">{img.analysis}</p>
+                              )}
+                            </CardContent>
+                          </Card>
+                        </CarouselItem>
+                      ))}
+                    </CarouselContent>
+                    <CarouselPrevious />
+                    <CarouselNext />
+                  </Carousel>
+                ) : imageUrls && imageUrls.length > 0 ? (
                   <Carousel className="w-full">
                     <CarouselContent>
                       {imageUrls.map((url, index) => (
                         <CarouselItem key={index} className="md:basis-1/2 lg:basis-1/3">
                           <Card className="overflow-hidden">
-                            <img 
-                              src={url} 
-                              alt={`Product image ${index + 1}`}
-                              className="w-full h-40 object-contain bg-white"
-                            />
+                            <img src={url} alt={`Product image ${index + 1}`} className="w-full h-40 object-contain bg-white" />
                             <CardContent className="p-2">
-                              <Badge variant="outline" className="text-xs">
-                                Image {index + 1}
-                              </Badge>
+                              <Badge variant="outline" className="text-xs">Image {index + 1}</Badge>
                             </CardContent>
                           </Card>
                         </CarouselItem>
@@ -356,9 +404,7 @@ export default function ProductAnalysisPanel({
                     <CarouselNext />
                   </Carousel>
                 ) : (
-                  <p className="text-sm text-muted-foreground text-center py-8">
-                    No product images available
-                  </p>
+                  <p className="text-sm text-muted-foreground text-center py-8">No product images available</p>
                 )}
               </CardContent>
             </Card>
@@ -367,26 +413,61 @@ export default function ProductAnalysisPanel({
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
                   <Users className="w-4 h-4" />
-                  Visual Analysis
+                  Visual & Audience Analysis
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div>
-                  <span className="text-xs text-muted-foreground">Image Quality</span>
-                  <p className="text-sm font-medium">{ma.visual_marketing?.image_quality_assessment ?? "Not analyzed"}</p>
-                </div>
-                <div>
-                  <span className="text-xs text-muted-foreground">Product Presentation</span>
-                  <p className="text-sm">{ma.visual_marketing?.product_presentation ?? "-"}</p>
-                </div>
-                <div>
-                  <span className="text-xs text-muted-foreground">Infographic Usage</span>
-                  <p className="text-sm">{ma.visual_marketing?.infographic_usage ?? "-"}</p>
-                </div>
-                {ma.target_demographics && (
+                {galleryDemographics.primary_audience && (
                   <div>
                     <span className="text-xs text-muted-foreground">Target Audience</span>
-                    <p className="text-sm">{ma.target_demographics.primary_audience ?? "-"}</p>
+                    <p className="text-sm font-medium">{galleryDemographics.primary_audience}</p>
+                  </div>
+                )}
+                {galleryDemographics.relatability_score && (
+                  <div>
+                    <span className="text-xs text-muted-foreground">Relatability Score</span>
+                    <div className="flex items-center gap-2">
+                      <Progress value={galleryDemographics.relatability_score * 10} className="h-2 flex-1" />
+                      <span className="text-sm font-medium">{galleryDemographics.relatability_score}/10</span>
+                    </div>
+                  </div>
+                )}
+                {/* Customer Sentiment from details */}
+                {customerSentiment.primary_praises && customerSentiment.primary_praises.length > 0 && (
+                  <div>
+                    <span className="text-xs text-muted-foreground">What Customers Love</span>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {customerSentiment.primary_praises.slice(0, 4).map((praise: string, i: number) => (
+                        <Badge key={i} variant="outline" className="text-xs bg-green-500/10 text-green-600 border-green-500/30">{praise}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {customerSentiment.primary_complaints && customerSentiment.primary_complaints.length > 0 && (
+                  <div>
+                    <span className="text-xs text-muted-foreground">Common Complaints</span>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {customerSentiment.primary_complaints.slice(0, 4).map((complaint: string, i: number) => (
+                        <Badge key={i} variant="outline" className="text-xs bg-red-500/10 text-red-600 border-red-500/30">{complaint}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {customerSentiment.gap_analysis && (
+                  <div>
+                    <span className="text-xs text-muted-foreground">Gap Analysis</span>
+                    <p className="text-sm text-muted-foreground">{customerSentiment.gap_analysis}</p>
+                  </div>
+                )}
+                {/* Copy Analysis Hooks */}
+                {copyAnalysis.hooks && copyAnalysis.hooks.length > 0 && (
+                  <div>
+                    <span className="text-xs text-muted-foreground">Copy Hooks</span>
+                    <div className="space-y-1 mt-1">
+                      {copyAnalysis.hooks.slice(0, 3).map((hook: string, i: number) => (
+                        <p key={i} className="text-xs text-muted-foreground">• {hook}</p>
+                      ))}
+                    </div>
                   </div>
                 )}
               </CardContent>

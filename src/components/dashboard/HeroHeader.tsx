@@ -68,16 +68,16 @@ export function HeroHeader({
   const displayScore = (normalizedScore / 10).toFixed(1);
 
   return (
-    <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-[#1e3a5f] via-[#264a6e] to-[#1e3a5f] p-4 md:p-6 text-white shadow-lg">
+    <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-[#1e3a5f] via-[#264a6e] to-[#1e3a5f] p-6 md:p-8 text-white shadow-lg">
       {/* Subtle background pattern */}
       <div className="absolute inset-0 opacity-5">
         <div className="absolute top-0 right-0 w-96 h-96 bg-white rounded-full blur-3xl -translate-y-1/2 translate-x-1/3" />
         <div className="absolute bottom-0 left-0 w-64 h-64 bg-white rounded-full blur-3xl translate-y-1/2 -translate-x-1/4" />
       </div>
 
-      <div className="relative space-y-4">
+      <div className="relative space-y-5">
         {/* Top Row: Title, Score, and Product Images */}
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
           {/* Left Section: Title, Badge, Score */}
           <div className="flex-1 space-y-3">
             {isLoading ? (

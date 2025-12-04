@@ -16,9 +16,9 @@ export function Layout({ children }: LayoutProps) {
             <SidebarTrigger />
           </header>
           <div className="flex-1 bg-background overflow-y-auto overflow-x-hidden flex flex-col items-center">
-            <div className="w-full max-w-[80vw]">
+            <div className="w-full max-w-[80vw] px-4 lg:px-0">
               <AnalysisTabs />
-              <div className="py-6">
+              <div className="py-8">
                 {children}
               </div>
             </div>

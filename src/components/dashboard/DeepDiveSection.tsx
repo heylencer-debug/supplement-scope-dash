@@ -234,8 +234,8 @@ function CriteriaBreakdownPanel({
   if (breakdown.length === 0) return null;
 
   return (
-    <div className="mt-6 pt-6 border-t">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+    <div className="mt-8 pt-8 border-t">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div className="flex items-center gap-2">
           <h4 className="text-sm font-semibold text-[#1e3a5f]">
             Criteria Breakdown
@@ -270,7 +270,7 @@ function CriteriaBreakdownPanel({
       </div>
 
       {/* Filter Chips */}
-      <div className="flex flex-wrap items-center gap-2 mb-4">
+      <div className="flex flex-wrap items-center gap-2 mb-6">
         <Filter className="w-4 h-4 text-muted-foreground" />
         <Button
           variant={filter === "all" ? "default" : "outline"}
@@ -307,13 +307,13 @@ function CriteriaBreakdownPanel({
       </div>
 
       {isLoading ? (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
           {[...Array(6)].map((_, i) => (
             <Skeleton key={i} className="h-20 rounded-lg" />
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
           {filteredBreakdown.map((item, idx) => {
             const name = item.name || item.criterion || item.category || "Unknown";
             const score = item.raw_score || item.score || 0;

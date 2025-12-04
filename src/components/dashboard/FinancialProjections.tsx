@@ -60,7 +60,7 @@ export function FinancialProjections({ financials }: FinancialProjectionsProps) 
         <CardDescription>Startup investment, revenue targets, and margin projections</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid lg:grid-cols-2 gap-6">
+        <div className="grid lg:grid-cols-2 gap-8">
           {/* Startup Investment Breakdown */}
           {(investmentData.length > 0 || startup_investment?.total) && (
             <div className="space-y-4">
@@ -146,7 +146,7 @@ export function FinancialProjections({ financials }: FinancialProjectionsProps) 
         </div>
 
         {/* Cost Structure & Breakeven */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mt-8">
           {/* Cost Structure */}
           {costs && (
             <>
@@ -189,12 +189,12 @@ export function FinancialProjections({ financials }: FinancialProjectionsProps) 
 
         {/* Margin Projections */}
         {margins && (margins.year_1 !== undefined || margins.year_2 !== undefined) && (
-          <div className="mt-6 space-y-3">
+          <div className="mt-8 space-y-4">
             <h4 className="font-medium text-sm flex items-center gap-2">
               <Target className="w-4 h-4 text-primary" />
               Margin Projections
             </h4>
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid md:grid-cols-2 gap-6">
               {margins.year_1 !== undefined && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">

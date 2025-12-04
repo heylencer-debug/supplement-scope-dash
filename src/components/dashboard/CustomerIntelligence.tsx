@@ -57,13 +57,13 @@ export default function CustomerIntelligence({
 
   return (
     <Card>
-      <CardHeader className="pb-4">
+      <CardHeader>
         <div className="flex items-center gap-2">
           <Users className="w-5 h-5 text-primary" />
           <CardTitle>Customer Intelligence</CardTitle>
         </div>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-8">
         {/* Target Buyer Profile */}
         {buyer_profile && (
           <div>
@@ -116,7 +116,7 @@ export default function CustomerIntelligence({
           </div>
         )}
 
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid md:grid-cols-2 gap-8">
           {/* Unmet Needs */}
           {unmet_needs && unmet_needs.length > 0 && (
             <div>

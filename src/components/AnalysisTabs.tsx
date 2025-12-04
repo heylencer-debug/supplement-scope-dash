@@ -31,12 +31,34 @@ export function AnalysisTabs() {
   }, []);
 
   // Load and sync pending analyses from localStorage
-  // Re-read when route changes (e.g., after submitting new analysis)
+  // Re-read when route changes or storage changes
   useEffect(() => {
-    const stored = localStorage.getItem(PENDING_ANALYSES_KEY);
-    if (stored) {
-      setPendingAnalyses(JSON.parse(stored));
-    }
+    const loadPending = () => {
+      const stored = localStorage.getItem(PENDING_ANALYSES_KEY);
+      if (stored) {
+        setPendingAnalyses(JSON.parse(stored));
+      }
+    };
+    
+    loadPending();
+    
+    // Listen for storage changes (from other tabs or custom events)
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === PENDING_ANALYSES_KEY) {
+        loadPending();
+      }
+    };
+    
+    // Listen for custom event from NewAnalysis
+    const handleNewAnalysis = () => loadPending();
+    
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener('newAnalysisAdded', handleNewAnalysis);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('newAnalysisAdded', handleNewAnalysis);
+    };
   }, [location.pathname, currentCategory]);
 
   // Clean up pending analyses once they appear in DB or are too old

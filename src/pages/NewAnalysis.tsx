@@ -106,6 +106,9 @@ export default function NewAnalysis() {
       });
       localStorage.setItem(PENDING_ANALYSES_KEY, JSON.stringify(pending));
 
+      // Dispatch custom event to notify AnalysisTabs
+      window.dispatchEvent(new Event('newAnalysisAdded'));
+
       // Invalidate the analyses query cache
       queryClient.invalidateQueries({ queryKey: ['category_analyses'] });
 

@@ -33,8 +33,8 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarHeader className="p-6 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-sidebar-primary flex items-center justify-center">
-            <Search className="w-5 h-5 text-sidebar-primary-foreground" />
+          <div className="w-12 h-12 rounded-2xl bg-sidebar-primary flex items-center justify-center shadow-soft">
+            <Search className="w-6 h-6 text-sidebar-primary-foreground" />
           </div>
           <div>
             <h1 className="text-lg font-semibold text-sidebar-foreground">Noodle Search</h1>
@@ -45,15 +45,15 @@ export function AppSidebar() {
       <SidebarContent className="p-4">
         <SidebarGroup>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="space-y-1">
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink
                       to={getUrl(item)}
                       end={item.url === "/"}
-                      className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
-                      activeClassName="bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground"
+                      className="flex items-center gap-3 px-4 py-3 rounded-xl text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-all"
+                      activeClassName="bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground shadow-soft"
                     >
                       <item.icon className="w-5 h-5" />
                       <span className="font-medium">{item.title}</span>

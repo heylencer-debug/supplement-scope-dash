@@ -157,9 +157,9 @@ export default function ProductExplorer() {
 
   const ScoreBadge = ({ score, label }: { score: number | null; label: string }) => {
     if (score === null) return null;
-    const color = score >= 7 ? "text-green-600 bg-green-500/10" 
-      : score >= 5 ? "text-yellow-600 bg-yellow-500/10" 
-      : "text-red-600 bg-red-500/10";
+    const color = score >= 7 ? "text-chart-4 bg-chart-4/10" 
+      : score >= 5 ? "text-chart-2 bg-chart-2/10" 
+      : "text-destructive bg-destructive/10";
     return (
       <span className={`${color} text-xs px-1.5 py-0.5 rounded font-medium`}>
         {label[0]}:{score}
@@ -170,7 +170,7 @@ export default function ProductExplorer() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-accent" />
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -310,7 +310,7 @@ export default function ProductExplorer() {
                           <TableCell className="text-right text-muted-foreground hidden lg:table-cell">
                             {product.monthly_sales?.toLocaleString() ?? "-"}
                           </TableCell>
-                          <TableCell className="text-right font-medium text-green-600">
+                          <TableCell className="text-right font-medium text-chart-4">
                             {product.monthly_revenue 
                               ? `$${product.monthly_revenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
                               : "-"}
@@ -325,7 +325,7 @@ export default function ProductExplorer() {
                           <TableCell className="text-center hidden lg:table-cell">
                             <div className="flex items-center justify-center gap-1">
                               {product.bestseller && (
-                                <Badge variant="default" className="bg-accent text-xs">
+                                <Badge variant="default" className="text-xs">
                                   Best
                                 </Badge>
                               )}
@@ -335,7 +335,7 @@ export default function ProductExplorer() {
                                 </Badge>
                               )}
                               {product.is_young_competitor && (
-                                <TrendingUp className="w-4 h-4 text-green-500" />
+                                <TrendingUp className="w-4 h-4 text-chart-4" />
                               )}
                             </div>
                           </TableCell>

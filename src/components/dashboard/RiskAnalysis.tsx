@@ -19,10 +19,10 @@ export function RiskAnalysis({ risks }: RiskAnalysisProps) {
   if (!hasData) return null;
 
   return (
-    <Card className="border-red-500/20">
+    <Card className="border-destructive/20">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <AlertTriangle className="w-5 h-5 text-red-500" />
+          <AlertTriangle className="w-5 h-5 text-destructive" />
           Risk Analysis
         </CardTitle>
         <CardDescription>Category challenges, failure patterns, and risk factors to consider</CardDescription>
@@ -33,12 +33,12 @@ export function RiskAnalysis({ risks }: RiskAnalysisProps) {
           {category_challenges && category_challenges.length > 0 && (
             <div className="space-y-4">
               <h4 className="font-medium text-sm flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-orange-500" />
+                <AlertCircle className="w-4 h-4 text-chart-2" />
                 Category Challenges
               </h4>
               <div className="space-y-2">
                 {category_challenges.map((challenge, idx) => (
-                  <div key={idx} className="p-3 bg-orange-500/5 border border-orange-500/20 rounded-lg">
+                  <div key={idx} className="p-3 bg-chart-2/5 border border-chart-2/20 rounded-lg">
                     <p className="text-sm text-foreground">{challenge}</p>
                   </div>
                 ))}
@@ -50,13 +50,13 @@ export function RiskAnalysis({ risks }: RiskAnalysisProps) {
           {failure_patterns && failure_patterns.length > 0 && (
             <div className="space-y-4">
               <h4 className="font-medium text-sm flex items-center gap-2">
-                <XCircle className="w-4 h-4 text-red-500" />
+                <XCircle className="w-4 h-4 text-destructive" />
                 Failure Patterns to Avoid
               </h4>
               <div className="space-y-2">
                 {failure_patterns.map((pattern, idx) => (
-                  <div key={idx} className="p-3 bg-red-500/5 border border-red-500/20 rounded-lg flex items-start gap-2">
-                    <Badge variant="outline" className="shrink-0 bg-red-500/10 text-red-600 border-red-500/30 text-xs">
+                  <div key={idx} className="p-3 bg-destructive/5 border border-destructive/20 rounded-lg flex items-start gap-2">
+                    <Badge variant="destructive" className="shrink-0 text-xs">
                       Avoid
                     </Badge>
                     <p className="text-sm text-foreground">{pattern}</p>
@@ -70,14 +70,14 @@ export function RiskAnalysis({ risks }: RiskAnalysisProps) {
           {regulatory && regulatory.length > 0 && (
             <div className="space-y-4">
               <h4 className="font-medium text-sm flex items-center gap-2">
-                <FileWarning className="w-4 h-4 text-yellow-500" />
+                <FileWarning className="w-4 h-4 text-chart-2" />
                 Regulatory Requirements
               </h4>
               <div className="space-y-2">
                 {regulatory.map((req, idx) => (
-                  <div key={idx} className="p-3 bg-yellow-500/5 border border-yellow-500/20 rounded-lg flex items-start gap-2">
-                    <div className="w-5 h-5 rounded-full bg-yellow-500/20 flex items-center justify-center shrink-0">
-                      <span className="text-xs text-yellow-600">{idx + 1}</span>
+                  <div key={idx} className="p-3 bg-chart-2/5 border border-chart-2/20 rounded-lg flex items-start gap-2">
+                    <div className="w-5 h-5 rounded-full bg-chart-2/20 flex items-center justify-center shrink-0">
+                      <span className="text-xs text-chart-2">{idx + 1}</span>
                     </div>
                     <p className="text-sm text-foreground">{req}</p>
                   </div>
@@ -90,12 +90,12 @@ export function RiskAnalysis({ risks }: RiskAnalysisProps) {
           {supply_chain && supply_chain.length > 0 && (
             <div className="space-y-4">
               <h4 className="font-medium text-sm flex items-center gap-2">
-                <Truck className="w-4 h-4 text-purple-500" />
+                <Truck className="w-4 h-4 text-chart-5" />
                 Supply Chain Risks
               </h4>
               <div className="space-y-2">
                 {supply_chain.map((risk, idx) => (
-                  <div key={idx} className="p-3 bg-purple-500/5 border border-purple-500/20 rounded-lg">
+                  <div key={idx} className="p-3 bg-chart-5/5 border border-chart-5/20 rounded-lg">
                     <p className="text-sm text-foreground">{risk}</p>
                   </div>
                 ))}

@@ -88,11 +88,11 @@ export function LaunchPlanSection({
 
   const phaseColors = [
     "from-primary to-primary/80",
-    "from-emerald-500 to-emerald-600",
-    "from-violet-500 to-violet-600",
-    "from-amber-500 to-amber-600",
-    "from-rose-500 to-rose-600",
-    "from-cyan-500 to-cyan-600",
+    "from-chart-4 to-chart-4/80",
+    "from-chart-5 to-chart-5/80",
+    "from-chart-2 to-chart-2/80",
+    "from-destructive to-destructive/80",
+    "from-chart-3 to-chart-3/80",
   ];
 
   const launchTactics = goToMarket ? [
@@ -147,14 +147,14 @@ export function LaunchPlanSection({
             {/* Ad Angles / Messaging */}
             {goToMarket?.messaging && goToMarket.messaging.length > 0 && (
               <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Megaphone className="h-4 w-4 text-amber-500" />
+              <div className="flex items-center gap-2">
+                  <Megaphone className="h-4 w-4 text-chart-2" />
                   <h4 className="text-sm font-semibold text-foreground">Ad Angles</h4>
                 </div>
                 <ul className="space-y-2">
                   {goToMarket.messaging.map((msg, index) => (
                     <li key={index} className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <Zap className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                      <Zap className="h-4 w-4 text-chart-2 mt-0.5 shrink-0" />
                       <span>{msg}</span>
                     </li>
                   ))}
@@ -166,7 +166,7 @@ export function LaunchPlanSection({
             {launchTactics.length > 0 && (
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                  <CheckCircle2 className="h-4 w-4 text-chart-4" />
                   <h4 className="text-sm font-semibold text-foreground">Launch Tactics</h4>
                 </div>
                 <div className="grid md:grid-cols-3 gap-4">
@@ -175,7 +175,7 @@ export function LaunchPlanSection({
                     return (
                       <div key={index} className="p-3 rounded-lg bg-muted/30 border border-border/50">
                         <div className="flex items-center gap-2 mb-1">
-                          <Icon className="h-4 w-4 text-emerald-500" />
+                          <Icon className="h-4 w-4 text-chart-4" />
                           <span className="text-sm font-medium text-foreground">{tactic.label}</span>
                         </div>
                         <p className="text-xs text-muted-foreground leading-relaxed">
@@ -192,7 +192,7 @@ export function LaunchPlanSection({
             {goToMarket?.differentiation && goToMarket.differentiation.length > 0 && (
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <Target className="h-4 w-4 text-blue-500" />
+                  <Target className="h-4 w-4 text-chart-3" />
                   <h4 className="text-sm font-semibold text-foreground">Differentiation</h4>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -283,7 +283,7 @@ export function LaunchPlanSection({
                               >
                                 <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${priorityConfig.color}`} />
                                 {isCompleted ? (
-                                  <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600 shrink-0" />
+                                  <CheckCircle2 className="w-2.5 h-2.5 text-chart-4 shrink-0" />
                                 ) : (
                                   <Circle className="w-2.5 h-2.5 text-muted-foreground shrink-0" />
                                 )}
@@ -299,7 +299,7 @@ export function LaunchPlanSection({
                                   {priorityConfig.label}
                                 </Badge>
                                 {isCompleted && (
-                                  <Badge variant="outline" className="text-[10px] text-emerald-600">
+                                  <Badge variant="outline" className="text-[10px] text-chart-4">
                                     Done
                                   </Badge>
                                 )}

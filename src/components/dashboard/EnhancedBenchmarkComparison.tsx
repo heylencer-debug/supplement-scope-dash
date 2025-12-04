@@ -571,8 +571,11 @@ export function EnhancedBenchmarkComparison({
                   <p className="text-[10px] font-semibold mb-1 flex items-center gap-1">
                     <Pill className="w-3 h-3 text-emerald-500" />
                     Key Ingredients
+                    <Badge variant="secondary" className="text-[9px] h-4 ml-auto">
+                      {getOurIngredients().length}
+                    </Badge>
                   </p>
-                  <div className="space-y-0.5">
+                  <div className="space-y-0.5 max-h-24 overflow-y-auto pr-1">
                     {getOurIngredients().map((ing, i) => (
                       <div key={i} className="flex items-start gap-1 text-[10px] text-muted-foreground">
                         <span className="w-1 h-1 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
@@ -736,8 +739,16 @@ export function EnhancedBenchmarkComparison({
                         <p className="text-[10px] font-semibold mb-1 flex items-center gap-1">
                           <Pill className="w-3 h-3 text-emerald-500" />
                           Ingredients
+                          {(() => {
+                            const { items } = parseCompetitorIngredients(product);
+                            return (
+                              <Badge variant="secondary" className="text-[9px] h-4 ml-auto">
+                                {items.length}
+                              </Badge>
+                            );
+                          })()}
                         </p>
-                        <div className="space-y-0.5">
+                        <div className="space-y-0.5 max-h-24 overflow-y-auto pr-1">
                           {(() => {
                             const { items, fallback } = parseCompetitorIngredients(product);
                               return items.map((ing, i) => (

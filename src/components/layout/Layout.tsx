@@ -15,10 +15,12 @@ export function Layout({ children }: LayoutProps) {
           <header className="h-14 border-b border-border bg-card flex items-center px-4 gap-4">
             <SidebarTrigger />
           </header>
-          <AnalysisTabs />
-          <div className="flex-1 p-6 bg-background overflow-y-auto overflow-x-hidden flex justify-center">
+          <div className="flex-1 bg-background overflow-y-auto overflow-x-hidden flex flex-col items-center">
             <div className="w-full max-w-[80vw]">
-              {children}
+              <AnalysisTabs />
+              <div className="py-6">
+                {children}
+              </div>
             </div>
           </div>
         </main>

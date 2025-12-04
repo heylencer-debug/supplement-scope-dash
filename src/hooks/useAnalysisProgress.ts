@@ -108,9 +108,9 @@ export function useAnalysisProgress(
     },
     {
       name: "Final Synthesis",
-      completed: (hasAnalysis ? 1 : 0) + (hasScores ? 1 : 0) + (hasFormulaBrief ? 1 : 0),
-      total: 3,
-      percentage: Math.round(((hasAnalysis ? 1 : 0) + (hasScores ? 1 : 0) + (hasFormulaBrief ? 1 : 0)) / 3 * 100),
+      completed: hasAnalysis ? 1 : 0,
+      total: 1,
+      percentage: hasAnalysis ? 100 : 0,
       weight: 10,
     },
   ];

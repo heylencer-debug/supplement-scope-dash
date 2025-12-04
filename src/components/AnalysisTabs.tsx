@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { useCategoryAnalyses } from "@/hooks/useCategoryAnalyses";
-import { Plus, X, Loader2 } from "lucide-react";
+import { X, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const DISMISSED_TABS_KEY = "dismissed_analysis_tabs";
@@ -111,8 +111,6 @@ export function AnalysisTabs() {
     }))
   ];
   
-  const isNewAnalysisActive = location.pathname === "/" && !currentCategory;
-  
   const handleDismissTab = (e: React.MouseEvent, categoryName: string) => {
     e.stopPropagation();
     const newDismissed = [...dismissedTabs, categoryName];
@@ -136,24 +134,8 @@ export function AnalysisTabs() {
     <div className="border-b border-border bg-card/95 backdrop-blur-sm sticky top-0 z-20 overflow-hidden shadow-sm">
       <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
         <div className="flex items-center gap-2 px-5 py-3 min-w-max">
-          {/* New Analysis Tab */}
-          <button 
-            onClick={() => navigate("/")}
-            className={cn(
-              "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 whitespace-nowrap flex-shrink-0",
-              isNewAnalysisActive 
-                ? "bg-primary text-primary-foreground shadow-sm" 
-                : "text-muted-foreground hover:bg-secondary hover:text-foreground hover:shadow-sm"
-            )}
-          >
-            <Plus className="w-4 h-4" />
-            New
-          </button>
-          
           {allTabs.length > 0 && (
             <>
-              {/* Divider */}
-              <div className="h-5 w-px bg-border mx-2 flex-shrink-0" />
               
               {/* Analysis Tabs */}
               {allTabs.map((tab) => {

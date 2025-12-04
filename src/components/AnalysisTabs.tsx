@@ -135,25 +135,25 @@ export function AnalysisTabs() {
   return (
     <div className="border-b border-border bg-card/95 backdrop-blur-sm sticky top-0 z-20 overflow-hidden shadow-sm">
       <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
-        <div className="flex items-center gap-1 px-4 py-2 min-w-max">
+        <div className="flex items-center gap-2 px-5 py-3 min-w-max">
           {/* New Analysis Tab */}
           <button 
             onClick={() => navigate("/")}
             className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0",
+              "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 whitespace-nowrap flex-shrink-0",
               isNewAnalysisActive 
-                ? "bg-accent text-accent-foreground" 
-                : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                ? "bg-accent text-accent-foreground shadow-sm" 
+                : "text-muted-foreground hover:bg-secondary hover:text-foreground hover:shadow-sm"
             )}
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Plus className="w-4 h-4" />
             New
           </button>
           
           {allTabs.length > 0 && (
             <>
               {/* Divider */}
-              <div className="h-4 w-px bg-border mx-1 flex-shrink-0" />
+              <div className="h-5 w-px bg-border mx-2 flex-shrink-0" />
               
               {/* Analysis Tabs */}
               {allTabs.map((tab) => {
@@ -164,34 +164,34 @@ export function AnalysisTabs() {
                   <div
                     key={tab.id}
                     className={cn(
-                      "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors group flex-shrink-0",
+                      "flex items-center gap-2.5 px-4 py-2 rounded-lg text-sm transition-all duration-200 group flex-shrink-0",
                       isActive 
-                        ? "bg-secondary text-foreground font-medium" 
-                        : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
+                        ? "bg-secondary text-foreground font-medium shadow-sm" 
+                        : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground hover:shadow-sm"
                     )}
                   >
                     <button
                       onClick={() => navigate(`/dashboard?category=${encodeURIComponent(tab.category_name)}`)}
-                      className="flex items-center gap-2 whitespace-nowrap"
+                      className="flex items-center gap-2.5 whitespace-nowrap"
                     >
                       {tab.isPending ? (
                         <Loader2 className="w-3.5 h-3.5 text-amber-500 animate-spin flex-shrink-0" />
                       ) : (
                         <span 
                           className={cn(
-                            "w-2 h-2 rounded-full flex-shrink-0",
+                            "w-2.5 h-2.5 rounded-full flex-shrink-0 transition-all",
                             isComplete ? "bg-green-500" : "bg-amber-500 animate-pulse"
                           )} 
                         />
                       )}
-                      <span className="max-w-[150px] truncate">{tab.category_name}</span>
+                      <span className="max-w-[160px] truncate">{tab.category_name}</span>
                     </button>
                     <button
                       onClick={(e) => handleDismissTab(e, tab.category_name)}
-                      className="opacity-0 group-hover:opacity-100 hover:bg-destructive/20 rounded p-0.5 transition-opacity flex-shrink-0"
+                      className="opacity-0 group-hover:opacity-100 hover:bg-destructive/20 rounded-md p-1 transition-all duration-200 flex-shrink-0"
                       title="Close tab"
                     >
-                      <X className="w-3 h-3" />
+                      <X className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 );

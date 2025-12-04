@@ -7,9 +7,20 @@ import {
   CheckCircle2, XCircle, Star, Quote, Megaphone, ShieldCheck
 } from "lucide-react";
 
+interface OverallMarketingScore {
+  grade?: string;
+  summary?: string;
+  copy_score?: number;
+  trust_score?: number;
+  overall_score?: number;
+  positioning_score?: number;
+  audience_targeting_score?: number;
+  message_consistency_score?: number;
+}
+
 interface MarketingAnalysis {
   key_insights?: string[];
-  overall_marketing_score?: number;
+  overall_marketing_score?: OverallMarketingScore | number;
   target_demographics?: {
     primary_audience?: string;
     age_range_appeal?: string;
@@ -150,11 +161,25 @@ export default function MarketingAnalysisPanel({ marketingAnalysis }: MarketingA
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-center mb-2">
-                  {ma.overall_marketing_score ?? "-"}
-                  <span className="text-lg text-muted-foreground">/100</span>
-                </div>
-                <Progress value={ma.overall_marketing_score ?? 0} className="h-2" />
+                {(() => {
+                  const score = typeof ma.overall_marketing_score === 'object' 
+                    ? ma.overall_marketing_score?.overall_score 
+                    : ma.overall_marketing_score;
+                  return (
+                    <>
+                      <div className="text-3xl font-bold text-center mb-2">
+                        {score ?? "-"}
+                        <span className="text-lg text-muted-foreground">/100</span>
+                      </div>
+                      <Progress value={score ?? 0} className="h-2" />
+                      {typeof ma.overall_marketing_score === 'object' && ma.overall_marketing_score?.grade && (
+                        <div className="text-center mt-2">
+                          <Badge variant="outline">{ma.overall_marketing_score.grade}</Badge>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </CardContent>
             </Card>
 

@@ -28,8 +28,8 @@ const amazonCategoryOptions = [
 const getRecommendationStyle = (recommendation: string | null) => {
   if (!recommendation) return "bg-muted text-muted-foreground border-border";
   const rec = recommendation.toUpperCase();
-  if (rec.includes('PROCEED')) return "bg-green-500/10 text-green-600 border-green-500/20";
-  if (rec.includes('CONSIDER') || rec.includes('CAUTION')) return "bg-amber-500/10 text-amber-600 border-amber-500/20";
+  if (rec.includes('PROCEED')) return "bg-chart-4/10 text-chart-4 border-chart-4/20";
+  if (rec.includes('CONSIDER') || rec.includes('CAUTION')) return "bg-chart-2/10 text-chart-2 border-chart-2/20";
   if (rec.includes('SKIP') || rec.includes('AVOID')) return "bg-destructive/10 text-destructive border-destructive/20";
   return "bg-muted text-muted-foreground border-border";
 };

@@ -40,7 +40,7 @@ function ScoreBadge({
   max?: number;
 }) {
   const percentage = score / max * 100;
-  const colorClass = percentage >= 70 ? "bg-green-500/10 text-green-600 border-green-500/30" : percentage >= 40 ? "bg-amber-500/10 text-amber-600 border-amber-500/30" : "bg-red-500/10 text-red-600 border-red-500/30";
+  const colorClass = percentage >= 70 ? "bg-chart-4/10 text-chart-4 border-chart-4/30" : percentage >= 40 ? "bg-chart-2/10 text-chart-2 border-chart-2/30" : "bg-destructive/10 text-destructive border-destructive/30";
   return <Badge variant="outline" className={colorClass}>
       {score}/{max}
     </Badge>;
@@ -53,7 +53,7 @@ function PriorityBadge({
   priority: string;
 }) {
   const priorityLower = priority?.toLowerCase() || 'medium';
-  const colorClass = priorityLower === 'high' ? "bg-red-500/10 text-red-600 border-red-500/30" : priorityLower === 'medium' ? "bg-amber-500/10 text-amber-600 border-amber-500/30" : "bg-green-500/10 text-green-600 border-green-500/30";
+  const colorClass = priorityLower === 'high' ? "bg-destructive/10 text-destructive border-destructive/30" : priorityLower === 'medium' ? "bg-chart-2/10 text-chart-2 border-chart-2/30" : "bg-chart-4/10 text-chart-4 border-chart-4/30";
   return <Badge variant="outline" className={`text-xs capitalize ${colorClass}`}>
       {priority}
     </Badge>;
@@ -69,16 +69,16 @@ function SmartImageCard({
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const purposeColors: Record<string, string> = {
-    "Product Feature": "bg-blue-500/90 text-white",
-    "Lifestyle": "bg-purple-500/90 text-white",
-    "Trust": "bg-green-500/90 text-white",
-    "Trust Anchor": "bg-emerald-500/90 text-white",
-    "Trust / Lifestyle": "bg-teal-500/90 text-white",
-    "Trust / Benefit": "bg-emerald-500/90 text-white",
-    "Benefit": "bg-amber-500/90 text-white",
-    "Benefit / Lifestyle": "bg-orange-500/90 text-white",
-    "Social Proof": "bg-indigo-500/90 text-white",
-    "Ingredient Highlight": "bg-cyan-500/90 text-white"
+    "Product Feature": "bg-chart-3/90 text-white",
+    "Lifestyle": "bg-chart-5/90 text-white",
+    "Trust": "bg-chart-4/90 text-white",
+    "Trust Anchor": "bg-chart-4/90 text-white",
+    "Trust / Lifestyle": "bg-chart-4/90 text-white",
+    "Trust / Benefit": "bg-chart-4/90 text-white",
+    "Benefit": "bg-chart-2/90 text-white",
+    "Benefit / Lifestyle": "bg-chart-2/90 text-white",
+    "Social Proof": "bg-primary/90 text-white",
+    "Ingredient Highlight": "bg-chart-3/90 text-white"
   };
   return <div className="space-y-2">
       <div className="relative aspect-square bg-muted rounded-lg overflow-hidden cursor-pointer group" onClick={() => setIsExpanded(!isExpanded)}>
@@ -93,7 +93,7 @@ function SmartImageCard({
           </div>}
         {/* Score Badge */}
         {image.score !== undefined && <div className="absolute top-2 right-2">
-            <Badge className={`text-xs ${image.score >= 8 ? "bg-green-500/90 text-white" : image.score >= 6 ? "bg-amber-500/90 text-white" : "bg-red-500/90 text-white"}`}>
+            <Badge className={`text-xs ${image.score >= 8 ? "bg-chart-4/90 text-white" : image.score >= 6 ? "bg-chart-2/90 text-white" : "bg-destructive/90 text-white"}`}>
               {image.score}/10
             </Badge>
           </div>}
@@ -163,7 +163,7 @@ function TitleAnalysisCard({
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm flex items-center gap-2">
-            <FileText className="w-4 h-4 text-blue-500" /> Title Analysis
+            <FileText className="w-4 h-4 text-chart-3" /> Title Analysis
           </CardTitle>
           {clarityScore !== undefined && <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">Clarity:</span>
@@ -175,8 +175,8 @@ function TitleAnalysisCard({
         {issues.length > 0 ? <div className="space-y-2">
             <p className="text-xs text-muted-foreground font-medium mb-3">Issues Found:</p>
             <div className="space-y-2">
-              {issues.map((issue: string, i: number) => <div key={i} className="flex items-start gap-2 p-3 bg-amber-500/5 rounded-md border border-amber-500/20">
-                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              {issues.map((issue: string, i: number) => <div key={i} className="flex items-start gap-2 p-3 bg-chart-2/5 rounded-md border border-chart-2/20">
+                  <AlertTriangle className="w-4 h-4 text-chart-2 shrink-0 mt-0.5" />
                   <span className="text-sm">{issue}</span>
                 </div>)}
             </div>
@@ -202,9 +202,9 @@ function BulletAnalysisCard({
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm flex items-center gap-2">
-            <List className="w-4 h-4 text-purple-500" /> Bullet Analysis
+            <List className="w-4 h-4 text-chart-5" /> Bullet Analysis
           </CardTitle>
-          {benefitFocused !== undefined && <Badge variant="outline" className={benefitFocused ? "bg-green-500/10 text-green-600 border-green-500/30" : "bg-amber-500/10 text-amber-600 border-amber-500/30"}>
+          {benefitFocused !== undefined && <Badge variant="outline" className={benefitFocused ? "bg-chart-4/10 text-chart-4 border-chart-4/30" : "bg-chart-2/10 text-chart-2 border-chart-2/30"}>
               {benefitFocused ? "✓ Benefit-Focused" : "✗ Not Benefit-Focused"}
             </Badge>}
         </div>
@@ -213,11 +213,11 @@ function BulletAnalysisCard({
         {/* Strengths */}
         {strengths.length > 0 && <div>
             <p className="text-xs text-muted-foreground font-medium mb-2 flex items-center gap-1">
-              <CheckCircle2 className="w-3 h-3 text-green-600" /> Strengths ({strengths.length})
+              <CheckCircle2 className="w-3 h-3 text-chart-4" /> Strengths ({strengths.length})
             </p>
             <div className="space-y-2">
-              {strengths.map((strength: string, i: number) => <div key={i} className="flex items-start gap-2 p-3 bg-green-500/5 rounded-md border border-green-500/20">
-                  <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
+              {strengths.map((strength: string, i: number) => <div key={i} className="flex items-start gap-2 p-3 bg-chart-4/5 rounded-md border border-chart-4/20">
+                  <CheckCircle2 className="w-4 h-4 text-chart-4 shrink-0 mt-0.5" />
                   <span className="text-sm">{strength}</span>
                 </div>)}
             </div>
@@ -226,11 +226,11 @@ function BulletAnalysisCard({
         {/* Weaknesses */}
         {weaknesses.length > 0 && <div>
             <p className="text-xs text-muted-foreground font-medium mb-2 flex items-center gap-1">
-              <XCircle className="w-3 h-3 text-amber-600" /> Weaknesses ({weaknesses.length})
+              <XCircle className="w-3 h-3 text-chart-2" /> Weaknesses ({weaknesses.length})
             </p>
             <div className="space-y-2">
-              {weaknesses.map((weakness: string, i: number) => <div key={i} className="flex items-start gap-2 p-3 bg-amber-500/5 rounded-md border border-amber-500/20">
-                  <XCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              {weaknesses.map((weakness: string, i: number) => <div key={i} className="flex items-start gap-2 p-3 bg-chart-2/5 rounded-md border border-chart-2/20">
+                  <XCircle className="w-4 h-4 text-chart-2 shrink-0 mt-0.5" />
                   <span className="text-sm">{weakness}</span>
                 </div>)}
             </div>
@@ -254,23 +254,23 @@ function VisualStyleGuideCard({
   return <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm flex items-center gap-2">
-          <Palette className="w-4 h-4 text-pink-500" /> Visual Style Guide
+          <Palette className="w-4 h-4 text-chart-5" /> Visual Style Guide
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Color Palette */}
-        {colorPalette && <div className="p-3 bg-pink-500/5 rounded-lg border border-pink-500/20">
+        {colorPalette && <div className="p-3 bg-chart-5/5 rounded-lg border border-chart-5/20">
             <div className="flex items-center gap-2 mb-2">
-              <Palette className="w-4 h-4 text-pink-500" />
+              <Palette className="w-4 h-4 text-chart-5" />
               <span className="text-xs font-semibold text-muted-foreground">Color Palette</span>
             </div>
             <p className="text-sm">{colorPalette}</p>
           </div>}
         
         {/* Mood Keywords */}
-        {moodKeywords.length > 0 && <div className="p-3 bg-purple-500/5 rounded-lg border border-purple-500/20">
+        {moodKeywords.length > 0 && <div className="p-3 bg-primary/5 rounded-lg border border-primary/20">
             <div className="flex items-center gap-2 mb-2">
-              <Heart className="w-4 h-4 text-purple-500" />
+              <Heart className="w-4 h-4 text-primary" />
               <span className="text-xs font-semibold text-muted-foreground">Mood Keywords</span>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -281,18 +281,18 @@ function VisualStyleGuideCard({
           </div>}
         
         {/* Lighting Style */}
-        {lightingStyle && <div className="p-3 bg-amber-500/5 rounded-lg border border-amber-500/20">
+        {lightingStyle && <div className="p-3 bg-chart-2/5 rounded-lg border border-chart-2/20">
             <div className="flex items-center gap-2 mb-2">
-              <Sun className="w-4 h-4 text-amber-500" />
+              <Sun className="w-4 h-4 text-chart-2" />
               <span className="text-xs font-semibold text-muted-foreground">Lighting Style</span>
             </div>
             <p className="text-sm">{lightingStyle}</p>
           </div>}
         
         {/* Composition Style */}
-        {compositionStyle && <div className="p-3 bg-blue-500/5 rounded-lg border border-blue-500/20">
+        {compositionStyle && <div className="p-3 bg-chart-3/5 rounded-lg border border-chart-3/20">
             <div className="flex items-center gap-2 mb-2">
-              <Layout className="w-4 h-4 text-blue-500" />
+              <Layout className="w-4 h-4 text-chart-3" />
               <span className="text-xs font-semibold text-muted-foreground">Composition Style</span>
             </div>
             <p className="text-sm">{compositionStyle}</p>
@@ -318,7 +318,7 @@ function CreativeStrategyCard({
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-purple-500" /> Creative Strategy
+            <Sparkles className="w-4 h-4 text-primary" /> Creative Strategy
           </CardTitle>
           {/* Brand Consistency Score */}
           {brandIdentity.consistency !== undefined && <div className="flex items-center gap-2">
@@ -330,58 +330,58 @@ function CreativeStrategyCard({
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Brand Archetype */}
-          {(brandIdentity.archetype || brandIdentity.tone) && <div className="p-3 bg-purple-500/5 rounded-lg border border-purple-500/20">
+          {(brandIdentity.archetype || brandIdentity.tone) && <div className="p-3 bg-primary/5 rounded-lg border border-primary/20">
               <div className="flex items-center gap-2 mb-2">
-                <Crown className="w-4 h-4 text-purple-500" />
+                <Crown className="w-4 h-4 text-primary" />
                 <span className="text-xs font-semibold text-muted-foreground">Brand Archetype</span>
               </div>
-              {brandIdentity.archetype && <Badge className="text-purple-700 mb-2 rounded-none opacity-100 border-muted bg-white/0">
+              {brandIdentity.archetype && <Badge className="text-primary mb-2 rounded-none opacity-100 border-muted bg-white/0">
                   {brandIdentity.archetype}
                 </Badge>}
               {brandIdentity.tone && <p className="text-sm text-muted-foreground">{brandIdentity.tone}</p>}
             </div>}
           
           {/* Target Persona - Enhanced with primary_motivation */}
-          {(targetPersona.demographic || targetPersona.psychographic || targetPersona.primary_motivation) && <div className="p-3 bg-blue-500/5 rounded-lg border border-blue-500/20">
+          {(targetPersona.demographic || targetPersona.psychographic || targetPersona.primary_motivation) && <div className="p-3 bg-chart-3/5 rounded-lg border border-chart-3/20">
               <div className="flex items-center gap-2 mb-2">
-                <UserCircle className="w-4 h-4 text-blue-500" />
+                <UserCircle className="w-4 h-4 text-chart-3" />
                 <span className="text-xs font-semibold text-muted-foreground">Target Persona</span>
               </div>
               {targetPersona.demographic && <p className="text-sm font-medium mb-1">{targetPersona.demographic}</p>}
               {targetPersona.psychographic && <p className="text-xs text-muted-foreground mb-2">{targetPersona.psychographic}</p>}
-              {targetPersona.primary_motivation && <div className="mt-2 p-2 bg-blue-500/10 rounded-md border-l-2 border-blue-500">
+              {targetPersona.primary_motivation && <div className="mt-2 p-2 bg-chart-3/10 rounded-md border-l-2 border-chart-3">
                   <p className="text-xs font-semibold text-muted-foreground mb-1">Primary Motivation:</p>
                   <p className="text-sm">{targetPersona.primary_motivation}</p>
                 </div>}
             </div>}
           
           {/* Winning Offer - Enhanced with effectiveness */}
-          {(winningOffers.analysis || winningOffers.effectiveness) && <div className="p-3 bg-amber-500/5 rounded-lg border border-amber-500/20 md:col-span-2">
+          {(winningOffers.analysis || winningOffers.effectiveness) && <div className="p-3 bg-chart-2/5 rounded-lg border border-chart-2/20 md:col-span-2">
               <div className="flex items-center gap-2 mb-2">
-                <Gift className="w-4 h-4 text-amber-500" />
+                <Gift className="w-4 h-4 text-chart-2" />
                 <span className="text-xs font-semibold text-muted-foreground">Winning Offer Analysis</span>
               </div>
-              {winningOffers.analysis && <div className="p-3 bg-amber-500/10 rounded-md mb-3">
+              {winningOffers.analysis && <div className="p-3 bg-chart-2/10 rounded-md mb-3">
                   <ExpandableText text={winningOffers.analysis} maxLength={300} />
                 </div>}
-              {winningOffers.effectiveness && <div className="p-3 bg-green-500/5 rounded-md border border-green-500/20">
+              {winningOffers.effectiveness && <div className="p-3 bg-chart-4/5 rounded-md border border-chart-4/20">
                   <p className="text-xs font-semibold text-muted-foreground mb-1 flex items-center gap-1">
-                    <TrendingUp className="w-3 h-3 text-green-600" /> Effectiveness Assessment
+                    <TrendingUp className="w-3 h-3 text-chart-4" /> Effectiveness Assessment
                   </p>
                   <p className="text-sm">{winningOffers.effectiveness}</p>
                 </div>}
             </div>}
           
           {/* USP List */}
-          {uniqueSellingProps.length > 0 && <div className="p-3 bg-green-500/5 rounded-lg border border-green-500/20 md:col-span-2">
+          {uniqueSellingProps.length > 0 && <div className="p-3 bg-chart-4/5 rounded-lg border border-chart-4/20 md:col-span-2">
               <div className="flex items-center gap-2 mb-2">
-                <List className="w-4 h-4 text-green-500" />
+                <List className="w-4 h-4 text-chart-4" />
                 <span className="text-xs font-semibold text-muted-foreground">Unique Selling Props</span>
                 <Badge variant="outline" className="ml-auto text-xs">{uniqueSellingProps.length}</Badge>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
                 {uniqueSellingProps.map((usp: string, i: number) => <div key={i} className="flex items-start gap-2 text-sm">
-                    <CheckCircle2 className="w-3 h-3 text-green-500 shrink-0 mt-1" />
+                    <CheckCircle2 className="w-3 h-3 text-chart-4 shrink-0 mt-1" />
                     <span>{usp}</span>
                   </div>)}
               </div>
@@ -404,9 +404,9 @@ function CopyAssetsCard({
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm flex items-center gap-2">
-            <FileText className="w-4 h-4 text-indigo-500" /> Copy Assets
+            <FileText className="w-4 h-4 text-primary" /> Copy Assets
             <Badge variant="outline" className="ml-2 text-xs">{bestHooks.length} hooks</Badge>
-            {benefitsFocus !== undefined && <Badge variant="outline" className={`text-xs ${benefitsFocus ? "bg-green-500/10 text-green-600 border-green-500/30" : "bg-amber-500/10 text-amber-600 border-amber-500/30"}`}>
+            {benefitsFocus !== undefined && <Badge variant="outline" className={`text-xs ${benefitsFocus ? "bg-chart-4/10 text-chart-4 border-chart-4/30" : "bg-chart-2/10 text-chart-2 border-chart-2/30"}`}>
                 {benefitsFocus ? "✓ Benefits Focus" : "✗ Feature-Heavy"}
               </Badge>}
           </CardTitle>
@@ -420,9 +420,9 @@ function CopyAssetsCard({
         {bestHooks.length > 0 ? <div className="space-y-2">
             <p className="text-xs text-muted-foreground font-medium mb-3">Killer Hooks (ALL-CAPS phrases from listing):</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              {bestHooks.map((hook: string, i: number) => <div key={i} className="p-3 bg-indigo-500/5 rounded-md border border-indigo-500/20 hover:bg-indigo-500/10 transition-colors">
+              {bestHooks.map((hook: string, i: number) => <div key={i} className="p-3 bg-primary/5 rounded-md border border-primary/20 hover:bg-primary/10 transition-colors">
                   <div className="flex items-start gap-2">
-                    <Quote className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
+                    <Quote className="w-4 h-4 text-primary shrink-0 mt-0.5" />
                     <span className="text-sm font-semibold">{hook}</span>
                   </div>
                 </div>)}
@@ -585,7 +585,7 @@ export default function ProductAnalysisPanel({
                     <TrendingUp className="w-4 h-4" /> Performance Score Card
                   </CardTitle>
                   {overallGrade && <div className="flex items-center gap-2">
-                      <Badge variant="outline" className={`text-lg px-3 py-1 ${scoreColor === "green-500" ? "bg-green-500/10 text-green-600 border-green-500/30" : scoreColor === "amber-500" ? "bg-amber-500/10 text-amber-600 border-amber-500/30" : "bg-red-500/10 text-red-600 border-red-500/30"}`}>
+                      <Badge variant="outline" className={`text-lg px-3 py-1 ${scoreColor === "green-500" ? "bg-chart-4/10 text-chart-4 border-chart-4/30" : scoreColor === "amber-500" ? "bg-chart-2/10 text-chart-2 border-chart-2/30" : "bg-destructive/10 text-destructive border-destructive/30"}`}>
                         Grade: {overallGrade}
                       </Badge>
                       {overallScore !== undefined && <Badge variant="outline">Score: {overallScore}/10</Badge>}
@@ -596,11 +596,11 @@ export default function ProductAnalysisPanel({
                 {metrics.length > 0 && <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     {metrics.map((metric: any, i: number) => {
                 const colorMap: Record<string, string> = {
-                  "green-500": "text-green-600",
-                  "amber-500": "text-amber-600",
-                  "red-500": "text-red-600"
+                  "green-500": "text-chart-4",
+                  "amber-500": "text-chart-2",
+                  "red-500": "text-destructive"
                 };
-                const valueColor = metric.color ? colorMap[metric.color] || "text-foreground" : metric.value >= 7 ? "text-green-600" : metric.value >= 4 ? "text-amber-600" : "text-red-600";
+                const valueColor = metric.color ? colorMap[metric.color] || "text-foreground" : metric.value >= 7 ? "text-chart-4" : metric.value >= 4 ? "text-chart-2" : "text-destructive";
                 return <div key={i} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                           <span className="text-sm font-medium">{metric.label}</span>
                           <span className={`text-lg font-bold ${valueColor}`}>{metric.value}/10</span>
@@ -668,8 +668,8 @@ export default function ProductAnalysisPanel({
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {copyHooks.map((hook: string, i: number) => <div key={i} className="flex items-start gap-2 p-3 bg-green-500/5 rounded-md border border-green-500/20">
-                      <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
+                  {copyHooks.map((hook: string, i: number) => <div key={i} className="flex items-start gap-2 p-3 bg-chart-4/5 rounded-md border border-chart-4/20">
+                      <CheckCircle2 className="w-4 h-4 text-chart-4 shrink-0 mt-0.5" />
                       <span className="text-sm">{hook}</span>
                     </div>)}
                 </div>
@@ -687,17 +687,17 @@ export default function ProductAnalysisPanel({
         {/* TAB 3: GAP ANALYSIS & SENTIMENT */}
         <TabsContent value="sentiment" className="mt-0 space-y-4">
           {/* Gap Analysis - Full Text Warning Box */}
-          {gapAnalysis && <Card className="border-amber-500/30">
+          {gapAnalysis && <Card className="border-chart-2/30">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-600" /> Gap Analysis
+                  <AlertTriangle className="w-4 h-4 text-chart-2" /> Gap Analysis
                   <span className="text-xs text-muted-foreground font-normal ml-2">Marketing vs. Customer Reality</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="p-4 bg-amber-500/5 rounded-lg border border-amber-500/20">
+                <div className="p-4 bg-chart-2/5 rounded-lg border border-chart-2/20">
                   <div className="flex items-start gap-3">
-                    <Quote className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                    <Quote className="w-5 h-5 text-chart-2 shrink-0 mt-0.5" />
                     <div className="text-sm leading-relaxed">
                       <ExpandableText text={gapAnalysis} maxLength={500} />
                     </div>
@@ -712,16 +712,16 @@ export default function ProductAnalysisPanel({
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
-                  <ThumbsUp className="w-4 h-4 text-green-600" /> What Customers Love
-                  <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/30 ml-auto">
+                  <ThumbsUp className="w-4 h-4 text-chart-4" /> What Customers Love
+                  <Badge variant="outline" className="bg-chart-4/10 text-chart-4 border-chart-4/30 ml-auto">
                     {primaryPraises.length}
                   </Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {primaryPraises.length > 0 ? <div className="space-y-2">
-                    {primaryPraises.map((praise: string, i: number) => <div key={i} className="flex items-start gap-2 p-2 bg-green-500/5 rounded-md">
-                        <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
+                    {primaryPraises.map((praise: string, i: number) => <div key={i} className="flex items-start gap-2 p-2 bg-chart-4/5 rounded-md">
+                        <CheckCircle2 className="w-4 h-4 text-chart-4 shrink-0 mt-0.5" />
                         <span className="text-sm">{praise}</span>
                       </div>)}
                   </div> : <p className="text-sm text-muted-foreground text-center py-4">
@@ -734,16 +734,16 @@ export default function ProductAnalysisPanel({
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
-                  <ThumbsDown className="w-4 h-4 text-amber-600" /> Customer Complaints
-                  <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30 ml-auto">
+                  <ThumbsDown className="w-4 h-4 text-chart-2" /> Customer Complaints
+                  <Badge variant="outline" className="bg-chart-2/10 text-chart-2 border-chart-2/30 ml-auto">
                     {primaryComplaints.length}
                   </Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {primaryComplaints.length > 0 ? <div className="space-y-2">
-                    {primaryComplaints.map((complaint: string, i: number) => <div key={i} className="flex items-start gap-2 p-2 bg-amber-500/5 rounded-md">
-                        <XCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    {primaryComplaints.map((complaint: string, i: number) => <div key={i} className="flex items-start gap-2 p-2 bg-chart-2/5 rounded-md">
+                        <XCircle className="w-4 h-4 text-chart-2 shrink-0 mt-0.5" />
                         <span className="text-sm">{complaint}</span>
                       </div>)}
                   </div> : <p className="text-sm text-muted-foreground text-center py-4">
@@ -777,13 +777,13 @@ export default function ProductAnalysisPanel({
               {positiveThemes.length > 0 && <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm flex items-center gap-2">
-                      <Star className="w-4 h-4 text-green-600" /> Positive Themes
+                      <Star className="w-4 h-4 text-chart-4" /> Positive Themes
                       <Badge variant="outline" className="ml-auto">{positiveThemes.length}</Badge>
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2">
-                      {positiveThemes.slice(0, 5).map((theme: any, i: number) => <div key={i} className="p-2 bg-green-500/5 rounded-md border border-green-500/20">
+                      {positiveThemes.slice(0, 5).map((theme: any, i: number) => <div key={i} className="p-2 bg-chart-4/5 rounded-md border border-chart-4/20">
                           <p className="text-sm font-medium">{theme.theme || theme}</p>
                           {theme.frequency && <p className="text-xs text-muted-foreground mt-1">
                               {theme.frequency}% mention rate
@@ -846,7 +846,7 @@ export default function ProductAnalysisPanel({
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2">
-                <Zap className="w-4 h-4 text-amber-500" /> Action Plan
+                <Zap className="w-4 h-4 text-chart-2" /> Action Plan
                 <Badge variant="outline" className="ml-auto">
                   {actionPlan.length} actions
                 </Badge>

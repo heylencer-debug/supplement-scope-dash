@@ -194,7 +194,7 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
             <span className="font-semibold text-foreground">${(product.price ?? 0).toFixed(2)}</span>
             <span>•</span>
             <div className="flex items-center gap-1">
-              <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+              <Star className="w-4 h-4 fill-chart-2 text-chart-2" />
               <span>{(product.rating ?? 0).toFixed(1)}</span>
             </div>
             <span>•</span>
@@ -427,7 +427,7 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                 <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><DollarSign className="w-4 h-4" />Price Metrics</CardTitle></CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div><p className="text-xs text-muted-foreground">Current Price</p><p className="text-xl font-bold text-green-600">${(product.price_current ?? product.current_price ?? product.price ?? 0).toFixed(2)}</p></div>
+                    <div><p className="text-xs text-muted-foreground">Current Price</p><p className="text-xl font-bold text-chart-4">${(product.price_current ?? product.current_price ?? product.price ?? 0).toFixed(2)}</p></div>
                     <div><p className="text-xs text-muted-foreground">30-Day Avg</p><p className="text-xl font-bold">${product.price_30_days_avg?.toFixed(2) ?? "-"}</p></div>
                     <div><p className="text-xs text-muted-foreground">90-Day Avg</p><p className="text-xl font-bold">${product.price_90_days_avg?.toFixed(2) ?? "-"}</p></div>
                     <div><p className="text-xs text-muted-foreground">Unit Price</p><p className="text-xl font-bold">{product.unit_price_value ? `$${product.unit_price_value.toFixed(2)}` : product.unit_price_text ?? "-"}</p></div>
@@ -461,8 +461,8 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                 <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Profitability Estimates</CardTitle></CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-3 gap-4">
-                    <div><p className="text-xs text-muted-foreground">FBA Fees Est.</p><p className="text-xl font-bold text-red-600">{formatCurrency(product.fees_estimate)}</p></div>
-                    <div><p className="text-xs text-muted-foreground">Net Est.</p><p className="text-xl font-bold text-green-600">{formatCurrency(product.net_estimate)}</p></div>
+                    <div><p className="text-xs text-muted-foreground">FBA Fees Est.</p><p className="text-xl font-bold text-destructive">{formatCurrency(product.fees_estimate)}</p></div>
+                    <div><p className="text-xs text-muted-foreground">Net Est.</p><p className="text-xl font-bold text-chart-4">{formatCurrency(product.net_estimate)}</p></div>
                     <div><p className="text-xs text-muted-foreground">PPC Bid Est.</p><p className="text-xl font-bold">{product.ppc_bid_estimate ? `$${product.ppc_bid_estimate.toFixed(2)}` : "-"}</p></div>
                   </div>
                 </CardContent>
@@ -543,8 +543,8 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
               </Card>
               {marketingAnalysis?.competitive_analysis?.unique_selling_points && marketingAnalysis.competitive_analysis.unique_selling_points.length > 0 && (
                 <Card>
-                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><CheckCircle className="w-4 h-4 text-green-500" />Unique Selling Points</CardTitle></CardHeader>
-                  <CardContent><ul className="space-y-2">{marketingAnalysis.competitive_analysis.unique_selling_points.map((point, idx) => <li key={idx} className="flex items-start gap-2 text-sm"><TrendingUp className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />{point}</li>)}</ul></CardContent>
+                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><CheckCircle className="w-4 h-4 text-chart-4" />Unique Selling Points</CardTitle></CardHeader>
+                  <CardContent><ul className="space-y-2">{marketingAnalysis.competitive_analysis.unique_selling_points.map((point, idx) => <li key={idx} className="flex items-start gap-2 text-sm"><TrendingUp className="w-4 h-4 text-chart-4 mt-0.5 shrink-0" />{point}</li>)}</ul></CardContent>
                 </Card>
               )}
               {marketingAnalysis?.competitive_analysis?.weaknesses_vs_competitors && marketingAnalysis.competitive_analysis.weaknesses_vs_competitors.length > 0 && (

@@ -254,17 +254,17 @@ function CriteriaBreakdownPanel({
 
         {/* Score Distribution */}
         <div className="flex items-center gap-1.5">
-          <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-100 dark:bg-emerald-900/30">
-            <div className="w-2 h-2 rounded-full bg-emerald-500" />
-            <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">{counts.high}</span>
+          <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-chart-4/10 dark:bg-chart-4/20">
+            <div className="w-2 h-2 rounded-full bg-chart-4" />
+            <span className="text-xs font-medium text-chart-4">{counts.high}</span>
           </div>
-          <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-amber-100 dark:bg-amber-900/30">
-            <div className="w-2 h-2 rounded-full bg-amber-500" />
-            <span className="text-xs font-medium text-amber-700 dark:text-amber-400">{counts.medium}</span>
+          <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-chart-2/10 dark:bg-chart-2/20">
+            <div className="w-2 h-2 rounded-full bg-chart-2" />
+            <span className="text-xs font-medium text-chart-2">{counts.medium}</span>
           </div>
-          <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-red-100 dark:bg-red-900/30">
-            <div className="w-2 h-2 rounded-full bg-red-500" />
-            <span className="text-xs font-medium text-red-700 dark:text-red-400">{counts.low}</span>
+          <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-destructive/10 dark:bg-destructive/20">
+            <div className="w-2 h-2 rounded-full bg-destructive" />
+            <span className="text-xs font-medium text-destructive">{counts.low}</span>
           </div>
         </div>
       </div>

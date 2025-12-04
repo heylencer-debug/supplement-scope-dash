@@ -129,8 +129,37 @@ export function DeepDiveSection({
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <div className="flex items-center justify-center h-[300px]">
-            <Skeleton className="w-64 h-64 rounded-full" />
+          <div className="space-y-6">
+            {/* Radar Chart Skeleton */}
+            <div className="flex items-center justify-center h-[350px]">
+              <div className="relative">
+                <Skeleton className="w-64 h-64 rounded-full" />
+                <Skeleton className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 rounded-full" />
+              </div>
+            </div>
+            
+            {/* Criteria Breakdown Skeleton */}
+            <div className="pt-8 border-t space-y-6">
+              <div className="flex items-center justify-between">
+                <Skeleton className="h-5 w-36" />
+                <div className="flex gap-2">
+                  <Skeleton className="h-6 w-12 rounded-md" />
+                  <Skeleton className="h-6 w-12 rounded-md" />
+                  <Skeleton className="h-6 w-12 rounded-md" />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Skeleton className="h-7 w-16 rounded-md" />
+                <Skeleton className="h-7 w-24 rounded-md" />
+                <Skeleton className="h-7 w-20 rounded-md" />
+                <Skeleton className="h-7 w-24 rounded-md" />
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                {[...Array(8)].map((_, i) => (
+                  <Skeleton key={i} className="h-24 rounded-lg" />
+                ))}
+              </div>
+            </div>
           </div>
         ) : radarData.length > 0 ? (
           <ResponsiveContainer width="100%" height={350}>

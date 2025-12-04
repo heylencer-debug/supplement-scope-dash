@@ -330,11 +330,20 @@ export default function ProductAnalysisPanel({
     );
   }
 
+  // Debug logging
+  console.log('ProductAnalysisPanel received:', { 
+    marketingAnalysis: ma, 
+    reviewAnalysis: ra,
+    hasMarketingData,
+    hasReviewData,
+    raKeys: Object.keys(ra)
+  });
+
   return (
     <div className="p-4 bg-muted/30 border-t">
       {/* Analysis Panel with 5 tabs: Copy, Sentiment, Actions, Visuals, Reviews */}
       <Tabs defaultValue={hasMarketingData ? "copy" : "reviews"} className="w-full">
-        <TabsList className="grid grid-cols-5 w-full max-w-2xl mb-4">
+        <TabsList className="grid grid-cols-5 w-full mb-4">
           <TabsTrigger value="copy" className="text-xs gap-1">
             <Lightbulb className="w-3 h-3" /> Copy
           </TabsTrigger>
@@ -611,12 +620,12 @@ export default function ProductAnalysisPanel({
 
         {/* TAB 5: REVIEWS ANALYSIS */}
         <TabsContent value="reviews" className="mt-0 space-y-4">
-          {/* Product Info */}
-          {Object.keys(productInfo).length > 0 && (
-            <Card>
+          {/* Always show summary at top if we have review data */}
+          {hasReviewData ? (
+            <Card className="border-primary/30 bg-primary/5">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
-                  <Star className="w-4 h-4" /> Product Info
+                  <Star className="w-4 h-4 text-primary" /> Review Analysis Summary
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -627,10 +636,28 @@ export default function ProductAnalysisPanel({
                   {productInfo.asin && (
                     <Badge variant="outline">ASIN: {productInfo.asin}</Badge>
                   )}
-                  {productInfo.reviews_analyzed !== undefined && (
-                    <Badge variant="outline">Reviews Analyzed: {productInfo.reviews_analyzed}</Badge>
+                  {(productInfo.reviews_analyzed || analysisMetadata.total_reviews_analyzed) && (
+                    <Badge variant="outline">
+                      Reviews Analyzed: {productInfo.reviews_analyzed || analysisMetadata.total_reviews_analyzed}
+                    </Badge>
                   )}
+                  {analysisMetadata.verified_purchase_rate !== undefined && (
+                    <Badge variant="outline">{analysisMetadata.verified_purchase_rate}% Verified</Badge>
+                  )}
+                  {analysisMetadata.analysis_quality && (
+                    <Badge variant="outline" className="capitalize">{analysisMetadata.analysis_quality} Quality</Badge>
+                  )}
+                  <Badge variant="outline" className="bg-muted">
+                    {Object.keys(ra).length} data sections available
+                  </Badge>
                 </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                <AlertTriangle className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                <p>No review analysis data available for this product.</p>
               </CardContent>
             </Card>
           )}

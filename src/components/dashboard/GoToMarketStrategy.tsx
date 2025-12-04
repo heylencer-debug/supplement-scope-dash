@@ -20,10 +20,10 @@ export function GoToMarketStrategy({ goToMarket }: GoToMarketStrategyProps) {
   if (!hasData) return null;
 
   return (
-    <Card className="border-blue-500/20">
+    <Card className="border-chart-3/20">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Rocket className="w-5 h-5 text-blue-500" />
+          <Rocket className="w-5 h-5 text-chart-3" />
           Go-To-Market Strategy
         </CardTitle>
         <CardDescription>Launch positioning, messaging, and listing optimization recommendations</CardDescription>
@@ -32,9 +32,9 @@ export function GoToMarketStrategy({ goToMarket }: GoToMarketStrategyProps) {
         <div className="space-y-6">
           {/* Positioning Statement */}
           {positioning && (
-            <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+            <div className="p-4 bg-chart-3/10 border border-chart-3/20 rounded-lg">
               <h4 className="font-medium text-sm flex items-center gap-2 mb-2">
-                <Target className="w-4 h-4 text-blue-500" />
+                <Target className="w-4 h-4 text-chart-3" />
                 Positioning
               </h4>
               <p className="text-sm text-foreground">{positioning}</p>
@@ -63,12 +63,12 @@ export function GoToMarketStrategy({ goToMarket }: GoToMarketStrategyProps) {
             {differentiation_points && differentiation_points.length > 0 && (
               <div className="space-y-3">
                 <h4 className="font-medium text-sm flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-yellow-500" />
+                  <Sparkles className="w-4 h-4 text-chart-2" />
                   Differentiation Points
                 </h4>
                 <div className="flex flex-wrap gap-2">
                   {differentiation_points.map((point, idx) => (
-                    <Badge key={idx} variant="outline" className="bg-yellow-500/10 border-yellow-500/30 text-foreground">
+                    <Badge key={idx} variant="outline" className="bg-chart-2/10 border-chart-2/30 text-foreground">
                       {point}
                     </Badge>
                   ))}
@@ -139,9 +139,9 @@ export function GoToMarketStrategy({ goToMarket }: GoToMarketStrategyProps) {
                             variant="outline"
                             className={
                               item.priority.toLowerCase() === "high"
-                                ? "bg-red-500/10 text-red-600 border-red-500/30"
+                                ? "bg-destructive/10 text-destructive border-destructive/30"
                                 : item.priority.toLowerCase() === "medium"
-                                ? "bg-yellow-500/10 text-yellow-600 border-yellow-500/30"
+                                ? "bg-chart-2/10 text-chart-2 border-chart-2/30"
                                 : "bg-secondary"
                             }
                           >

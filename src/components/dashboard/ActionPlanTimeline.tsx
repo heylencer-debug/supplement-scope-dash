@@ -37,7 +37,7 @@ export function ActionPlanTimeline({
     }
     if (p === "high") {
       return {
-        color: "bg-amber-500",
+        color: "bg-chart-2",
         label: "High",
       };
     }
@@ -73,11 +73,11 @@ export function ActionPlanTimeline({
 
   const phaseColors = [
     "from-primary to-primary/80",
-    "from-emerald-500 to-emerald-600",
-    "from-violet-500 to-violet-600",
-    "from-amber-500 to-amber-600",
-    "from-rose-500 to-rose-600",
-    "from-cyan-500 to-cyan-600",
+    "from-chart-4 to-chart-4/80",
+    "from-chart-5 to-chart-5/80",
+    "from-chart-2 to-chart-2/80",
+    "from-destructive to-destructive/80",
+    "from-chart-3 to-chart-3/80",
   ];
 
   return (
@@ -158,7 +158,7 @@ export function ActionPlanTimeline({
                             >
                               <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${priorityConfig.color}`} />
                               {isCompleted ? (
-                                <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600 shrink-0" />
+                                <CheckCircle2 className="w-2.5 h-2.5 text-chart-4 shrink-0" />
                               ) : (
                                 <Circle className="w-2.5 h-2.5 text-muted-foreground shrink-0" />
                               )}
@@ -174,7 +174,7 @@ export function ActionPlanTimeline({
                                 {priorityConfig.label}
                               </Badge>
                               {isCompleted && (
-                                <Badge variant="outline" className="text-[10px] text-emerald-600">
+                                <Badge variant="outline" className="text-[10px] text-chart-4">
                                   Done
                                 </Badge>
                               )}

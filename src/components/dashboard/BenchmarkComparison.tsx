@@ -64,7 +64,10 @@ export default function BenchmarkComparison({
   const keyInsights = analysis?.key_insights as KeyInsights | null;
 
   const getRecommendedPrice = () => {
-    return analysisScores?.product_development?.pricing?.recommended_price;
+    const price = analysisScores?.product_development?.pricing?.recommended_price;
+    if (price === undefined || price === null) return null;
+    const numPrice = typeof price === 'string' ? parseFloat(price) : price;
+    return isNaN(numPrice) ? null : numPrice;
   };
 
   const getPricingTier = () => {

@@ -139,17 +139,15 @@ export default function ProductExplorer() {
 
   const getMarketingScore = (product: Product) => {
     const ma = product.marketing_analysis as any;
-    const score = ma?.overall_marketing_score;
-    // Handle both object and number formats
-    if (typeof score === 'object') {
-      return score?.overall_score ?? null;
-    }
-    return score ?? null;
+    // Try score_card first (actual format), then fallback paths
+    return ma?.score_card?.overall_score ?? ma?.overall_marketing_score?.overall_score ?? ma?.overall_marketing_score ?? null;
   };
 
   const getCopyScore = (product: Product) => {
     const ma = product.marketing_analysis as any;
-    return ma?.copy_effectiveness?.overall_copy_score ?? null;
+    // Try score_card metrics, then fallback
+    const copyMetric = ma?.score_card?.metrics?.find((m: any) => m.label === 'Copy');
+    return copyMetric?.value ?? ma?.copy_effectiveness?.overall_copy_score ?? null;
   };
 
   const getTrustScore = (product: Product) => {
@@ -262,7 +260,7 @@ export default function ProductExplorer() {
                   const isSelected = selectedProductIds.has(product.id);
                   const isDisabled = !isSelected && selectedProductIds.size >= MAX_COMPARISON_PRODUCTS;
                   const isExpanded = expandedRows.has(product.id);
-                  const hasMarketingData = !!product.marketing_analysis;
+                  const hasAnalysisData = !!product.marketing_analysis || !!product.review_analysis;
                   
                   return (
                     <Collapsible key={product.id} open={isExpanded} onOpenChange={() => toggleRowExpansion(product.id)} asChild>
@@ -277,9 +275,9 @@ export default function ProductExplorer() {
                                 variant="ghost" 
                                 size="sm" 
                                 className="p-0 h-6 w-6"
-                                disabled={!hasMarketingData}
+                                disabled={!hasAnalysisData}
                               >
-                                {hasMarketingData ? (
+                                {hasAnalysisData ? (
                                   isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />
                                 ) : (
                                   <span className="w-4 h-4" />

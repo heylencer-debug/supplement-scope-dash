@@ -549,7 +549,10 @@ export default function Dashboard() {
 
       {/* SECTION 6: Financial Projections */}
       <div className="animate-fade-in" style={{ animationDelay: '0.35s' }}>
-        <FinancialProjections financials={dashboardData.financials as Record<string, unknown> | null} />
+        <FinancialProjections 
+          financials={dashboardData.financials as Record<string, unknown> | null} 
+          isLoading={analysisLoading && !hasAnalysis}
+        />
       </div>
 
       {/* SECTION 7: Launch Strategy + Action Plan */}
@@ -572,7 +575,10 @@ export default function Dashboard() {
 
       {/* SECTION 8: Risk Analysis */}
       <div className="animate-fade-in" style={{ animationDelay: '0.45s' }}>
-        <RiskAnalysis risks={dashboardData.risks as Record<string, unknown> | null} />
+        <RiskAnalysis 
+          risks={dashboardData.risks as Record<string, unknown> | null} 
+          isLoading={analysisLoading && !hasAnalysis}
+        />
       </div>
     </div>
   );

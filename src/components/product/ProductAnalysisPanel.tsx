@@ -276,21 +276,18 @@ function CreativeStrategyCard({ creativeBrief }: { creativeBrief: any }) {
 
 // Copy Assets / Swipe File Component
 function CopyAssetsCard({ copyAssets }: { copyAssets: any }) {
-  if (!copyAssets) return null;
-  
-  const bestHooks = copyAssets.best_hooks || [];
-  const clarityScore = copyAssets.clarity_score;
-  
-  if (bestHooks.length === 0 && clarityScore === undefined) return null;
+  const bestHooks = copyAssets?.best_hooks || [];
+  const clarityScore = copyAssets?.clarity_score;
   
   return (
     <Card>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm flex items-center gap-2">
-            <FileText className="w-4 h-4 text-indigo-500" /> Copywriter's Swipe File
+            <FileText className="w-4 h-4 text-indigo-500" /> Copy Assets
+            <Badge variant="outline" className="ml-2 text-xs">{bestHooks.length} hooks</Badge>
           </CardTitle>
-          {clarityScore !== undefined && (
+          {clarityScore !== undefined && clarityScore !== null && (
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">Clarity Score:</span>
               <ScoreBadge score={clarityScore} />
@@ -301,7 +298,7 @@ function CopyAssetsCard({ copyAssets }: { copyAssets: any }) {
       <CardContent>
         {bestHooks.length > 0 ? (
           <div className="space-y-2">
-            <p className="text-xs text-muted-foreground font-medium mb-3">Killer Hooks (extracted from listing):</p>
+            <p className="text-xs text-muted-foreground font-medium mb-3">Killer Hooks (ALL-CAPS phrases from listing):</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               {bestHooks.map((hook: string, i: number) => (
                 <div 
@@ -310,16 +307,18 @@ function CopyAssetsCard({ copyAssets }: { copyAssets: any }) {
                 >
                   <div className="flex items-start gap-2">
                     <Quote className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
-                    <span className="text-sm font-medium">{hook}</span>
+                    <span className="text-sm font-semibold">{hook}</span>
                   </div>
                 </div>
               ))}
             </div>
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground text-center py-4">
-            No hooks extracted
-          </p>
+          <div className="text-center py-6 text-muted-foreground">
+            <Quote className="w-8 h-8 mx-auto mb-2 opacity-30" />
+            <p className="text-sm">No killer hooks extracted yet.</p>
+            <p className="text-xs mt-1">This section shows ALL-CAPS phrases from the listing.</p>
+          </div>
         )}
       </CardContent>
     </Card>
@@ -354,8 +353,11 @@ export default function ProductAnalysisPanel({
   // NEW: Creative Brief data
   const creativeBrief = ma.creative_brief || {};
   
-  // NEW: Copy Assets data
-  const copyAssets = ma.copy_assets || {};
+  // NEW: Copy Assets data - check multiple locations
+  const copyAssets = ma.copy_assets || details.copy_assets || {};
+  
+  // Debug: Log copy_assets to verify data structure
+  console.log('Copy Assets data:', { copyAssets, maKeys: Object.keys(ma), detailsKeys: Object.keys(details) });
 
   // Copy Analysis fields
   const copyHooks = copyAnalysis.hooks || [];

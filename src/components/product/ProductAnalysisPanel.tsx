@@ -618,286 +618,145 @@ export default function ProductAnalysisPanel({
           </Card>
         </TabsContent>
 
-        {/* TAB 5: REVIEWS ANALYSIS */}
+        {/* TAB 5: REVIEWS ANALYSIS - Simplified to show only important data */}
         <TabsContent value="reviews" className="mt-0 space-y-4">
-          {/* Always show summary at top if we have review data */}
           {hasReviewData ? (
-            <Card className="border-primary/30 bg-primary/5">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Star className="w-4 h-4 text-primary" /> Review Analysis Summary
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-3">
-                  {productInfo.brand && (
-                    <Badge variant="outline">Brand: {productInfo.brand}</Badge>
-                  )}
-                  {productInfo.asin && (
-                    <Badge variant="outline">ASIN: {productInfo.asin}</Badge>
-                  )}
-                  {(productInfo.reviews_analyzed || analysisMetadata.total_reviews_analyzed) && (
-                    <Badge variant="outline">
-                      Reviews Analyzed: {productInfo.reviews_analyzed || analysisMetadata.total_reviews_analyzed}
-                    </Badge>
-                  )}
-                  {analysisMetadata.verified_purchase_rate !== undefined && (
-                    <Badge variant="outline">{analysisMetadata.verified_purchase_rate}% Verified</Badge>
-                  )}
-                  {analysisMetadata.analysis_quality && (
-                    <Badge variant="outline" className="capitalize">{analysisMetadata.analysis_quality} Quality</Badge>
-                  )}
-                  <Badge variant="outline" className="bg-muted">
-                    {Object.keys(ra).length} data sections available
+            <>
+              {/* Quick Stats Banner */}
+              <div className="flex flex-wrap gap-3 p-3 bg-muted/50 rounded-lg">
+                {(productInfo.reviews_analyzed || analysisMetadata.total_reviews_analyzed) && (
+                  <Badge variant="outline">
+                    {productInfo.reviews_analyzed || analysisMetadata.total_reviews_analyzed} Reviews Analyzed
                   </Badge>
-                </div>
-              </CardContent>
-            </Card>
+                )}
+                {analysisMetadata.verified_purchase_rate !== undefined && (
+                  <Badge variant="outline">{analysisMetadata.verified_purchase_rate}% Verified</Badge>
+                )}
+                {analysisMetadata.analysis_quality && (
+                  <Badge variant="outline" className="capitalize">{analysisMetadata.analysis_quality} Quality</Badge>
+                )}
+              </div>
+
+              {/* Key Insights */}
+              {keyInsights.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Lightbulb className="w-4 h-4 text-primary" /> Key Insights
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {keyInsights.slice(0, 5).map((insight: string, i: number) => (
+                        <div key={i} className="flex items-start gap-2 p-2 bg-primary/5 rounded-md">
+                          <Lightbulb className="w-3 h-3 text-primary shrink-0 mt-1" />
+                          <span className="text-sm">{insight}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Pain Points & Positive Themes side by side */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* Pain Points */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <ThumbsDown className="w-4 h-4 text-destructive" /> Pain Points
+                      <Badge variant="outline" className="ml-auto">{painPoints.length}</Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {painPoints.length > 0 ? (
+                      <div className="space-y-2">
+                        {painPoints.slice(0, 5).map((point: any, i: number) => (
+                          <div key={i} className="p-2 bg-destructive/5 rounded-md border border-destructive/20">
+                            <p className="text-sm font-medium">{point.issue || point}</p>
+                            {point.affected_percentage && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {point.affected_percentage}% affected
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground text-center py-4">No pain points found</p>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Positive Themes */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <ThumbsUp className="w-4 h-4 text-green-600" /> Positive Themes
+                      <Badge variant="outline" className="ml-auto">{positiveThemes.length}</Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {positiveThemes.length > 0 ? (
+                      <div className="space-y-2">
+                        {positiveThemes.slice(0, 5).map((theme: any, i: number) => (
+                          <div key={i} className="p-2 bg-green-500/5 rounded-md border border-green-500/20">
+                            <p className="text-sm font-medium">{theme.theme || theme}</p>
+                            {theme.frequency && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {theme.frequency}% mention rate
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground text-center py-4">No positive themes found</p>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Actionable Recommendations */}
+              {actionableRecommendations.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Target className="w-4 h-4 text-primary" /> Actionable Recommendations
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {actionableRecommendations.slice(0, 4).map((rec: any, i: number) => (
+                        <div key={i} className="p-3 bg-muted/50 rounded-md">
+                          <div className="flex items-center gap-2 mb-1">
+                            {rec.area && <Badge variant="outline" className="text-xs">{rec.area}</Badge>}
+                            {rec.priority && (
+                              <Badge 
+                                variant="outline" 
+                                className={`text-xs ${
+                                  rec.priority === 'high' ? 'border-destructive text-destructive' :
+                                  rec.priority === 'medium' ? 'border-amber-500 text-amber-600' :
+                                  'border-muted-foreground'
+                                }`}
+                              >
+                                {rec.priority}
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-sm">{rec.recommendation || rec}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </>
           ) : (
             <Card>
               <CardContent className="py-8 text-center text-muted-foreground">
                 <AlertTriangle className="w-8 h-8 mx-auto mb-2 opacity-50" />
                 <p>No review analysis data available for this product.</p>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Analysis Metadata */}
-          {Object.keys(analysisMetadata).length > 0 && (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Star className="w-4 h-4" /> Analysis Metadata
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {analysisMetadata.total_reviews_analyzed !== undefined && (
-                    <div className="p-3 bg-muted/50 rounded-lg text-center">
-                      <p className="text-2xl font-bold">{analysisMetadata.total_reviews_analyzed}</p>
-                      <p className="text-xs text-muted-foreground">Reviews Analyzed</p>
-                    </div>
-                  )}
-                  {analysisMetadata.verified_purchase_rate !== undefined && (
-                    <div className="p-3 bg-muted/50 rounded-lg text-center">
-                      <p className="text-2xl font-bold">{analysisMetadata.verified_purchase_rate}%</p>
-                      <p className="text-xs text-muted-foreground">Verified Purchase</p>
-                    </div>
-                  )}
-                  {analysisMetadata.average_helpful_votes !== undefined && (
-                    <div className="p-3 bg-muted/50 rounded-lg text-center">
-                      <p className="text-2xl font-bold">{analysisMetadata.average_helpful_votes}</p>
-                      <p className="text-xs text-muted-foreground">Avg Helpful Votes</p>
-                    </div>
-                  )}
-                  {analysisMetadata.analysis_quality && (
-                    <div className="p-3 bg-muted/50 rounded-lg text-center">
-                      <p className="text-2xl font-bold capitalize">{analysisMetadata.analysis_quality}</p>
-                      <p className="text-xs text-muted-foreground">Analysis Quality</p>
-                    </div>
-                  )}
-                  {analysisMetadata.analysis_date && (
-                    <div className="p-3 bg-muted/50 rounded-lg text-center">
-                      <p className="text-sm font-bold">{new Date(analysisMetadata.analysis_date).toLocaleDateString()}</p>
-                      <p className="text-xs text-muted-foreground">Analysis Date</p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Key Insights */}
-          {keyInsights.length > 0 && (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Lightbulb className="w-4 h-4 text-primary" /> Key Insights
-                  <Badge variant="outline" className="ml-auto">{keyInsights.length} insights</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {keyInsights.map((insight: string, i: number) => (
-                    <div key={i} className="flex items-start gap-2 p-3 bg-primary/5 rounded-md border border-primary/20">
-                      <Lightbulb className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                      <span className="text-sm">{insight}</span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Sentiment Distribution */}
-          {Object.keys(sentimentDistribution).length > 0 && (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4" /> Sentiment Distribution
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <RenderJsonData data={sentimentDistribution} />
-              </CardContent>
-            </Card>
-          )}
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* Positive Themes */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <ThumbsUp className="w-4 h-4 text-green-600" /> Positive Themes
-                  <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/30 ml-auto">
-                    {positiveThemes.length} items
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {positiveThemes.length > 0 ? (
-                  <RenderJsonData data={positiveThemes} />
-                ) : (
-                  <p className="text-sm text-muted-foreground text-center py-4">No positive themes</p>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Pain Points */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <ThumbsDown className="w-4 h-4 text-red-600" /> Pain Points
-                  <Badge variant="outline" className="bg-red-500/10 text-red-600 border-red-500/30 ml-auto">
-                    {painPoints.length} items
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {painPoints.length > 0 ? (
-                  <RenderJsonData data={painPoints} />
-                ) : (
-                  <p className="text-sm text-muted-foreground text-center py-4">No pain points</p>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Feature Requests */}
-          {featureRequests.length > 0 && (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Lightbulb className="w-4 h-4 text-amber-600" /> Feature Requests
-                  <Badge variant="outline" className="ml-auto">{featureRequests.length} items</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <RenderJsonData data={featureRequests} />
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Common Complaints */}
-          {commonComplaints.length > 0 && (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-600" /> Common Complaints
-                  <Badge variant="outline" className="ml-auto">{commonComplaints.length} items</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <RenderJsonData data={commonComplaints} />
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Product Experience Breakdown */}
-          {Object.keys(productExperience).length > 0 && (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Star className="w-4 h-4" /> Product Experience Breakdown
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <RenderJsonData data={productExperience} />
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Buyer Types & Use Cases */}
-          {(buyerTypes.length > 0 || useCases.length > 0) && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {buyerTypes.length > 0 && (
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm flex items-center gap-2">
-                      <Users className="w-4 h-4" /> Buyer Types
-                      <Badge variant="outline" className="ml-auto">{buyerTypes.length} types</Badge>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <RenderJsonData data={buyerTypes} />
-                  </CardContent>
-                </Card>
-              )}
-              {useCases.length > 0 && (
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm flex items-center gap-2">
-                      <Target className="w-4 h-4" /> Use Cases
-                      <Badge variant="outline" className="ml-auto">{useCases.length} cases</Badge>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <RenderJsonData data={useCases} />
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          )}
-
-          {/* Competitor Comparisons */}
-          {Object.keys(competitorComparisons).length > 0 && (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4" /> Competitor Comparisons
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <RenderJsonData data={competitorComparisons} />
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Actionable Recommendations */}
-          {actionableRecommendations.length > 0 && (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Zap className="w-4 h-4 text-amber-500" /> Actionable Recommendations
-                  <Badge variant="outline" className="ml-auto">{actionableRecommendations.length} items</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <RenderJsonData data={actionableRecommendations} />
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Raw Review Analysis Data (fallback to show any remaining data) */}
-          {Object.keys(ra).length > 0 && (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <MessageSquare className="w-4 h-4" /> Full Review Analysis Data
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <RenderJsonData data={ra} />
               </CardContent>
             </Card>
           )}

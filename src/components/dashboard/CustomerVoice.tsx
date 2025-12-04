@@ -39,7 +39,7 @@ export function CustomerVoice({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg font-semibold text-[#1e3a5f]">
+        <CardTitle className="text-lg font-semibold text-foreground">
           Customer Voice
         </CardTitle>
         <CardDescription>
@@ -66,7 +66,7 @@ export function CustomerVoice({
           <div className="grid md:grid-cols-2 gap-6">
             {/* Pain Points - Why They Leave */}
             <div className="space-y-3">
-              <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
+              <div className="flex items-center gap-2 text-destructive">
                 <ThumbsDown className="w-4 h-4" />
                 <p className="text-sm font-semibold">Why They Leave</p>
               </div>
@@ -75,7 +75,7 @@ export function CustomerVoice({
                   {painPoints.slice(0, 5).map((pp, idx) => (
                     <div
                       key={idx}
-                      className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-100 dark:border-red-900"
+                      className="flex items-center justify-between p-3 bg-destructive/5 dark:bg-destructive/10 rounded-lg border border-destructive/20"
                     >
                       <span className="text-sm text-foreground flex-1">
                         {getPainPointLabel(pp)}
@@ -83,7 +83,7 @@ export function CustomerVoice({
                       {getFrequency(pp) && (
                         <Badge
                           variant="outline"
-                          className="ml-2 bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200"
+                          className="ml-2 bg-destructive/10 text-destructive border-destructive/20"
                         >
                           {getFrequency(pp)}
                         </Badge>
@@ -100,7 +100,7 @@ export function CustomerVoice({
 
             {/* Unmet Needs - What They Want */}
             <div className="space-y-3">
-              <div className="flex items-center gap-2 text-[#0ea5e9]">
+              <div className="flex items-center gap-2 text-primary">
                 <Lightbulb className="w-4 h-4" />
                 <p className="text-sm font-semibold">What They Want</p>
               </div>
@@ -109,9 +109,9 @@ export function CustomerVoice({
                   {unmetNeeds.slice(0, 5).map((need, idx) => (
                     <div
                       key={idx}
-                      className="flex items-start gap-2 p-3 bg-[#0ea5e9]/5 rounded-lg border border-[#0ea5e9]/20"
+                      className="flex items-start gap-2 p-3 bg-primary/5 rounded-lg border border-primary/20"
                     >
-                      <Lightbulb className="w-4 h-4 mt-0.5 text-[#0ea5e9] shrink-0" />
+                      <Lightbulb className="w-4 h-4 mt-0.5 text-primary shrink-0" />
                       <span className="text-sm text-foreground">{need}</span>
                     </div>
                   ))}

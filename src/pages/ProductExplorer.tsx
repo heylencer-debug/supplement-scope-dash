@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Search, Filter, Download, Star, TrendingUp, Loader2, Eye, Calendar, DollarSign, Package } from "lucide-react";
+import { Search, Filter, Download, Star, TrendingUp, Loader2, Eye, Calendar, ChevronDown, ChevronRight, Target, FileText, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -28,7 +28,9 @@ import { useCategoryByName } from "@/hooks/useCategoryByName";
 import { useCategoryAnalysis } from "@/hooks/useCategoryAnalyses";
 import ProductDetailModal from "@/components/ProductDetailModal";
 import BenchmarkComparison from "@/components/dashboard/BenchmarkComparison";
+import MarketingAnalysisPanel from "@/components/product/MarketingAnalysisPanel";
 import { toast } from "@/hooks/use-toast";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 const MAX_COMPARISON_PRODUCTS = 5;
 
@@ -41,6 +43,7 @@ export default function ProductExplorer() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
   const { currentCategoryId, categoryName: contextCategoryName, setCategoryContext } = useCategoryContext();
   
@@ -122,6 +125,46 @@ export default function ProductExplorer() {
     setSelectedProductIds(new Set());
   };
 
+  const toggleRowExpansion = (productId: string) => {
+    setExpandedRows(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(productId)) {
+        newSet.delete(productId);
+      } else {
+        newSet.add(productId);
+      }
+      return newSet;
+    });
+  };
+
+  const getMarketingScore = (product: Product) => {
+    const ma = product.marketing_analysis as any;
+    return ma?.overall_marketing_score ?? null;
+  };
+
+  const getCopyScore = (product: Product) => {
+    const ma = product.marketing_analysis as any;
+    return ma?.copy_effectiveness?.overall_copy_score ?? null;
+  };
+
+  const getTrustScore = (product: Product) => {
+    const ma = product.marketing_analysis as any;
+    return ma?.trust_signals?.trust_score ?? null;
+  };
+
+  const ScoreBadge = ({ score, icon: Icon }: { score: number | null; icon: React.ElementType }) => {
+    if (score === null) return <span className="text-muted-foreground">-</span>;
+    const color = score >= 7 ? "text-green-600 bg-green-500/10 border-green-500/30" 
+      : score >= 5 ? "text-yellow-600 bg-yellow-500/10 border-yellow-500/30" 
+      : "text-red-600 bg-red-500/10 border-red-500/30";
+    return (
+      <Badge variant="outline" className={`${color} gap-1`}>
+        <Icon className="w-3 h-3" />
+        {score}
+      </Badge>
+    );
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -185,6 +228,7 @@ export default function ProductExplorer() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-8"></TableHead>
                   <TableHead className="w-12">
                     <div className="flex items-center gap-2">
                       <span className="sr-only">Select</span>
@@ -201,10 +245,9 @@ export default function ProductExplorer() {
                   <TableHead className="text-right">Reviews</TableHead>
                   <TableHead className="text-right">Mo. Sales</TableHead>
                   <TableHead className="text-right">Mo. Revenue</TableHead>
-                  <TableHead className="text-right">BSR</TableHead>
-                  <TableHead className="text-center">Age</TableHead>
-                  <TableHead className="text-center">LQS</TableHead>
-                  <TableHead className="text-center">Servings</TableHead>
+                  <TableHead className="text-center">Mkt</TableHead>
+                  <TableHead className="text-center">Copy</TableHead>
+                  <TableHead className="text-center">Trust</TableHead>
                   <TableHead className="text-center">Status</TableHead>
                   <TableHead className="text-center">Actions</TableHead>
                 </TableRow>
@@ -213,106 +256,113 @@ export default function ProductExplorer() {
                 {filteredProducts.slice(0, 50).map((product) => {
                   const isSelected = selectedProductIds.has(product.id);
                   const isDisabled = !isSelected && selectedProductIds.size >= MAX_COMPARISON_PRODUCTS;
+                  const isExpanded = expandedRows.has(product.id);
+                  const hasMarketingData = !!product.marketing_analysis;
                   
                   return (
-                    <TableRow
-                      key={product.id}
-                      className={`cursor-pointer hover:bg-muted/50 ${isSelected ? "bg-primary/5" : ""}`}
-                      onClick={() => handleRowClick(product)}
-                    >
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <Checkbox
-                          checked={isSelected}
-                          disabled={isDisabled}
-                          onCheckedChange={(checked) => handleCheckboxChange(product.id, checked as boolean)}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <div className="max-w-md">
-                          <p className="font-medium text-foreground truncate">{product.title ?? "Untitled"}</p>
-                          <p className="text-sm text-muted-foreground">{product.brand ?? "Unknown Brand"}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        ${(product.price ?? 0).toFixed(2)}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                          <span>{(product.rating ?? 0).toFixed(1)}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right text-muted-foreground">
-                        {(product.reviews ?? 0).toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-right text-muted-foreground">
-                        {product.monthly_sales?.toLocaleString() ?? "-"}
-                      </TableCell>
-                      <TableCell className="text-right font-medium text-green-600">
-                        {product.monthly_revenue 
-                          ? `$${product.monthly_revenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
-                          : "-"}
-                      </TableCell>
-                      <TableCell className="text-right text-muted-foreground">
-                        {product.bsr_current?.toLocaleString() ?? "-"}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex items-center justify-center gap-1 text-muted-foreground">
-                          <Calendar className="w-3 h-3" />
-                          <span>{product.age_months != null ? `${product.age_months}mo` : "-"}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {product.lqs != null ? (
-                          <Badge 
-                            variant="outline" 
-                            className={
-                              product.lqs >= 80 
-                                ? "border-green-500/50 text-green-600 bg-green-500/10" 
-                                : product.lqs >= 50 
-                                  ? "border-yellow-500/50 text-yellow-600 bg-yellow-500/10"
-                                  : "border-red-500/50 text-red-600 bg-red-500/10"
-                            }
-                          >
-                            {product.lqs}
-                          </Badge>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center text-muted-foreground">
-                        {product.servings_per_container ?? "-"}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          {product.bestseller && (
-                            <Badge variant="default" className="bg-accent text-xs">
-                              Bestseller
-                            </Badge>
-                          )}
-                          {product.amazon_choice && (
-                            <Badge variant="secondary" className="text-xs">
-                              Choice
-                            </Badge>
-                          )}
-                          {product.is_young_competitor && (
-                            <TrendingUp className="w-4 h-4 text-green-500" />
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRowClick(product);
-                          }}
+                    <Collapsible key={product.id} open={isExpanded} onOpenChange={() => toggleRowExpansion(product.id)} asChild>
+                      <>
+                        <TableRow
+                          className={`cursor-pointer hover:bg-muted/50 ${isSelected ? "bg-primary/5" : ""} ${isExpanded ? "border-b-0" : ""}`}
+                          onClick={() => handleRowClick(product)}
                         >
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <CollapsibleTrigger asChild>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="p-0 h-6 w-6"
+                                disabled={!hasMarketingData}
+                              >
+                                {hasMarketingData ? (
+                                  isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />
+                                ) : (
+                                  <span className="w-4 h-4" />
+                                )}
+                              </Button>
+                            </CollapsibleTrigger>
+                          </TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <Checkbox
+                              checked={isSelected}
+                              disabled={isDisabled}
+                              onCheckedChange={(checked) => handleCheckboxChange(product.id, checked as boolean)}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <div className="max-w-md">
+                              <p className="font-medium text-foreground truncate">{product.title ?? "Untitled"}</p>
+                              <p className="text-sm text-muted-foreground">{product.brand ?? "Unknown Brand"}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right font-medium">
+                            ${(product.price ?? 0).toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                              <span>{(product.rating ?? 0).toFixed(1)}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right text-muted-foreground">
+                            {(product.reviews ?? 0).toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-right text-muted-foreground">
+                            {product.monthly_sales?.toLocaleString() ?? "-"}
+                          </TableCell>
+                          <TableCell className="text-right font-medium text-green-600">
+                            {product.monthly_revenue 
+                              ? `$${product.monthly_revenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                              : "-"}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <ScoreBadge score={getMarketingScore(product)} icon={Target} />
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <ScoreBadge score={getCopyScore(product)} icon={FileText} />
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <ScoreBadge score={getTrustScore(product)} icon={ShieldCheck} />
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              {product.bestseller && (
+                                <Badge variant="default" className="bg-accent text-xs">
+                                  Bestseller
+                                </Badge>
+                              )}
+                              {product.amazon_choice && (
+                                <Badge variant="secondary" className="text-xs">
+                                  Choice
+                                </Badge>
+                              )}
+                              {product.is_young_competitor && (
+                                <TrendingUp className="w-4 h-4 text-green-500" />
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRowClick(product);
+                              }}
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                        <CollapsibleContent asChild>
+                          <tr>
+                            <td colSpan={13} className="p-0">
+                              <MarketingAnalysisPanel marketingAnalysis={product.marketing_analysis as any} />
+                            </td>
+                          </tr>
+                        </CollapsibleContent>
+                      </>
+                    </Collapsible>
                   );
                 })}
               </TableBody>

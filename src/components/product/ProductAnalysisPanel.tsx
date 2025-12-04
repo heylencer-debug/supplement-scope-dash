@@ -334,19 +334,19 @@ export default function ProductAnalysisPanel({
     <div className="p-4 bg-muted/30 border-t">
       <Tabs defaultValue={hasMarketingData ? "copy" : "reviews"} className="w-full">
         <TabsList className="grid grid-cols-5 w-full max-w-2xl mb-4">
-          <TabsTrigger value="copy" className="text-xs gap-1" disabled={!hasMarketingData}>
+          <TabsTrigger value="copy" className="text-xs gap-1">
             <Lightbulb className="w-3 h-3" /> Copy
           </TabsTrigger>
-          <TabsTrigger value="sentiment" className="text-xs gap-1" disabled={!hasMarketingData}>
+          <TabsTrigger value="sentiment" className="text-xs gap-1">
             <MessageSquare className="w-3 h-3" /> Sentiment
           </TabsTrigger>
-          <TabsTrigger value="actions" className="text-xs gap-1" disabled={!hasMarketingData}>
+          <TabsTrigger value="actions" className="text-xs gap-1">
             <Zap className="w-3 h-3" /> Actions
           </TabsTrigger>
-          <TabsTrigger value="visuals" className="text-xs gap-1" disabled={!hasMarketingData}>
+          <TabsTrigger value="visuals" className="text-xs gap-1">
             <ImageIcon className="w-3 h-3" /> Visuals
           </TabsTrigger>
-          <TabsTrigger value="reviews" className="text-xs gap-1" disabled={!hasReviewData}>
+          <TabsTrigger value="reviews" className="text-xs gap-1">
             <Star className="w-3 h-3" /> Reviews
           </TabsTrigger>
         </TabsList>

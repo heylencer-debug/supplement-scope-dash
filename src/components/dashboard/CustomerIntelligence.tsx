@@ -1,6 +1,7 @@
 import { Users, AlertTriangle, Heart, Target, Lightbulb } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -39,10 +40,55 @@ export default function CustomerIntelligence({
   if (isLoading) {
     return (
       <Card>
-        <CardContent className="p-8">
-          <div className="animate-pulse space-y-4">
-            <div className="h-6 bg-muted rounded w-1/3"></div>
-            <div className="h-32 bg-muted rounded"></div>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Users className="w-5 h-5 text-primary" />
+            <CardTitle>Customer Intelligence</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-8">
+          {/* Target Buyer Profile Skeleton */}
+          <div className="space-y-3">
+            <Skeleton className="h-5 w-40" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-3/4" />
+          </div>
+          
+          {/* Pain Points Table Skeleton */}
+          <div className="space-y-3">
+            <Skeleton className="h-5 w-36" />
+            <div className="rounded-md border">
+              <div className="p-4 space-y-3">
+                <div className="grid grid-cols-3 gap-4">
+                  <Skeleton className="h-4" />
+                  <Skeleton className="h-4" />
+                  <Skeleton className="h-4" />
+                </div>
+                <Skeleton className="h-12 w-full rounded-lg" />
+                <Skeleton className="h-12 w-full rounded-lg" />
+                <Skeleton className="h-12 w-full rounded-lg" />
+              </div>
+            </div>
+          </div>
+
+          {/* Unmet Needs & What Customers Love Skeleton */}
+          <div className="grid md:grid-cols-2 gap-8">
+            <div className="space-y-3">
+              <Skeleton className="h-5 w-28" />
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-5/6" />
+                <Skeleton className="h-4 w-4/5" />
+              </div>
+            </div>
+            <div className="space-y-3">
+              <Skeleton className="h-5 w-36" />
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-4 w-5/6" />
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>

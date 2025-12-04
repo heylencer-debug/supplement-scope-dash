@@ -47,12 +47,64 @@ export function LaunchPlanSection({
     return (
       <Card>
         <CardHeader>
-          <Skeleton className="h-6 w-48" />
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Rocket className="h-5 w-5 text-primary" />
+            Launch Strategy & Action Plan
+          </CardTitle>
+          <CardDescription>
+            Go-to-market strategy and execution roadmap
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <Skeleton className="h-24 w-full" />
-          <Skeleton className="h-32 w-full" />
-          <Skeleton className="h-28 w-full" />
+        <CardContent className="space-y-8">
+          {/* Winning Hook Skeleton */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-4 w-4 rounded" />
+              <Skeleton className="h-4 w-28" />
+            </div>
+            <Skeleton className="h-20 w-full rounded-lg" />
+          </div>
+
+          {/* Ad Angles Skeleton */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-4 w-4 rounded" />
+              <Skeleton className="h-4 w-24" />
+            </div>
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-5/6" />
+              <Skeleton className="h-4 w-4/5" />
+            </div>
+          </div>
+
+          {/* Launch Tactics Skeleton */}
+          <div className="space-y-4">
+            <Skeleton className="h-4 w-32" />
+            <div className="grid md:grid-cols-3 gap-4">
+              <Skeleton className="h-24 rounded-lg" />
+              <Skeleton className="h-24 rounded-lg" />
+              <Skeleton className="h-24 rounded-lg" />
+            </div>
+          </div>
+
+          <div className="border-t border-border" />
+
+          {/* Action Plan Timeline Skeleton */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Skeleton className="h-4 w-40" />
+              <Skeleton className="h-4 w-32" />
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="space-y-0">
+                  <Skeleton className="h-12 rounded-t-md rounded-b-none" />
+                  <Skeleton className="h-20 rounded-t-none rounded-b-md" />
+                </div>
+              ))}
+            </div>
+          </div>
         </CardContent>
       </Card>
     );

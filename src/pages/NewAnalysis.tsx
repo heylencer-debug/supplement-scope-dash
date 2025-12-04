@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, Clock, TrendingUp, Loader2, Target, FileText, Package, MessageSquare } from "lucide-react";
+import { ArrowRight, Loader2, FileText, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,12 +24,6 @@ const amazonCategoryOptions = [
   { id: "pet-supplies", label: "Pet Supplies" },
 ];
 
-const trendingCategories = [
-  { name: "Immunity Boosters", growth: "+24%" },
-  { name: "Sleep Support", growth: "+18%" },
-  { name: "Joint Health", growth: "+15%" },
-  { name: "Energy & Focus", growth: "+12%" },
-];
 
 const getRecommendationStyle = (recommendation: string | null) => {
   if (!recommendation) return "bg-muted text-muted-foreground border-border";
@@ -334,61 +328,6 @@ export default function NewAnalysis() {
         </CardContent>
       </Card>
 
-      <div className="grid md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Clock className="w-4 h-4 text-muted-foreground" />
-              Quick Start
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {[
-                { query: "Vitamin D3 5000 IU", category: "Vitamins" },
-                { query: "Omega-3 Fish Oil", category: "Supplements" },
-                { query: "Probiotic 50 Billion", category: "Digestive Health" },
-              ].map((search, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 hover:bg-secondary cursor-pointer transition-colors"
-                  onClick={() => setCategory(search.query)}
-                >
-                  <div>
-                    <p className="font-medium text-foreground">{search.query}</p>
-                    <p className="text-sm text-muted-foreground">{search.category}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <TrendingUp className="w-4 h-4 text-accent" />
-              Trending Categories
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {trendingCategories.map((cat, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 hover:bg-secondary cursor-pointer transition-colors"
-                  onClick={() => setCategory(cat.name)}
-                >
-                  <span className="font-medium text-foreground">{cat.name}</span>
-                  <Badge className="bg-accent/10 text-accent hover:bg-accent/20">
-                    {cat.growth}
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
     </div>
   );
 }

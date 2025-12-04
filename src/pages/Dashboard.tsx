@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { 
   Loader2, RefreshCw, CheckCircle2, Circle, Clock,
-  Building2
+  Building2, Package, Eye, MessageSquare, BarChart3, Sparkles
 } from "lucide-react";
 
 // Dashboard components
@@ -32,6 +32,7 @@ import { useCategoryContext } from "@/contexts/CategoryContext";
 import { useCategoryScores } from "@/hooks/useCategoryScores";
 import { useCategorySales } from "@/hooks/useCategorySales";
 import { useFormulaBrief } from "@/hooks/useFormulaBrief";
+import { useAnalysisProgress } from "@/hooks/useAnalysisProgress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -116,24 +117,17 @@ export default function Dashboard() {
   const hasCategory = !!category;
   const hasAnalysis = !!analysis;
   const hasProducts = products && products.length > 0;
+  const hasScores = !!categoryScores;
+  const hasFormulaBriefData = !!formulaBrief;
 
-  // Progress calculation
-  const progress = useMemo(() => {
-    const steps = [
-      { name: "Category Created", done: hasCategory },
-      { name: "Products Scraped", done: hasProducts || (category?.total_products ?? 0) > 0 },
-      { name: "Reviews Analyzed", done: (analysis?.reviews_analyzed ?? 0) > 0 },
-      { name: "Scores Calculated", done: !!categoryScores },
-      { name: "Analysis Complete", done: !!analysis?.executive_summary && !!analysis?.opportunity_index },
-      { name: "Formula Brief Ready", done: !!formulaBrief },
-    ];
-    const completed = steps.filter(s => s.done).length;
-    return { 
-      percentage: Math.round((completed / steps.length) * 100), 
-      steps, 
-      completed 
-    };
-  }, [hasCategory, hasProducts, category?.total_products, analysis, categoryScores, formulaBrief]);
+  // Granular progress tracking
+  const { progress } = useAnalysisProgress(
+    category?.id,
+    hasCategory,
+    hasAnalysis,
+    hasScores,
+    hasFormulaBriefData
+  );
 
   // Parse analysis data for components
   const dashboardData = useMemo(() => {
@@ -350,7 +344,7 @@ export default function Dashboard() {
       />
 
       {/* Progress Banner */}
-      {progress.percentage < 100 && (
+      {!progress.isComplete && (
         <Card className="border-[#0ea5e9]/30 bg-[#0ea5e9]/5">
           <CardContent className="p-5">
             <div className="space-y-4">
@@ -360,31 +354,74 @@ export default function Dashboard() {
                   <div>
                     <p className="font-medium text-foreground">Analysis in Progress</p>
                     <p className="text-sm text-muted-foreground">
-                      {progress.percentage}% Complete • {6 - progress.completed} steps remaining
+                      {progress.overallPercentage}% Complete • Est. {progress.estimatedMinutesRemaining} min remaining
                     </p>
                   </div>
                 </div>
-                <Badge variant="outline">{progress.completed}/6 Steps</Badge>
+                <Badge variant="outline" className="text-sm">
+                  {progress.overallPercentage}%
+                </Badge>
               </div>
-              <Progress value={progress.percentage} className="h-2" />
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
-                {progress.steps.map((step, idx) => (
-                  <div 
-                    key={idx} 
-                    className={`flex items-center gap-1.5 text-xs ${step.done ? 'text-emerald-600' : 'text-muted-foreground'}`}
-                  >
-                    {step.done ? (
-                      <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
-                    ) : (
-                      <Circle className="w-3.5 h-3.5 flex-shrink-0" />
-                    )}
-                    <span className="truncate">{step.name}</span>
-                  </div>
-                ))}
+              <Progress value={progress.overallPercentage} className="h-2" />
+              
+              {/* Phase-by-phase breakdown */}
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-4">
+                {progress.phases.map((phase, idx) => {
+                  const PhaseIcon = [CheckCircle2, Package, Eye, BarChart3, MessageSquare, Sparkles][idx] || Circle;
+                  const isComplete = phase.percentage >= 100;
+                  const isActive = phase.percentage > 0 && phase.percentage < 100;
+                  
+                  return (
+                    <div 
+                      key={idx} 
+                      className={`p-3 rounded-lg border ${
+                        isComplete 
+                          ? 'border-emerald-500/30 bg-emerald-500/5' 
+                          : isActive 
+                            ? 'border-[#0ea5e9]/30 bg-[#0ea5e9]/5' 
+                            : 'border-border bg-muted/30'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <PhaseIcon className={`w-4 h-4 ${
+                          isComplete 
+                            ? 'text-emerald-500' 
+                            : isActive 
+                              ? 'text-[#0ea5e9]' 
+                              : 'text-muted-foreground'
+                        }`} />
+                        <span className={`text-xs font-medium ${
+                          isComplete 
+                            ? 'text-emerald-600' 
+                            : isActive 
+                              ? 'text-[#0ea5e9]' 
+                              : 'text-muted-foreground'
+                        }`}>
+                          {phase.name}
+                        </span>
+                      </div>
+                      <Progress 
+                        value={phase.percentage} 
+                        className={`h-1.5 ${isComplete ? '[&>div]:bg-emerald-500' : ''}`}
+                      />
+                      <div className="flex justify-between items-center mt-1.5">
+                        <span className="text-[10px] text-muted-foreground">
+                          {phase.completed}/{phase.total}
+                        </span>
+                        <span className={`text-[10px] font-medium ${
+                          isComplete ? 'text-emerald-600' : 'text-muted-foreground'
+                        }`}>
+                          {phase.percentage}%
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
+              
               <p className="text-xs text-muted-foreground flex items-center gap-1">
                 <Clock className="w-3 h-3" />
-                Est. time: ~{Math.max(1, Math.round((6 - progress.completed) * 1.5))} min
+                Auto-refreshing every 5 seconds
               </p>
             </div>
           </CardContent>

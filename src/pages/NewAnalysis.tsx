@@ -143,8 +143,8 @@ export default function NewAnalysis() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
-      <div className="text-center space-y-2">
+    <div className="max-w-4xl mx-auto space-y-10">
+      <div className="text-center space-y-3">
         <h1 className="text-3xl font-bold text-foreground">New Market Analysis</h1>
         <p className="text-muted-foreground">
           Enter your search criteria to analyze products in the supplement market
@@ -158,7 +158,7 @@ export default function NewAnalysis() {
             Configure your analysis parameters below
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-8">
           {/* Category Name Field */}
           <div className="space-y-2">
             <Label htmlFor="category">
@@ -187,9 +187,9 @@ export default function NewAnalysis() {
           </div>
 
           {/* Amazon Categories Multi-select */}
-          <div className="space-y-3">
+          <div className="space-y-4">
             <Label>Amazon Categories</Label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-4">
               {amazonCategoryOptions.map((option) => (
                 <div
                   key={option.id}
@@ -244,19 +244,19 @@ export default function NewAnalysis() {
             Click to view the full analysis dashboard
           </CardDescription>
         </CardHeader>
-      <CardContent>
+        <CardContent>
           {categoriesLoading && !recentCategories ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {[1, 2, 3].map((i) => (
                 <Skeleton key={i} className="h-48 w-full rounded-xl" />
               ))}
             </div>
           ) : uniqueCategories.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">
+            <p className="text-muted-foreground text-center py-10">
               No categories yet. Start your first analysis above!
             </p>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {uniqueCategories.slice(0, 6).map((category) => (
                 <div
                   key={category.id}
@@ -289,7 +289,7 @@ export default function NewAnalysis() {
                   </div>
                   
                   {/* Card Content */}
-                  <div className="p-4 space-y-3">
+                  <div className="p-5 space-y-4">
                     <div className="flex items-start justify-between gap-2">
                       <h3 className="font-semibold text-foreground line-clamp-1 group-hover:text-accent transition-colors">
                         {category.name}

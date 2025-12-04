@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   AlertTriangle, CheckCircle2, Lightbulb, Zap, Image as ImageIcon,
-  Users, MessageSquare, Target, TrendingUp, XCircle
+  Users, MessageSquare, Target, TrendingUp, XCircle, Star, ThumbsUp, ThumbsDown
 } from "lucide-react";
 
 interface ProductAnalysisPanelProps {
@@ -60,7 +60,6 @@ function MetricCard({ label, value, color }: { label: string; value: number; col
 
 // Action Item Component
 function ActionItem({ action, badgeColor }: { action: string; badgeColor?: string }) {
-  // Extract category from action text (e.g., "REWRITE TITLE:" -> "REWRITE TITLE")
   const categoryMatch = action.match(/^([A-Z\s]+):/);
   const category = categoryMatch ? categoryMatch[1].trim() : "ACTION";
   const content = categoryMatch ? action.slice(categoryMatch[0].length).trim() : action;
@@ -85,11 +84,9 @@ function ActionItem({ action, badgeColor }: { action: string; badgeColor?: strin
   };
   
   const getCategoryColor = () => {
-    // First check if badgeColor is provided
     if (badgeColor && badgeColorMap[badgeColor]) {
       return badgeColorMap[badgeColor];
     }
-    // Then check category keywords
     for (const [key, color] of Object.entries(categoryColors)) {
       if (category.toUpperCase().includes(key)) return color;
     }
@@ -108,7 +105,7 @@ function ActionItem({ action, badgeColor }: { action: string; badgeColor?: strin
   );
 }
 
-// Image Analysis Card Component - shows ALL data
+// Image Analysis Card Component
 function ImageAnalysisCard({ image }: { image: any }) {
   const purposeColors: Record<string, string> = {
     "Product Feature": "bg-blue-500/10 text-blue-600 border-blue-500/30",
@@ -184,6 +181,66 @@ function ImageAnalysisCard({ image }: { image: any }) {
   );
 }
 
+// Render any JSON data recursively
+function RenderJsonData({ data, depth = 0 }: { data: any; depth?: number }) {
+  if (data === null || data === undefined) return null;
+  
+  if (typeof data === 'string' || typeof data === 'number' || typeof data === 'boolean') {
+    return <span className="text-sm">{String(data)}</span>;
+  }
+  
+  if (Array.isArray(data)) {
+    if (data.length === 0) return <span className="text-sm text-muted-foreground">Empty array</span>;
+    
+    // Check if it's an array of strings
+    if (data.every(item => typeof item === 'string')) {
+      return (
+        <div className="space-y-1">
+          {data.map((item, i) => (
+            <div key={i} className="flex items-start gap-2 p-2 bg-muted/30 rounded">
+              <span className="text-xs text-muted-foreground shrink-0">{i + 1}.</span>
+              <span className="text-sm">{item}</span>
+            </div>
+          ))}
+        </div>
+      );
+    }
+    
+    // Array of objects
+    return (
+      <div className="space-y-2">
+        {data.map((item, i) => (
+          <div key={i} className="p-2 bg-muted/30 rounded">
+            <RenderJsonData data={item} depth={depth + 1} />
+          </div>
+        ))}
+      </div>
+    );
+  }
+  
+  if (typeof data === 'object') {
+    const entries = Object.entries(data);
+    if (entries.length === 0) return <span className="text-sm text-muted-foreground">Empty object</span>;
+    
+    return (
+      <div className="space-y-2">
+        {entries.map(([key, value]) => (
+          <div key={key} className={depth > 0 ? "" : "p-2 bg-muted/20 rounded"}>
+            <p className="text-xs font-medium text-muted-foreground mb-1 capitalize">
+              {key.replace(/_/g, ' ')}:
+            </p>
+            <div className="pl-2">
+              <RenderJsonData data={value} depth={depth + 1} />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  
+  return null;
+}
+
 export default function ProductAnalysisPanel({ 
   marketingAnalysis, 
   reviewAnalysis,
@@ -199,8 +256,9 @@ export default function ProductAnalysisPanel({
   }
 
   const ma = marketingAnalysis || {};
+  const ra = reviewAnalysis || {};
 
-  // Extract data from the ACTUAL format
+  // Extract MARKETING data from the ACTUAL format
   const details = ma.details || {};
   const copyAnalysis = details.copy_analysis || {};
   const customerSentiment = details.customer_sentiment || {};
@@ -234,8 +292,21 @@ export default function ProductAnalysisPanel({
     badgeColor: item.badge_color
   })).filter((item: any) => item.text.length > 0);
 
-  // Check if we have any data
-  const hasAnyData = 
+  // Extract REVIEW ANALYSIS data
+  const sentimentDistribution = ra.sentiment_distribution || ra.sentiment || {};
+  const painPoints = ra.pain_points || [];
+  const positiveThemes = ra.positive_themes || [];
+  const featureRequests = ra.feature_requests || [];
+  const commonComplaints = ra.common_complaints || [];
+  const buyerTypes = ra.buyer_types || ra.demographics?.buyer_types || [];
+  const useCases = ra.use_cases || ra.demographics?.use_cases || [];
+  const analysisMetadata = ra.analysis_metadata || {};
+  const productExperience = ra.product_experience_breakdown || {};
+  const competitorComparisons = ra.competitor_comparisons || {};
+  const actionableRecommendations = ra.actionable_recommendations || [];
+
+  // Check if we have any marketing data
+  const hasMarketingData = 
     copyHooks.length > 0 ||
     primaryPraises.length > 0 ||
     primaryComplaints.length > 0 ||
@@ -244,36 +315,50 @@ export default function ProductAnalysisPanel({
     images.length > 0 ||
     actionPlan.length > 0;
 
-  if (!hasAnyData) {
+  // Check if we have any review data
+  const hasReviewData = 
+    Object.keys(sentimentDistribution).length > 0 ||
+    painPoints.length > 0 ||
+    positiveThemes.length > 0 ||
+    featureRequests.length > 0 ||
+    commonComplaints.length > 0 ||
+    buyerTypes.length > 0 ||
+    useCases.length > 0 ||
+    Object.keys(ra).length > 0;
+
+  if (!hasMarketingData && !hasReviewData) {
     return (
       <div className="p-6 text-center text-muted-foreground">
         <AlertTriangle className="w-8 h-8 mx-auto mb-2 opacity-50" />
-        <p>Marketing analysis data is still being processed.</p>
+        <p>Analysis data is still being processed.</p>
       </div>
     );
   }
 
   return (
     <div className="p-4 bg-muted/30 border-t">
-      <Tabs defaultValue="copy" className="w-full">
-        <TabsList className="grid grid-cols-4 w-full max-w-xl mb-4">
-          <TabsTrigger value="copy" className="text-xs gap-1">
+      <Tabs defaultValue={hasMarketingData ? "copy" : "reviews"} className="w-full">
+        <TabsList className="grid grid-cols-5 w-full max-w-2xl mb-4">
+          <TabsTrigger value="copy" className="text-xs gap-1" disabled={!hasMarketingData}>
             <Lightbulb className="w-3 h-3" /> Copy
           </TabsTrigger>
-          <TabsTrigger value="sentiment" className="text-xs gap-1">
+          <TabsTrigger value="sentiment" className="text-xs gap-1" disabled={!hasMarketingData}>
             <MessageSquare className="w-3 h-3" /> Sentiment
           </TabsTrigger>
-          <TabsTrigger value="actions" className="text-xs gap-1">
+          <TabsTrigger value="actions" className="text-xs gap-1" disabled={!hasMarketingData}>
             <Zap className="w-3 h-3" /> Actions
           </TabsTrigger>
-          <TabsTrigger value="visuals" className="text-xs gap-1">
+          <TabsTrigger value="visuals" className="text-xs gap-1" disabled={!hasMarketingData}>
             <ImageIcon className="w-3 h-3" /> Visuals
+          </TabsTrigger>
+          <TabsTrigger value="reviews" className="text-xs gap-1" disabled={!hasReviewData}>
+            <Star className="w-3 h-3" /> Reviews
           </TabsTrigger>
         </TabsList>
 
         {/* TAB 1: COPY ANALYSIS */}
         <TabsContent value="copy" className="mt-0 space-y-4">
-          {/* Score Card Summary - moved here */}
+          {/* Score Card Summary */}
           {(overallGrade || metrics.length > 0) && (
             <Card>
               <CardHeader className="pb-2">
@@ -418,7 +503,7 @@ export default function ProductAnalysisPanel({
             </Card>
           </div>
 
-          {/* Gap Analysis - Full text, no truncation */}
+          {/* Gap Analysis */}
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2">
@@ -468,7 +553,7 @@ export default function ProductAnalysisPanel({
 
         {/* TAB 4: VISUAL GALLERY */}
         <TabsContent value="visuals" className="mt-0 space-y-4">
-          {/* Target Audience / Vibe - Full text */}
+          {/* Target Audience / Vibe */}
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2">
@@ -502,7 +587,7 @@ export default function ProductAnalysisPanel({
             </CardContent>
           </Card>
 
-          {/* Image Gallery - Full analysis, no truncation */}
+          {/* Image Gallery */}
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2">
@@ -526,6 +611,221 @@ export default function ProductAnalysisPanel({
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* TAB 5: REVIEWS ANALYSIS */}
+        <TabsContent value="reviews" className="mt-0 space-y-4">
+          {/* Analysis Metadata */}
+          {Object.keys(analysisMetadata).length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Star className="w-4 h-4" /> Analysis Metadata
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {analysisMetadata.total_reviews_analyzed !== undefined && (
+                    <div className="p-3 bg-muted/50 rounded-lg text-center">
+                      <p className="text-2xl font-bold">{analysisMetadata.total_reviews_analyzed}</p>
+                      <p className="text-xs text-muted-foreground">Reviews Analyzed</p>
+                    </div>
+                  )}
+                  {analysisMetadata.verified_purchase_rate !== undefined && (
+                    <div className="p-3 bg-muted/50 rounded-lg text-center">
+                      <p className="text-2xl font-bold">{analysisMetadata.verified_purchase_rate}%</p>
+                      <p className="text-xs text-muted-foreground">Verified Purchase</p>
+                    </div>
+                  )}
+                  {analysisMetadata.helpful_votes !== undefined && (
+                    <div className="p-3 bg-muted/50 rounded-lg text-center">
+                      <p className="text-2xl font-bold">{analysisMetadata.helpful_votes}</p>
+                      <p className="text-xs text-muted-foreground">Helpful Votes</p>
+                    </div>
+                  )}
+                  {analysisMetadata.quality_score !== undefined && (
+                    <div className="p-3 bg-muted/50 rounded-lg text-center">
+                      <p className="text-2xl font-bold">{analysisMetadata.quality_score}</p>
+                      <p className="text-xs text-muted-foreground">Quality Score</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Sentiment Distribution */}
+          {Object.keys(sentimentDistribution).length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4" /> Sentiment Distribution
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <RenderJsonData data={sentimentDistribution} />
+              </CardContent>
+            </Card>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Positive Themes */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <ThumbsUp className="w-4 h-4 text-green-600" /> Positive Themes
+                  <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/30 ml-auto">
+                    {positiveThemes.length} items
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {positiveThemes.length > 0 ? (
+                  <RenderJsonData data={positiveThemes} />
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-4">No positive themes</p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Pain Points */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <ThumbsDown className="w-4 h-4 text-red-600" /> Pain Points
+                  <Badge variant="outline" className="bg-red-500/10 text-red-600 border-red-500/30 ml-auto">
+                    {painPoints.length} items
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {painPoints.length > 0 ? (
+                  <RenderJsonData data={painPoints} />
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-4">No pain points</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Feature Requests */}
+          {featureRequests.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Lightbulb className="w-4 h-4 text-amber-600" /> Feature Requests
+                  <Badge variant="outline" className="ml-auto">{featureRequests.length} items</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <RenderJsonData data={featureRequests} />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Common Complaints */}
+          {commonComplaints.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-600" /> Common Complaints
+                  <Badge variant="outline" className="ml-auto">{commonComplaints.length} items</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <RenderJsonData data={commonComplaints} />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Product Experience Breakdown */}
+          {Object.keys(productExperience).length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Star className="w-4 h-4" /> Product Experience Breakdown
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <RenderJsonData data={productExperience} />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Buyer Types & Use Cases */}
+          {(buyerTypes.length > 0 || useCases.length > 0) && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {buyerTypes.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Users className="w-4 h-4" /> Buyer Types
+                      <Badge variant="outline" className="ml-auto">{buyerTypes.length} types</Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <RenderJsonData data={buyerTypes} />
+                  </CardContent>
+                </Card>
+              )}
+              {useCases.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Target className="w-4 h-4" /> Use Cases
+                      <Badge variant="outline" className="ml-auto">{useCases.length} cases</Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <RenderJsonData data={useCases} />
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+
+          {/* Competitor Comparisons */}
+          {Object.keys(competitorComparisons).length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4" /> Competitor Comparisons
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <RenderJsonData data={competitorComparisons} />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Actionable Recommendations */}
+          {actionableRecommendations.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-amber-500" /> Actionable Recommendations
+                  <Badge variant="outline" className="ml-auto">{actionableRecommendations.length} items</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <RenderJsonData data={actionableRecommendations} />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Raw Review Analysis Data (fallback to show any remaining data) */}
+          {Object.keys(ra).length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4" /> Full Review Analysis Data
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <RenderJsonData data={ra} />
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
     </div>

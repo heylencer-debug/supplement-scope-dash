@@ -3,7 +3,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { 
   AlertTriangle, CheckCircle2, Lightbulb, Zap, Image as ImageIcon,
@@ -68,8 +67,10 @@ function PriorityBadge({ priority }: { priority: string }) {
   );
 }
 
-// Enhanced Image Card with Hover Analysis
-function SmartImageCard({ image }: { image: any }) {
+// Enhanced Image Card with Hover Analysis - using expandable card pattern
+function SmartImageCard({ image, index }: { image: any; index: number }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  
   const purposeColors: Record<string, string> = {
     "Product Feature": "bg-blue-500/90 text-white",
     "Lifestyle": "bg-purple-500/90 text-white",
@@ -84,63 +85,64 @@ function SmartImageCard({ image }: { image: any }) {
   };
 
   return (
-    <TooltipProvider delayDuration={300}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div className="relative aspect-square bg-muted rounded-lg overflow-hidden cursor-pointer group">
-            <img 
-              src={image.url} 
-              alt={image.description || "Product image"} 
-              className="w-full h-full object-cover transition-transform group-hover:scale-105"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none';
-              }}
-            />
-            {/* Purpose Badge on top */}
-            {image.purpose && (
-              <div className="absolute top-2 left-2">
-                <Badge className={`text-xs ${purposeColors[image.purpose] || "bg-primary/90 text-white"}`}>
-                  {image.purpose}
-                </Badge>
-              </div>
-            )}
-            {/* Score Badge */}
-            {image.score !== undefined && (
-              <div className="absolute top-2 right-2">
-                <Badge 
-                  className={`text-xs ${
-                    image.score >= 8 ? "bg-green-500/90 text-white" 
-                    : image.score >= 6 ? "bg-amber-500/90 text-white"
-                    : "bg-red-500/90 text-white"
-                  }`}
-                >
-                  {image.score}/10
-                </Badge>
-              </div>
-            )}
-            {/* Hover overlay indicator */}
-            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-              <span className="text-white opacity-0 group-hover:opacity-100 text-xs bg-black/50 px-2 py-1 rounded">
-                Hover for analysis
-              </span>
+    <div className="space-y-2">
+      <div 
+        className="relative aspect-square bg-muted rounded-lg overflow-hidden cursor-pointer group"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <img 
+          src={image.url} 
+          alt={image.description || `Product image ${index + 1}`} 
+          className="w-full h-full object-cover transition-transform group-hover:scale-105"
+          onError={(e) => {
+            (e.target as HTMLImageElement).style.display = 'none';
+          }}
+        />
+        {/* Purpose Badge on top */}
+        {image.purpose && (
+          <div className="absolute top-2 left-2">
+            <Badge className={`text-xs ${purposeColors[image.purpose] || "bg-primary/90 text-white"}`}>
+              {image.purpose}
+            </Badge>
+          </div>
+        )}
+        {/* Score Badge */}
+        {image.score !== undefined && (
+          <div className="absolute top-2 right-2">
+            <Badge 
+              className={`text-xs ${
+                image.score >= 8 ? "bg-green-500/90 text-white" 
+                : image.score >= 6 ? "bg-amber-500/90 text-white"
+                : "bg-red-500/90 text-white"
+              }`}
+            >
+              {image.score}/10
+            </Badge>
+          </div>
+        )}
+        {/* Click indicator */}
+        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+          <span className="text-white opacity-0 group-hover:opacity-100 text-xs bg-black/50 px-2 py-1 rounded">
+            {isExpanded ? "Click to collapse" : "Click for analysis"}
+          </span>
+        </div>
+      </div>
+      
+      {/* Analysis shown below the image when expanded */}
+      {isExpanded && (image.description || image.analysis) && (
+        <div className="p-3 bg-muted/50 rounded-md border border-border text-xs space-y-2 animate-in fade-in slide-in-from-top-2">
+          {image.description && (
+            <p className="font-medium">{image.description}</p>
+          )}
+          {image.analysis && (
+            <div className="p-2 bg-primary/5 rounded border-l-2 border-primary">
+              <p className="text-muted-foreground mb-1 font-semibold">Strategy:</p>
+              <p className="leading-relaxed">{image.analysis}</p>
             </div>
-          </div>
-        </TooltipTrigger>
-        <TooltipContent side="bottom" className="max-w-sm p-4 bg-popover border">
-          <div className="space-y-2">
-            {image.description && (
-              <p className="text-sm font-medium">{image.description}</p>
-            )}
-            {image.analysis && (
-              <div className="p-3 bg-muted/50 rounded-md border-l-4 border-primary">
-                <p className="text-xs text-muted-foreground mb-1">Strategy Analysis:</p>
-                <p className="text-sm leading-relaxed">{image.analysis}</p>
-              </div>
-            )}
-          </div>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -783,7 +785,7 @@ export default function ProductAnalysisPanel({
               {images.length > 0 ? (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                   {images.map((image: any, i: number) => (
-                    <SmartImageCard key={i} image={image} />
+                    <SmartImageCard key={i} image={image} index={i} />
                   ))}
                 </div>
               ) : (

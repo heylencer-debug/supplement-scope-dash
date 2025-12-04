@@ -298,12 +298,15 @@ export default function ProductAnalysisPanel({
   const positiveThemes = ra.positive_themes || [];
   const featureRequests = ra.feature_requests || [];
   const commonComplaints = ra.common_complaints || [];
-  const buyerTypes = ra.buyer_types || ra.demographics?.buyer_types || [];
-  const useCases = ra.use_cases || ra.demographics?.use_cases || [];
+  const buyerTypes = ra.buyer_types || ra.demographics_insights?.buyer_types || ra.demographics?.buyer_types || [];
+  const useCases = ra.use_cases || ra.demographics_insights?.use_cases || ra.demographics?.use_cases || [];
   const analysisMetadata = ra.analysis_metadata || {};
   const productExperience = ra.product_experience_breakdown || {};
   const competitorComparisons = ra.competitor_comparisons || {};
   const actionableRecommendations = ra.actionable_recommendations || [];
+  const keyInsights = ra.key_insights || [];
+  const productInfo = ra.product_info || {};
+  const demographicsInsights = ra.demographics_insights || {};
 
   // Check if we have any marketing data
   const hasMarketingData = 
@@ -315,16 +318,8 @@ export default function ProductAnalysisPanel({
     images.length > 0 ||
     actionPlan.length > 0;
 
-  // Check if we have any review data
-  const hasReviewData = 
-    Object.keys(sentimentDistribution).length > 0 ||
-    painPoints.length > 0 ||
-    positiveThemes.length > 0 ||
-    featureRequests.length > 0 ||
-    commonComplaints.length > 0 ||
-    buyerTypes.length > 0 ||
-    useCases.length > 0 ||
-    Object.keys(ra).length > 0;
+  // Check if we have any review data - simplified check
+  const hasReviewData = Object.keys(ra).length > 0;
 
   if (!hasMarketingData && !hasReviewData) {
     return (
@@ -615,6 +610,30 @@ export default function ProductAnalysisPanel({
 
         {/* TAB 5: REVIEWS ANALYSIS */}
         <TabsContent value="reviews" className="mt-0 space-y-4">
+          {/* Product Info */}
+          {Object.keys(productInfo).length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Star className="w-4 h-4" /> Product Info
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-3">
+                  {productInfo.brand && (
+                    <Badge variant="outline">Brand: {productInfo.brand}</Badge>
+                  )}
+                  {productInfo.asin && (
+                    <Badge variant="outline">ASIN: {productInfo.asin}</Badge>
+                  )}
+                  {productInfo.reviews_analyzed !== undefined && (
+                    <Badge variant="outline">Reviews Analyzed: {productInfo.reviews_analyzed}</Badge>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Analysis Metadata */}
           {Object.keys(analysisMetadata).length > 0 && (
             <Card>
@@ -637,18 +656,46 @@ export default function ProductAnalysisPanel({
                       <p className="text-xs text-muted-foreground">Verified Purchase</p>
                     </div>
                   )}
-                  {analysisMetadata.helpful_votes !== undefined && (
+                  {analysisMetadata.average_helpful_votes !== undefined && (
                     <div className="p-3 bg-muted/50 rounded-lg text-center">
-                      <p className="text-2xl font-bold">{analysisMetadata.helpful_votes}</p>
-                      <p className="text-xs text-muted-foreground">Helpful Votes</p>
+                      <p className="text-2xl font-bold">{analysisMetadata.average_helpful_votes}</p>
+                      <p className="text-xs text-muted-foreground">Avg Helpful Votes</p>
                     </div>
                   )}
-                  {analysisMetadata.quality_score !== undefined && (
+                  {analysisMetadata.analysis_quality && (
                     <div className="p-3 bg-muted/50 rounded-lg text-center">
-                      <p className="text-2xl font-bold">{analysisMetadata.quality_score}</p>
-                      <p className="text-xs text-muted-foreground">Quality Score</p>
+                      <p className="text-2xl font-bold capitalize">{analysisMetadata.analysis_quality}</p>
+                      <p className="text-xs text-muted-foreground">Analysis Quality</p>
                     </div>
                   )}
+                  {analysisMetadata.analysis_date && (
+                    <div className="p-3 bg-muted/50 rounded-lg text-center">
+                      <p className="text-sm font-bold">{new Date(analysisMetadata.analysis_date).toLocaleDateString()}</p>
+                      <p className="text-xs text-muted-foreground">Analysis Date</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Key Insights */}
+          {keyInsights.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Lightbulb className="w-4 h-4 text-primary" /> Key Insights
+                  <Badge variant="outline" className="ml-auto">{keyInsights.length} insights</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {keyInsights.map((insight: string, i: number) => (
+                    <div key={i} className="flex items-start gap-2 p-3 bg-primary/5 rounded-md border border-primary/20">
+                      <Lightbulb className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                      <span className="text-sm">{insight}</span>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>

@@ -101,7 +101,7 @@ function PainPointCard({ painPoint }: { painPoint: any }) {
   );
 }
 
-// Experience Card Component
+// Experience Card Component - handles various DB field structures
 function ExperienceCard({ 
   title, 
   icon: Icon, 
@@ -113,9 +113,12 @@ function ExperienceCard({
 }) {
   if (!data) return null;
   
-  const positiveCount = data.positive_count || 0;
-  const negativeCount = data.negative_count || 0;
-  const total = positiveCount + negativeCount;
+  // Handle different count field names in DB
+  const positiveCount = data.positive_count || data.works_count || data.good_value_count || 0;
+  const negativeCount = data.negative_count || data.no_effect_count || data.overpriced_count || 0;
+  const neutralCount = data.neutral_count || data.mixed_count || data.fair_price_count || 0;
+  
+  const total = positiveCount + negativeCount + neutralCount;
   const sentiment = total > 0 ? (positiveCount / total) : 0.5;
   
   const borderColor = sentiment >= 0.6 ? "border-l-green-500" : sentiment >= 0.4 ? "border-l-yellow-500" : "border-l-red-500";
@@ -129,18 +132,40 @@ function ExperienceCard({
             <Icon className="w-4 h-4" />
             {title}
           </div>
-          <div className="flex items-center gap-2 text-xs">
-            <span className="text-green-600 flex items-center gap-1">
-              <ThumbsUp className="w-3 h-3" /> {positiveCount}
-            </span>
-            <span className="text-red-600 flex items-center gap-1">
-              <ThumbsDown className="w-3 h-3" /> {negativeCount}
-            </span>
-          </div>
+          {total > 0 && (
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-green-600 flex items-center gap-1">
+                <ThumbsUp className="w-3 h-3" /> {positiveCount}
+              </span>
+              {neutralCount > 0 && (
+                <span className="text-muted-foreground">{neutralCount}</span>
+              )}
+              <span className="text-red-600 flex items-center gap-1">
+                <ThumbsDown className="w-3 h-3" /> {negativeCount}
+              </span>
+            </div>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent className="text-xs text-muted-foreground">
-        {data.key_insights || data.summary || "No insights available"}
+        <p>{data.key_insights || data.summary || "No insights available"}</p>
+        {data.time_to_see_results && data.time_to_see_results !== "Not mentioned" && (
+          <p className="mt-1"><span className="font-medium">Time to results:</span> {data.time_to_see_results}</p>
+        )}
+        {data.common_descriptors && data.common_descriptors.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-2">
+            {data.common_descriptors.map((d: string, i: number) => (
+              <Badge key={i} variant="outline" className="text-xs">{d}</Badge>
+            ))}
+          </div>
+        )}
+        {data.specific_issues && data.specific_issues.length > 0 && (
+          <div className="mt-2 space-y-1">
+            {data.specific_issues.slice(0, 3).map((issue: string, i: number) => (
+              <p key={i} className="text-red-600">• {issue}</p>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -175,12 +200,24 @@ export default function ProductAnalysisPanel({
   const score = overallScore?.overall_score ?? 0;
   const summary = overallScore?.summary || ma.score_card?.summary_text;
 
-  // Prepare sentiment data
+  // Prepare sentiment data - handle nested object structure from DB
   const sentimentData = ra.sentiment_distribution 
-    ? Object.entries(ra.sentiment_distribution).map(([key, value]) => ({
-        name: key,
-        value: value as number,
-      })).reverse()
+    ? Object.entries(ra.sentiment_distribution)
+        .map(([key, val]: [string, any]) => ({
+          name: key.replace(/_/g, ' ').replace(/(\d)star/, '$1★'),
+          value: typeof val === 'object' ? (val.percentage || val.count || 0) : val,
+          count: typeof val === 'object' ? val.count : undefined,
+          themes: typeof val === 'object' ? val.key_themes : undefined,
+        }))
+        .filter(d => d.value > 0)
+        .sort((a, b) => {
+          // Sort by star rating (5 star first)
+          const getStarNum = (name: string) => {
+            const match = name.match(/(\d)/);
+            return match ? parseInt(match[1]) : 0;
+          };
+          return getStarNum(b.name) - getStarNum(a.name);
+        })
     : [];
 
   // Get pain points
@@ -443,9 +480,11 @@ export default function ProductAnalysisPanel({
                   <div className="flex flex-wrap gap-2">
                     {positiveThemes.map((theme: any, i: number) => {
                       const themeName = typeof theme === 'string' ? theme : theme.theme || theme.category;
-                      const themeCount = typeof theme === 'object' ? theme.mention_count || theme.count : null;
+                      const themeCount = typeof theme === 'object' 
+                        ? (theme.frequency || theme.mentioned_by_percentage || theme.mention_count || theme.count) 
+                        : null;
                       return (
-                        <Badge 
+                        <Badge
                           key={i} 
                           variant="outline" 
                           className="bg-green-500/10 text-green-600 border-green-500/30"
@@ -489,68 +528,71 @@ export default function ProductAnalysisPanel({
             <ExperienceCard 
               title="Taste" 
               icon={Heart} 
-              data={productExperience.taste} 
+              data={productExperience.taste_feedback || productExperience.taste} 
             />
             <ExperienceCard 
               title="Efficacy" 
               icon={Zap} 
-              data={productExperience.efficacy} 
+              data={productExperience.efficacy_feedback || productExperience.efficacy} 
             />
             <ExperienceCard 
               title="Value" 
               icon={DollarSign} 
-              data={productExperience.value || productExperience.value_perception} 
+              data={productExperience.value_perception || productExperience.value} 
             />
             <ExperienceCard 
               title="Packaging" 
               icon={Package} 
-              data={productExperience.packaging || productExperience.packaging_feedback} 
+              data={productExperience.packaging_quality || productExperience.packaging_feedback || productExperience.packaging} 
             />
           </div>
           
-          {/* Demographics Section */}
-          {ra.buyer_demographics && (
-            <Card className="mt-4">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Users className="w-4 h-4" />
-                  Buyer Demographics
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {ra.buyer_demographics.buyer_types && (
-                  <div>
-                    <span className="text-xs text-muted-foreground">Buyer Types</span>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {ra.buyer_demographics.buyer_types.map((type: string, i: number) => (
-                        <Badge key={i} variant="outline" className="text-xs">{type}</Badge>
-                      ))}
+          {/* Demographics Section - handles both field name variants */}
+          {(ra.demographics_insights || ra.buyer_demographics) && (() => {
+            const demo = ra.demographics_insights || ra.buyer_demographics;
+            return (
+              <Card className="mt-4">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Users className="w-4 h-4" />
+                    Buyer Demographics
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {demo.buyer_types && demo.buyer_types.length > 0 && (
+                    <div>
+                      <span className="text-xs text-muted-foreground">Buyer Types</span>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {demo.buyer_types.map((type: string, i: number) => (
+                          <Badge key={i} variant="outline" className="text-xs">{type}</Badge>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
-                {ra.buyer_demographics.use_cases && (
-                  <div>
-                    <span className="text-xs text-muted-foreground">Use Cases</span>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {ra.buyer_demographics.use_cases.map((uc: string, i: number) => (
-                        <Badge key={i} variant="outline" className="text-xs">{uc}</Badge>
-                      ))}
+                  )}
+                  {demo.use_cases && demo.use_cases.length > 0 && (
+                    <div>
+                      <span className="text-xs text-muted-foreground">Use Cases</span>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {demo.use_cases.map((uc: string, i: number) => (
+                          <Badge key={i} variant="outline" className="text-xs">{uc}</Badge>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
-                {ra.buyer_demographics.age_groups_mentioned && (
-                  <div>
-                    <span className="text-xs text-muted-foreground">Age Groups</span>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {ra.buyer_demographics.age_groups_mentioned.map((age: string, i: number) => (
-                        <Badge key={i} variant="outline" className="text-xs">{age}</Badge>
-                      ))}
+                  )}
+                  {demo.age_groups_mentioned && demo.age_groups_mentioned.length > 0 && (
+                    <div>
+                      <span className="text-xs text-muted-foreground">Age Groups</span>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {demo.age_groups_mentioned.map((age: string, i: number) => (
+                          <Badge key={i} variant="outline" className="text-xs">{age}</Badge>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })()}
         </TabsContent>
 
         {/* SECTION 5: MARKETING ACTION PLAN */}

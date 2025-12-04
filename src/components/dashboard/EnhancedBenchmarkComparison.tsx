@@ -587,7 +587,7 @@ export function EnhancedBenchmarkComparison({
                               <div className="flex items-center gap-2 mt-0.5">
                                 <span className="text-[10px] text-muted-foreground">${product.price?.toFixed(2)}</span>
                                 <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
-                                  <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />
+                                  <Star className="w-2.5 h-2.5 fill-chart-2 text-chart-2" />
                                   {product.rating?.toFixed(1)}
                                 </span>
                                 <span className="text-[10px] text-muted-foreground">{(product.reviews || 0).toLocaleString()} reviews</span>
@@ -609,8 +609,8 @@ export function EnhancedBenchmarkComparison({
         <CardContent className="px-2 md:px-6">
           <div className="flex gap-2 md:gap-3">
             {/* Our Concept Column - Fixed */}
-            <div className="w-[280px] md:w-[320px] shrink-0 rounded-lg border-2 border-amber-500/50 bg-gradient-to-b from-amber-50/50 to-background dark:from-amber-950/20 overflow-hidden">
-              <div className="bg-gradient-to-r from-amber-500 to-amber-600 px-3 py-2">
+            <div className="w-[280px] md:w-[320px] shrink-0 rounded-lg border-2 border-chart-2/50 bg-gradient-to-b from-chart-2/10 to-background dark:from-chart-2/20 overflow-hidden">
+              <div className="bg-gradient-to-r from-chart-2 to-chart-2/80 px-3 py-2">
                 <div className="flex items-center gap-2">
                   <div className="w-6 h-6 md:w-7 md:h-7 rounded-full bg-white/20 flex items-center justify-center">
                     <Target className="w-3 h-3 md:w-4 md:h-4 text-white" />
@@ -623,10 +623,10 @@ export function EnhancedBenchmarkComparison({
               </div>
               
               <div className="p-2 md:p-3 space-y-3">
-                <div className="w-full aspect-square rounded-lg bg-gradient-to-br from-amber-100 to-amber-50 dark:from-amber-900/30 dark:to-amber-800/20 flex items-center justify-center">
+                <div className="w-full aspect-square rounded-lg bg-gradient-to-br from-chart-2/20 to-chart-2/10 dark:from-chart-2/30 dark:to-chart-2/20 flex items-center justify-center">
                   <div className="text-center">
-                    <Target className="w-10 h-10 md:w-12 md:h-12 text-amber-500/50 mx-auto" />
-                    <p className="text-[10px] text-amber-600/70 mt-1">Your Product</p>
+                    <Target className="w-10 h-10 md:w-12 md:h-12 text-chart-2/50 mx-auto" />
+                    <p className="text-[10px] text-chart-2/70 mt-1">Your Product</p>
                   </div>
                 </div>
 
@@ -644,7 +644,7 @@ export function EnhancedBenchmarkComparison({
                 {/* Ingredients */}
                 <div>
                   <p className="text-[10px] font-semibold mb-1 flex items-center gap-1">
-                    <Pill className="w-3 h-3 text-emerald-500" />
+                    <Pill className="w-3 h-3 text-chart-4" />
                     Key Ingredients
                     <Badge variant="secondary" className="text-[9px] h-4 ml-auto">
                       {getOurIngredients().length}
@@ -654,11 +654,11 @@ export function EnhancedBenchmarkComparison({
                     {getOurIngredients().map((ing, i) => {
                       const hasMatch = isOurIngredientInCompetitors(ing);
                       return (
-                        <div key={i} className={`flex items-start gap-1 text-[10px] ${hasMatch ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-muted-foreground'}`}>
+                        <div key={i} className={`flex items-start gap-1 text-[10px] ${hasMatch ? 'text-chart-4 font-medium' : 'text-muted-foreground'}`}>
                           {hasMatch ? (
-                            <Check className="w-3 h-3 text-emerald-500 mt-0.5 shrink-0" />
+                            <Check className="w-3 h-3 text-chart-4 mt-0.5 shrink-0" />
                           ) : (
-                            <span className="w-1 h-1 rounded-full bg-emerald-500 mt-1.5 shrink-0 ml-1" />
+                            <span className="w-1 h-1 rounded-full bg-chart-4 mt-1.5 shrink-0 ml-1" />
                           )}
                           <span>{ing}</span>
                         </div>
@@ -670,10 +670,10 @@ export function EnhancedBenchmarkComparison({
                 {/* Flavors & Form Factor */}
                 <div>
                   <p className="text-[10px] font-semibold mb-1 flex items-center gap-1">
-                    <Palette className="w-3 h-3 text-pink-500" />
+                    <Palette className="w-3 h-3 text-chart-5" />
                     Flavors & Form
                   </p>
-                  <span className="inline-flex items-center px-2 py-0.5 text-[10px] rounded-full bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300">
+                  <span className="inline-flex items-center px-2 py-0.5 text-[10px] rounded-full bg-chart-5/10 text-chart-5">
                     {getOurFormFactor()}
                   </span>
                 </div>
@@ -681,7 +681,7 @@ export function EnhancedBenchmarkComparison({
                 {/* Marketing Strategy */}
                 <div>
                   <p className="text-[10px] font-semibold mb-1 flex items-center gap-1">
-                    <Megaphone className="w-3 h-3 text-blue-500" />
+                    <Megaphone className="w-3 h-3 text-chart-3" />
                     Marketing Strategy
                   </p>
                   <p className="text-[10px] text-muted-foreground">
@@ -692,7 +692,7 @@ export function EnhancedBenchmarkComparison({
                 {/* Target Audience */}
                 <div>
                   <p className="text-[10px] font-semibold mb-1 flex items-center gap-1">
-                    <Users className="w-3 h-3 text-violet-500" />
+                    <Users className="w-3 h-3 text-primary" />
                     Target Audience
                   </p>
                   <div className="space-y-1.5">
@@ -700,8 +700,8 @@ export function EnhancedBenchmarkComparison({
                       {getOurBuyerProfile()}
                     </p>
                     {getOurMotivation() && (
-                      <div className="bg-violet-50 dark:bg-violet-950/30 rounded p-1.5 border border-violet-200 dark:border-violet-800">
-                        <p className="text-[9px] font-medium text-violet-700 dark:text-violet-300 mb-0.5">Primary Motivation</p>
+                      <div className="bg-primary/10 dark:bg-primary/20 rounded p-1.5 border border-primary/20 dark:border-primary/30">
+                        <p className="text-[9px] font-medium text-primary mb-0.5">Primary Motivation</p>
                         <p className="text-[10px] text-muted-foreground max-h-16 overflow-y-auto">
                           {getOurMotivation()}
                         </p>
@@ -711,15 +711,15 @@ export function EnhancedBenchmarkComparison({
                 </div>
 
                 {/* Our Strengths */}
-                <div className="bg-emerald-50 dark:bg-emerald-950/30 rounded-lg p-2 border border-emerald-200 dark:border-emerald-800">
-                  <p className="text-[10px] font-semibold mb-1 flex items-center gap-1 text-emerald-700 dark:text-emerald-300">
+                <div className="bg-chart-4/10 dark:bg-chart-4/20 rounded-lg p-2 border border-chart-4/20 dark:border-chart-4/30">
+                  <p className="text-[10px] font-semibold mb-1 flex items-center gap-1 text-chart-4">
                     <ThumbsUp className="w-3 h-3" />
                     Our Strengths
                   </p>
                   <div className="space-y-0.5">
                     {getOurStrengths().map((strength, i) => (
-                      <div key={i} className="flex items-start gap-1 text-[10px] text-emerald-800 dark:text-emerald-200">
-                        <span className="w-1 h-1 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
+                      <div key={i} className="flex items-start gap-1 text-[10px] text-foreground">
+                        <span className="w-1 h-1 rounded-full bg-chart-4 mt-1.5 shrink-0" />
                         <span>{strength}</span>
                       </div>
                     ))}
@@ -727,15 +727,15 @@ export function EnhancedBenchmarkComparison({
                 </div>
 
                 {/* Our Risks/Challenges */}
-                <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-2 border border-amber-200 dark:border-amber-800">
-                  <p className="text-[10px] font-semibold mb-1 flex items-center gap-1 text-amber-700 dark:text-amber-300">
+                <div className="bg-chart-2/10 dark:bg-chart-2/20 rounded-lg p-2 border border-chart-2/20 dark:border-chart-2/30">
+                  <p className="text-[10px] font-semibold mb-1 flex items-center gap-1 text-chart-2">
                     <AlertTriangle className="w-3 h-3" />
                     Risks & Challenges
                   </p>
                   <div className="space-y-0.5">
                     {getOurWeaknesses().map((weakness, i) => (
-                      <div key={i} className="flex items-start gap-1 text-[10px] text-amber-800 dark:text-amber-200">
-                        <span className="w-1 h-1 rounded-full bg-amber-500 mt-1.5 shrink-0" />
+                      <div key={i} className="flex items-start gap-1 text-[10px] text-foreground">
+                        <span className="w-1 h-1 rounded-full bg-chart-2 mt-1.5 shrink-0" />
                         <span>{weakness}</span>
                       </div>
                     ))}
@@ -787,8 +787,8 @@ export function EnhancedBenchmarkComparison({
                         </div>
                         <div className="p-1.5 bg-secondary rounded text-center flex-1">
                           <p className="text-[10px] text-muted-foreground">Rating</p>
-                          <div className="flex items-center justify-center gap-0.5">
-                            <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                        <div className="flex items-center justify-center gap-0.5">
+                            <Star className="w-3 h-3 fill-chart-2 text-chart-2" />
                             <span className="text-sm md:text-base font-bold">{product.rating?.toFixed(1) || 'N/A'}</span>
                           </div>
                         </div>
@@ -802,7 +802,7 @@ export function EnhancedBenchmarkComparison({
                         <div className="grid grid-cols-2 gap-1 text-[10px]">
                           <div>
                             <p className="text-muted-foreground">Monthly</p>
-                            <p className="font-semibold text-emerald-600">{(product.monthly_sales || 0).toLocaleString()}</p>
+                            <p className="font-semibold text-chart-4">{(product.monthly_sales || 0).toLocaleString()}</p>
                           </div>
                           <div>
                             <p className="text-muted-foreground">Reviews</p>
@@ -829,7 +829,7 @@ export function EnhancedBenchmarkComparison({
                       {/* Ingredients */}
                       <div>
                         <p className="text-[10px] font-semibold mb-1 flex items-center gap-1">
-                          <Pill className="w-3 h-3 text-emerald-500" />
+                          <Pill className="w-3 h-3 text-chart-4" />
                           Ingredients
                           {(() => {
                             const { items } = parseCompetitorIngredients(product);
@@ -847,11 +847,11 @@ export function EnhancedBenchmarkComparison({
                             return items.map((ing, i) => {
                               const hasMatch = isMatchingIngredient(ing, ourIngredients);
                               return (
-                                <div key={i} className={`flex items-start gap-1 text-[10px] ${hasMatch ? 'text-emerald-600 dark:text-emerald-400 font-medium' : fallback ? 'text-primary' : 'text-muted-foreground'}`}>
+                                <div key={i} className={`flex items-start gap-1 text-[10px] ${hasMatch ? 'text-chart-4 font-medium' : fallback ? 'text-primary' : 'text-muted-foreground'}`}>
                                   {hasMatch ? (
-                                    <Check className="w-3 h-3 text-emerald-500 mt-0.5 shrink-0" />
+                                    <Check className="w-3 h-3 text-chart-4 mt-0.5 shrink-0" />
                                   ) : (
-                                    <span className="w-1 h-1 rounded-full bg-emerald-500 mt-1.5 shrink-0 ml-1" />
+                                    <span className="w-1 h-1 rounded-full bg-chart-4 mt-1.5 shrink-0 ml-1" />
                                   )}
                                   <span>{ing}</span>
                                 </div>
@@ -864,7 +864,7 @@ export function EnhancedBenchmarkComparison({
                       {/* Flavors & Variants */}
                       <div>
                         <p className="text-[10px] font-semibold mb-1 flex items-center gap-1">
-                          <Palette className="w-3 h-3 text-pink-500" />
+                          <Palette className="w-3 h-3 text-chart-5" />
                           Flavors & Variants
                         </p>
                         {(() => {
@@ -899,7 +899,7 @@ export function EnhancedBenchmarkComparison({
                       {/* Marketing Strategy */}
                       <div>
                         <p className="text-[10px] font-semibold mb-1 flex items-center gap-1">
-                          <Megaphone className="w-3 h-3 text-blue-500" />
+                          <Megaphone className="w-3 h-3 text-chart-3" />
                           Marketing
                         </p>
                         {hasMarketingAnalysis(product) ? (
@@ -911,7 +911,7 @@ export function EnhancedBenchmarkComparison({
                               }
                               return marketing.map((item, i) => (
                                 <div key={i} className="flex items-start gap-1 text-[10px] text-muted-foreground">
-                                  <span className="w-1 h-1 rounded-full bg-blue-500 mt-1.5 shrink-0" />
+                                  <span className="w-1 h-1 rounded-full bg-chart-3 mt-1.5 shrink-0" />
                                   <span>{item}</span>
                                 </div>
                               ));
@@ -925,7 +925,7 @@ export function EnhancedBenchmarkComparison({
                       {/* Target Audience */}
                       <div>
                         <p className="text-[10px] font-semibold mb-1 flex items-center gap-1">
-                          <Users className="w-3 h-3 text-violet-500" />
+                          <Users className="w-3 h-3 text-primary" />
                           Target Audience
                         </p>
                         {hasMarketingAnalysis(product) ? (
@@ -934,8 +934,8 @@ export function EnhancedBenchmarkComparison({
                               {getCompetitorAudience(product) || 'Not specified'}
                             </p>
                             {getCompetitorMotivation(product) && (
-                              <div className="bg-violet-50 dark:bg-violet-950/30 rounded p-1.5 border border-violet-200 dark:border-violet-800">
-                                <p className="text-[9px] font-medium text-violet-700 dark:text-violet-300 mb-0.5">Primary Motivation</p>
+                              <div className="bg-primary/10 dark:bg-primary/20 rounded p-1.5 border border-primary/20 dark:border-primary/30">
+                                <p className="text-[9px] font-medium text-primary mb-0.5">Primary Motivation</p>
                                 <p className="text-[10px] text-muted-foreground max-h-16 overflow-y-auto">
                                   {getCompetitorMotivation(product)}
                                 </p>
@@ -948,8 +948,8 @@ export function EnhancedBenchmarkComparison({
                       </div>
 
                       {/* Where Competitors Win - NEW */}
-                      <div className="bg-emerald-50 dark:bg-emerald-950/30 rounded-lg p-2 border border-emerald-200 dark:border-emerald-800">
-                        <p className="text-[10px] font-semibold mb-1 flex items-center gap-1 text-emerald-700 dark:text-emerald-300">
+                      <div className="bg-chart-4/10 dark:bg-chart-4/20 rounded-lg p-2 border border-chart-4/20 dark:border-chart-4/30">
+                        <p className="text-[10px] font-semibold mb-1 flex items-center gap-1 text-chart-4">
                           <Trophy className="w-3 h-3" />
                           Where They Win
                         </p>
@@ -961,9 +961,9 @@ export function EnhancedBenchmarkComparison({
                             }
                             return (
                               <div className="flex items-center gap-1">
-                                <span className="text-[10px] font-medium text-emerald-800 dark:text-emerald-200">{topWin.theme}</span>
+                                <span className="text-[10px] font-medium text-foreground">{topWin.theme}</span>
                                 {topWin.percentage && (
-                                  <Badge variant="secondary" className="text-[9px] h-4 bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300">
+                                  <Badge variant="secondary" className="text-[9px] h-4 bg-chart-4/20 text-chart-4">
                                     {topWin.percentage}%
                                   </Badge>
                                 )}
@@ -978,7 +978,7 @@ export function EnhancedBenchmarkComparison({
                       {/* Strengths (from Reviews) */}
                       <div>
                         <p className="text-[10px] font-semibold mb-1 flex items-center gap-1">
-                          <ThumbsUp className="w-3 h-3 text-emerald-500" />
+                          <ThumbsUp className="w-3 h-3 text-chart-4" />
                           Strengths (Reviews)
                         </p>
                         {hasReviewAnalysis(product) ? (
@@ -990,10 +990,10 @@ export function EnhancedBenchmarkComparison({
                               }
                               return strengths.map((s, i) => (
                                 <div key={i} className="flex items-start gap-1 text-[10px] text-muted-foreground">
-                                  <span className="w-1 h-1 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
+                                  <span className="w-1 h-1 rounded-full bg-chart-4 mt-1.5 shrink-0" />
                                   <span>{s.theme}</span>
                                   {s.percentage && (
-                                    <span className="text-emerald-600 font-medium ml-auto">{s.percentage}%</span>
+                                    <span className="text-chart-4 font-medium ml-auto">{s.percentage}%</span>
                                   )}
                                 </div>
                               ));
@@ -1007,7 +1007,7 @@ export function EnhancedBenchmarkComparison({
                       {/* Weaknesses (from Reviews) */}
                       <div>
                         <p className="text-[10px] font-semibold mb-1 flex items-center gap-1">
-                          <ThumbsDown className="w-3 h-3 text-rose-500" />
+                          <ThumbsDown className="w-3 h-3 text-destructive" />
                           Weaknesses (Reviews)
                         </p>
                         {hasReviewAnalysis(product) ? (
@@ -1019,10 +1019,10 @@ export function EnhancedBenchmarkComparison({
                               }
                               return weaknesses.map((w, i) => (
                                 <div key={i} className="flex items-start gap-1 text-[10px] text-muted-foreground">
-                                  <span className="w-1 h-1 rounded-full bg-rose-500 mt-1.5 shrink-0" />
+                                  <span className="w-1 h-1 rounded-full bg-destructive mt-1.5 shrink-0" />
                                   <span>{w.issue}</span>
                                   {w.percentage && (
-                                    <span className="text-rose-600 font-medium ml-auto">{w.percentage}%</span>
+                                    <span className="text-destructive font-medium ml-auto">{w.percentage}%</span>
                                   )}
                                 </div>
                               ));

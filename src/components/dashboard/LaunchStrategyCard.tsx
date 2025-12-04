@@ -129,13 +129,13 @@ export function LaunchStrategyCard({
         {goToMarket.messaging && goToMarket.messaging.length > 0 && (
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <Megaphone className="h-4 w-4 text-amber-500" />
+              <Megaphone className="h-4 w-4 text-chart-2" />
               <h4 className="text-sm font-semibold text-foreground">Ad Angles</h4>
             </div>
             <ul className="space-y-2">
               {goToMarket.messaging.map((msg, index) => (
                 <li key={index} className="flex items-start gap-2 text-sm text-muted-foreground">
-                  <Zap className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                  <Zap className="h-4 w-4 text-chart-2 mt-0.5 shrink-0" />
                   <span>{msg}</span>
                 </li>
               ))}
@@ -147,7 +147,7 @@ export function LaunchStrategyCard({
         {launchTactics.length > 0 && (
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+              <CheckCircle2 className="h-4 w-4 text-chart-4" />
               <h4 className="text-sm font-semibold text-foreground">Launch Tactics</h4>
             </div>
             <div className="space-y-3">
@@ -156,7 +156,7 @@ export function LaunchStrategyCard({
                 return (
                   <div key={index} className="p-3 rounded-lg bg-muted/30 border border-border/50">
                     <div className="flex items-center gap-2 mb-1">
-                      <Icon className="h-4 w-4 text-emerald-500" />
+                      <Icon className="h-4 w-4 text-chart-4" />
                       <span className="text-sm font-medium text-foreground">{tactic.label}</span>
                       {tactic.label === "Pricing Approach" && tactic.value && (
                         <Badge variant="outline" className="ml-auto text-xs capitalize">
@@ -180,7 +180,7 @@ export function LaunchStrategyCard({
         {goToMarket.differentiation && goToMarket.differentiation.length > 0 && (
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <Target className="h-4 w-4 text-blue-500" />
+              <Target className="h-4 w-4 text-chart-3" />
               <h4 className="text-sm font-semibold text-foreground">Differentiation</h4>
             </div>
             <div className="flex flex-wrap gap-2">

@@ -132,7 +132,7 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
   const getSeverityColor = (severity?: string) => {
     switch (severity?.toLowerCase()) {
       case "high": return "text-destructive";
-      case "medium": return "text-yellow-500";
+      case "medium": return "text-chart-2";
       default: return "text-muted-foreground";
     }
   };
@@ -146,9 +146,9 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
   };
 
   const getLqsColor = (lqs: number) => {
-    if (lqs >= 80) return "text-green-600";
-    if (lqs >= 50) return "text-yellow-600";
-    return "text-red-600";
+    if (lqs >= 80) return "text-chart-4";
+    if (lqs >= 50) return "text-chart-2";
+    return "text-destructive";
   };
 
   const formatCurrency = (value: number | null | undefined) => {
@@ -280,9 +280,9 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                     <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Award className="w-4 h-4" />Status & Badges</CardTitle></CardHeader>
                     <CardContent>
                       <div className="flex flex-wrap gap-2">
-                        {product.bestseller && <Badge className="bg-orange-500/10 text-orange-600 border-orange-500/30">Bestseller</Badge>}
-                        {product.amazon_choice && <Badge className="bg-blue-500/10 text-blue-600 border-blue-500/30">Amazon's Choice</Badge>}
-                        {product.is_young_competitor && <Badge className="bg-green-500/10 text-green-600 border-green-500/30">New Competitor</Badge>}
+                        {product.bestseller && <Badge className="bg-chart-2/10 text-chart-2 border-chart-2/30">Bestseller</Badge>}
+                        {product.amazon_choice && <Badge className="bg-chart-3/10 text-chart-3 border-chart-3/30">Amazon's Choice</Badge>}
+                        {product.is_young_competitor && <Badge className="bg-chart-4/10 text-chart-4 border-chart-4/30">New Competitor</Badge>}
                         {product.is_fba && <Badge variant="outline">FBA</Badge>}
                         {product.is_available === false && <Badge variant="destructive">Unavailable</Badge>}
                         {product.has_a_plus_content && <Badge variant="secondary">A+ Content</Badge>}
@@ -334,7 +334,7 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
               </div>
               {product.feature_bullets && product.feature_bullets.length > 0 && (
                 <Card>
-                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><CheckCircle className="w-4 h-4 text-green-500" />Feature Bullets ({product.bullets_count ?? product.feature_bullets.length})</CardTitle></CardHeader>
+                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><CheckCircle className="w-4 h-4 text-chart-4" />Feature Bullets ({product.bullets_count ?? product.feature_bullets.length})</CardTitle></CardHeader>
                   <CardContent>
                     <ul className="space-y-2">
                       {product.feature_bullets.map((bullet, idx) => <li key={idx} className="flex items-start gap-2 text-sm"><span className="text-primary mt-1">•</span><span>{bullet}</span></li>)}
@@ -384,7 +384,7 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
             <div className="space-y-4">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <Card><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Monthly Sales</p><p className="text-2xl font-bold">{product.monthly_sales?.toLocaleString() ?? "-"}</p>{product.estimated_monthly_sales && product.estimated_monthly_sales !== product.monthly_sales && <p className="text-xs text-muted-foreground">Est: {product.estimated_monthly_sales.toLocaleString()}</p>}</CardContent></Card>
-                <Card><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Monthly Revenue</p><p className="text-2xl font-bold text-green-600">{formatCurrency(product.monthly_revenue)}</p>{product.estimated_revenue && product.estimated_revenue !== product.monthly_revenue && <p className="text-xs text-muted-foreground">Est: {formatCurrency(product.estimated_revenue)}</p>}</CardContent></Card>
+                <Card><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Monthly Revenue</p><p className="text-2xl font-bold text-chart-4">{formatCurrency(product.monthly_revenue)}</p>{product.estimated_revenue && product.estimated_revenue !== product.monthly_revenue && <p className="text-xs text-muted-foreground">Est: {formatCurrency(product.estimated_revenue)}</p>}</CardContent></Card>
                 <Card><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Recent Sales</p><p className="text-2xl font-bold">{product.recent_sales ?? "-"}</p></CardContent></Card>
                 <Card><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Rating Count</p><p className="text-2xl font-bold">{product.rating_count?.toLocaleString() ?? product.reviews?.toLocaleString() ?? "-"}</p></CardContent></Card>
               </div>
@@ -394,7 +394,7 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div><p className="text-xs text-muted-foreground">Current BSR</p><p className="text-xl font-bold">#{product.bsr_current?.toLocaleString() ?? "-"}</p></div>
                     <div><p className="text-xs text-muted-foreground">Primary BSR</p><p className="text-xl font-bold">#{product.bsr_primary?.toLocaleString() ?? "-"}</p></div>
-                    <div><p className="text-xs text-muted-foreground">30-Day Avg</p><p className="text-xl font-bold flex items-center gap-1">#{product.bsr_30_days_avg?.toLocaleString() ?? "-"}{product.bsr_current && product.bsr_30_days_avg && (product.bsr_current < product.bsr_30_days_avg ? <TrendingUp className="w-4 h-4 text-green-500" /> : product.bsr_current > product.bsr_30_days_avg ? <TrendingDown className="w-4 h-4 text-red-500" /> : null)}</p></div>
+                    <div><p className="text-xs text-muted-foreground">30-Day Avg</p><p className="text-xl font-bold flex items-center gap-1">#{product.bsr_30_days_avg?.toLocaleString() ?? "-"}{product.bsr_current && product.bsr_30_days_avg && (product.bsr_current < product.bsr_30_days_avg ? <TrendingUp className="w-4 h-4 text-chart-4" /> : product.bsr_current > product.bsr_30_days_avg ? <TrendingDown className="w-4 h-4 text-destructive" /> : null)}</p></div>
                     <div><p className="text-xs text-muted-foreground">90-Day Avg</p><p className="text-xl font-bold">#{product.bsr_90_days_avg?.toLocaleString() ?? "-"}</p></div>
                   </div>
                   {(product.bsr_current || product.bsr_30_days_avg || product.bsr_90_days_avg) && (

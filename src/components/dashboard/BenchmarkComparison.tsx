@@ -133,7 +133,7 @@ export default function BenchmarkComparison({
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Trophy className="w-5 h-5 text-amber-500" />
+            <Trophy className="w-5 h-5 text-chart-2" />
             <CardTitle>Benchmark Comparison</CardTitle>
             <Badge variant="secondary">{selectedProducts.length} of 5 selected</Badge>
           </div>
@@ -146,34 +146,34 @@ export default function BenchmarkComparison({
         <ScrollArea className="w-full">
           <div className="flex min-w-max">
             {/* Our Concept Column - Fixed with Gold/Orange styling */}
-            <div className="w-64 flex-shrink-0 border-r-2 border-amber-400 bg-gradient-to-b from-amber-50/80 to-orange-50/30 dark:from-amber-950/30 dark:to-orange-950/20">
+            <div className="w-64 flex-shrink-0 border-r-2 border-chart-2 bg-gradient-to-b from-chart-2/10 to-chart-2/5 dark:from-chart-2/20 dark:to-chart-2/10">
               {/* Header */}
-              <div className="bg-gradient-to-r from-amber-500 via-amber-500 to-orange-500 text-white p-4 rounded-tl-lg shadow-lg border-l-4 border-amber-700">
+              <div className="bg-gradient-to-r from-chart-2 via-chart-2/90 to-chart-2/80 text-white p-4 rounded-tl-lg shadow-lg border-l-4 border-chart-2">
                 <div className="flex items-center gap-2">
                   <Trophy className="w-5 h-5 drop-shadow" />
                   <span className="font-bold tracking-wide">OUR CONCEPT</span>
                 </div>
-                <p className="text-xs text-amber-100 mt-1">Winning Strategy</p>
+                <p className="text-xs text-white/80 mt-1">Winning Strategy</p>
               </div>
 
               {/* Price & Value Row */}
-              <div className="p-4 border-b border-amber-200/50 dark:border-amber-800/30 bg-amber-50/60 dark:bg-amber-950/30">
-                <div className="flex items-center gap-2 text-sm font-medium text-amber-800 dark:text-amber-300 mb-2">
+              <div className="p-4 border-b border-chart-2/20 dark:border-chart-2/30 bg-chart-2/5 dark:bg-chart-2/10">
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground mb-2">
                   <DollarSign className="w-4 h-4" />
                   PRICE & VALUE
                 </div>
                 <div className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-amber-600" />
-                  <span className="font-bold text-lg text-amber-900 dark:text-amber-100">
+                  <Check className="w-4 h-4 text-chart-2" />
+                  <span className="font-bold text-lg text-foreground">
                     ${getRecommendedPrice()?.toFixed(2) || "TBD"}
                   </span>
                 </div>
-                <p className="text-xs text-amber-700/70 dark:text-amber-400/70 mt-1">{getPricingTier()}</p>
+                <p className="text-xs text-muted-foreground mt-1">{getPricingTier()}</p>
               </div>
 
               {/* Core Formula Row */}
-              <div className="p-4 border-b border-amber-200/50 dark:border-amber-800/30 bg-amber-50/60 dark:bg-amber-950/30">
-                <div className="flex items-center gap-2 text-sm font-medium text-amber-800 dark:text-amber-300 mb-2">
+              <div className="p-4 border-b border-chart-2/20 dark:border-chart-2/30 bg-chart-2/5 dark:bg-chart-2/10">
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground mb-2">
                   <FlaskConical className="w-4 h-4" />
                   CORE FORMULA
                 </div>
@@ -181,52 +181,52 @@ export default function BenchmarkComparison({
                   {getRecommendedIngredients().length > 0 ? (
                     getRecommendedIngredients().map((ing, idx) => (
                       <div key={idx} className="flex items-start gap-2 text-sm">
-                        <Check className="w-3 h-3 text-amber-600 mt-0.5 flex-shrink-0" />
-                        <span className="truncate text-amber-900 dark:text-amber-100">{typeof ing === 'string' ? ing : ing.ingredient}</span>
+                        <Check className="w-3 h-3 text-chart-2 mt-0.5 flex-shrink-0" />
+                        <span className="truncate text-foreground">{typeof ing === 'string' ? ing : ing.ingredient}</span>
                       </div>
                     ))
                   ) : (
-                    <span className="text-sm text-amber-700/70 dark:text-amber-400/70">Analysis pending</span>
+                    <span className="text-sm text-muted-foreground">Analysis pending</span>
                   )}
                 </div>
               </div>
 
               {/* Marketing Strategy Row */}
-              <div className="p-4 border-b border-amber-200/50 dark:border-amber-800/30 bg-amber-50/60 dark:bg-amber-950/30">
-                <div className="flex items-center gap-2 text-sm font-medium text-amber-800 dark:text-amber-300 mb-2">
+              <div className="p-4 border-b border-chart-2/20 dark:border-chart-2/30 bg-chart-2/5 dark:bg-chart-2/10">
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground mb-2">
                   <Megaphone className="w-4 h-4" />
                   MARKETING
                 </div>
                 <div className="flex items-start gap-2 text-sm">
-                  <Check className="w-3 h-3 text-amber-600 mt-0.5 flex-shrink-0" />
-                  <span className="text-amber-900 dark:text-amber-100 italic">"{getPositioning()}"</span>
+                  <Check className="w-3 h-3 text-chart-2 mt-0.5 flex-shrink-0" />
+                  <span className="text-foreground italic">"{getPositioning()}"</span>
                 </div>
               </div>
 
               {/* Pain Gap Row */}
-              <div className="p-4 border-b border-amber-200/50 dark:border-amber-800/30 bg-amber-50/60 dark:bg-amber-950/30">
-                <div className="flex items-center gap-2 text-sm font-medium text-amber-800 dark:text-amber-300 mb-2">
+              <div className="p-4 border-b border-chart-2/20 dark:border-chart-2/30 bg-chart-2/5 dark:bg-chart-2/10">
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground mb-2">
                   <HeartCrack className="w-4 h-4" />
                   PAIN GAP
                 </div>
-                <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1">Solves For:</p>
+                <p className="text-xs font-medium text-chart-2 mb-1">Solves For:</p>
                 <div className="space-y-1">
                   {getOurPainPoints().length > 0 ? (
                     getOurPainPoints().map((point, idx) => (
                       <div key={idx} className="flex items-start gap-2 text-xs">
-                        <Check className="w-3 h-3 text-amber-600 mt-0.5 flex-shrink-0" />
-                        <span className="line-clamp-2 text-amber-900 dark:text-amber-100">{point}</span>
+                        <Check className="w-3 h-3 text-chart-2 mt-0.5 flex-shrink-0" />
+                        <span className="line-clamp-2 text-foreground">{point}</span>
                       </div>
                     ))
                   ) : (
-                    <span className="text-xs text-amber-700/70 dark:text-amber-400/70">Analysis pending</span>
+                    <span className="text-xs text-muted-foreground">Analysis pending</span>
                   )}
                 </div>
               </div>
 
               {/* Key Features Row */}
-              <div className="p-4 bg-amber-50/60 dark:bg-amber-950/30 rounded-bl-lg">
-                <div className="flex items-center gap-2 text-sm font-medium text-amber-800 dark:text-amber-300 mb-2">
+              <div className="p-4 bg-chart-2/5 dark:bg-chart-2/10 rounded-bl-lg">
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground mb-2">
                   <Sparkles className="w-4 h-4" />
                   KEY FEATURES
                 </div>
@@ -234,12 +234,12 @@ export default function BenchmarkComparison({
                   {getKeyFeatures().length > 0 ? (
                     getKeyFeatures().map((feature, idx) => (
                       <div key={idx} className="flex items-start gap-2 text-xs">
-                        <Check className="w-3 h-3 text-amber-600 mt-0.5 flex-shrink-0" />
-                        <span className="line-clamp-2 text-amber-900 dark:text-amber-100">{feature}</span>
+                        <Check className="w-3 h-3 text-chart-2 mt-0.5 flex-shrink-0" />
+                        <span className="line-clamp-2 text-foreground">{feature}</span>
                       </div>
                     ))
                   ) : (
-                    <span className="text-xs text-amber-700/70 dark:text-amber-400/70">Analysis pending</span>
+                    <span className="text-xs text-muted-foreground">Analysis pending</span>
                   )}
                 </div>
               </div>
@@ -293,12 +293,12 @@ export default function BenchmarkComparison({
                 {/* Pain Gap Row */}
                 <div className="p-4 border-b">
                   <div className="text-sm font-medium text-muted-foreground mb-2 opacity-0">Pain</div>
-                  <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1">Suffers From:</p>
+                <p className="text-xs font-medium text-chart-2 mb-1">Suffers From:</p>
                   <div className="space-y-1">
                     {getCompetitorPainPoints(product).length > 0 ? (
                       getCompetitorPainPoints(product).map((point, idx) => (
                         <div key={idx} className="flex items-start gap-2 text-xs">
-                          <AlertTriangle className="w-3 h-3 text-amber-600 mt-0.5 flex-shrink-0" />
+                          <AlertTriangle className="w-3 h-3 text-chart-2 mt-0.5 flex-shrink-0" />
                           <span className="line-clamp-2">{point}</span>
                         </div>
                       ))

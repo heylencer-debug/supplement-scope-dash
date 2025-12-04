@@ -294,16 +294,32 @@ export default function NewAnalysis() {
                       <h3 className="font-semibold text-foreground line-clamp-1 group-hover:text-primary transition-colors">
                         {category.name}
                       </h3>
-                      <Badge 
-                        variant="outline" 
-                        className={`text-xs shrink-0 ${
-                          category.total_products && category.total_products > 0 
-                            ? "bg-chart-4/10 text-chart-4 border-chart-4/20" 
-                            : "bg-chart-2/10 text-chart-2 border-chart-2/20"
-                        }`}
-                      >
-                        {category.total_products && category.total_products > 0 ? "Complete" : "Processing"}
-                      </Badge>
+                      {(() => {
+                        const isComplete = category.total_products && category.total_products > 0;
+                        const createdAt = category.created_at ? new Date(category.created_at) : null;
+                        const hoursSinceCreation = createdAt ? (Date.now() - createdAt.getTime()) / (1000 * 60 * 60) : 0;
+                        const isCancelled = !isComplete && hoursSinceCreation > 12;
+                        
+                        if (isComplete) {
+                          return (
+                            <Badge variant="outline" className="text-xs shrink-0 bg-chart-4/10 text-chart-4 border-chart-4/20">
+                              Complete
+                            </Badge>
+                          );
+                        } else if (isCancelled) {
+                          return (
+                            <Badge variant="outline" className="text-xs shrink-0 bg-destructive/10 text-destructive border-destructive/20">
+                              Cancelled
+                            </Badge>
+                          );
+                        } else {
+                          return (
+                            <Badge variant="outline" className="text-xs shrink-0 bg-chart-2/10 text-chart-2 border-chart-2/20">
+                              Processing
+                            </Badge>
+                          );
+                        }
+                      })()}
                     </div>
                     
                     <div className="flex items-center justify-between text-sm text-muted-foreground">

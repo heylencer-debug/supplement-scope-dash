@@ -347,7 +347,7 @@ export default function Dashboard() {
 
       {/* Progress Banner */}
       {!progress.isComplete && (
-        <Card className="border-primary/30 bg-primary/5">
+        <Card className="border-primary/30 bg-primary/5 animate-pulse [animation-duration:3s]">
           <CardContent className="p-6">
             <div className="space-y-4">
               <div className="flex items-center justify-between">

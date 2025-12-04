@@ -3,7 +3,7 @@ import { AppSidebar } from "./AppSidebar";
 import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { Plus, X, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useCategoryAnalyses } from "@/hooks/useCategoryAnalyses";
 
 const DISMISSED_TABS_KEY = "dismissed_analysis_tabs";
@@ -27,8 +27,20 @@ export function Layout({ children }: LayoutProps) {
 
   const [dismissedTabs, setDismissedTabs] = useState<string[]>([]);
   const [pendingAnalyses, setPendingAnalyses] = useState<PendingAnalysis[]>([]);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+  const tabsScrollRef = useRef<HTMLDivElement>(null);
   
   const { data: analyses } = useCategoryAnalyses();
+
+  // Check scroll state
+  const handleTabsScroll = useCallback(() => {
+    const el = tabsScrollRef.current;
+    if (!el) return;
+    
+    setCanScrollLeft(el.scrollLeft > 0);
+    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 1);
+  }, []);
   
   // Load dismissed tabs from localStorage on mount
   useEffect(() => {
@@ -113,6 +125,11 @@ export function Layout({ children }: LayoutProps) {
       isPending: true as const,
     }))
   ];
+
+  // Update scroll indicators when tabs change
+  useEffect(() => {
+    handleTabsScroll();
+  }, [allTabs.length, handleTabsScroll]);
   
   const handleDismissTab = (e: React.MouseEvent, categoryName: string) => {
     e.stopPropagation();
@@ -158,50 +175,73 @@ export function Layout({ children }: LayoutProps) {
                 {/* Divider */}
                 <div className="h-5 w-px bg-border flex-shrink-0" />
                 
-                {/* Analysis Tabs - scrollable area */}
-                <div className="flex-1 overflow-x-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
-                  <div className="flex items-center gap-2 min-w-max">
-                    {allTabs.map((tab) => {
-                      const isActive = currentCategory === tab.category_name;
-                      const isComplete = (tab.products_analyzed ?? 0) > 0;
-                      
-                      return (
-                        <div
-                          key={tab.id}
-                          className={cn(
-                            "flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all duration-200 group flex-shrink-0",
-                            isActive 
-                              ? "bg-secondary text-foreground font-medium shadow-sm" 
-                              : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground hover:shadow-sm"
-                          )}
-                        >
-                          <button
-                            onClick={() => navigate(`/dashboard?category=${encodeURIComponent(tab.category_name)}`)}
-                            className="flex items-center gap-2 whitespace-nowrap"
-                          >
-                            {tab.isPending ? (
-                              <Loader2 className="w-3 h-3 text-chart-2 animate-spin flex-shrink-0" />
-                            ) : (
-                              <span 
-                                className={cn(
-                                  "w-2 h-2 rounded-full flex-shrink-0 transition-all",
-                                  isComplete ? "bg-chart-4" : "bg-chart-2 animate-pulse"
-                                )} 
-                              />
+                {/* Analysis Tabs - scrollable area with scroll indicators */}
+                <div className="flex-1 relative min-w-0">
+                  {/* Left scroll indicator */}
+                  <div 
+                    className={cn(
+                      "absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-card to-transparent z-10 pointer-events-none transition-opacity duration-200",
+                      canScrollLeft ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  
+                  {/* Scrollable tabs */}
+                  <div 
+                    ref={tabsScrollRef}
+                    onScroll={handleTabsScroll}
+                    className="overflow-x-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent"
+                  >
+                    <div className="flex items-center gap-2 min-w-max px-1">
+                      {allTabs.map((tab) => {
+                        const isActive = currentCategory === tab.category_name;
+                        const isComplete = (tab.products_analyzed ?? 0) > 0;
+                        
+                        return (
+                          <div
+                            key={tab.id}
+                            className={cn(
+                              "flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all duration-200 group flex-shrink-0",
+                              isActive 
+                                ? "bg-secondary text-foreground font-medium shadow-sm" 
+                                : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground hover:shadow-sm"
                             )}
-                            <span className="max-w-[140px] truncate">{tab.category_name}</span>
-                          </button>
-                          <button
-                            onClick={(e) => handleDismissTab(e, tab.category_name)}
-                            className="opacity-0 group-hover:opacity-100 hover:bg-destructive/20 rounded p-0.5 transition-all duration-200 flex-shrink-0"
-                            title="Close tab"
                           >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </div>
-                      );
-                    })}
+                            <button
+                              onClick={() => navigate(`/dashboard?category=${encodeURIComponent(tab.category_name)}`)}
+                              className="flex items-center gap-2 whitespace-nowrap"
+                            >
+                              {tab.isPending ? (
+                                <Loader2 className="w-3 h-3 text-chart-2 animate-spin flex-shrink-0" />
+                              ) : (
+                                <span 
+                                  className={cn(
+                                    "w-2 h-2 rounded-full flex-shrink-0 transition-all",
+                                    isComplete ? "bg-chart-4" : "bg-chart-2 animate-pulse"
+                                  )} 
+                                />
+                              )}
+                              <span className="max-w-[140px] truncate">{tab.category_name}</span>
+                            </button>
+                            <button
+                              onClick={(e) => handleDismissTab(e, tab.category_name)}
+                              className="opacity-0 group-hover:opacity-100 hover:bg-destructive/20 rounded p-0.5 transition-all duration-200 flex-shrink-0"
+                              title="Close tab"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
+                  
+                  {/* Right scroll indicator */}
+                  <div 
+                    className={cn(
+                      "absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-card to-transparent z-10 pointer-events-none transition-opacity duration-200",
+                      canScrollRight ? "opacity-100" : "opacity-0"
+                    )}
+                  />
                 </div>
               </>
             )}

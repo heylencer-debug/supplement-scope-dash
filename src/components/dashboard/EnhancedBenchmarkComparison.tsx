@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Star, TrendingUp, Pill, Target, MessageSquare, Package, Users, Megaphone, AlertTriangle, CheckCircle, XCircle, Palette, Search, Filter, X } from "lucide-react";
+import { Star, TrendingUp, Pill, Target, MessageSquare, Package, Users, Megaphone, AlertTriangle, CheckCircle, XCircle, Palette, Search, Filter, X, Trophy, ThumbsUp, ThumbsDown } from "lucide-react";
 import { useProducts, Product } from "@/hooks/useProducts";
 import ProductDetailModal from "@/components/ProductDetailModal";
 import { useToast } from "@/hooks/use-toast";
@@ -123,8 +123,8 @@ export function EnhancedBenchmarkComparison({
   const getOurIngredients = (): string[] => {
     const ingredients = analysisData?.analysis_1_category_scores?.product_development?.formulation?.recommended_ingredients;
     if (!ingredients || !Array.isArray(ingredients)) return ['Pending analysis'];
-    return ingredients.slice(0, 5).map(ing => {
-      // Handle both string and object formats
+    // Show ALL ingredients without limit
+    return ingredients.map(ing => {
       if (typeof ing === 'string') return ing;
       return ing.ingredient || ing.name || 'Unknown';
     });
@@ -212,11 +212,11 @@ export function EnhancedBenchmarkComparison({
   };
 
   const parseCompetitorIngredients = (product: Product): { items: string[]; fallback: boolean } => {
-    // Primary: product.ingredients
+    // Primary: product.ingredients - show ALL
     if (product.ingredients) {
       const parts = product.ingredients.split(/[,;]/).map(i => i.trim()).filter(Boolean);
       if (parts.length > 0) {
-        return { items: parts.slice(0, 3), fallback: false };
+        return { items: parts, fallback: false };
       }
     }
     
@@ -227,7 +227,7 @@ export function EnhancedBenchmarkComparison({
       if (ingredientsSpec && typeof ingredientsSpec === 'string') {
         const parts = ingredientsSpec.split(/[,;]/).map(i => i.trim()).filter(Boolean);
         if (parts.length > 0) {
-          return { items: parts.slice(0, 3), fallback: false };
+          return { items: parts, fallback: false };
         }
       }
     }
@@ -257,56 +257,83 @@ export function EnhancedBenchmarkComparison({
     return null;
   };
 
+  // Fixed: Multi-source Target Audience extraction
   const getCompetitorAudience = (product: Product): string | null => {
     const marketingAnalysis = product.marketing_analysis as Record<string, unknown> | null;
-    if (!marketingAnalysis) return null;
+    const reviewAnalysis = product.review_analysis as Record<string, unknown> | null;
     
-    const targetDemo = marketingAnalysis.target_demographics as Record<string, unknown> | undefined;
-    if (targetDemo?.primary_audience) {
-      return targetDemo.primary_audience as string;
+    // Try 1: marketing_analysis.target_demographics.primary_audience
+    if (marketingAnalysis) {
+      const targetDemo = marketingAnalysis.target_demographics as Record<string, unknown> | undefined;
+      if (targetDemo?.primary_audience) {
+        return targetDemo.primary_audience as string;
+      }
+      
+      // Try 2: marketing_analysis.lifestyle_positioning.primary_lifestyle
+      const lifestylePos = marketingAnalysis.lifestyle_positioning as Record<string, unknown> | undefined;
+      if (lifestylePos?.primary_lifestyle) {
+        return lifestylePos.primary_lifestyle as string;
+      }
+    }
+    
+    // Try 3: review_analysis.demographics_insights.buyer_types
+    if (reviewAnalysis) {
+      const demographics = reviewAnalysis.demographics_insights as Record<string, unknown> | undefined;
+      const buyerTypes = demographics?.buyer_types as string[] | undefined;
+      if (buyerTypes && buyerTypes.length > 0) {
+        return buyerTypes.slice(0, 2).join(', ');
+      }
     }
     
     return null;
   };
 
-  const getCompetitorPainPoints = (product: Product): Array<{ issue: string }> => {
+  // NEW: Get Strengths from review_analysis.positive_themes
+  const getCompetitorStrengths = (product: Product): Array<{ theme: string; percentage?: number }> => {
     const reviewAnalysis = product.review_analysis as Record<string, unknown> | null;
     if (!reviewAnalysis) return [];
     
-    const painPoints = reviewAnalysis.pain_points as Array<{ pain_point?: string; issue?: string }> | undefined;
-    if (!painPoints || !Array.isArray(painPoints)) return [];
+    const positiveThemes = reviewAnalysis.positive_themes as Array<{ theme?: string; positive_theme?: string; frequency?: number; mention_rate?: number }> | undefined;
+    if (!positiveThemes || !Array.isArray(positiveThemes)) return [];
     
-    return painPoints.slice(0, 2).map(pp => ({
-      issue: pp.issue || pp.pain_point || 'Unknown issue'
+    return positiveThemes.slice(0, 3).map(pt => ({
+      theme: pt.theme || pt.positive_theme || 'Unknown',
+      percentage: pt.frequency || pt.mention_rate
     }));
   };
 
-  const getCompetitorUSPs = (product: Product): string[] | null => {
-    const marketingAnalysis = product.marketing_analysis as Record<string, unknown> | null;
-    if (!marketingAnalysis) return null;
+  // UPDATED: Get Weaknesses from review_analysis.pain_points
+  const getCompetitorWeaknesses = (product: Product): Array<{ issue: string; percentage?: number }> => {
+    const reviewAnalysis = product.review_analysis as Record<string, unknown> | null;
+    if (!reviewAnalysis) return [];
     
-    const competitiveAnalysis = marketingAnalysis.competitive_analysis as Record<string, unknown> | undefined;
-    const usps = competitiveAnalysis?.unique_selling_points as string[] | undefined;
+    const painPoints = reviewAnalysis.pain_points as Array<{ pain_point?: string; issue?: string; affected_percentage?: number; frequency?: number }> | undefined;
+    if (!painPoints || !Array.isArray(painPoints)) return [];
     
-    if (usps && usps.length > 0) {
-      return usps.slice(0, 2);
-    }
-    
-    return null;
+    return painPoints.slice(0, 3).map(pp => ({
+      issue: pp.issue || pp.pain_point || 'Unknown issue',
+      percentage: pp.affected_percentage || pp.frequency
+    }));
   };
 
-  const getCompetitorWeaknesses = (product: Product): string[] | null => {
-    const marketingAnalysis = product.marketing_analysis as Record<string, unknown> | null;
-    if (!marketingAnalysis) return null;
+  // NEW: Get top competitor advantage (Where Competitors Win)
+  const getCompetitorTopWin = (product: Product): { theme: string; percentage?: number } | null => {
+    const reviewAnalysis = product.review_analysis as Record<string, unknown> | null;
+    if (!reviewAnalysis) return null;
     
-    const competitiveAnalysis = marketingAnalysis.competitive_analysis as Record<string, unknown> | undefined;
-    const weaknesses = competitiveAnalysis?.weaknesses_vs_competitors as string[] | undefined;
+    const positiveThemes = reviewAnalysis.positive_themes as Array<{ theme?: string; positive_theme?: string; frequency?: number; mention_rate?: number }> | undefined;
+    if (!positiveThemes || !Array.isArray(positiveThemes) || positiveThemes.length === 0) return null;
     
-    if (weaknesses && weaknesses.length > 0) {
-      return weaknesses.slice(0, 2);
-    }
+    // Get the top theme (highest frequency)
+    const sortedThemes = [...positiveThemes].sort((a, b) => 
+      ((b.frequency || b.mention_rate || 0) - (a.frequency || a.mention_rate || 0))
+    );
     
-    return null;
+    const top = sortedThemes[0];
+    return {
+      theme: top.theme || top.positive_theme || 'Unknown',
+      percentage: top.frequency || top.mention_rate
+    };
   };
 
   const clearSelection = () => {
@@ -678,75 +705,83 @@ export function EnhancedBenchmarkComparison({
                         )}
                       </div>
 
-                      {/* Unique Selling Points */}
-                      <div>
-                        <p className="text-[10px] font-semibold mb-1 flex items-center gap-1">
-                          <CheckCircle className="w-3 h-3 text-emerald-500" />
-                          USPs
+                      {/* Where Competitors Win - NEW */}
+                      <div className="bg-emerald-50 dark:bg-emerald-950/30 rounded-lg p-2 border border-emerald-200 dark:border-emerald-800">
+                        <p className="text-[10px] font-semibold mb-1 flex items-center gap-1 text-emerald-700 dark:text-emerald-300">
+                          <Trophy className="w-3 h-3" />
+                          Where They Win
                         </p>
-                        {hasMarketingAnalysis(product) ? (
-                          <div className="space-y-0.5">
-                            {(() => {
-                              const usps = getCompetitorUSPs(product);
-                              if (!usps || usps.length === 0) {
-                                return <p className="text-[10px] text-muted-foreground">Not specified</p>;
-                              }
-                              return usps.map((usp, i) => (
-                                <div key={i} className="flex items-start gap-1 text-[10px] text-muted-foreground">
-                                  <span className="w-1 h-1 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
-                                  <span>{usp}</span>
-                                </div>
-                              ));
-                            })()}
-                          </div>
+                        {hasReviewAnalysis(product) ? (
+                          (() => {
+                            const topWin = getCompetitorTopWin(product);
+                            if (!topWin) {
+                              return <p className="text-[10px] text-muted-foreground">No data</p>;
+                            }
+                            return (
+                              <div className="flex items-center gap-1">
+                                <span className="text-[10px] font-medium text-emerald-800 dark:text-emerald-200">{topWin.theme}</span>
+                                {topWin.percentage && (
+                                  <Badge variant="secondary" className="text-[9px] h-4 bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300">
+                                    {topWin.percentage}%
+                                  </Badge>
+                                )}
+                              </div>
+                            );
+                          })()
                         ) : (
                           <span className="text-[10px] px-1.5 py-0.5 bg-muted rounded text-muted-foreground">Analysis Pending</span>
                         )}
                       </div>
 
-                      {/* Weaknesses vs Competitors */}
+                      {/* Strengths (from Reviews) */}
                       <div>
                         <p className="text-[10px] font-semibold mb-1 flex items-center gap-1">
-                          <XCircle className="w-3 h-3 text-orange-500" />
-                          Weaknesses
-                        </p>
-                        {hasMarketingAnalysis(product) ? (
-                          <div className="space-y-0.5">
-                            {(() => {
-                              const weaknesses = getCompetitorWeaknesses(product);
-                              if (!weaknesses || weaknesses.length === 0) {
-                                return <p className="text-[10px] text-muted-foreground">Not specified</p>;
-                              }
-                              return weaknesses.map((weakness, i) => (
-                                <div key={i} className="flex items-start gap-1 text-[10px] text-muted-foreground">
-                                  <span className="w-1 h-1 rounded-full bg-orange-500 mt-1.5 shrink-0" />
-                                  <span>{weakness}</span>
-                                </div>
-                              ));
-                            })()}
-                          </div>
-                        ) : (
-                          <span className="text-[10px] px-1.5 py-0.5 bg-muted rounded text-muted-foreground">Analysis Pending</span>
-                        )}
-                      </div>
-
-                      {/* Pain Points */}
-                      <div>
-                        <p className="text-[10px] font-semibold mb-1 flex items-center gap-1">
-                          <AlertTriangle className="w-3 h-3 text-rose-500" />
-                          Suffers From
+                          <ThumbsUp className="w-3 h-3 text-emerald-500" />
+                          Strengths (Reviews)
                         </p>
                         {hasReviewAnalysis(product) ? (
                           <div className="space-y-0.5">
                             {(() => {
-                              const painPoints = getCompetitorPainPoints(product);
-                              if (painPoints.length === 0) {
+                              const strengths = getCompetitorStrengths(product);
+                              if (strengths.length === 0) {
+                                return <p className="text-[10px] text-muted-foreground">No data</p>;
+                              }
+                              return strengths.map((s, i) => (
+                                <div key={i} className="flex items-start gap-1 text-[10px] text-muted-foreground">
+                                  <span className="w-1 h-1 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
+                                  <span>{s.theme}</span>
+                                  {s.percentage && (
+                                    <span className="text-emerald-600 font-medium ml-auto">{s.percentage}%</span>
+                                  )}
+                                </div>
+                              ));
+                            })()}
+                          </div>
+                        ) : (
+                          <span className="text-[10px] px-1.5 py-0.5 bg-muted rounded text-muted-foreground">Analysis Pending</span>
+                        )}
+                      </div>
+
+                      {/* Weaknesses (from Reviews) */}
+                      <div>
+                        <p className="text-[10px] font-semibold mb-1 flex items-center gap-1">
+                          <ThumbsDown className="w-3 h-3 text-rose-500" />
+                          Weaknesses (Reviews)
+                        </p>
+                        {hasReviewAnalysis(product) ? (
+                          <div className="space-y-0.5">
+                            {(() => {
+                              const weaknesses = getCompetitorWeaknesses(product);
+                              if (weaknesses.length === 0) {
                                 return <p className="text-[10px] text-muted-foreground">No issues reported</p>;
                               }
-                              return painPoints.map((pp, i) => (
-                                 <div key={i} className="flex items-start gap-1 text-[10px] text-muted-foreground">
+                              return weaknesses.map((w, i) => (
+                                <div key={i} className="flex items-start gap-1 text-[10px] text-muted-foreground">
                                   <span className="w-1 h-1 rounded-full bg-rose-500 mt-1.5 shrink-0" />
-                                  <span>{pp.issue}</span>
+                                  <span>{w.issue}</span>
+                                  {w.percentage && (
+                                    <span className="text-rose-600 font-medium ml-auto">{w.percentage}%</span>
+                                  )}
                                 </div>
                               ));
                             })()}

@@ -332,6 +332,7 @@ export default function ProductAnalysisPanel({
 
   return (
     <div className="p-4 bg-muted/30 border-t">
+      {/* Analysis Panel with 5 tabs: Copy, Sentiment, Actions, Visuals, Reviews */}
       <Tabs defaultValue={hasMarketingData ? "copy" : "reviews"} className="w-full">
         <TabsList className="grid grid-cols-5 w-full max-w-2xl mb-4">
           <TabsTrigger value="copy" className="text-xs gap-1">

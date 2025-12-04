@@ -162,54 +162,56 @@ export function DeepDiveSection({
             </div>
           </div>
         ) : radarData.length > 0 ? (
-          <ResponsiveContainer width="100%" height={350}>
-            <RadarChart data={radarData} margin={{ top: 20, right: 30, bottom: 20, left: 30 }}>
-              <PolarGrid stroke="hsl(var(--border))" />
-              <PolarAngleAxis
-                dataKey="criteria"
-                tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 8 }}
-              />
-              <PolarRadiusAxis
-                angle={30}
-                domain={[0, 10]}
-                tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }}
-              />
-              <Radar
-                name="Score"
-                dataKey="score"
-                stroke="hsl(var(--primary))"
-                fill="hsl(var(--primary))"
-                fillOpacity={0.25}
-                strokeWidth={2}
-              />
-              <RechartsTooltip
-                content={({ payload }) => {
-                  if (payload && payload.length > 0) {
-                    const data = payload[0].payload;
-                    return (
-                      <div className="bg-popover border border-border rounded-md p-3 shadow-lg max-w-xs">
-                        <p className="font-semibold text-sm text-foreground">{data.fullName}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className={`text-lg font-bold ${getScoreColor(data.score)}`}>
-                            {data.score}/10
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            (weight: {data.weight}x)
-                          </span>
+          <div className="animate-fade-in">
+            <ResponsiveContainer width="100%" height={350}>
+              <RadarChart data={radarData} margin={{ top: 20, right: 30, bottom: 20, left: 30 }}>
+                <PolarGrid stroke="hsl(var(--border))" />
+                <PolarAngleAxis
+                  dataKey="criteria"
+                  tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 8 }}
+                />
+                <PolarRadiusAxis
+                  angle={30}
+                  domain={[0, 10]}
+                  tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }}
+                />
+                <Radar
+                  name="Score"
+                  dataKey="score"
+                  stroke="hsl(var(--primary))"
+                  fill="hsl(var(--primary))"
+                  fillOpacity={0.25}
+                  strokeWidth={2}
+                />
+                <RechartsTooltip
+                  content={({ payload }) => {
+                    if (payload && payload.length > 0) {
+                      const data = payload[0].payload;
+                      return (
+                        <div className="bg-popover border border-border rounded-md p-3 shadow-lg max-w-xs">
+                          <p className="font-semibold text-sm text-foreground">{data.fullName}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className={`text-lg font-bold ${getScoreColor(data.score)}`}>
+                              {data.score}/10
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              (weight: {data.weight}x)
+                            </span>
+                          </div>
+                          {data.justification && (
+                            <p className="text-xs text-muted-foreground mt-2 line-clamp-3">
+                              {data.justification}
+                            </p>
+                          )}
                         </div>
-                        {data.justification && (
-                          <p className="text-xs text-muted-foreground mt-2 line-clamp-3">
-                            {data.justification}
-                          </p>
-                        )}
-                      </div>
-                    );
-                  }
-                  return null;
-                }}
-              />
-            </RadarChart>
-          </ResponsiveContainer>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+              </RadarChart>
+            </ResponsiveContainer>
+          </div>
         ) : (
           <div className="flex items-center justify-center h-[300px] text-muted-foreground">
             No criteria scores available

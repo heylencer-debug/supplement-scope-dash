@@ -1,12 +1,43 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, XCircle, FileWarning, Truck, AlertCircle } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface RiskAnalysisProps {
   risks: Record<string, unknown> | null;
+  isLoading?: boolean;
 }
 
-export function RiskAnalysis({ risks }: RiskAnalysisProps) {
+export function RiskAnalysis({ risks, isLoading }: RiskAnalysisProps) {
+  // Show loading skeleton
+  if (isLoading) {
+    return (
+      <Card className="border-destructive/20">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-destructive" />
+            Risk Analysis
+          </CardTitle>
+          <CardDescription>Category challenges, failure patterns, and risk factors to consider</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid md:grid-cols-2 gap-8">
+            <div className="space-y-4">
+              <Skeleton className="h-4 w-40" />
+              <Skeleton className="h-16 rounded-lg" />
+              <Skeleton className="h-16 rounded-lg" />
+            </div>
+            <div className="space-y-4">
+              <Skeleton className="h-4 w-40" />
+              <Skeleton className="h-16 rounded-lg" />
+              <Skeleton className="h-16 rounded-lg" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (!risks) return null;
 
   const category_challenges = risks.category_challenges as string[] | undefined;

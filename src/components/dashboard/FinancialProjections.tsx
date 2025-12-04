@@ -3,9 +3,11 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { DollarSign, TrendingUp, PiggyBank, Target, Calendar } from "lucide-react";
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, AreaChart, Area, XAxis, YAxis, CartesianGrid } from "recharts";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface FinancialProjectionsProps {
   financials: Record<string, unknown> | null;
+  isLoading?: boolean;
 }
 
 const CHART_COLORS = [
@@ -17,7 +19,40 @@ const CHART_COLORS = [
   "hsl(var(--muted-foreground))",
 ];
 
-export function FinancialProjections({ financials }: FinancialProjectionsProps) {
+export function FinancialProjections({ financials, isLoading }: FinancialProjectionsProps) {
+  // Show loading skeleton
+  if (isLoading) {
+    return (
+      <Card className="border-chart-4/20">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <DollarSign className="w-5 h-5 text-chart-4" />
+            Financial Projections
+          </CardTitle>
+          <CardDescription>Startup investment, revenue targets, and margin projections</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid lg:grid-cols-2 gap-8">
+            <div className="space-y-4">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-[200px] w-full rounded-lg" />
+            </div>
+            <div className="space-y-4">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-[200px] w-full rounded-lg" />
+            </div>
+          </div>
+          <div className="grid md:grid-cols-4 gap-4 mt-8">
+            <Skeleton className="h-20 rounded-lg" />
+            <Skeleton className="h-20 rounded-lg" />
+            <Skeleton className="h-20 rounded-lg" />
+            <Skeleton className="h-20 rounded-lg" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (!financials) return null;
 
   const startup_investment = financials.startup_investment as { total?: number; breakdown?: Record<string, number> } | undefined;

@@ -7,7 +7,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { 
   AlertTriangle, CheckCircle2, Lightbulb, Zap, Image as ImageIcon,
   Users, MessageSquare, Target, TrendingUp, XCircle, Star, ThumbsUp, ThumbsDown,
-  Sparkles, FileText, ChevronDown, ChevronUp, Quote, Crown, UserCircle, Gift, List
+  Sparkles, FileText, ChevronDown, ChevronUp, Quote, Crown, UserCircle, Gift, List,
+  Palette, Sun, Layout, Heart
 } from "lucide-react";
 
 interface ProductAnalysisPanelProps {
@@ -182,7 +183,205 @@ function EnhancedActionItem({ item }: { item: any }) {
   );
 }
 
-// Creative Strategy Card Component
+// NEW: Title Analysis Card Component
+function TitleAnalysisCard({ titleAnalysis }: { titleAnalysis: any }) {
+  if (!titleAnalysis) return null;
+  
+  const clarityScore = titleAnalysis.clarity_score;
+  const issues = titleAnalysis.issues || [];
+  
+  if (clarityScore === undefined && issues.length === 0) return null;
+  
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <FileText className="w-4 h-4 text-blue-500" /> Title Analysis
+          </CardTitle>
+          {clarityScore !== undefined && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Clarity:</span>
+              <ScoreBadge score={clarityScore} />
+            </div>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent>
+        {issues.length > 0 ? (
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground font-medium mb-3">Issues Found:</p>
+            <div className="space-y-2">
+              {issues.map((issue: string, i: number) => (
+                <div 
+                  key={i} 
+                  className="flex items-start gap-2 p-3 bg-amber-500/5 rounded-md border border-amber-500/20"
+                >
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <span className="text-sm">{issue}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground text-center py-4">
+            No title issues identified
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// NEW: Bullet Analysis Card Component
+function BulletAnalysisCard({ bulletAnalysis }: { bulletAnalysis: any }) {
+  if (!bulletAnalysis) return null;
+  
+  const benefitFocused = bulletAnalysis.benefit_focused;
+  const strengths = bulletAnalysis.strengths || [];
+  const weaknesses = bulletAnalysis.weaknesses || [];
+  
+  if (strengths.length === 0 && weaknesses.length === 0 && benefitFocused === undefined) return null;
+  
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <List className="w-4 h-4 text-purple-500" /> Bullet Analysis
+          </CardTitle>
+          {benefitFocused !== undefined && (
+            <Badge 
+              variant="outline" 
+              className={benefitFocused 
+                ? "bg-green-500/10 text-green-600 border-green-500/30" 
+                : "bg-amber-500/10 text-amber-600 border-amber-500/30"
+              }
+            >
+              {benefitFocused ? "✓ Benefit-Focused" : "✗ Not Benefit-Focused"}
+            </Badge>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Strengths */}
+        {strengths.length > 0 && (
+          <div>
+            <p className="text-xs text-muted-foreground font-medium mb-2 flex items-center gap-1">
+              <CheckCircle2 className="w-3 h-3 text-green-600" /> Strengths ({strengths.length})
+            </p>
+            <div className="space-y-2">
+              {strengths.map((strength: string, i: number) => (
+                <div 
+                  key={i} 
+                  className="flex items-start gap-2 p-3 bg-green-500/5 rounded-md border border-green-500/20"
+                >
+                  <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
+                  <span className="text-sm">{strength}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        
+        {/* Weaknesses */}
+        {weaknesses.length > 0 && (
+          <div>
+            <p className="text-xs text-muted-foreground font-medium mb-2 flex items-center gap-1">
+              <XCircle className="w-3 h-3 text-amber-600" /> Weaknesses ({weaknesses.length})
+            </p>
+            <div className="space-y-2">
+              {weaknesses.map((weakness: string, i: number) => (
+                <div 
+                  key={i} 
+                  className="flex items-start gap-2 p-3 bg-amber-500/5 rounded-md border border-amber-500/20"
+                >
+                  <XCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <span className="text-sm">{weakness}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// NEW: Visual Style Guide Card Component
+function VisualStyleGuideCard({ visualStyleGuide }: { visualStyleGuide: any }) {
+  if (!visualStyleGuide) return null;
+  
+  const colorPalette = visualStyleGuide.color_palette || '';
+  const moodKeywords = visualStyleGuide.mood_keywords || [];
+  const lightingStyle = visualStyleGuide.lighting_style || '';
+  const compositionStyle = visualStyleGuide.composition_style || '';
+  
+  if (!colorPalette && moodKeywords.length === 0 && !lightingStyle && !compositionStyle) return null;
+  
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <Palette className="w-4 h-4 text-pink-500" /> Visual Style Guide
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Color Palette */}
+        {colorPalette && (
+          <div className="p-3 bg-pink-500/5 rounded-lg border border-pink-500/20">
+            <div className="flex items-center gap-2 mb-2">
+              <Palette className="w-4 h-4 text-pink-500" />
+              <span className="text-xs font-semibold text-muted-foreground">Color Palette</span>
+            </div>
+            <p className="text-sm">{colorPalette}</p>
+          </div>
+        )}
+        
+        {/* Mood Keywords */}
+        {moodKeywords.length > 0 && (
+          <div className="p-3 bg-purple-500/5 rounded-lg border border-purple-500/20">
+            <div className="flex items-center gap-2 mb-2">
+              <Heart className="w-4 h-4 text-purple-500" />
+              <span className="text-xs font-semibold text-muted-foreground">Mood Keywords</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {moodKeywords.map((keyword: string, i: number) => (
+                <Badge key={i} variant="secondary" className="text-xs">
+                  {keyword}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+        
+        {/* Lighting Style */}
+        {lightingStyle && (
+          <div className="p-3 bg-amber-500/5 rounded-lg border border-amber-500/20">
+            <div className="flex items-center gap-2 mb-2">
+              <Sun className="w-4 h-4 text-amber-500" />
+              <span className="text-xs font-semibold text-muted-foreground">Lighting Style</span>
+            </div>
+            <p className="text-sm">{lightingStyle}</p>
+          </div>
+        )}
+        
+        {/* Composition Style */}
+        {compositionStyle && (
+          <div className="p-3 bg-blue-500/5 rounded-lg border border-blue-500/20">
+            <div className="flex items-center gap-2 mb-2">
+              <Layout className="w-4 h-4 text-blue-500" />
+              <span className="text-xs font-semibold text-muted-foreground">Composition Style</span>
+            </div>
+            <p className="text-sm">{compositionStyle}</p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// Creative Strategy Card Component - Enhanced
 function CreativeStrategyCard({ creativeBrief }: { creativeBrief: any }) {
   if (!creativeBrief) return null;
   
@@ -197,9 +396,18 @@ function CreativeStrategyCard({ creativeBrief }: { creativeBrief: any }) {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-purple-500" /> Creative Strategy
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-purple-500" /> Creative Strategy
+          </CardTitle>
+          {/* Brand Consistency Score */}
+          {brandIdentity.consistency !== undefined && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Consistency:</span>
+              <ScoreBadge score={brandIdentity.consistency} />
+            </div>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -221,8 +429,8 @@ function CreativeStrategyCard({ creativeBrief }: { creativeBrief: any }) {
             </div>
           )}
           
-          {/* Target Persona */}
-          {(targetPersona.demographic || targetPersona.psychographic) && (
+          {/* Target Persona - Enhanced with primary_motivation */}
+          {(targetPersona.demographic || targetPersona.psychographic || targetPersona.primary_motivation) && (
             <div className="p-3 bg-blue-500/5 rounded-lg border border-blue-500/20">
               <div className="flex items-center gap-2 mb-2">
                 <UserCircle className="w-4 h-4 text-blue-500" />
@@ -232,21 +440,37 @@ function CreativeStrategyCard({ creativeBrief }: { creativeBrief: any }) {
                 <p className="text-sm font-medium mb-1">{targetPersona.demographic}</p>
               )}
               {targetPersona.psychographic && (
-                <p className="text-xs text-muted-foreground">{targetPersona.psychographic}</p>
+                <p className="text-xs text-muted-foreground mb-2">{targetPersona.psychographic}</p>
+              )}
+              {targetPersona.primary_motivation && (
+                <div className="mt-2 p-2 bg-blue-500/10 rounded-md border-l-2 border-blue-500">
+                  <p className="text-xs font-semibold text-muted-foreground mb-1">Primary Motivation:</p>
+                  <p className="text-sm">{targetPersona.primary_motivation}</p>
+                </div>
               )}
             </div>
           )}
           
-          {/* Winning Offer */}
-          {winningOffers.analysis && (
+          {/* Winning Offer - Enhanced with effectiveness */}
+          {(winningOffers.analysis || winningOffers.effectiveness) && (
             <div className="p-3 bg-amber-500/5 rounded-lg border border-amber-500/20 md:col-span-2">
               <div className="flex items-center gap-2 mb-2">
                 <Gift className="w-4 h-4 text-amber-500" />
                 <span className="text-xs font-semibold text-muted-foreground">Winning Offer Analysis</span>
               </div>
-              <div className="p-3 bg-amber-500/10 rounded-md">
-                <ExpandableText text={winningOffers.analysis} maxLength={300} />
-              </div>
+              {winningOffers.analysis && (
+                <div className="p-3 bg-amber-500/10 rounded-md mb-3">
+                  <ExpandableText text={winningOffers.analysis} maxLength={300} />
+                </div>
+              )}
+              {winningOffers.effectiveness && (
+                <div className="p-3 bg-green-500/5 rounded-md border border-green-500/20">
+                  <p className="text-xs font-semibold text-muted-foreground mb-1 flex items-center gap-1">
+                    <TrendingUp className="w-3 h-3 text-green-600" /> Effectiveness Assessment
+                  </p>
+                  <p className="text-sm">{winningOffers.effectiveness}</p>
+                </div>
+              )}
             </div>
           )}
           
@@ -258,7 +482,7 @@ function CreativeStrategyCard({ creativeBrief }: { creativeBrief: any }) {
                 <span className="text-xs font-semibold text-muted-foreground">Unique Selling Props</span>
                 <Badge variant="outline" className="ml-auto text-xs">{uniqueSellingProps.length}</Badge>
               </div>
-              <div className="space-y-1">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
                 {uniqueSellingProps.map((usp: string, i: number) => (
                   <div key={i} className="flex items-start gap-2 text-sm">
                     <CheckCircle2 className="w-3 h-3 text-green-500 shrink-0 mt-1" />
@@ -278,6 +502,7 @@ function CreativeStrategyCard({ creativeBrief }: { creativeBrief: any }) {
 function CopyAssetsCard({ copyAssets }: { copyAssets: any }) {
   const bestHooks = copyAssets?.best_hooks || [];
   const clarityScore = copyAssets?.clarity_score;
+  const benefitsFocus = copyAssets?.benefits_focus;
   
   return (
     <Card>
@@ -286,6 +511,17 @@ function CopyAssetsCard({ copyAssets }: { copyAssets: any }) {
           <CardTitle className="text-sm flex items-center gap-2">
             <FileText className="w-4 h-4 text-indigo-500" /> Copy Assets
             <Badge variant="outline" className="ml-2 text-xs">{bestHooks.length} hooks</Badge>
+            {benefitsFocus !== undefined && (
+              <Badge 
+                variant="outline" 
+                className={`text-xs ${benefitsFocus 
+                  ? "bg-green-500/10 text-green-600 border-green-500/30" 
+                  : "bg-amber-500/10 text-amber-600 border-amber-500/30"
+                }`}
+              >
+                {benefitsFocus ? "✓ Benefits Focus" : "✗ Feature-Heavy"}
+              </Badge>
+            )}
           </CardTitle>
           {clarityScore !== undefined && clarityScore !== null && (
             <div className="flex items-center gap-2">
@@ -356,8 +592,14 @@ export default function ProductAnalysisPanel({
   // NEW: Copy Assets data - check multiple locations
   const copyAssets = ma.copy_assets || details.copy_assets || {};
   
-  // Debug: Log copy_assets to verify data structure
-  console.log('Copy Assets data:', { copyAssets, maKeys: Object.keys(ma), detailsKeys: Object.keys(details) });
+  // NEW: Title Analysis from copy_analysis
+  const titleAnalysis = copyAnalysis.title_analysis || {};
+  
+  // NEW: Bullet Analysis from copy_analysis
+  const bulletAnalysis = copyAnalysis.bullet_analysis || {};
+  
+  // NEW: Visual Style Guide from creative_brief
+  const visualStyleGuide = creativeBrief.visual_style_guide || {};
 
   // Copy Analysis fields
   const copyHooks = copyAnalysis.hooks || [];
@@ -427,7 +669,9 @@ export default function ProductAnalysisPanel({
     images.length > 0 ||
     actionPlan.length > 0 ||
     Object.keys(creativeBrief).length > 0 ||
-    Object.keys(copyAssets).length > 0;
+    Object.keys(copyAssets).length > 0 ||
+    Object.keys(titleAnalysis).length > 0 ||
+    Object.keys(bulletAnalysis).length > 0;
 
   const hasReviewData = Object.keys(ra).length > 0;
 
@@ -465,6 +709,9 @@ export default function ProductAnalysisPanel({
         <TabsContent value="strategy" className="mt-0 space-y-4">
           {/* Creative Strategy Card */}
           <CreativeStrategyCard creativeBrief={creativeBrief} />
+          
+          {/* Visual Style Guide */}
+          <VisualStyleGuideCard visualStyleGuide={visualStyleGuide} />
           
           {/* Score Card Summary */}
           {(overallGrade || metrics.length > 0) && (
@@ -551,11 +798,17 @@ export default function ProductAnalysisPanel({
 
         {/* TAB 2: COPY ANALYSIS & SWIPE FILE */}
         <TabsContent value="copy" className="mt-0 space-y-4">
+          {/* Title Analysis - NEW */}
+          <TitleAnalysisCard titleAnalysis={titleAnalysis} />
+          
+          {/* Bullet Analysis - NEW */}
+          <BulletAnalysisCard bulletAnalysis={bulletAnalysis} />
+          
           {/* Copy Assets / Swipe File */}
           <CopyAssetsCard copyAssets={copyAssets} />
           
           {/* Clarity Score (legacy) */}
-          {copyClarity !== undefined && !copyAssets.clarity_score && (
+          {copyClarity !== undefined && !copyAssets.clarity_score && !titleAnalysis.clarity_score && (
             <Card>
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
@@ -590,7 +843,8 @@ export default function ProductAnalysisPanel({
             </Card>
           )}
           
-          {!copyAssets.best_hooks?.length && copyHooks.length === 0 && copyClarity === undefined && (
+          {!copyAssets.best_hooks?.length && copyHooks.length === 0 && copyClarity === undefined && 
+           !titleAnalysis.issues?.length && !bulletAnalysis.strengths?.length && !bulletAnalysis.weaknesses?.length && (
             <Card>
               <CardContent className="py-8 text-center text-muted-foreground">
                 <FileText className="w-8 h-8 mx-auto mb-2 opacity-50" />
@@ -780,7 +1034,7 @@ export default function ProductAnalysisPanel({
                 <Badge variant="outline" className="ml-auto">
                   {images.length} images
                 </Badge>
-                <span className="text-xs text-muted-foreground font-normal">Hover for strategy analysis</span>
+                <span className="text-xs text-muted-foreground font-normal">Click for strategy analysis</span>
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -837,36 +1091,23 @@ export default function ProductAnalysisPanel({
                 <div className="space-y-2">
                   {actionableRecommendations.slice(0, 4).map((rec: any, i: number) => (
                     <div key={i} className="p-3 bg-muted/50 rounded-md">
-                      <div className="flex items-center gap-2 mb-1">
-                        {rec.area && <Badge variant="outline" className="text-xs">{rec.area}</Badge>}
+                      <div className="flex items-start gap-2">
                         {rec.priority && <PriorityBadge priority={rec.priority} />}
+                        <div>
+                          {rec.area && (
+                            <p className="text-xs text-muted-foreground font-medium">{rec.area}</p>
+                          )}
+                          <p className="text-sm font-medium">{rec.recommendation}</p>
+                          {rec.rationale && (
+                            <p className="text-xs text-muted-foreground mt-1 italic">{rec.rationale}</p>
+                          )}
+                        </div>
                       </div>
-                      <p className="text-sm">{rec.recommendation || rec}</p>
-                      {rec.rationale && (
-                        <p className="text-xs text-muted-foreground mt-2 italic">{rec.rationale}</p>
-                      )}
                     </div>
                   ))}
                 </div>
               </CardContent>
             </Card>
-          )}
-          
-          {/* Quick Stats */}
-          {(productInfo.reviews_analyzed || analysisMetadata.total_reviews_analyzed) && (
-            <div className="flex flex-wrap gap-3 p-3 bg-muted/50 rounded-lg">
-              {(productInfo.reviews_analyzed || analysisMetadata.total_reviews_analyzed) && (
-                <Badge variant="outline">
-                  {productInfo.reviews_analyzed || analysisMetadata.total_reviews_analyzed} Reviews Analyzed
-                </Badge>
-              )}
-              {analysisMetadata.verified_purchase_rate !== undefined && (
-                <Badge variant="outline">{analysisMetadata.verified_purchase_rate}% Verified</Badge>
-              )}
-              {analysisMetadata.analysis_quality && (
-                <Badge variant="outline" className="capitalize">{analysisMetadata.analysis_quality} Quality</Badge>
-              )}
-            </div>
           )}
         </TabsContent>
       </Tabs>

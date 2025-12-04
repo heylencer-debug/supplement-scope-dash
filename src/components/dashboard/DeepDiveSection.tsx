@@ -77,9 +77,9 @@ const abbreviateLabel = (name: string): string => {
 };
 
 const getScoreColor = (score: number): string => {
-  if (score >= 7) return "text-emerald-600 dark:text-emerald-400";
-  if (score >= 5) return "text-amber-600 dark:text-amber-400";
-  return "text-red-600 dark:text-red-400";
+  if (score >= 7) return "text-chart-4";
+  if (score >= 5) return "text-chart-2";
+  return "text-destructive";
 };
 
 export function DeepDiveSection({
@@ -120,7 +120,7 @@ export function DeepDiveSection({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg font-semibold text-[#1e3a5f]">
+        <CardTitle className="text-lg font-semibold text-foreground">
           18-Point Analysis
         </CardTitle>
         <CardDescription>
@@ -148,8 +148,8 @@ export function DeepDiveSection({
               <Radar
                 name="Score"
                 dataKey="score"
-                stroke="#0ea5e9"
-                fill="#0ea5e9"
+                stroke="hsl(var(--primary))"
+                fill="hsl(var(--primary))"
                 fillOpacity={0.25}
                 strokeWidth={2}
               />
@@ -237,7 +237,7 @@ function CriteriaBreakdownPanel({
     <div className="mt-8 pt-8 border-t">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div className="flex items-center gap-2">
-          <h4 className="text-sm font-semibold text-[#1e3a5f]">
+        <h4 className="text-sm font-semibold text-foreground">
             Criteria Breakdown
           </h4>
           <Tooltip>

@@ -14,22 +14,22 @@ interface CriteriaCardProps {
 
 const getScoreColor = (score: number) => {
   if (score >= 7) return { 
-    ring: "stroke-emerald-500", 
-    bg: "bg-emerald-50 dark:bg-emerald-950/30",
-    border: "border-emerald-200 dark:border-emerald-800",
-    text: "text-emerald-600 dark:text-emerald-400"
+    ring: "stroke-chart-4", 
+    bg: "bg-chart-4/5",
+    border: "border-chart-4/20",
+    text: "text-chart-4"
   };
   if (score >= 5) return { 
-    ring: "stroke-amber-500", 
-    bg: "bg-amber-50 dark:bg-amber-950/30",
-    border: "border-amber-200 dark:border-amber-800",
-    text: "text-amber-600 dark:text-amber-400"
+    ring: "stroke-chart-2", 
+    bg: "bg-chart-2/5",
+    border: "border-chart-2/20",
+    text: "text-chart-2"
   };
   return { 
-    ring: "stroke-red-500", 
-    bg: "bg-red-50 dark:bg-red-950/30",
-    border: "border-red-200 dark:border-red-800",
-    text: "text-red-600 dark:text-red-400"
+    ring: "stroke-destructive", 
+    bg: "bg-destructive/5",
+    border: "border-destructive/20",
+    text: "text-destructive"
   };
 };
 

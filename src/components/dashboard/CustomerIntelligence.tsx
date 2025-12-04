@@ -76,7 +76,7 @@ export default function CustomerIntelligence({
         {primary_pain_points && primary_pain_points.length > 0 && (
           <div>
             <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-500" />
+              <AlertTriangle className="w-4 h-4 text-chart-2" />
               Primary Pain Points
             </h3>
             <div className="rounded-md border">
@@ -121,7 +121,7 @@ export default function CustomerIntelligence({
           {unmet_needs && unmet_needs.length > 0 && (
             <div>
               <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                <Lightbulb className="w-4 h-4 text-blue-500" />
+                <Lightbulb className="w-4 h-4 text-chart-3" />
                 Unmet Needs
               </h3>
               <ul className="space-y-2">
@@ -139,13 +139,13 @@ export default function CustomerIntelligence({
           {love_most && love_most.length > 0 && (
             <div>
               <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                <Heart className="w-4 h-4 text-rose-500" />
+                <Heart className="w-4 h-4 text-destructive" />
                 What Customers Love
               </h3>
               <ul className="space-y-2">
                 {love_most.map((item, idx) => (
                   <li key={idx} className="flex items-start gap-2 text-sm text-muted-foreground">
-                    <span className="text-rose-500 mt-1">•</span>
+                    <span className="text-destructive mt-1">•</span>
                     <span>{item}</span>
                   </li>
                 ))}
@@ -158,7 +158,7 @@ export default function CustomerIntelligence({
         {decision_drivers && decision_drivers.length > 0 && (
           <div>
             <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-              <Target className="w-4 h-4 text-emerald-500" />
+              <Target className="w-4 h-4 text-chart-4" />
               Decision Drivers
             </h3>
             <p className="text-sm text-muted-foreground">

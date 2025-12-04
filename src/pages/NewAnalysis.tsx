@@ -151,7 +151,7 @@ export default function NewAnalysis() {
         </p>
       </div>
 
-      <Card className="border-2 border-accent/20 shadow-lg">
+      <Card className="border-2 border-primary/20 shadow-lg">
         <CardHeader>
           <CardTitle>Start Analysis</CardTitle>
           <CardDescription>
@@ -215,7 +215,7 @@ export default function NewAnalysis() {
 
           <Button
             onClick={handleAnalysis}
-            className="w-full h-12 text-base bg-accent hover:bg-accent/90"
+            className="w-full h-12 text-base"
             disabled={isLoading || !category.trim()}
           >
             {isLoading ? (
@@ -237,7 +237,7 @@ export default function NewAnalysis() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
-            <FileText className="w-4 h-4 text-accent" />
+            <FileText className="w-4 h-4 text-primary" />
             Recently Analyzed Categories
           </CardTitle>
           <CardDescription>
@@ -261,7 +261,7 @@ export default function NewAnalysis() {
                 <div
                   key={category.id}
                   onClick={() => handleAnalysisClick(category.name)}
-                  className="group relative overflow-hidden rounded-xl border bg-card hover:border-accent/50 cursor-pointer transition-all duration-300 hover:shadow-lg hover:shadow-accent/5"
+                  className="group relative overflow-hidden rounded-xl border bg-card hover:border-primary/50 cursor-pointer transition-all duration-300 hover:shadow-lg hover:shadow-primary/5"
                 >
                   {/* Product Images Grid */}
                   <div className="grid grid-cols-2 gap-0.5 h-32 bg-muted/50">
@@ -291,15 +291,15 @@ export default function NewAnalysis() {
                   {/* Card Content */}
                   <div className="p-5 space-y-4">
                     <div className="flex items-start justify-between gap-2">
-                      <h3 className="font-semibold text-foreground line-clamp-1 group-hover:text-accent transition-colors">
+                      <h3 className="font-semibold text-foreground line-clamp-1 group-hover:text-primary transition-colors">
                         {category.name}
                       </h3>
                       <Badge 
                         variant="outline" 
                         className={`text-xs shrink-0 ${
                           category.total_products && category.total_products > 0 
-                            ? "bg-green-500/10 text-green-600 border-green-500/20" 
-                            : "bg-amber-500/10 text-amber-600 border-amber-500/20"
+                            ? "bg-chart-4/10 text-chart-4 border-chart-4/20" 
+                            : "bg-chart-2/10 text-chart-2 border-chart-2/20"
                         }`}
                       >
                         {category.total_products && category.total_products > 0 ? "Complete" : "Processing"}
@@ -320,7 +320,7 @@ export default function NewAnalysis() {
                   </div>
                   
                   {/* Hover overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-accent/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
                 </div>
               ))}
             </div>

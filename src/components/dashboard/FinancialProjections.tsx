@@ -51,10 +51,10 @@ export function FinancialProjections({ financials }: FinancialProjectionsProps) 
   if (!hasData) return null;
 
   return (
-    <Card className="border-green-500/20">
+    <Card className="border-chart-4/20">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <DollarSign className="w-5 h-5 text-green-500" />
+          <DollarSign className="w-5 h-5 text-chart-4" />
           Financial Projections
         </CardTitle>
         <CardDescription>Startup investment, revenue targets, and margin projections</CardDescription>
@@ -70,7 +70,7 @@ export function FinancialProjections({ financials }: FinancialProjectionsProps) 
                   Startup Investment
                 </h4>
                 {startup_investment?.total && (
-                  <Badge variant="outline" className="text-green-600">
+                  <Badge variant="outline" className="text-chart-4">
                     ${startup_investment.total.toLocaleString()} total
                   </Badge>
                 )}
@@ -169,8 +169,8 @@ export function FinancialProjections({ financials }: FinancialProjectionsProps) 
           {breakeven && (
             <>
               {breakeven.months_to_breakeven !== undefined && (
-                <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg text-center">
-                  <p className="text-2xl font-bold text-green-600">{breakeven.months_to_breakeven}</p>
+                <div className="p-4 bg-chart-4/10 border border-chart-4/20 rounded-lg text-center">
+                  <p className="text-2xl font-bold text-chart-4">{breakeven.months_to_breakeven}</p>
                   <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
                     <Calendar className="w-3 h-3" />
                     Months to Breakeven

@@ -142,7 +142,7 @@ export function AnalysisTabs() {
             className={cn(
               "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 whitespace-nowrap flex-shrink-0",
               isNewAnalysisActive 
-                ? "bg-accent text-accent-foreground shadow-sm" 
+                ? "bg-primary text-primary-foreground shadow-sm" 
                 : "text-muted-foreground hover:bg-secondary hover:text-foreground hover:shadow-sm"
             )}
           >
@@ -175,12 +175,12 @@ export function AnalysisTabs() {
                       className="flex items-center gap-2.5 whitespace-nowrap"
                     >
                       {tab.isPending ? (
-                        <Loader2 className="w-3.5 h-3.5 text-amber-500 animate-spin flex-shrink-0" />
+                        <Loader2 className="w-3.5 h-3.5 text-chart-2 animate-spin flex-shrink-0" />
                       ) : (
                         <span 
                           className={cn(
                             "w-2.5 h-2.5 rounded-full flex-shrink-0 transition-all",
-                            isComplete ? "bg-green-500" : "bg-amber-500 animate-pulse"
+                            isComplete ? "bg-chart-4" : "bg-chart-2 animate-pulse"
                           )} 
                         />
                       )}

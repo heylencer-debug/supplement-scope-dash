@@ -28,9 +28,9 @@ export function KPIMetricsGrid({
 
   const getRiskLevel = (score: number | null) => {
     if (!score) return { label: "Unknown", color: "text-muted-foreground" };
-    if (score <= 30) return { label: "Low Risk", color: "text-emerald-600" };
-    if (score <= 60) return { label: "Moderate", color: "text-amber-600" };
-    return { label: "High Risk", color: "text-red-600" };
+    if (score <= 30) return { label: "Low Risk", color: "text-chart-4" };
+    if (score <= 60) return { label: "Moderate", color: "text-chart-2" };
+    return { label: "High Risk", color: "text-destructive" };
   };
 
   const kpis = [
@@ -39,24 +39,24 @@ export function KPIMetricsGrid({
       value: formatMarketSize(marketSize),
       subtext: "/ month",
       icon: TrendingUp,
-      iconBg: "bg-[#0ea5e9]/10",
-      iconColor: "text-[#0ea5e9]",
+      iconBg: "bg-primary/10",
+      iconColor: "text-primary",
     },
     {
       label: "Profit Margin",
       value: profitMargin ? `${profitMargin}%` : "N/A",
       subtext: "Avg",
       icon: DollarSign,
-      iconBg: "bg-emerald-500/10",
-      iconColor: "text-emerald-600",
+      iconBg: "bg-chart-4/10",
+      iconColor: "text-chart-4",
     },
     {
       label: "Competition",
       value: competitionLevel || "N/A",
       subtext: brandCount ? `${brandCount} Brands` : "",
       icon: Users,
-      iconBg: "bg-amber-500/10",
-      iconColor: "text-amber-600",
+      iconBg: "bg-chart-2/10",
+      iconColor: "text-chart-2",
     },
     {
       label: "Risk Score",
@@ -64,8 +64,8 @@ export function KPIMetricsGrid({
       subtext: getRiskLevel(riskScore).label,
       subtextColor: getRiskLevel(riskScore).color,
       icon: Shield,
-      iconBg: "bg-purple-500/10",
-      iconColor: "text-purple-600",
+      iconBg: "bg-chart-5/10",
+      iconColor: "text-chart-5",
     },
   ];
 

@@ -278,7 +278,7 @@ export default function Dashboard() {
     if (totalRev === 0) return [];
 
     const CHART_COLORS = [
-      "#0ea5e9", "#22c55e", "#f59e0b", "#8b5cf6", "#ef4444", "#64748b"
+      "hsl(var(--chart-1))", "hsl(var(--chart-4))", "hsl(var(--chart-2))", "hsl(var(--chart-5))", "hsl(var(--destructive))", "hsl(var(--muted-foreground))"
     ];
 
     const sortedBrands = Array.from(brandRevenue.entries()).sort((a, b) => b[1] - a[1]);
@@ -345,12 +345,12 @@ export default function Dashboard() {
 
       {/* Progress Banner */}
       {!progress.isComplete && (
-        <Card className="border-[#0ea5e9]/30 bg-[#0ea5e9]/5">
+        <Card className="border-primary/30 bg-primary/5">
           <CardContent className="p-6">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <RefreshCw className="h-5 w-5 text-[#0ea5e9] animate-spin" />
+                  <RefreshCw className="h-5 w-5 text-primary animate-spin" />
                   <div>
                     <p className="font-medium text-foreground">Analysis in Progress</p>
                     <p className="text-sm text-muted-foreground">
@@ -376,25 +376,25 @@ export default function Dashboard() {
                       key={idx} 
                       className={`p-3 rounded-lg border ${
                         isComplete 
-                          ? 'border-emerald-500/30 bg-emerald-500/5' 
+                          ? 'border-chart-4/30 bg-chart-4/5' 
                           : isActive 
-                            ? 'border-[#0ea5e9]/30 bg-[#0ea5e9]/5' 
+                            ? 'border-primary/30 bg-primary/5' 
                             : 'border-border bg-muted/30'
                       }`}
                     >
                       <div className="flex items-center gap-2 mb-2">
                         <PhaseIcon className={`w-4 h-4 ${
                           isComplete 
-                            ? 'text-emerald-500' 
+                            ? 'text-chart-4' 
                             : isActive 
-                              ? 'text-[#0ea5e9]' 
+                              ? 'text-primary' 
                               : 'text-muted-foreground'
                         }`} />
                         <span className={`text-xs font-medium ${
                           isComplete 
-                            ? 'text-emerald-600' 
+                            ? 'text-chart-4' 
                             : isActive 
-                              ? 'text-[#0ea5e9]' 
+                              ? 'text-primary' 
                               : 'text-muted-foreground'
                         }`}>
                           {phase.name}
@@ -402,14 +402,14 @@ export default function Dashboard() {
                       </div>
                       <Progress 
                         value={phase.percentage} 
-                        className={`h-1.5 ${isComplete ? '[&>div]:bg-emerald-500' : ''}`}
+                        className={`h-1.5 ${isComplete ? '[&>div]:bg-chart-4' : ''}`}
                       />
                       <div className="flex justify-between items-center mt-1.5">
                         <span className="text-[10px] text-muted-foreground">
                           {phase.completed}/{phase.total}
                         </span>
                         <span className={`text-[10px] font-medium ${
-                          isComplete ? 'text-emerald-600' : 'text-muted-foreground'
+                          isComplete ? 'text-chart-4' : 'text-muted-foreground'
                         }`}>
                           {phase.percentage}%
                         </span>

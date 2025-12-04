@@ -35,16 +35,16 @@ export function HeroHeader({
 
   const getVerdictColor = (rec: string | null) => {
     const r = (rec || "").toUpperCase();
-    if (r.includes("PROCEED") || r.includes("HIGH")) return "bg-emerald-500/90 text-white border-emerald-400";
-    if (r.includes("CONSIDER") || r.includes("CAUTION")) return "bg-amber-500/90 text-white border-amber-400";
-    if (r.includes("SKIP") || r.includes("AVOID")) return "bg-red-500/90 text-white border-red-400";
-    return "bg-primary/90 text-primary-foreground";
+    if (r.includes("PROCEED") || r.includes("HIGH")) return "bg-chart-4/90 text-primary-foreground border-chart-4";
+    if (r.includes("CONSIDER") || r.includes("CAUTION")) return "bg-chart-2/90 text-primary-foreground border-chart-2";
+    if (r.includes("SKIP") || r.includes("AVOID")) return "bg-destructive/90 text-destructive-foreground border-destructive";
+    return "bg-secondary/90 text-secondary-foreground";
   };
 
   const getScoreColor = (score: number) => {
-    if (score >= 70) return "bg-emerald-500";
-    if (score >= 50) return "bg-amber-500";
-    return "bg-red-500";
+    if (score >= 70) return "bg-chart-4";
+    if (score >= 50) return "bg-chart-2";
+    return "bg-destructive";
   };
 
   const getTierDisplay = () => {
@@ -68,7 +68,7 @@ export function HeroHeader({
   const displayScore = (normalizedScore / 10).toFixed(1);
 
   return (
-    <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-[#1e3a5f] via-[#264a6e] to-[#1e3a5f] p-6 md:p-8 text-white shadow-lg">
+    <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-primary via-primary/90 to-primary p-6 md:p-8 text-primary-foreground shadow-lg">
       {/* Subtle background pattern */}
       <div className="absolute inset-0 opacity-5">
         <div className="absolute top-0 right-0 w-96 h-96 bg-white rounded-full blur-3xl -translate-y-1/2 translate-x-1/3" />

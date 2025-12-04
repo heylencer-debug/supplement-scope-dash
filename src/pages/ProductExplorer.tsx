@@ -28,7 +28,7 @@ import { useCategoryByName } from "@/hooks/useCategoryByName";
 import { useCategoryAnalysis } from "@/hooks/useCategoryAnalyses";
 import ProductDetailModal from "@/components/ProductDetailModal";
 import BenchmarkComparison from "@/components/dashboard/BenchmarkComparison";
-import MarketingAnalysisPanel from "@/components/product/MarketingAnalysisPanel";
+import ProductAnalysisPanel from "@/components/product/ProductAnalysisPanel";
 import { toast } from "@/hooks/use-toast";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
@@ -362,7 +362,11 @@ export default function ProductExplorer() {
                         <CollapsibleContent asChild>
                           <tr>
                             <td colSpan={13} className="p-0">
-                              <MarketingAnalysisPanel marketingAnalysis={product.marketing_analysis as any} />
+                              <ProductAnalysisPanel 
+                                marketingAnalysis={product.marketing_analysis as any} 
+                                reviewAnalysis={product.review_analysis as any}
+                                imageUrls={product.image_urls as string[] | undefined}
+                              />
                             </td>
                           </tr>
                         </CollapsibleContent>

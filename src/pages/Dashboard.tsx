@@ -328,7 +328,8 @@ export default function Dashboard() {
   return (
     <div className="space-y-10 pb-16">
       {/* SECTION 1: Hero Header with Executive Summary */}
-      <HeroHeader
+      <div className="animate-fade-in">
+        <HeroHeader
         categoryName={categoryName}
         recommendation={analysis?.recommendation || null}
         opportunityIndex={analysis?.opportunity_index || 0}
@@ -341,7 +342,8 @@ export default function Dashboard() {
           title: p.title
         }))}
         isLoading={analysisLoading && !hasAnalysis}
-      />
+        />
+      </div>
 
       {/* Progress Banner */}
       {!progress.isComplete && (
@@ -429,28 +431,32 @@ export default function Dashboard() {
       )}
 
       {/* SECTION 2: KPI Metrics Grid (Scoreboards) */}
-      <KPIMetricsGrid
+      <div className="animate-fade-in" style={{ animationDelay: '0.1s' }}>
+        <KPIMetricsGrid
         marketSize={totalRevenue}
         profitMargin={dashboardData.margins?.year_1 || null}
         competitionLevel={dashboardData.competitionLevel}
         brandCount={uniqueBrands}
         riskScore={dashboardData.riskScore}
         isLoading={isDataLoading && !hasAnalysis}
-      />
+        />
+      </div>
 
       {/* SECTION 3: Benchmark Comparison - Top 5 Competitors */}
-      <EnhancedBenchmarkComparison
+      <div className="animate-fade-in" style={{ animationDelay: '0.15s' }}>
+        <EnhancedBenchmarkComparison
         categoryId={category?.id}
         analysisData={dashboardData.benchmarkData}
         isLoading={productsLoading}
-      />
+        />
+      </div>
 
       {/* SECTION 4: Brand Market Share */}
       {brandMarketShare.length > 0 ? (
-        <Card>
+        <Card className="animate-fade-in" style={{ animationDelay: '0.2s' }}>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg font-semibold text-[#1e3a5f]">
-              <Building2 className="w-5 h-5 text-[#0ea5e9]" />
+            <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
+              <Building2 className="w-5 h-5 text-primary" />
               Brand Market Share
             </CardTitle>
             <CardDescription>Revenue distribution across top brands</CardDescription>
@@ -481,7 +487,7 @@ export default function Dashboard() {
                             <div className="bg-popover border border-border rounded-md p-2 shadow-md">
                               <p className="font-medium text-sm">{data.fullName}</p>
                               <p className="text-sm text-muted-foreground">Share: {data.value}%</p>
-                              <p className="text-sm text-[#0ea5e9]">
+                              <p className="text-sm text-primary">
                                 ${(data.revenue / 1000).toFixed(1)}K/mo
                               </p>
                             </div>
@@ -508,10 +514,10 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       ) : productsLoading ? (
-        <Card>
+        <Card className="animate-fade-in" style={{ animationDelay: '0.2s' }}>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg font-semibold text-[#1e3a5f]">
-              <Building2 className="w-5 h-5 text-[#0ea5e9]" />
+            <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
+              <Building2 className="w-5 h-5 text-primary" />
               Brand Market Share
             </CardTitle>
           </CardHeader>
@@ -522,26 +528,33 @@ export default function Dashboard() {
       ) : null}
 
       {/* SECTION 5: 18-Point Analysis */}
-      <DeepDiveSection
+      <div className="animate-fade-in" style={{ animationDelay: '0.25s' }}>
+        <DeepDiveSection
         criteriaScores={dashboardData.criteriaScores}
         criteriaBreakdown={dashboardData.criteriaBreakdown}
         executiveSummary={analysis?.executive_summary || null}
         topOpportunities={dashboardData.topOpportunities}
         criticalRisks={dashboardData.criticalRisks}
         isLoading={analysisLoading && !hasAnalysis}
-      />
+        />
+      </div>
 
       {/* SECTION 5: Customer Intelligence */}
-      <CustomerIntelligence
+      <div className="animate-fade-in" style={{ animationDelay: '0.3s' }}>
+        <CustomerIntelligence
         customerInsights={dashboardData.customerIntelligence}
         isLoading={analysisLoading && !hasAnalysis}
-      />
+        />
+      </div>
 
       {/* SECTION 6: Financial Projections */}
-      <FinancialProjections financials={dashboardData.financials as Record<string, unknown> | null} />
+      <div className="animate-fade-in" style={{ animationDelay: '0.35s' }}>
+        <FinancialProjections financials={dashboardData.financials as Record<string, unknown> | null} />
+      </div>
 
       {/* SECTION 7: Launch Strategy + Action Plan */}
-      <LaunchPlanSection
+      <div className="animate-fade-in" style={{ animationDelay: '0.4s' }}>
+        <LaunchPlanSection
         goToMarket={dashboardData.goToMarket as {
           positioning?: string;
           messaging?: string[];
@@ -554,10 +567,13 @@ export default function Dashboard() {
         } | null}
         actionItems={dashboardData.actionItems}
         isLoading={analysisLoading && !hasAnalysis}
-      />
+        />
+      </div>
 
       {/* SECTION 8: Risk Analysis */}
-      <RiskAnalysis risks={dashboardData.risks as Record<string, unknown> | null} />
+      <div className="animate-fade-in" style={{ animationDelay: '0.45s' }}>
+        <RiskAnalysis risks={dashboardData.risks as Record<string, unknown> | null} />
+      </div>
     </div>
   );
 }

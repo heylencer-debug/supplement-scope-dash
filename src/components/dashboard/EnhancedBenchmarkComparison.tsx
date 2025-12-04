@@ -184,9 +184,31 @@ export function EnhancedBenchmarkComparison({
   const getOurBuyerProfile = (): string => {
     const profile = analysisData?.analysis_1_category_scores?.customer_insights?.buyer_profile;
     if (!profile) return 'Pending analysis';
-    // Truncate to first sentence
-    const firstSentence = profile.split(/[.!?]/)[0];
-    return firstSentence ? firstSentence + '.' : profile.substring(0, 100) + '...';
+    return profile;
+  };
+
+  // NEW: Get primary motivation for Our Concept from customer_insights
+  const getOurMotivation = (): string | null => {
+    const customerInsights = analysisData?.analysis_1_category_scores?.customer_insights as Record<string, unknown> | undefined;
+    if (!customerInsights) return null;
+    
+    // Try primary_motivation field
+    if (customerInsights.primary_motivation) {
+      return customerInsights.primary_motivation as string;
+    }
+    
+    // Try purchase_drivers or decision_drivers as fallback
+    const purchaseDrivers = customerInsights.purchase_drivers as string[] | undefined;
+    if (purchaseDrivers && purchaseDrivers.length > 0) {
+      return purchaseDrivers.slice(0, 2).join('. ');
+    }
+    
+    const decisionDrivers = customerInsights.decision_drivers as string[] | undefined;
+    if (decisionDrivers && decisionDrivers.length > 0) {
+      return decisionDrivers.slice(0, 2).join('. ');
+    }
+    
+    return null;
   };
 
   const getOurFormFactor = (): string => {
@@ -673,9 +695,19 @@ export function EnhancedBenchmarkComparison({
                     <Users className="w-3 h-3 text-violet-500" />
                     Target Audience
                   </p>
-                  <p className="text-[10px] text-muted-foreground">
-                    {getOurBuyerProfile()}
-                  </p>
+                  <div className="space-y-1.5">
+                    <p className="text-[10px] text-muted-foreground max-h-20 overflow-y-auto">
+                      {getOurBuyerProfile()}
+                    </p>
+                    {getOurMotivation() && (
+                      <div className="bg-violet-50 dark:bg-violet-950/30 rounded p-1.5 border border-violet-200 dark:border-violet-800">
+                        <p className="text-[9px] font-medium text-violet-700 dark:text-violet-300 mb-0.5">Primary Motivation</p>
+                        <p className="text-[10px] text-muted-foreground max-h-16 overflow-y-auto">
+                          {getOurMotivation()}
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Our Strengths */}

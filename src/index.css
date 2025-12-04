@@ -6,91 +6,91 @@
 
 @layer base {
   :root {
-    /* Softer lavender-gray background - more subtle */
-    --background: 240 10% 94%;
-    --foreground: 224 25% 20%;
+    /* Modern Soft UI - Light Grey/Blue background */
+    --background: 224 50% 98%;
+    --foreground: 228 47% 31%;
     
-    /* Pure white cards for contrast */
+    /* Pure white cards */
     --card: 0 0% 100%;
-    --card-foreground: 224 25% 20%;
+    --card-foreground: 228 47% 31%;
     
     /* Pure white popovers */
     --popover: 0 0% 100%;
-    --popover-foreground: 224 25% 20%;
+    --popover-foreground: 228 47% 31%;
     
-    /* Coral/Orange primary accent */
-    --primary: 24 95% 53%;
+    /* Deep Indigo primary accent */
+    --primary: 251 100% 55%;
     --primary-foreground: 0 0% 100%;
     
-    /* Very soft lavender secondary */
-    --secondary: 240 8% 97%;
-    --secondary-foreground: 224 25% 20%;
+    /* Soft secondary */
+    --secondary: 224 40% 96%;
+    --secondary-foreground: 228 47% 31%;
     
-    /* Softer muted tones */
-    --muted: 240 8% 95%;
-    --muted-foreground: 224 10% 46%;
+    /* Cool Grey muted tones */
+    --muted: 224 30% 95%;
+    --muted-foreground: 224 30% 66%;
     
-    /* Blue accent for variety */
-    --accent: 199 89% 48%;
+    /* Deep Indigo accent */
+    --accent: 251 100% 55%;
     --accent-foreground: 0 0% 100%;
     
     /* Destructive remains red */
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
     
-    /* Softer borders - barely visible */
-    --border: 240 8% 90%;
-    --input: 240 8% 92%;
-    --ring: 24 95% 53%;
+    /* Very soft borders */
+    --border: 224 30% 92%;
+    --input: 224 30% 94%;
+    --ring: 251 100% 55%;
     
-    /* Larger radius for softer corners - 16px */
-    --radius: 1rem;
+    /* Larger radius for softer corners - 20px */
+    --radius: 1.25rem;
     
-    /* Charcoal sidebar - slightly warmer */
-    --sidebar-background: 220 25% 18%;
-    --sidebar-foreground: 0 0% 96%;
-    --sidebar-primary: 24 95% 53%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 25% 24%;
-    --sidebar-accent-foreground: 0 0% 96%;
-    --sidebar-border: 220 25% 24%;
-    --sidebar-ring: 24 95% 53%;
+    /* Deep Indigo sidebar */
+    --sidebar-background: 251 100% 55%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 0 0% 100%;
+    --sidebar-primary-foreground: 251 100% 55%;
+    --sidebar-accent: 251 100% 48%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 251 100% 48%;
+    --sidebar-ring: 0 0% 100%;
     
-    /* Warmer chart colors */
-    --chart-1: 24 95% 53%;
-    --chart-2: 142 70% 40%;
-    --chart-3: 38 92% 50%;
-    --chart-4: 262 80% 60%;
-    --chart-5: 199 85% 50%;
+    /* Modern chart colors - Purple/Orange/Blue */
+    --chart-1: 251 100% 55%;
+    --chart-2: 24 95% 53%;
+    --chart-3: 199 89% 48%;
+    --chart-4: 142 70% 45%;
+    --chart-5: 262 80% 60%;
   }
 
   .dark {
     /* Dark mode - deeper background */
-    --background: 220 25% 10%;
-    --foreground: 240 10% 95%;
+    --background: 228 47% 8%;
+    --foreground: 224 50% 95%;
     
     /* Dark cards */
-    --card: 220 25% 14%;
-    --card-foreground: 240 10% 95%;
+    --card: 228 47% 12%;
+    --card-foreground: 224 50% 95%;
     
     /* Dark popovers */
-    --popover: 220 25% 14%;
-    --popover-foreground: 240 10% 95%;
+    --popover: 228 47% 12%;
+    --popover-foreground: 224 50% 95%;
     
-    /* Keep coral primary in dark mode */
-    --primary: 24 95% 53%;
+    /* Keep Deep Indigo primary in dark mode */
+    --primary: 251 100% 60%;
     --primary-foreground: 0 0% 100%;
     
     /* Dark secondary */
-    --secondary: 220 25% 18%;
-    --secondary-foreground: 240 10% 95%;
+    --secondary: 228 47% 16%;
+    --secondary-foreground: 224 50% 95%;
     
     /* Dark muted */
-    --muted: 220 25% 18%;
-    --muted-foreground: 240 8% 55%;
+    --muted: 228 47% 16%;
+    --muted-foreground: 224 30% 55%;
     
-    /* Blue accent */
-    --accent: 199 89% 48%;
+    /* Deep Indigo accent */
+    --accent: 251 100% 60%;
     --accent-foreground: 0 0% 100%;
     
     /* Destructive */
@@ -98,19 +98,19 @@
     --destructive-foreground: 0 0% 100%;
     
     /* Dark borders */
-    --border: 220 25% 22%;
-    --input: 220 25% 22%;
-    --ring: 24 95% 53%;
+    --border: 228 47% 20%;
+    --input: 228 47% 20%;
+    --ring: 251 100% 60%;
     
-    /* Dark sidebar */
-    --sidebar-background: 220 25% 12%;
-    --sidebar-foreground: 240 10% 95%;
-    --sidebar-primary: 24 95% 53%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 25% 18%;
-    --sidebar-accent-foreground: 240 10% 95%;
-    --sidebar-border: 220 25% 18%;
-    --sidebar-ring: 24 95% 53%;
+    /* Dark sidebar - keep indigo but darker */
+    --sidebar-background: 251 100% 40%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 0 0% 100%;
+    --sidebar-primary-foreground: 251 100% 40%;
+    --sidebar-accent: 251 100% 35%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 251 100% 35%;
+    --sidebar-ring: 0 0% 100%;
   }
 }
 
@@ -120,7 +120,11 @@
   }
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold text-foreground;
   }
 }
 

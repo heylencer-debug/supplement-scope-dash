@@ -326,7 +326,7 @@ export default function Dashboard() {
   const isDataLoading = analysisLoading || productsLoading;
 
   return (
-    <div className="space-y-8 pb-12">
+    <div className="space-y-10 pb-16">
       {/* SECTION 1: Hero Header with Executive Summary */}
       <HeroHeader
         categoryName={categoryName}

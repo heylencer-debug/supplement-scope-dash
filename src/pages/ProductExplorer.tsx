@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Search, Filter, Download, Star, TrendingUp, Loader2, Eye, Calendar, ChevronDown, ChevronRight, Target, FileText, ShieldCheck } from "lucide-react";
+import { Search, Filter, Download, Star, TrendingUp, Loader2, Eye, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -155,16 +155,15 @@ export default function ProductExplorer() {
     return ma?.trust_signals?.trust_score ?? null;
   };
 
-  const ScoreBadge = ({ score, icon: Icon }: { score: number | null; icon: React.ElementType }) => {
-    if (score === null) return <span className="text-muted-foreground">-</span>;
-    const color = score >= 7 ? "text-green-600 bg-green-500/10 border-green-500/30" 
-      : score >= 5 ? "text-yellow-600 bg-yellow-500/10 border-yellow-500/30" 
-      : "text-red-600 bg-red-500/10 border-red-500/30";
+  const ScoreBadge = ({ score, label }: { score: number | null; label: string }) => {
+    if (score === null) return null;
+    const color = score >= 7 ? "text-green-600 bg-green-500/10" 
+      : score >= 5 ? "text-yellow-600 bg-yellow-500/10" 
+      : "text-red-600 bg-red-500/10";
     return (
-      <Badge variant="outline" className={`${color} gap-1`}>
-        <Icon className="w-3 h-3" />
-        {score}
-      </Badge>
+      <span className={`${color} text-xs px-1.5 py-0.5 rounded font-medium`}>
+        {label[0]}:{score}
+      </span>
     );
   };
 
@@ -227,12 +226,12 @@ export default function ProductExplorer() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border overflow-x-auto">
+          <div className="rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-8"></TableHead>
-                  <TableHead className="w-12">
+                  <TableHead className="w-10">
                     <div className="flex items-center gap-2">
                       <span className="sr-only">Select</span>
                       {selectedProductIds.size > 0 && (
@@ -242,17 +241,15 @@ export default function ProductExplorer() {
                       )}
                     </div>
                   </TableHead>
-                  <TableHead>Product</TableHead>
-                  <TableHead className="text-right">Price</TableHead>
-                  <TableHead className="text-center">Rating</TableHead>
-                  <TableHead className="text-right">Reviews</TableHead>
-                  <TableHead className="text-right">Mo. Sales</TableHead>
-                  <TableHead className="text-right">Mo. Revenue</TableHead>
-                  <TableHead className="text-center">Mkt</TableHead>
-                  <TableHead className="text-center">Copy</TableHead>
-                  <TableHead className="text-center">Trust</TableHead>
-                  <TableHead className="text-center">Status</TableHead>
-                  <TableHead className="text-center">Actions</TableHead>
+                  <TableHead className="min-w-0">Product</TableHead>
+                  <TableHead className="text-right w-16">Price</TableHead>
+                  <TableHead className="text-center w-16">Rating</TableHead>
+                  <TableHead className="text-right w-20">Reviews</TableHead>
+                  <TableHead className="text-right w-20 hidden lg:table-cell">Mo. Sales</TableHead>
+                  <TableHead className="text-right w-24">Revenue</TableHead>
+                  <TableHead className="text-center w-28">Scores</TableHead>
+                  <TableHead className="text-center w-24 hidden lg:table-cell">Status</TableHead>
+                  <TableHead className="text-center w-12"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -310,7 +307,7 @@ export default function ProductExplorer() {
                           <TableCell className="text-right text-muted-foreground">
                             {(product.reviews ?? 0).toLocaleString()}
                           </TableCell>
-                          <TableCell className="text-right text-muted-foreground">
+                          <TableCell className="text-right text-muted-foreground hidden lg:table-cell">
                             {product.monthly_sales?.toLocaleString() ?? "-"}
                           </TableCell>
                           <TableCell className="text-right font-medium text-green-600">
@@ -319,19 +316,17 @@ export default function ProductExplorer() {
                               : "-"}
                           </TableCell>
                           <TableCell className="text-center">
-                            <ScoreBadge score={getMarketingScore(product)} icon={Target} />
+                            <div className="flex flex-wrap items-center justify-center gap-1">
+                              <ScoreBadge score={getMarketingScore(product)} label="Mkt" />
+                              <ScoreBadge score={getCopyScore(product)} label="Copy" />
+                              <ScoreBadge score={getTrustScore(product)} label="Trust" />
+                            </div>
                           </TableCell>
-                          <TableCell className="text-center">
-                            <ScoreBadge score={getCopyScore(product)} icon={FileText} />
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <ScoreBadge score={getTrustScore(product)} icon={ShieldCheck} />
-                          </TableCell>
-                          <TableCell className="text-center">
+                          <TableCell className="text-center hidden lg:table-cell">
                             <div className="flex items-center justify-center gap-1">
                               {product.bestseller && (
                                 <Badge variant="default" className="bg-accent text-xs">
-                                  Bestseller
+                                  Best
                                 </Badge>
                               )}
                               {product.amazon_choice && (
@@ -359,7 +354,7 @@ export default function ProductExplorer() {
                         </TableRow>
                         <CollapsibleContent asChild>
                           <tr>
-                            <td colSpan={13} className="p-0">
+                            <td colSpan={11} className="p-0">
                               <ProductAnalysisPanel 
                                 marketingAnalysis={product.marketing_analysis as any} 
                                 reviewAnalysis={product.review_analysis as any}

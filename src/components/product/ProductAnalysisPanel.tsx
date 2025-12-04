@@ -4,13 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { 
-  AlertTriangle, CheckCircle2, Lightbulb, Zap, Image as ImageIcon,
-  Users, MessageSquare, Target, TrendingUp, XCircle, Star, ThumbsUp, ThumbsDown,
-  Sparkles, FileText, ChevronDown, ChevronUp, Quote, Crown, UserCircle, Gift, List,
-  Palette, Sun, Layout, Heart
-} from "lucide-react";
-
+import { AlertTriangle, CheckCircle2, Lightbulb, Zap, Image as ImageIcon, Users, MessageSquare, Target, TrendingUp, XCircle, Star, ThumbsUp, ThumbsDown, Sparkles, FileText, ChevronDown, ChevronUp, Quote, Crown, UserCircle, Gift, List, Palette, Sun, Layout, Heart } from "lucide-react";
 interface ProductAnalysisPanelProps {
   marketingAnalysis: any;
   reviewAnalysis: any;
@@ -18,60 +12,62 @@ interface ProductAnalysisPanelProps {
 }
 
 // Expandable Text Component for long content
-function ExpandableText({ text, maxLength = 200 }: { text: string; maxLength?: number }) {
+function ExpandableText({
+  text,
+  maxLength = 200
+}: {
+  text: string;
+  maxLength?: number;
+}) {
   const [isExpanded, setIsExpanded] = useState(false);
-  
   if (!text || text.length <= maxLength) {
     return <span>{text}</span>;
   }
-  
-  return (
-    <div>
+  return <div>
       <span>{isExpanded ? text : `${text.slice(0, maxLength)}...`}</span>
-      <Button 
-        variant="link" 
-        size="sm" 
-        className="h-auto p-0 ml-1 text-xs"
-        onClick={() => setIsExpanded(!isExpanded)}
-      >
+      <Button variant="link" size="sm" className="h-auto p-0 ml-1 text-xs" onClick={() => setIsExpanded(!isExpanded)}>
         {isExpanded ? "Read Less" : "Read More"}
       </Button>
-    </div>
-  );
+    </div>;
 }
 
 // Score Badge Component
-function ScoreBadge({ score, max = 10 }: { score: number; max?: number }) {
-  const percentage = (score / max) * 100;
-  const colorClass = percentage >= 70 ? "bg-green-500/10 text-green-600 border-green-500/30" 
-    : percentage >= 40 ? "bg-amber-500/10 text-amber-600 border-amber-500/30"
-    : "bg-red-500/10 text-red-600 border-red-500/30";
-  
-  return (
-    <Badge variant="outline" className={colorClass}>
+function ScoreBadge({
+  score,
+  max = 10
+}: {
+  score: number;
+  max?: number;
+}) {
+  const percentage = score / max * 100;
+  const colorClass = percentage >= 70 ? "bg-green-500/10 text-green-600 border-green-500/30" : percentage >= 40 ? "bg-amber-500/10 text-amber-600 border-amber-500/30" : "bg-red-500/10 text-red-600 border-red-500/30";
+  return <Badge variant="outline" className={colorClass}>
       {score}/{max}
-    </Badge>
-  );
+    </Badge>;
 }
 
 // Priority Badge Component
-function PriorityBadge({ priority }: { priority: string }) {
+function PriorityBadge({
+  priority
+}: {
+  priority: string;
+}) {
   const priorityLower = priority?.toLowerCase() || 'medium';
-  const colorClass = priorityLower === 'high' ? "bg-red-500/10 text-red-600 border-red-500/30"
-    : priorityLower === 'medium' ? "bg-amber-500/10 text-amber-600 border-amber-500/30"
-    : "bg-green-500/10 text-green-600 border-green-500/30";
-  
-  return (
-    <Badge variant="outline" className={`text-xs capitalize ${colorClass}`}>
+  const colorClass = priorityLower === 'high' ? "bg-red-500/10 text-red-600 border-red-500/30" : priorityLower === 'medium' ? "bg-amber-500/10 text-amber-600 border-amber-500/30" : "bg-green-500/10 text-green-600 border-green-500/30";
+  return <Badge variant="outline" className={`text-xs capitalize ${colorClass}`}>
       {priority}
-    </Badge>
-  );
+    </Badge>;
 }
 
 // Enhanced Image Card with Hover Analysis - using expandable card pattern
-function SmartImageCard({ image, index }: { image: any; index: number }) {
+function SmartImageCard({
+  image,
+  index
+}: {
+  image: any;
+  index: number;
+}) {
   const [isExpanded, setIsExpanded] = useState(false);
-  
   const purposeColors: Record<string, string> = {
     "Product Feature": "bg-blue-500/90 text-white",
     "Lifestyle": "bg-purple-500/90 text-white",
@@ -82,45 +78,25 @@ function SmartImageCard({ image, index }: { image: any; index: number }) {
     "Benefit": "bg-amber-500/90 text-white",
     "Benefit / Lifestyle": "bg-orange-500/90 text-white",
     "Social Proof": "bg-indigo-500/90 text-white",
-    "Ingredient Highlight": "bg-cyan-500/90 text-white",
+    "Ingredient Highlight": "bg-cyan-500/90 text-white"
   };
-
-  return (
-    <div className="space-y-2">
-      <div 
-        className="relative aspect-square bg-muted rounded-lg overflow-hidden cursor-pointer group"
-        onClick={() => setIsExpanded(!isExpanded)}
-      >
-        <img 
-          src={image.url} 
-          alt={image.description || `Product image ${index + 1}`} 
-          className="w-full h-full object-cover transition-transform group-hover:scale-105"
-          onError={(e) => {
-            (e.target as HTMLImageElement).style.display = 'none';
-          }}
-        />
+  return <div className="space-y-2">
+      <div className="relative aspect-square bg-muted rounded-lg overflow-hidden cursor-pointer group" onClick={() => setIsExpanded(!isExpanded)}>
+        <img src={image.url} alt={image.description || `Product image ${index + 1}`} className="w-full h-full object-cover transition-transform group-hover:scale-105" onError={e => {
+        (e.target as HTMLImageElement).style.display = 'none';
+      }} />
         {/* Purpose Badge on top */}
-        {image.purpose && (
-          <div className="absolute top-2 left-2">
+        {image.purpose && <div className="absolute top-2 left-2">
             <Badge className={`text-xs ${purposeColors[image.purpose] || "bg-primary/90 text-white"}`}>
               {image.purpose}
             </Badge>
-          </div>
-        )}
+          </div>}
         {/* Score Badge */}
-        {image.score !== undefined && (
-          <div className="absolute top-2 right-2">
-            <Badge 
-              className={`text-xs ${
-                image.score >= 8 ? "bg-green-500/90 text-white" 
-                : image.score >= 6 ? "bg-amber-500/90 text-white"
-                : "bg-red-500/90 text-white"
-              }`}
-            >
+        {image.score !== undefined && <div className="absolute top-2 right-2">
+            <Badge className={`text-xs ${image.score >= 8 ? "bg-green-500/90 text-white" : image.score >= 6 ? "bg-amber-500/90 text-white" : "bg-red-500/90 text-white"}`}>
               {image.score}/10
             </Badge>
-          </div>
-        )}
+          </div>}
         {/* Click indicator */}
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
           <span className="text-white opacity-0 group-hover:opacity-100 text-xs bg-black/50 px-2 py-1 rounded">
@@ -130,197 +106,152 @@ function SmartImageCard({ image, index }: { image: any; index: number }) {
       </div>
       
       {/* Analysis shown below the image when expanded */}
-      {isExpanded && (image.description || image.analysis) && (
-        <div className="p-3 bg-muted/50 rounded-md border border-border text-xs space-y-2 animate-in fade-in slide-in-from-top-2">
-          {image.description && (
-            <p className="font-medium">{image.description}</p>
-          )}
-          {image.analysis && (
-            <div className="p-2 bg-primary/5 rounded border-l-2 border-primary">
+      {isExpanded && (image.description || image.analysis) && <div className="p-3 bg-muted/50 rounded-md border border-border text-xs space-y-2 animate-in fade-in slide-in-from-top-2">
+          {image.description && <p className="font-medium">{image.description}</p>}
+          {image.analysis && <div className="p-2 bg-primary/5 rounded border-l-2 border-primary">
               <p className="text-muted-foreground mb-1 font-semibold">Strategy:</p>
               <p className="leading-relaxed">{image.analysis}</p>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
+            </div>}
+        </div>}
+    </div>;
 }
 
 // Action Item Component with Priority and Rationale
-function EnhancedActionItem({ item }: { item: any }) {
+function EnhancedActionItem({
+  item
+}: {
+  item: any;
+}) {
   const [isExpanded, setIsExpanded] = useState(false);
   const suggestion = item.suggestion || item.text || '';
   const priority = item.priority || 'medium';
   const rationale = item.rationale || '';
-  
-  return (
-    <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
+  return <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
       <div className="border-l-4 border-l-primary/50 bg-muted/30 p-3 rounded-r-md">
         <div className="flex items-start gap-2">
           <PriorityBadge priority={priority} />
           <div className="flex-1">
             <p className="text-sm">{suggestion}</p>
-            {rationale && (
-              <CollapsibleTrigger asChild>
+            {rationale && <CollapsibleTrigger asChild>
                 <Button variant="ghost" size="sm" className="h-auto p-0 mt-1 text-xs text-muted-foreground hover:text-foreground">
                   {isExpanded ? <ChevronUp className="w-3 h-3 mr-1" /> : <ChevronDown className="w-3 h-3 mr-1" />}
                   {isExpanded ? "Hide rationale" : "Why this matters"}
                 </Button>
-              </CollapsibleTrigger>
-            )}
+              </CollapsibleTrigger>}
           </div>
         </div>
-        {rationale && (
-          <CollapsibleContent>
+        {rationale && <CollapsibleContent>
             <div className="mt-2 ml-16 p-2 bg-muted/50 rounded text-xs text-muted-foreground italic">
               {rationale}
             </div>
-          </CollapsibleContent>
-        )}
+          </CollapsibleContent>}
       </div>
-    </Collapsible>
-  );
+    </Collapsible>;
 }
 
 // NEW: Title Analysis Card Component
-function TitleAnalysisCard({ titleAnalysis }: { titleAnalysis: any }) {
+function TitleAnalysisCard({
+  titleAnalysis
+}: {
+  titleAnalysis: any;
+}) {
   if (!titleAnalysis) return null;
-  
   const clarityScore = titleAnalysis.clarity_score;
   const issues = titleAnalysis.issues || [];
-  
   if (clarityScore === undefined && issues.length === 0) return null;
-  
-  return (
-    <Card>
+  return <Card>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm flex items-center gap-2">
             <FileText className="w-4 h-4 text-blue-500" /> Title Analysis
           </CardTitle>
-          {clarityScore !== undefined && (
-            <div className="flex items-center gap-2">
+          {clarityScore !== undefined && <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">Clarity:</span>
               <ScoreBadge score={clarityScore} />
-            </div>
-          )}
+            </div>}
         </div>
       </CardHeader>
       <CardContent>
-        {issues.length > 0 ? (
-          <div className="space-y-2">
+        {issues.length > 0 ? <div className="space-y-2">
             <p className="text-xs text-muted-foreground font-medium mb-3">Issues Found:</p>
             <div className="space-y-2">
-              {issues.map((issue: string, i: number) => (
-                <div 
-                  key={i} 
-                  className="flex items-start gap-2 p-3 bg-amber-500/5 rounded-md border border-amber-500/20"
-                >
+              {issues.map((issue: string, i: number) => <div key={i} className="flex items-start gap-2 p-3 bg-amber-500/5 rounded-md border border-amber-500/20">
                   <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                   <span className="text-sm">{issue}</span>
-                </div>
-              ))}
+                </div>)}
             </div>
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground text-center py-4">
+          </div> : <p className="text-sm text-muted-foreground text-center py-4">
             No title issues identified
-          </p>
-        )}
+          </p>}
       </CardContent>
-    </Card>
-  );
+    </Card>;
 }
 
 // NEW: Bullet Analysis Card Component
-function BulletAnalysisCard({ bulletAnalysis }: { bulletAnalysis: any }) {
+function BulletAnalysisCard({
+  bulletAnalysis
+}: {
+  bulletAnalysis: any;
+}) {
   if (!bulletAnalysis) return null;
-  
   const benefitFocused = bulletAnalysis.benefit_focused;
   const strengths = bulletAnalysis.strengths || [];
   const weaknesses = bulletAnalysis.weaknesses || [];
-  
   if (strengths.length === 0 && weaknesses.length === 0 && benefitFocused === undefined) return null;
-  
-  return (
-    <Card>
+  return <Card>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm flex items-center gap-2">
             <List className="w-4 h-4 text-purple-500" /> Bullet Analysis
           </CardTitle>
-          {benefitFocused !== undefined && (
-            <Badge 
-              variant="outline" 
-              className={benefitFocused 
-                ? "bg-green-500/10 text-green-600 border-green-500/30" 
-                : "bg-amber-500/10 text-amber-600 border-amber-500/30"
-              }
-            >
+          {benefitFocused !== undefined && <Badge variant="outline" className={benefitFocused ? "bg-green-500/10 text-green-600 border-green-500/30" : "bg-amber-500/10 text-amber-600 border-amber-500/30"}>
               {benefitFocused ? "✓ Benefit-Focused" : "✗ Not Benefit-Focused"}
-            </Badge>
-          )}
+            </Badge>}
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Strengths */}
-        {strengths.length > 0 && (
-          <div>
+        {strengths.length > 0 && <div>
             <p className="text-xs text-muted-foreground font-medium mb-2 flex items-center gap-1">
               <CheckCircle2 className="w-3 h-3 text-green-600" /> Strengths ({strengths.length})
             </p>
             <div className="space-y-2">
-              {strengths.map((strength: string, i: number) => (
-                <div 
-                  key={i} 
-                  className="flex items-start gap-2 p-3 bg-green-500/5 rounded-md border border-green-500/20"
-                >
+              {strengths.map((strength: string, i: number) => <div key={i} className="flex items-start gap-2 p-3 bg-green-500/5 rounded-md border border-green-500/20">
                   <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
                   <span className="text-sm">{strength}</span>
-                </div>
-              ))}
+                </div>)}
             </div>
-          </div>
-        )}
+          </div>}
         
         {/* Weaknesses */}
-        {weaknesses.length > 0 && (
-          <div>
+        {weaknesses.length > 0 && <div>
             <p className="text-xs text-muted-foreground font-medium mb-2 flex items-center gap-1">
               <XCircle className="w-3 h-3 text-amber-600" /> Weaknesses ({weaknesses.length})
             </p>
             <div className="space-y-2">
-              {weaknesses.map((weakness: string, i: number) => (
-                <div 
-                  key={i} 
-                  className="flex items-start gap-2 p-3 bg-amber-500/5 rounded-md border border-amber-500/20"
-                >
+              {weaknesses.map((weakness: string, i: number) => <div key={i} className="flex items-start gap-2 p-3 bg-amber-500/5 rounded-md border border-amber-500/20">
                   <XCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                   <span className="text-sm">{weakness}</span>
-                </div>
-              ))}
+                </div>)}
             </div>
-          </div>
-        )}
+          </div>}
       </CardContent>
-    </Card>
-  );
+    </Card>;
 }
 
 // NEW: Visual Style Guide Card Component
-function VisualStyleGuideCard({ visualStyleGuide }: { visualStyleGuide: any }) {
+function VisualStyleGuideCard({
+  visualStyleGuide
+}: {
+  visualStyleGuide: any;
+}) {
   if (!visualStyleGuide) return null;
-  
   const colorPalette = visualStyleGuide.color_palette || '';
   const moodKeywords = visualStyleGuide.mood_keywords || [];
   const lightingStyle = visualStyleGuide.lighting_style || '';
   const compositionStyle = visualStyleGuide.composition_style || '';
-  
   if (!colorPalette && moodKeywords.length === 0 && !lightingStyle && !compositionStyle) return null;
-  
-  return (
-    <Card>
+  return <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm flex items-center gap-2">
           <Palette className="w-4 h-4 text-pink-500" /> Visual Style Guide
@@ -328,253 +259,193 @@ function VisualStyleGuideCard({ visualStyleGuide }: { visualStyleGuide: any }) {
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Color Palette */}
-        {colorPalette && (
-          <div className="p-3 bg-pink-500/5 rounded-lg border border-pink-500/20">
+        {colorPalette && <div className="p-3 bg-pink-500/5 rounded-lg border border-pink-500/20">
             <div className="flex items-center gap-2 mb-2">
               <Palette className="w-4 h-4 text-pink-500" />
               <span className="text-xs font-semibold text-muted-foreground">Color Palette</span>
             </div>
             <p className="text-sm">{colorPalette}</p>
-          </div>
-        )}
+          </div>}
         
         {/* Mood Keywords */}
-        {moodKeywords.length > 0 && (
-          <div className="p-3 bg-purple-500/5 rounded-lg border border-purple-500/20">
+        {moodKeywords.length > 0 && <div className="p-3 bg-purple-500/5 rounded-lg border border-purple-500/20">
             <div className="flex items-center gap-2 mb-2">
               <Heart className="w-4 h-4 text-purple-500" />
               <span className="text-xs font-semibold text-muted-foreground">Mood Keywords</span>
             </div>
             <div className="flex flex-wrap gap-2">
-              {moodKeywords.map((keyword: string, i: number) => (
-                <Badge key={i} variant="secondary" className="text-xs">
+              {moodKeywords.map((keyword: string, i: number) => <Badge key={i} variant="secondary" className="text-xs">
                   {keyword}
-                </Badge>
-              ))}
+                </Badge>)}
             </div>
-          </div>
-        )}
+          </div>}
         
         {/* Lighting Style */}
-        {lightingStyle && (
-          <div className="p-3 bg-amber-500/5 rounded-lg border border-amber-500/20">
+        {lightingStyle && <div className="p-3 bg-amber-500/5 rounded-lg border border-amber-500/20">
             <div className="flex items-center gap-2 mb-2">
               <Sun className="w-4 h-4 text-amber-500" />
               <span className="text-xs font-semibold text-muted-foreground">Lighting Style</span>
             </div>
             <p className="text-sm">{lightingStyle}</p>
-          </div>
-        )}
+          </div>}
         
         {/* Composition Style */}
-        {compositionStyle && (
-          <div className="p-3 bg-blue-500/5 rounded-lg border border-blue-500/20">
+        {compositionStyle && <div className="p-3 bg-blue-500/5 rounded-lg border border-blue-500/20">
             <div className="flex items-center gap-2 mb-2">
               <Layout className="w-4 h-4 text-blue-500" />
               <span className="text-xs font-semibold text-muted-foreground">Composition Style</span>
             </div>
             <p className="text-sm">{compositionStyle}</p>
-          </div>
-        )}
+          </div>}
       </CardContent>
-    </Card>
-  );
+    </Card>;
 }
 
 // Creative Strategy Card Component - Enhanced
-function CreativeStrategyCard({ creativeBrief }: { creativeBrief: any }) {
+function CreativeStrategyCard({
+  creativeBrief
+}: {
+  creativeBrief: any;
+}) {
   if (!creativeBrief) return null;
-  
   const brandIdentity = creativeBrief.brand_identity || {};
   const targetPersona = creativeBrief.target_persona || {};
   const winningOffers = creativeBrief.winning_offers || {};
   const uniqueSellingProps = creativeBrief.unique_selling_props || [];
-  
   const hasData = brandIdentity.archetype || targetPersona.demographic || winningOffers.analysis || uniqueSellingProps.length > 0;
   if (!hasData) return null;
-  
-  return (
-    <Card>
+  return <Card>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-purple-500" /> Creative Strategy
           </CardTitle>
           {/* Brand Consistency Score */}
-          {brandIdentity.consistency !== undefined && (
-            <div className="flex items-center gap-2">
+          {brandIdentity.consistency !== undefined && <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">Consistency:</span>
               <ScoreBadge score={brandIdentity.consistency} />
-            </div>
-          )}
+            </div>}
         </div>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Brand Archetype */}
-          {(brandIdentity.archetype || brandIdentity.tone) && (
-            <div className="p-3 bg-purple-500/5 rounded-lg border border-purple-500/20">
+          {(brandIdentity.archetype || brandIdentity.tone) && <div className="p-3 bg-purple-500/5 rounded-lg border border-purple-500/20">
               <div className="flex items-center gap-2 mb-2">
                 <Crown className="w-4 h-4 text-purple-500" />
                 <span className="text-xs font-semibold text-muted-foreground">Brand Archetype</span>
               </div>
-              {brandIdentity.archetype && (
-                <Badge className="bg-purple-500/20 text-purple-700 border-purple-500/30 mb-2">
+              {brandIdentity.archetype && <Badge className="text-purple-700 mb-2 rounded-none opacity-100 border-muted bg-white/0">
                   {brandIdentity.archetype}
-                </Badge>
-              )}
-              {brandIdentity.tone && (
-                <p className="text-sm text-muted-foreground">{brandIdentity.tone}</p>
-              )}
-            </div>
-          )}
+                </Badge>}
+              {brandIdentity.tone && <p className="text-sm text-muted-foreground">{brandIdentity.tone}</p>}
+            </div>}
           
           {/* Target Persona - Enhanced with primary_motivation */}
-          {(targetPersona.demographic || targetPersona.psychographic || targetPersona.primary_motivation) && (
-            <div className="p-3 bg-blue-500/5 rounded-lg border border-blue-500/20">
+          {(targetPersona.demographic || targetPersona.psychographic || targetPersona.primary_motivation) && <div className="p-3 bg-blue-500/5 rounded-lg border border-blue-500/20">
               <div className="flex items-center gap-2 mb-2">
                 <UserCircle className="w-4 h-4 text-blue-500" />
                 <span className="text-xs font-semibold text-muted-foreground">Target Persona</span>
               </div>
-              {targetPersona.demographic && (
-                <p className="text-sm font-medium mb-1">{targetPersona.demographic}</p>
-              )}
-              {targetPersona.psychographic && (
-                <p className="text-xs text-muted-foreground mb-2">{targetPersona.psychographic}</p>
-              )}
-              {targetPersona.primary_motivation && (
-                <div className="mt-2 p-2 bg-blue-500/10 rounded-md border-l-2 border-blue-500">
+              {targetPersona.demographic && <p className="text-sm font-medium mb-1">{targetPersona.demographic}</p>}
+              {targetPersona.psychographic && <p className="text-xs text-muted-foreground mb-2">{targetPersona.psychographic}</p>}
+              {targetPersona.primary_motivation && <div className="mt-2 p-2 bg-blue-500/10 rounded-md border-l-2 border-blue-500">
                   <p className="text-xs font-semibold text-muted-foreground mb-1">Primary Motivation:</p>
                   <p className="text-sm">{targetPersona.primary_motivation}</p>
-                </div>
-              )}
-            </div>
-          )}
+                </div>}
+            </div>}
           
           {/* Winning Offer - Enhanced with effectiveness */}
-          {(winningOffers.analysis || winningOffers.effectiveness) && (
-            <div className="p-3 bg-amber-500/5 rounded-lg border border-amber-500/20 md:col-span-2">
+          {(winningOffers.analysis || winningOffers.effectiveness) && <div className="p-3 bg-amber-500/5 rounded-lg border border-amber-500/20 md:col-span-2">
               <div className="flex items-center gap-2 mb-2">
                 <Gift className="w-4 h-4 text-amber-500" />
                 <span className="text-xs font-semibold text-muted-foreground">Winning Offer Analysis</span>
               </div>
-              {winningOffers.analysis && (
-                <div className="p-3 bg-amber-500/10 rounded-md mb-3">
+              {winningOffers.analysis && <div className="p-3 bg-amber-500/10 rounded-md mb-3">
                   <ExpandableText text={winningOffers.analysis} maxLength={300} />
-                </div>
-              )}
-              {winningOffers.effectiveness && (
-                <div className="p-3 bg-green-500/5 rounded-md border border-green-500/20">
+                </div>}
+              {winningOffers.effectiveness && <div className="p-3 bg-green-500/5 rounded-md border border-green-500/20">
                   <p className="text-xs font-semibold text-muted-foreground mb-1 flex items-center gap-1">
                     <TrendingUp className="w-3 h-3 text-green-600" /> Effectiveness Assessment
                   </p>
                   <p className="text-sm">{winningOffers.effectiveness}</p>
-                </div>
-              )}
-            </div>
-          )}
+                </div>}
+            </div>}
           
           {/* USP List */}
-          {uniqueSellingProps.length > 0 && (
-            <div className="p-3 bg-green-500/5 rounded-lg border border-green-500/20 md:col-span-2">
+          {uniqueSellingProps.length > 0 && <div className="p-3 bg-green-500/5 rounded-lg border border-green-500/20 md:col-span-2">
               <div className="flex items-center gap-2 mb-2">
                 <List className="w-4 h-4 text-green-500" />
                 <span className="text-xs font-semibold text-muted-foreground">Unique Selling Props</span>
                 <Badge variant="outline" className="ml-auto text-xs">{uniqueSellingProps.length}</Badge>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
-                {uniqueSellingProps.map((usp: string, i: number) => (
-                  <div key={i} className="flex items-start gap-2 text-sm">
+                {uniqueSellingProps.map((usp: string, i: number) => <div key={i} className="flex items-start gap-2 text-sm">
                     <CheckCircle2 className="w-3 h-3 text-green-500 shrink-0 mt-1" />
                     <span>{usp}</span>
-                  </div>
-                ))}
+                  </div>)}
               </div>
-            </div>
-          )}
+            </div>}
         </div>
       </CardContent>
-    </Card>
-  );
+    </Card>;
 }
 
 // Copy Assets / Swipe File Component
-function CopyAssetsCard({ copyAssets }: { copyAssets: any }) {
+function CopyAssetsCard({
+  copyAssets
+}: {
+  copyAssets: any;
+}) {
   const bestHooks = copyAssets?.best_hooks || [];
   const clarityScore = copyAssets?.clarity_score;
   const benefitsFocus = copyAssets?.benefits_focus;
-  
-  return (
-    <Card>
+  return <Card>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm flex items-center gap-2">
             <FileText className="w-4 h-4 text-indigo-500" /> Copy Assets
             <Badge variant="outline" className="ml-2 text-xs">{bestHooks.length} hooks</Badge>
-            {benefitsFocus !== undefined && (
-              <Badge 
-                variant="outline" 
-                className={`text-xs ${benefitsFocus 
-                  ? "bg-green-500/10 text-green-600 border-green-500/30" 
-                  : "bg-amber-500/10 text-amber-600 border-amber-500/30"
-                }`}
-              >
+            {benefitsFocus !== undefined && <Badge variant="outline" className={`text-xs ${benefitsFocus ? "bg-green-500/10 text-green-600 border-green-500/30" : "bg-amber-500/10 text-amber-600 border-amber-500/30"}`}>
                 {benefitsFocus ? "✓ Benefits Focus" : "✗ Feature-Heavy"}
-              </Badge>
-            )}
+              </Badge>}
           </CardTitle>
-          {clarityScore !== undefined && clarityScore !== null && (
-            <div className="flex items-center gap-2">
+          {clarityScore !== undefined && clarityScore !== null && <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">Clarity Score:</span>
               <ScoreBadge score={clarityScore} />
-            </div>
-          )}
+            </div>}
         </div>
       </CardHeader>
       <CardContent>
-        {bestHooks.length > 0 ? (
-          <div className="space-y-2">
+        {bestHooks.length > 0 ? <div className="space-y-2">
             <p className="text-xs text-muted-foreground font-medium mb-3">Killer Hooks (ALL-CAPS phrases from listing):</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              {bestHooks.map((hook: string, i: number) => (
-                <div 
-                  key={i} 
-                  className="p-3 bg-indigo-500/5 rounded-md border border-indigo-500/20 hover:bg-indigo-500/10 transition-colors"
-                >
+              {bestHooks.map((hook: string, i: number) => <div key={i} className="p-3 bg-indigo-500/5 rounded-md border border-indigo-500/20 hover:bg-indigo-500/10 transition-colors">
                   <div className="flex items-start gap-2">
                     <Quote className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
                     <span className="text-sm font-semibold">{hook}</span>
                   </div>
-                </div>
-              ))}
+                </div>)}
             </div>
-          </div>
-        ) : (
-          <div className="text-center py-6 text-muted-foreground">
+          </div> : <div className="text-center py-6 text-muted-foreground">
             <Quote className="w-8 h-8 mx-auto mb-2 opacity-30" />
             <p className="text-sm">No killer hooks extracted yet.</p>
             <p className="text-xs mt-1">This section shows ALL-CAPS phrases from the listing.</p>
-          </div>
-        )}
+          </div>}
       </CardContent>
-    </Card>
-  );
+    </Card>;
 }
-
-export default function ProductAnalysisPanel({ 
-  marketingAnalysis, 
+export default function ProductAnalysisPanel({
+  marketingAnalysis,
   reviewAnalysis,
-  imageUrls 
+  imageUrls
 }: ProductAnalysisPanelProps) {
   if (!marketingAnalysis && !reviewAnalysis) {
-    return (
-      <div className="p-6 text-center text-muted-foreground">
+    return <div className="p-6 text-center text-muted-foreground">
         <AlertTriangle className="w-8 h-8 mx-auto mb-2 opacity-50" />
         <p>No analysis available for this product yet.</p>
-      </div>
-    );
+      </div>;
   }
-
   const ma = marketingAnalysis || {};
   const ra = reviewAnalysis || {};
 
@@ -585,19 +456,19 @@ export default function ProductAnalysisPanel({
   const scoreCard = ma.score_card || {};
   const visualGallery = ma.visual_gallery || {};
   const actionPlanRaw = ma.action_plan || [];
-  
+
   // NEW: Creative Brief data
   const creativeBrief = ma.creative_brief || {};
-  
+
   // NEW: Copy Assets data - check multiple locations
   const copyAssets = ma.copy_assets || details.copy_assets || {};
-  
+
   // NEW: Title Analysis from copy_analysis
   const titleAnalysis = copyAnalysis.title_analysis || {};
-  
+
   // NEW: Bullet Analysis from copy_analysis
   const bulletAnalysis = copyAnalysis.bullet_analysis || {};
-  
+
   // NEW: Visual Style Guide from creative_brief
   const visualStyleGuide = creativeBrief.visual_style_guide || {};
 
@@ -646,9 +517,19 @@ export default function ProductAnalysisPanel({
     }
     // String format
     if (typeof item === 'string') {
-      return { text: item, suggestion: item, priority: 'medium', rationale: '' };
+      return {
+        text: item,
+        suggestion: item,
+        priority: 'medium',
+        rationale: ''
+      };
     }
-    return { text: '', suggestion: '', priority: 'medium', rationale: '' };
+    return {
+      text: '',
+      suggestion: '',
+      priority: 'medium',
+      rationale: ''
+    };
   }).filter((item: any) => item.text.length > 0 || item.suggestion.length > 0);
 
   // Extract REVIEW ANALYSIS data
@@ -660,32 +541,15 @@ export default function ProductAnalysisPanel({
   const productInfo = ra.product_info || {};
 
   // Check if we have data
-  const hasMarketingData = 
-    copyHooks.length > 0 ||
-    primaryPraises.length > 0 ||
-    primaryComplaints.length > 0 ||
-    gapAnalysis.length > 0 ||
-    Object.keys(scoreCard).length > 0 ||
-    images.length > 0 ||
-    actionPlan.length > 0 ||
-    Object.keys(creativeBrief).length > 0 ||
-    Object.keys(copyAssets).length > 0 ||
-    Object.keys(titleAnalysis).length > 0 ||
-    Object.keys(bulletAnalysis).length > 0;
-
+  const hasMarketingData = copyHooks.length > 0 || primaryPraises.length > 0 || primaryComplaints.length > 0 || gapAnalysis.length > 0 || Object.keys(scoreCard).length > 0 || images.length > 0 || actionPlan.length > 0 || Object.keys(creativeBrief).length > 0 || Object.keys(copyAssets).length > 0 || Object.keys(titleAnalysis).length > 0 || Object.keys(bulletAnalysis).length > 0;
   const hasReviewData = Object.keys(ra).length > 0;
-
   if (!hasMarketingData && !hasReviewData) {
-    return (
-      <div className="p-6 text-center text-muted-foreground">
+    return <div className="p-6 text-center text-muted-foreground">
         <AlertTriangle className="w-8 h-8 mx-auto mb-2 opacity-50" />
         <p>Analysis data is still being processed.</p>
-      </div>
-    );
+      </div>;
   }
-
-  return (
-    <div className="p-4 bg-muted/30 border-t">
+  return <div className="p-4 bg-muted/30 border-t">
       <Tabs defaultValue={hasMarketingData ? "strategy" : "reviews"} className="w-full">
         <TabsList className="grid grid-cols-5 w-full mb-4">
           <TabsTrigger value="strategy" className="text-xs gap-1">
@@ -714,60 +578,40 @@ export default function ProductAnalysisPanel({
           <VisualStyleGuideCard visualStyleGuide={visualStyleGuide} />
           
           {/* Score Card Summary */}
-          {(overallGrade || metrics.length > 0) && (
-            <Card>
+          {(overallGrade || metrics.length > 0) && <Card>
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm flex items-center gap-2">
                     <TrendingUp className="w-4 h-4" /> Performance Score Card
                   </CardTitle>
-                  {overallGrade && (
-                    <div className="flex items-center gap-2">
-                      <Badge 
-                        variant="outline" 
-                        className={`text-lg px-3 py-1 ${
-                          scoreColor === "green-500" ? "bg-green-500/10 text-green-600 border-green-500/30" :
-                          scoreColor === "amber-500" ? "bg-amber-500/10 text-amber-600 border-amber-500/30" :
-                          "bg-red-500/10 text-red-600 border-red-500/30"
-                        }`}
-                      >
+                  {overallGrade && <div className="flex items-center gap-2">
+                      <Badge variant="outline" className={`text-lg px-3 py-1 ${scoreColor === "green-500" ? "bg-green-500/10 text-green-600 border-green-500/30" : scoreColor === "amber-500" ? "bg-amber-500/10 text-amber-600 border-amber-500/30" : "bg-red-500/10 text-red-600 border-red-500/30"}`}>
                         Grade: {overallGrade}
                       </Badge>
-                      {overallScore !== undefined && (
-                        <Badge variant="outline">Score: {overallScore}/10</Badge>
-                      )}
-                    </div>
-                  )}
+                      {overallScore !== undefined && <Badge variant="outline">Score: {overallScore}/10</Badge>}
+                    </div>}
                 </div>
               </CardHeader>
               <CardContent>
-                {metrics.length > 0 && (
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {metrics.length > 0 && <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     {metrics.map((metric: any, i: number) => {
-                      const colorMap: Record<string, string> = {
-                        "green-500": "text-green-600",
-                        "amber-500": "text-amber-600",
-                        "red-500": "text-red-600",
-                      };
-                      const valueColor = metric.color ? (colorMap[metric.color] || "text-foreground") : 
-                        (metric.value >= 7 ? "text-green-600" : metric.value >= 4 ? "text-amber-600" : "text-red-600");
-                      
-                      return (
-                        <div key={i} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                const colorMap: Record<string, string> = {
+                  "green-500": "text-green-600",
+                  "amber-500": "text-amber-600",
+                  "red-500": "text-red-600"
+                };
+                const valueColor = metric.color ? colorMap[metric.color] || "text-foreground" : metric.value >= 7 ? "text-green-600" : metric.value >= 4 ? "text-amber-600" : "text-red-600";
+                return <div key={i} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                           <span className="text-sm font-medium">{metric.label}</span>
                           <span className={`text-lg font-bold ${valueColor}`}>{metric.value}/10</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+                        </div>;
+              })}
+                  </div>}
               </CardContent>
-            </Card>
-          )}
+            </Card>}
           
           {/* Key Insights from Reviews */}
-          {keyInsights.length > 0 && (
-            <Card>
+          {keyInsights.length > 0 && <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
                   <Lightbulb className="w-4 h-4 text-primary" /> Key Insights
@@ -775,25 +619,20 @@ export default function ProductAnalysisPanel({
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {keyInsights.slice(0, 5).map((insight: string, i: number) => (
-                    <div key={i} className="flex items-start gap-2 p-2 bg-primary/5 rounded-md">
+                  {keyInsights.slice(0, 5).map((insight: string, i: number) => <div key={i} className="flex items-start gap-2 p-2 bg-primary/5 rounded-md">
                       <Lightbulb className="w-3 h-3 text-primary shrink-0 mt-1" />
                       <span className="text-sm">{insight}</span>
-                    </div>
-                  ))}
+                    </div>)}
                 </div>
               </CardContent>
-            </Card>
-          )}
+            </Card>}
           
-          {!Object.keys(creativeBrief).length && !overallGrade && !metrics.length && !keyInsights.length && (
-            <Card>
+          {!Object.keys(creativeBrief).length && !overallGrade && !metrics.length && !keyInsights.length && <Card>
               <CardContent className="py-8 text-center text-muted-foreground">
                 <Sparkles className="w-8 h-8 mx-auto mb-2 opacity-50" />
                 <p>No creative strategy data available yet.</p>
               </CardContent>
-            </Card>
-          )}
+            </Card>}
         </TabsContent>
 
         {/* TAB 2: COPY ANALYSIS & SWIPE FILE */}
@@ -808,8 +647,7 @@ export default function ProductAnalysisPanel({
           <CopyAssetsCard copyAssets={copyAssets} />
           
           {/* Clarity Score (legacy) */}
-          {copyClarity !== undefined && !copyAssets.clarity_score && !titleAnalysis.clarity_score && (
-            <Card>
+          {copyClarity !== undefined && !copyAssets.clarity_score && !titleAnalysis.clarity_score && <Card>
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm flex items-center gap-2">
@@ -818,12 +656,10 @@ export default function ProductAnalysisPanel({
                   <ScoreBadge score={copyClarity} />
                 </div>
               </CardHeader>
-            </Card>
-          )}
+            </Card>}
 
           {/* Copy Hooks (legacy) */}
-          {copyHooks.length > 0 && (
-            <Card>
+          {copyHooks.length > 0 && <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
                   <Lightbulb className="w-4 h-4" /> What the Copy Does Well
@@ -832,33 +668,26 @@ export default function ProductAnalysisPanel({
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {copyHooks.map((hook: string, i: number) => (
-                    <div key={i} className="flex items-start gap-2 p-3 bg-green-500/5 rounded-md border border-green-500/20">
+                  {copyHooks.map((hook: string, i: number) => <div key={i} className="flex items-start gap-2 p-3 bg-green-500/5 rounded-md border border-green-500/20">
                       <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
                       <span className="text-sm">{hook}</span>
-                    </div>
-                  ))}
+                    </div>)}
                 </div>
               </CardContent>
-            </Card>
-          )}
+            </Card>}
           
-          {!copyAssets.best_hooks?.length && copyHooks.length === 0 && copyClarity === undefined && 
-           !titleAnalysis.issues?.length && !bulletAnalysis.strengths?.length && !bulletAnalysis.weaknesses?.length && (
-            <Card>
+          {!copyAssets.best_hooks?.length && copyHooks.length === 0 && copyClarity === undefined && !titleAnalysis.issues?.length && !bulletAnalysis.strengths?.length && !bulletAnalysis.weaknesses?.length && <Card>
               <CardContent className="py-8 text-center text-muted-foreground">
                 <FileText className="w-8 h-8 mx-auto mb-2 opacity-50" />
                 <p>No copy analysis data available yet.</p>
               </CardContent>
-            </Card>
-          )}
+            </Card>}
         </TabsContent>
 
         {/* TAB 3: GAP ANALYSIS & SENTIMENT */}
         <TabsContent value="sentiment" className="mt-0 space-y-4">
           {/* Gap Analysis - Full Text Warning Box */}
-          {gapAnalysis && (
-            <Card className="border-amber-500/30">
+          {gapAnalysis && <Card className="border-amber-500/30">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 text-amber-600" /> Gap Analysis
@@ -875,8 +704,7 @@ export default function ProductAnalysisPanel({
                   </div>
                 </div>
               </CardContent>
-            </Card>
-          )}
+            </Card>}
           
           {/* Praises & Complaints */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -891,20 +719,14 @@ export default function ProductAnalysisPanel({
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {primaryPraises.length > 0 ? (
-                  <div className="space-y-2">
-                    {primaryPraises.map((praise: string, i: number) => (
-                      <div key={i} className="flex items-start gap-2 p-2 bg-green-500/5 rounded-md">
+                {primaryPraises.length > 0 ? <div className="space-y-2">
+                    {primaryPraises.map((praise: string, i: number) => <div key={i} className="flex items-start gap-2 p-2 bg-green-500/5 rounded-md">
                         <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
                         <span className="text-sm">{praise}</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground text-center py-4">
+                      </div>)}
+                  </div> : <p className="text-sm text-muted-foreground text-center py-4">
                     No praises identified
-                  </p>
-                )}
+                  </p>}
               </CardContent>
             </Card>
 
@@ -919,29 +741,21 @@ export default function ProductAnalysisPanel({
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {primaryComplaints.length > 0 ? (
-                  <div className="space-y-2">
-                    {primaryComplaints.map((complaint: string, i: number) => (
-                      <div key={i} className="flex items-start gap-2 p-2 bg-amber-500/5 rounded-md">
+                {primaryComplaints.length > 0 ? <div className="space-y-2">
+                    {primaryComplaints.map((complaint: string, i: number) => <div key={i} className="flex items-start gap-2 p-2 bg-amber-500/5 rounded-md">
                         <XCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                         <span className="text-sm">{complaint}</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground text-center py-4">
+                      </div>)}
+                  </div> : <p className="text-sm text-muted-foreground text-center py-4">
                     No complaints identified
-                  </p>
-                )}
+                  </p>}
               </CardContent>
             </Card>
           </div>
           
           {/* Pain Points & Positive Themes from Reviews */}
-          {(painPoints.length > 0 || positiveThemes.length > 0) && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {painPoints.length > 0 && (
-                <Card>
+          {(painPoints.length > 0 || positiveThemes.length > 0) && <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {painPoints.length > 0 && <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm flex items-center gap-2">
                       <AlertTriangle className="w-4 h-4 text-destructive" /> Review Pain Points
@@ -950,23 +764,17 @@ export default function ProductAnalysisPanel({
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2">
-                      {painPoints.slice(0, 5).map((point: any, i: number) => (
-                        <div key={i} className="p-2 bg-destructive/5 rounded-md border border-destructive/20">
+                      {painPoints.slice(0, 5).map((point: any, i: number) => <div key={i} className="p-2 bg-destructive/5 rounded-md border border-destructive/20">
                           <p className="text-sm font-medium">{point.issue || point}</p>
-                          {point.affected_percentage && (
-                            <p className="text-xs text-muted-foreground mt-1">
+                          {point.affected_percentage && <p className="text-xs text-muted-foreground mt-1">
                               {point.affected_percentage}% affected
-                            </p>
-                          )}
-                        </div>
-                      ))}
+                            </p>}
+                        </div>)}
                     </div>
                   </CardContent>
-                </Card>
-              )}
+                </Card>}
 
-              {positiveThemes.length > 0 && (
-                <Card>
+              {positiveThemes.length > 0 && <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm flex items-center gap-2">
                       <Star className="w-4 h-4 text-green-600" /> Positive Themes
@@ -975,56 +783,42 @@ export default function ProductAnalysisPanel({
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2">
-                      {positiveThemes.slice(0, 5).map((theme: any, i: number) => (
-                        <div key={i} className="p-2 bg-green-500/5 rounded-md border border-green-500/20">
+                      {positiveThemes.slice(0, 5).map((theme: any, i: number) => <div key={i} className="p-2 bg-green-500/5 rounded-md border border-green-500/20">
                           <p className="text-sm font-medium">{theme.theme || theme}</p>
-                          {theme.frequency && (
-                            <p className="text-xs text-muted-foreground mt-1">
+                          {theme.frequency && <p className="text-xs text-muted-foreground mt-1">
                               {theme.frequency}% mention rate
-                            </p>
-                          )}
-                        </div>
-                      ))}
+                            </p>}
+                        </div>)}
                     </div>
                   </CardContent>
-                </Card>
-              )}
-            </div>
-          )}
+                </Card>}
+            </div>}
         </TabsContent>
 
         {/* TAB 4: SMART VISUAL GALLERY */}
         <TabsContent value="visuals" className="mt-0 space-y-4">
           {/* Target Audience / Vibe */}
-          {(vibe || demographics.primary_audience) && (
-            <Card>
+          {(vibe || demographics.primary_audience) && <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
                   <Users className="w-4 h-4" /> Visual Strategy & Demographics
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {vibe && (
-                  <div>
+                {vibe && <div>
                     <p className="text-xs text-muted-foreground mb-1 font-medium">Visual Vibe:</p>
                     <p className="text-sm p-3 bg-muted/50 rounded-md">{vibe}</p>
-                  </div>
-                )}
-                {demographics.primary_audience && (
-                  <div>
+                  </div>}
+                {demographics.primary_audience && <div>
                     <p className="text-xs text-muted-foreground mb-1 font-medium">Primary Audience:</p>
                     <p className="text-sm p-3 bg-muted/50 rounded-md">{demographics.primary_audience}</p>
-                  </div>
-                )}
-                {demographics.relatability_score !== undefined && (
-                  <div className="flex items-center gap-2">
+                  </div>}
+                {demographics.relatability_score !== undefined && <div className="flex items-center gap-2">
                     <p className="text-xs text-muted-foreground font-medium">Relatability Score:</p>
                     <ScoreBadge score={demographics.relatability_score} />
-                  </div>
-                )}
+                  </div>}
               </CardContent>
-            </Card>
-          )}
+            </Card>}
 
           {/* Smart Image Gallery with Hover Analysis */}
           <Card>
@@ -1038,17 +832,11 @@ export default function ProductAnalysisPanel({
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {images.length > 0 ? (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {images.map((image: any, i: number) => (
-                    <SmartImageCard key={i} image={image} index={i} />
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-4">
+              {images.length > 0 ? <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {images.map((image: any, i: number) => <SmartImageCard key={i} image={image} index={i} />)}
+                </div> : <p className="text-sm text-muted-foreground text-center py-4">
                   No image analysis available
-                </p>
-              )}
+                </p>}
             </CardContent>
           </Card>
         </TabsContent>
@@ -1065,23 +853,16 @@ export default function ProductAnalysisPanel({
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {actionPlan.length > 0 ? (
-                <div className="space-y-3">
-                  {actionPlan.map((item: any, i: number) => (
-                    <EnhancedActionItem key={i} item={item} />
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-4">
+              {actionPlan.length > 0 ? <div className="space-y-3">
+                  {actionPlan.map((item: any, i: number) => <EnhancedActionItem key={i} item={item} />)}
+                </div> : <p className="text-sm text-muted-foreground text-center py-4">
                   No action items available
-                </p>
-              )}
+                </p>}
             </CardContent>
           </Card>
           
           {/* Actionable Recommendations from Reviews */}
-          {actionableRecommendations.length > 0 && (
-            <Card>
+          {actionableRecommendations.length > 0 && <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
                   <Target className="w-4 h-4 text-primary" /> Review-Based Recommendations
@@ -1089,28 +870,20 @@ export default function ProductAnalysisPanel({
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {actionableRecommendations.slice(0, 4).map((rec: any, i: number) => (
-                    <div key={i} className="p-3 bg-muted/50 rounded-md">
+                  {actionableRecommendations.slice(0, 4).map((rec: any, i: number) => <div key={i} className="p-3 bg-muted/50 rounded-md">
                       <div className="flex items-start gap-2">
                         {rec.priority && <PriorityBadge priority={rec.priority} />}
                         <div>
-                          {rec.area && (
-                            <p className="text-xs text-muted-foreground font-medium">{rec.area}</p>
-                          )}
+                          {rec.area && <p className="text-xs text-muted-foreground font-medium">{rec.area}</p>}
                           <p className="text-sm font-medium">{rec.recommendation}</p>
-                          {rec.rationale && (
-                            <p className="text-xs text-muted-foreground mt-1 italic">{rec.rationale}</p>
-                          )}
+                          {rec.rationale && <p className="text-xs text-muted-foreground mt-1 italic">{rec.rationale}</p>}
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    </div>)}
                 </div>
               </CardContent>
-            </Card>
-          )}
+            </Card>}
         </TabsContent>
       </Tabs>
-    </div>
-  );
+    </div>;
 }

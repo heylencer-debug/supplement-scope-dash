@@ -158,24 +158,41 @@ export default function ProductAnalysisPanel({
 
   const ma = marketingAnalysis || {};
 
-  // CORRECT DATA PATHS based on actual DB structure
-  const overallScore = ma.overall_marketing_score || {};
-  const grade = overallScore.grade || "N/A";
-  const score = overallScore.overall_score ?? 0;
-  const summary = overallScore.summary || "";
-  const copyScore = overallScore.copy_score ?? 0;
-  const trustScore = overallScore.trust_score ?? 0;
-  const positioningScore = overallScore.positioning_score ?? 0;
-  const audienceTargetingScore = overallScore.audience_targeting_score ?? 0;
-  const messageConsistencyScore = overallScore.message_consistency_score ?? 0;
+  // Parse overall_marketing_score - handle both object and string formats
+  let overallScoreData = ma.overall_marketing_score || {};
+  if (typeof overallScoreData === 'string') {
+    try {
+      overallScoreData = JSON.parse(overallScoreData);
+    } catch (e) {
+      overallScoreData = {};
+    }
+  }
+  
+  // Also check details.score_card as alternate location
+  const details = ma.details || {};
+  const scoreCard = ma.score_card || details.score_card || {};
+  
+  // Merge scores from multiple possible sources
+  const grade = overallScoreData.grade || scoreCard.overall_grade || "N/A";
+  const score = Number(overallScoreData.overall_score) || Number(scoreCard.overall_score) || 0;
+  const summary = overallScoreData.summary || scoreCard.summary_text || "";
+  const copyScore = Number(overallScoreData.copy_score) || Number(details.copy_analysis?.clarity) || 0;
+  const trustScore = Number(overallScoreData.trust_score) || 0;
+  const positioningScore = Number(overallScoreData.positioning_score) || 0;
+  const audienceTargetingScore = Number(overallScoreData.audience_targeting_score) || 0;
+  const messageConsistencyScore = Number(overallScoreData.message_consistency_score) || 0;
   
   // Key Insights (array of strings)
-  const keyInsights = ma.key_insights || [];
+  const keyInsights = Array.isArray(ma.key_insights) ? ma.key_insights : [];
   
-  // Copy Effectiveness
+  // Copy Effectiveness - check multiple locations
   const copyEffectiveness = ma.copy_effectiveness || {};
   const titleAnalysis = copyEffectiveness.title_analysis || {};
   const bulletAnalysis = copyEffectiveness.bullet_analysis || {};
+  
+  // Also get copy analysis from details
+  const detailsCopyAnalysis = details.copy_analysis || {};
+  const copyHooks = detailsCopyAnalysis.hooks || [];
   
   // Target Demographics
   const targetDemographics = ma.target_demographics || {};
@@ -190,11 +207,27 @@ export default function ProductAnalysisPanel({
   const messagingAnalysis = ma.messaging_analysis || {};
   const keyClaims = messagingAnalysis.key_claims_shown || [];
   
-  // Optimization Opportunities (array of strings)
-  const optimizationOpportunities = ma.optimization_opportunities || [];
+  // Optimization Opportunities (array of strings) - filter out corrupted data
+  const rawOpportunities = ma.optimization_opportunities || [];
+  const optimizationOpportunities = Array.isArray(rawOpportunities) 
+    ? rawOpportunities.filter((item: any) => typeof item === 'string')
+    : [];
   
   // Competitive Positioning
-  const competitivePositioning = ma.competitive_positioning || "";
+  const competitivePositioning = typeof ma.competitive_positioning === 'string' 
+    ? ma.competitive_positioning 
+    : "";
+  
+  // Customer Sentiment from details
+  const customerSentiment = details.customer_sentiment || {};
+  
+  // Check if we have any meaningful data to show
+  const hasScoreData = grade !== "N/A" || score > 0 || copyScore > 0;
+  const hasInsights = keyInsights.length > 0;
+  const hasCopyData = Object.keys(titleAnalysis).length > 0 || Object.keys(bulletAnalysis).length > 0 || copyHooks.length > 0;
+  const hasStrategyData = Object.keys(targetDemographics).length > 0 || Object.keys(positioningStrategy).length > 0 || competitivePositioning;
+  const hasActions = optimizationOpportunities.length > 0;
+  const hasAnyData = hasScoreData || hasInsights || hasCopyData || hasStrategyData || hasActions;
 
   // Grade color mapping
   const getGradeColor = (g: string) => {
@@ -204,6 +237,17 @@ export default function ProductAnalysisPanel({
     if (g === "D") return "bg-orange-500 text-white";
     return "bg-red-500 text-white";
   };
+  
+  // If no meaningful data, show a message
+  if (!hasAnyData) {
+    return (
+      <div className="p-6 text-center text-muted-foreground">
+        <AlertTriangle className="w-8 h-8 mx-auto mb-2 opacity-50" />
+        <p>Marketing analysis data is still being processed for this product.</p>
+        <p className="text-xs mt-1">Check back later for detailed insights.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 bg-muted/30 border-t">
@@ -412,6 +456,28 @@ export default function ProductAnalysisPanel({
             </Card>
           </div>
           
+          {/* Copy Hooks from details.copy_analysis */}
+          {copyHooks.length > 0 && (
+            <Card className="mt-4">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Megaphone className="w-4 h-4 text-amber-500" />
+                  Copy Hooks ({copyHooks.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {copyHooks.map((hook: string, i: number) => (
+                    <div key={i} className="flex items-start gap-2 p-2 bg-amber-500/5 rounded-md">
+                      <Zap className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                      <p className="text-sm">{hook}</p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          
           {/* Key Claims Shown */}
           {keyClaims.length > 0 && (
             <Card className="mt-4">
@@ -430,6 +496,50 @@ export default function ProductAnalysisPanel({
                     </Badge>
                   ))}
                 </div>
+              </CardContent>
+            </Card>
+          )}
+          
+          {/* Customer Sentiment */}
+          {(customerSentiment.primary_praises?.length > 0 || customerSentiment.primary_complaints?.length > 0) && (
+            <Card className="mt-4">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4" />
+                  Customer Sentiment
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {customerSentiment.primary_praises?.length > 0 && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-2">What Customers Love</p>
+                    <div className="flex flex-wrap gap-2">
+                      {customerSentiment.primary_praises.map((praise: string, i: number) => (
+                        <Badge key={i} variant="outline" className="text-xs bg-green-500/10 text-green-600 border-green-500/30">
+                          {praise}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {customerSentiment.primary_complaints?.length > 0 && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-2">Common Complaints</p>
+                    <div className="flex flex-wrap gap-2">
+                      {customerSentiment.primary_complaints.map((complaint: string, i: number) => (
+                        <Badge key={i} variant="outline" className="text-xs bg-red-500/10 text-red-600 border-red-500/30">
+                          {complaint}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {customerSentiment.gap_analysis && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Gap Analysis</p>
+                    <p className="text-sm">{customerSentiment.gap_analysis}</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}

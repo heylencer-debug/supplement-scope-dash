@@ -150,15 +150,15 @@ export function FinancialProjections({ financials }: FinancialProjectionsProps) 
           {/* Cost Structure */}
           {costs && (
             <>
-              {costs.cogs_per_unit !== undefined && (
+              {costs.cogs_per_unit !== undefined && costs.cogs_per_unit !== null && (
                 <div className="p-4 bg-secondary rounded-lg text-center">
-                  <p className="text-2xl font-bold text-foreground">${costs.cogs_per_unit.toFixed(2)}</p>
+                  <p className="text-2xl font-bold text-foreground">${Number(costs.cogs_per_unit).toFixed(2)}</p>
                   <p className="text-xs text-muted-foreground">COGS per Unit</p>
                 </div>
               )}
-              {costs.amazon_fees_percent !== undefined && (
+              {costs.amazon_fees_percent !== undefined && costs.amazon_fees_percent !== null && (
                 <div className="p-4 bg-secondary rounded-lg text-center">
-                  <p className="text-2xl font-bold text-foreground">{costs.amazon_fees_percent}%</p>
+                  <p className="text-2xl font-bold text-foreground">{Number(costs.amazon_fees_percent)}%</p>
                   <p className="text-xs text-muted-foreground">Amazon Fees</p>
                 </div>
               )}

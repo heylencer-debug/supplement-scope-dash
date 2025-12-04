@@ -139,7 +139,12 @@ export default function ProductExplorer() {
 
   const getMarketingScore = (product: Product) => {
     const ma = product.marketing_analysis as any;
-    return ma?.overall_marketing_score ?? null;
+    const score = ma?.overall_marketing_score;
+    // Handle both object and number formats
+    if (typeof score === 'object') {
+      return score?.overall_score ?? null;
+    }
+    return score ?? null;
   };
 
   const getCopyScore = (product: Product) => {

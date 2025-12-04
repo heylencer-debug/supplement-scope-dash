@@ -109,7 +109,7 @@ export default function CustomerIntelligence({
           <CardTitle>Customer Intelligence</CardTitle>
         </div>
       </CardHeader>
-      <CardContent className="space-y-8">
+      <CardContent className="space-y-8 animate-fade-in">
         {/* Target Buyer Profile */}
         {buyer_profile && (
           <div>

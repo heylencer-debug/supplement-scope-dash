@@ -176,7 +176,7 @@ export function LaunchPlanSection({
           Go-to-market strategy and execution roadmap
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-8">
+      <CardContent className="space-y-8 animate-fade-in">
         {/* Launch Strategy Section */}
         {hasLaunchStrategy && (
           <div className="space-y-6">

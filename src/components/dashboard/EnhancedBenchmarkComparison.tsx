@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Star, TrendingUp, Pill, Target, MessageSquare, Package, Users, Megaphone, AlertTriangle, CheckCircle, XCircle, Palette, Search, Filter, X, Trophy, ThumbsUp, ThumbsDown } from "lucide-react";
+import { Star, TrendingUp, Pill, Target, MessageSquare, Package, Users, Megaphone, AlertTriangle, CheckCircle, XCircle, Palette, Search, Filter, X, Trophy, ThumbsUp, ThumbsDown, Check } from "lucide-react";
 import { useProducts, Product } from "@/hooks/useProducts";
 import ProductDetailModal from "@/components/ProductDetailModal";
 import { useToast } from "@/hooks/use-toast";
@@ -136,6 +136,42 @@ export function EnhancedBenchmarkComparison({
     return ingredients.map(ing => {
       if (typeof ing === 'string') return ing;
       return ing.ingredient || ing.name || 'Unknown';
+    });
+  };
+
+  // Normalize ingredient name for comparison (lowercase, remove common suffixes/prefixes)
+  const normalizeIngredient = (ing: string): string => {
+    return ing
+      .toLowerCase()
+      .replace(/\s*\(.*?\)\s*/g, '') // Remove parenthetical content
+      .replace(/\s*(extract|powder|complex|blend|root|leaf|fruit|seed|oil|vitamin|mg|mcg|iu)\s*/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
+  // Check if an ingredient matches any in the Our Concept list
+  const isMatchingIngredient = (competitorIng: string, ourIngredients: string[]): boolean => {
+    const normalizedCompetitor = normalizeIngredient(competitorIng);
+    return ourIngredients.some(ourIng => {
+      const normalizedOur = normalizeIngredient(ourIng);
+      // Check if either contains the other (handles partial matches like "Vitamin D" vs "Vitamin D3")
+      return normalizedCompetitor.includes(normalizedOur) || 
+             normalizedOur.includes(normalizedCompetitor) ||
+             normalizedCompetitor === normalizedOur;
+    });
+  };
+
+  // Check if Our Concept ingredient matches any competitor
+  const isOurIngredientInCompetitors = (ourIng: string): boolean => {
+    const normalizedOur = normalizeIngredient(ourIng);
+    return displayedProducts.some(product => {
+      const { items } = parseCompetitorIngredients(product);
+      return items.some(compIng => {
+        const normalizedComp = normalizeIngredient(compIng);
+        return normalizedComp.includes(normalizedOur) || 
+               normalizedOur.includes(normalizedComp) ||
+               normalizedComp === normalizedOur;
+      });
     });
   };
 
@@ -576,12 +612,19 @@ export function EnhancedBenchmarkComparison({
                     </Badge>
                   </p>
                   <div className="space-y-0.5 max-h-24 overflow-y-auto pr-1">
-                    {getOurIngredients().map((ing, i) => (
-                      <div key={i} className="flex items-start gap-1 text-[10px] text-muted-foreground">
-                        <span className="w-1 h-1 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
-                        <span>{ing}</span>
-                      </div>
-                    ))}
+                    {getOurIngredients().map((ing, i) => {
+                      const hasMatch = isOurIngredientInCompetitors(ing);
+                      return (
+                        <div key={i} className={`flex items-start gap-1 text-[10px] ${hasMatch ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-muted-foreground'}`}>
+                          {hasMatch ? (
+                            <Check className="w-3 h-3 text-emerald-500 mt-0.5 shrink-0" />
+                          ) : (
+                            <span className="w-1 h-1 rounded-full bg-emerald-500 mt-1.5 shrink-0 ml-1" />
+                          )}
+                          <span>{ing}</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -751,12 +794,20 @@ export function EnhancedBenchmarkComparison({
                         <div className="space-y-0.5 max-h-24 overflow-y-auto pr-1">
                           {(() => {
                             const { items, fallback } = parseCompetitorIngredients(product);
-                              return items.map((ing, i) => (
-                              <div key={i} className={`flex items-start gap-1 text-[10px] ${fallback ? 'text-primary' : 'text-muted-foreground'}`}>
-                                <span className="w-1 h-1 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
-                                <span>{ing}</span>
-                              </div>
-                            ));
+                            const ourIngredients = getOurIngredients();
+                            return items.map((ing, i) => {
+                              const hasMatch = isMatchingIngredient(ing, ourIngredients);
+                              return (
+                                <div key={i} className={`flex items-start gap-1 text-[10px] ${hasMatch ? 'text-emerald-600 dark:text-emerald-400 font-medium' : fallback ? 'text-primary' : 'text-muted-foreground'}`}>
+                                  {hasMatch ? (
+                                    <Check className="w-3 h-3 text-emerald-500 mt-0.5 shrink-0" />
+                                  ) : (
+                                    <span className="w-1 h-1 rounded-full bg-emerald-500 mt-1.5 shrink-0 ml-1" />
+                                  )}
+                                  <span>{ing}</span>
+                                </div>
+                              );
+                            });
                           })()}
                         </div>
                       </div>

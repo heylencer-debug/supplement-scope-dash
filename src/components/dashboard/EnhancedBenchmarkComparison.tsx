@@ -31,7 +31,16 @@ interface EnhancedBenchmarkComparisonProps {
       };
       customer_insights?: {
         buyer_profile?: string;
+        love_most?: string[];
+        pain_points?: Array<{ pain_point?: string; frequency?: number }>;
+        unmet_needs?: string[];
       };
+    };
+    top_strengths?: Array<{ strength?: string; description?: string }>;
+    top_weaknesses?: Array<{ weakness?: string; description?: string }>;
+    formula_brief?: {
+      key_differentiators?: string[];
+      risk_factors?: string[];
     };
   } | null;
   isLoading?: boolean;
@@ -167,6 +176,86 @@ export function EnhancedBenchmarkComparison({
     }
     
     return 'Pending analysis';
+  };
+
+  // NEW: Get Our Concept Strengths from multiple sources
+  const getOurStrengths = (): string[] => {
+    const strengths: string[] = [];
+    
+    // Source 1: top_strengths from category_analyses
+    const topStrengths = analysisData?.top_strengths;
+    if (topStrengths && Array.isArray(topStrengths)) {
+      topStrengths.slice(0, 3).forEach(s => {
+        if (s.strength) strengths.push(s.strength);
+      });
+    }
+    
+    // Source 2: key_differentiators from formula_brief
+    if (strengths.length < 3) {
+      const differentiators = analysisData?.formula_brief?.key_differentiators;
+      if (differentiators && Array.isArray(differentiators)) {
+        differentiators.slice(0, 3 - strengths.length).forEach(d => {
+          if (!strengths.includes(d)) strengths.push(d);
+        });
+      }
+    }
+    
+    // Source 3: key_features from formulation
+    if (strengths.length < 3) {
+      const keyFeatures = analysisData?.analysis_1_category_scores?.product_development?.formulation?.key_features;
+      if (keyFeatures && Array.isArray(keyFeatures)) {
+        keyFeatures.slice(0, 3 - strengths.length).forEach(f => {
+          if (!strengths.includes(f)) strengths.push(f);
+        });
+      }
+    }
+    
+    // Source 4: love_most from customer_insights
+    if (strengths.length < 3) {
+      const loveMost = analysisData?.analysis_1_category_scores?.customer_insights?.love_most;
+      if (loveMost && Array.isArray(loveMost)) {
+        loveMost.slice(0, 3 - strengths.length).forEach(l => {
+          if (!strengths.includes(l)) strengths.push(l);
+        });
+      }
+    }
+    
+    return strengths.length > 0 ? strengths : ['Pending analysis'];
+  };
+
+  // NEW: Get Our Concept Weaknesses/Risks from multiple sources
+  const getOurWeaknesses = (): string[] => {
+    const weaknesses: string[] = [];
+    
+    // Source 1: top_weaknesses from category_analyses
+    const topWeaknesses = analysisData?.top_weaknesses;
+    if (topWeaknesses && Array.isArray(topWeaknesses)) {
+      topWeaknesses.slice(0, 3).forEach(w => {
+        if (w.weakness) weaknesses.push(w.weakness);
+      });
+    }
+    
+    // Source 2: risk_factors from formula_brief
+    if (weaknesses.length < 3) {
+      const riskFactors = analysisData?.formula_brief?.risk_factors;
+      if (riskFactors && Array.isArray(riskFactors)) {
+        riskFactors.slice(0, 3 - weaknesses.length).forEach(r => {
+          if (!weaknesses.includes(r)) weaknesses.push(r);
+        });
+      }
+    }
+    
+    // Source 3: unmet_needs (things we need to address)
+    if (weaknesses.length < 3) {
+      const unmetNeeds = analysisData?.analysis_1_category_scores?.customer_insights?.unmet_needs;
+      if (unmetNeeds && Array.isArray(unmetNeeds)) {
+        unmetNeeds.slice(0, 3 - weaknesses.length).forEach(n => {
+          if (!weaknesses.includes(n)) weaknesses.push(`Address: ${n}`);
+        });
+      }
+    }
+    
+    return weaknesses.length > 0 ? weaknesses : ['Pending analysis'];
   };
 
   const getCompetitorFlavors = (product: Product): { flavors: string[]; count: number } => {
@@ -524,6 +613,38 @@ export function EnhancedBenchmarkComparison({
                   <p className="text-[10px] text-muted-foreground">
                     {getOurBuyerProfile()}
                   </p>
+                </div>
+
+                {/* Our Strengths */}
+                <div className="bg-emerald-50 dark:bg-emerald-950/30 rounded-lg p-2 border border-emerald-200 dark:border-emerald-800">
+                  <p className="text-[10px] font-semibold mb-1 flex items-center gap-1 text-emerald-700 dark:text-emerald-300">
+                    <ThumbsUp className="w-3 h-3" />
+                    Our Strengths
+                  </p>
+                  <div className="space-y-0.5">
+                    {getOurStrengths().map((strength, i) => (
+                      <div key={i} className="flex items-start gap-1 text-[10px] text-emerald-800 dark:text-emerald-200">
+                        <span className="w-1 h-1 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
+                        <span>{strength}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Our Risks/Challenges */}
+                <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-2 border border-amber-200 dark:border-amber-800">
+                  <p className="text-[10px] font-semibold mb-1 flex items-center gap-1 text-amber-700 dark:text-amber-300">
+                    <AlertTriangle className="w-3 h-3" />
+                    Risks & Challenges
+                  </p>
+                  <div className="space-y-0.5">
+                    {getOurWeaknesses().map((weakness, i) => (
+                      <div key={i} className="flex items-start gap-1 text-[10px] text-amber-800 dark:text-amber-200">
+                        <span className="w-1 h-1 rounded-full bg-amber-500 mt-1.5 shrink-0" />
+                        <span>{weakness}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>

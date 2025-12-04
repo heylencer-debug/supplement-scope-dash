@@ -382,32 +382,49 @@ export function EnhancedBenchmarkComparison({
     return null;
   };
 
-  // Fixed: Multi-source Target Audience extraction
+  // Fixed: Multi-source Target Audience extraction using correct data paths
   const getCompetitorAudience = (product: Product): string | null => {
     const marketingAnalysis = product.marketing_analysis as Record<string, unknown> | null;
     const reviewAnalysis = product.review_analysis as Record<string, unknown> | null;
     
-    // Try 1: marketing_analysis.target_demographics.primary_audience
+    // Try 1: creative_brief.target_persona.demographic (PRIMARY - from per-product analysis)
     if (marketingAnalysis) {
-      const targetDemo = marketingAnalysis.target_demographics as Record<string, unknown> | undefined;
-      if (targetDemo?.primary_audience) {
-        return targetDemo.primary_audience as string;
+      const creativeBrief = marketingAnalysis.creative_brief as Record<string, unknown> | undefined;
+      const targetPersona = creativeBrief?.target_persona as Record<string, unknown> | undefined;
+      if (targetPersona?.demographic) {
+        return targetPersona.demographic as string;
       }
       
-      // Try 2: marketing_analysis.lifestyle_positioning.primary_lifestyle
-      const lifestylePos = marketingAnalysis.lifestyle_positioning as Record<string, unknown> | undefined;
-      if (lifestylePos?.primary_lifestyle) {
-        return lifestylePos.primary_lifestyle as string;
+      // Try 2: visual_gallery.demographics.primary_audience
+      const visualGallery = marketingAnalysis.visual_gallery as Record<string, unknown> | undefined;
+      const demographics = visualGallery?.demographics as Record<string, unknown> | undefined;
+      if (demographics?.primary_audience) {
+        return demographics.primary_audience as string;
       }
     }
     
-    // Try 3: review_analysis.demographics_insights.buyer_types
+    // Try 3: review_analysis.demographics_insights.buyer_types (FALLBACK)
     if (reviewAnalysis) {
       const demographics = reviewAnalysis.demographics_insights as Record<string, unknown> | undefined;
       const buyerTypes = demographics?.buyer_types as string[] | undefined;
       if (buyerTypes && buyerTypes.length > 0) {
         return buyerTypes.slice(0, 2).join(', ');
       }
+    }
+    
+    return null;
+  };
+
+  // NEW: Get Primary Motivation from creative_brief.target_persona.primary_motivation
+  const getCompetitorMotivation = (product: Product): string | null => {
+    const marketingAnalysis = product.marketing_analysis as Record<string, unknown> | null;
+    if (!marketingAnalysis) return null;
+    
+    const creativeBrief = marketingAnalysis.creative_brief as Record<string, unknown> | undefined;
+    const targetPersona = creativeBrief?.target_persona as Record<string, unknown> | undefined;
+    
+    if (targetPersona?.primary_motivation) {
+      return targetPersona.primary_motivation as string;
     }
     
     return null;
@@ -880,9 +897,19 @@ export function EnhancedBenchmarkComparison({
                           Target Audience
                         </p>
                         {hasMarketingAnalysis(product) ? (
-                          <p className="text-[10px] text-muted-foreground">
-                            {getCompetitorAudience(product) || 'Not specified'}
-                          </p>
+                          <div className="space-y-1.5">
+                            <p className="text-[10px] text-muted-foreground max-h-20 overflow-y-auto">
+                              {getCompetitorAudience(product) || 'Not specified'}
+                            </p>
+                            {getCompetitorMotivation(product) && (
+                              <div className="bg-violet-50 dark:bg-violet-950/30 rounded p-1.5 border border-violet-200 dark:border-violet-800">
+                                <p className="text-[9px] font-medium text-violet-700 dark:text-violet-300 mb-0.5">Primary Motivation</p>
+                                <p className="text-[10px] text-muted-foreground max-h-16 overflow-y-auto">
+                                  {getCompetitorMotivation(product)}
+                                </p>
+                              </div>
+                            )}
+                          </div>
                         ) : (
                           <span className="text-[10px] px-1.5 py-0.5 bg-muted rounded text-muted-foreground">Analysis Pending</span>
                         )}

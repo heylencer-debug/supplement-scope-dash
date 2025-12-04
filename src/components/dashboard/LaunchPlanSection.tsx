@@ -115,7 +115,7 @@ export function LaunchPlanSection({
 
   return (
     <Card>
-      <CardHeader className="pb-4">
+      <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
           <Rocket className="h-5 w-5 text-primary" />
           Launch Strategy & Action Plan
@@ -124,10 +124,10 @@ export function LaunchPlanSection({
           Go-to-market strategy and execution roadmap
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-8">
         {/* Launch Strategy Section */}
         {hasLaunchStrategy && (
-          <div className="space-y-5">
+          <div className="space-y-6">
             {/* Winning Hook / Positioning */}
             {goToMarket?.positioning && (
               <div className="space-y-2">
@@ -164,12 +164,12 @@ export function LaunchPlanSection({
 
             {/* Launch Tactics */}
             {launchTactics.length > 0 && (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                   <h4 className="text-sm font-semibold text-foreground">Launch Tactics</h4>
                 </div>
-                <div className="grid md:grid-cols-3 gap-3">
+                <div className="grid md:grid-cols-3 gap-4">
                   {launchTactics.map((tactic, index) => {
                     const Icon = tactic.icon;
                     return (
@@ -214,7 +214,7 @@ export function LaunchPlanSection({
 
         {/* Action Plan Timeline */}
         {hasActionItems && (
-          <div className="space-y-3">
+          <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-primary" />
@@ -225,7 +225,7 @@ export function LaunchPlanSection({
               </span>
             </div>
             
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
               {timelineKeys.map((timeline, timelineIdx) => {
                 const items = groupedItems[timeline];
                 const completedCount = items.filter(

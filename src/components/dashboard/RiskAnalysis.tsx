@@ -28,10 +28,10 @@ export function RiskAnalysis({ risks }: RiskAnalysisProps) {
         <CardDescription>Category challenges, failure patterns, and risk factors to consider</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid md:grid-cols-2 gap-8">
           {/* Category Challenges */}
           {category_challenges && category_challenges.length > 0 && (
-            <div className="space-y-3">
+            <div className="space-y-4">
               <h4 className="font-medium text-sm flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 text-orange-500" />
                 Category Challenges
@@ -48,7 +48,7 @@ export function RiskAnalysis({ risks }: RiskAnalysisProps) {
 
           {/* Failure Patterns to Avoid */}
           {failure_patterns && failure_patterns.length > 0 && (
-            <div className="space-y-3">
+            <div className="space-y-4">
               <h4 className="font-medium text-sm flex items-center gap-2">
                 <XCircle className="w-4 h-4 text-red-500" />
                 Failure Patterns to Avoid
@@ -68,7 +68,7 @@ export function RiskAnalysis({ risks }: RiskAnalysisProps) {
 
           {/* Regulatory Requirements */}
           {regulatory && regulatory.length > 0 && (
-            <div className="space-y-3">
+            <div className="space-y-4">
               <h4 className="font-medium text-sm flex items-center gap-2">
                 <FileWarning className="w-4 h-4 text-yellow-500" />
                 Regulatory Requirements
@@ -88,7 +88,7 @@ export function RiskAnalysis({ risks }: RiskAnalysisProps) {
 
           {/* Supply Chain Risks */}
           {supply_chain && supply_chain.length > 0 && (
-            <div className="space-y-3">
+            <div className="space-y-4">
               <h4 className="font-medium text-sm flex items-center gap-2">
                 <Truck className="w-4 h-4 text-purple-500" />
                 Supply Chain Risks

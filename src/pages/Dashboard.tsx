@@ -326,7 +326,7 @@ export default function Dashboard() {
   const isDataLoading = analysisLoading || productsLoading;
 
   return (
-    <div className="space-y-6 pb-8">
+    <div className="space-y-8 pb-12">
       {/* SECTION 1: Hero Header with Executive Summary */}
       <HeroHeader
         categoryName={categoryName}
@@ -346,7 +346,7 @@ export default function Dashboard() {
       {/* Progress Banner */}
       {!progress.isComplete && (
         <Card className="border-[#0ea5e9]/30 bg-[#0ea5e9]/5">
-          <CardContent className="p-5">
+          <CardContent className="p-6">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">

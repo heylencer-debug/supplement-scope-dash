@@ -70,10 +70,10 @@ export function KPIMetricsGrid({
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
       {kpis.map((kpi, idx) => (
         <Card key={idx} className="border-border/50 hover:shadow-md transition-shadow">
-          <CardContent className="p-5">
+          <CardContent className="p-6">
             {isLoading ? (
               <div className="space-y-3">
                 <Skeleton className="h-4 w-24" />

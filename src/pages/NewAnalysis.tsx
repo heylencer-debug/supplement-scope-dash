@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { useRecentCategories } from "@/hooks/useCategoryAnalyses";
+import { useRecentCategories, CategoryWithImages } from "@/hooks/useCategoryAnalyses";
 import { formatDistanceToNow } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -57,7 +57,7 @@ export default function NewAnalysis() {
       acc.push(cat);
     }
     return acc;
-  }, [] as typeof recentCategories) ?? [];
+  }, [] as CategoryWithImages[]) ?? [];
 
   const handleCategoryToggle = (categoryLabel: string, checked: boolean) => {
     if (checked) {
@@ -132,6 +132,19 @@ export default function NewAnalysis() {
   };
 
   const handleAnalysisClick = (categoryName: string) => {
+    // Add to pending analyses to create a tab (if not already there)
+    const pending = JSON.parse(localStorage.getItem(PENDING_ANALYSES_KEY) || '[]');
+    const alreadyPending = pending.some((p: { categoryName: string }) => p.categoryName === categoryName);
+    
+    if (!alreadyPending) {
+      pending.push({ 
+        categoryName, 
+        startedAt: new Date().toISOString() 
+      });
+      localStorage.setItem(PENDING_ANALYSES_KEY, JSON.stringify(pending));
+      window.dispatchEvent(new Event('newAnalysisAdded'));
+    }
+    
     navigate(`/dashboard?category=${encodeURIComponent(categoryName)}`);
   };
 
@@ -239,9 +252,9 @@ export default function NewAnalysis() {
         </CardHeader>
       <CardContent>
           {categoriesLoading && !recentCategories ? (
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-20 w-full rounded-lg" />
+                <Skeleton key={i} className="h-48 w-full rounded-xl" />
               ))}
             </div>
           ) : uniqueCategories.length === 0 ? (
@@ -249,36 +262,47 @@ export default function NewAnalysis() {
               No categories yet. Start your first analysis above!
             </p>
           ) : (
-            <div className="space-y-3">
-              {uniqueCategories.slice(0, 5).map((category) => (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {uniqueCategories.slice(0, 6).map((category) => (
                 <div
                   key={category.id}
                   onClick={() => handleAnalysisClick(category.name)}
-                  className="p-4 rounded-lg border bg-secondary/30 hover:bg-secondary/50 cursor-pointer transition-colors"
+                  className="group relative overflow-hidden rounded-xl border bg-card hover:border-accent/50 cursor-pointer transition-all duration-300 hover:shadow-lg hover:shadow-accent/5"
                 >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-foreground truncate">
+                  {/* Product Images Grid */}
+                  <div className="grid grid-cols-2 gap-0.5 h-32 bg-muted/50">
+                    {category.product_images && category.product_images.length > 0 ? (
+                      category.product_images.slice(0, 4).map((img, idx) => (
+                        <div key={idx} className="relative overflow-hidden bg-background">
+                          <img 
+                            src={img} 
+                            alt="" 
+                            className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-300"
+                          />
+                        </div>
+                      ))
+                    ) : (
+                      <div className="col-span-2 flex items-center justify-center text-muted-foreground">
+                        <Package className="w-8 h-8" />
+                      </div>
+                    )}
+                    {/* Fill empty slots if less than 4 images */}
+                    {category.product_images && category.product_images.length > 0 && category.product_images.length < 4 && (
+                      Array.from({ length: 4 - category.product_images.length }).map((_, idx) => (
+                        <div key={`empty-${idx}`} className="bg-muted/30" />
+                      ))
+                    )}
+                  </div>
+                  
+                  {/* Card Content */}
+                  <div className="p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="font-semibold text-foreground line-clamp-1 group-hover:text-accent transition-colors">
                         {category.name}
                       </h3>
-                      <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
-                        {category.total_products != null && category.total_products > 0 && (
-                          <span className="flex items-center gap-1">
-                            <Package className="w-3.5 h-3.5" />
-                            {category.total_products} products
-                          </span>
-                        )}
-                        {category.search_term && (
-                          <span className="truncate max-w-[200px]">
-                            {category.search_term}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-end gap-2">
                       <Badge 
                         variant="outline" 
-                        className={`text-xs whitespace-nowrap ${
+                        className={`text-xs shrink-0 ${
                           category.total_products && category.total_products > 0 
                             ? "bg-green-500/10 text-green-600 border-green-500/20" 
                             : "bg-amber-500/10 text-amber-600 border-amber-500/20"
@@ -286,13 +310,23 @@ export default function NewAnalysis() {
                       >
                         {category.total_products && category.total_products > 0 ? "Complete" : "Processing"}
                       </Badge>
+                    </div>
+                    
+                    <div className="flex items-center justify-between text-sm text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                        <Package className="w-3.5 h-3.5" />
+                        <span>{category.total_products || 0} products</span>
+                      </div>
                       {category.created_at && (
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-xs">
                           {formatDistanceToNow(new Date(category.created_at), { addSuffix: true })}
                         </span>
                       )}
                     </div>
                   </div>
+                  
+                  {/* Hover overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-accent/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
                 </div>
               ))}
             </div>

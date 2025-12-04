@@ -133,7 +133,7 @@ export function AnalysisTabs() {
   };
   
   return (
-    <div className="border-b border-border bg-card/95 backdrop-blur-sm sticky top-0 z-20 overflow-hidden">
+    <div className="border-b border-border bg-card/95 backdrop-blur-sm sticky top-0 z-20 overflow-hidden shadow-sm">
       <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
         <div className="flex items-center gap-1 px-4 py-2 min-w-max">
           {/* New Analysis Tab */}

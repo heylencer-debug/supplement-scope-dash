@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { ScrollAnimate } from "@/components/ui/scroll-animate";
 import { 
   Loader2, RefreshCw, CheckCircle2, Circle, Clock,
   Building2, Package, Eye, MessageSquare, BarChart3, Sparkles
@@ -443,92 +444,96 @@ export default function Dashboard() {
       </div>
 
       {/* SECTION 3: Benchmark Comparison - Top 5 Competitors */}
-      <div className="animate-fade-in" style={{ animationDelay: '0.15s' }}>
+      <ScrollAnimate delay={50}>
         <EnhancedBenchmarkComparison
         categoryId={category?.id}
         analysisData={dashboardData.benchmarkData}
         isLoading={productsLoading}
         />
-      </div>
+      </ScrollAnimate>
 
       {/* SECTION 4: Brand Market Share */}
       {brandMarketShare.length > 0 ? (
-        <Card className="animate-fade-in" style={{ animationDelay: '0.2s' }}>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
-              <Building2 className="w-5 h-5 text-primary" />
-              Brand Market Share
-            </CardTitle>
-            <CardDescription>Revenue distribution across top brands</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col md:flex-row items-center gap-6">
-              <div className="w-full md:w-1/2">
-                <ResponsiveContainer width="100%" height={220}>
-                  <PieChart>
-                    <Pie
-                      data={brandMarketShare}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={55}
-                      outerRadius={85}
-                      paddingAngle={2}
-                      dataKey="value"
-                    >
-                      {brandMarketShare.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill} />
-                      ))}
-                    </Pie>
-                    <Tooltip 
-                      content={({ payload }) => {
-                        if (payload && payload.length > 0) {
-                          const data = payload[0].payload;
-                          return (
-                            <div className="bg-popover border border-border rounded-md p-2 shadow-md">
-                              <p className="font-medium text-sm">{data.fullName}</p>
-                              <p className="text-sm text-muted-foreground">Share: {data.value}%</p>
-                              <p className="text-sm text-primary">
-                                ${(data.revenue / 1000).toFixed(1)}K/mo
-                              </p>
-                            </div>
-                          );
-                        }
-                        return null;
-                      }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 w-full md:w-1/2">
-                {brandMarketShare.slice(0, 6).map((brand, idx) => (
-                  <div key={idx} className="flex items-center gap-2 p-2 bg-secondary/50 rounded-lg">
-                    <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: brand.fill }} />
-                    <div className="min-w-0 flex-1">
-                      <span className="text-xs text-foreground truncate block">{brand.fullName}</span>
-                      <span className="text-sm font-bold">{brand.value}%</span>
+        <ScrollAnimate delay={100}>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
+                <Building2 className="w-5 h-5 text-primary" />
+                Brand Market Share
+              </CardTitle>
+              <CardDescription>Revenue distribution across top brands</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col md:flex-row items-center gap-6">
+                <div className="w-full md:w-1/2">
+                  <ResponsiveContainer width="100%" height={220}>
+                    <PieChart>
+                      <Pie
+                        data={brandMarketShare}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={55}
+                        outerRadius={85}
+                        paddingAngle={2}
+                        dataKey="value"
+                      >
+                        {brandMarketShare.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.fill} />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        content={({ payload }) => {
+                          if (payload && payload.length > 0) {
+                            const data = payload[0].payload;
+                            return (
+                              <div className="bg-popover border border-border rounded-md p-2 shadow-md">
+                                <p className="font-medium text-sm">{data.fullName}</p>
+                                <p className="text-sm text-muted-foreground">Share: {data.value}%</p>
+                                <p className="text-sm text-primary">
+                                  ${(data.revenue / 1000).toFixed(1)}K/mo
+                                </p>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 w-full md:w-1/2">
+                  {brandMarketShare.slice(0, 6).map((brand, idx) => (
+                    <div key={idx} className="flex items-center gap-2 p-2 bg-secondary/50 rounded-lg">
+                      <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: brand.fill }} />
+                      <div className="min-w-0 flex-1">
+                        <span className="text-xs text-foreground truncate block">{brand.fullName}</span>
+                        <span className="text-sm font-bold">{brand.value}%</span>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </ScrollAnimate>
       ) : productsLoading ? (
-        <Card className="animate-fade-in" style={{ animationDelay: '0.2s' }}>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
-              <Building2 className="w-5 h-5 text-primary" />
-              Brand Market Share
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Skeleton className="h-[200px] w-full" />
-          </CardContent>
-        </Card>
+        <ScrollAnimate delay={100}>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
+                <Building2 className="w-5 h-5 text-primary" />
+                Brand Market Share
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-[200px] w-full" />
+            </CardContent>
+          </Card>
+        </ScrollAnimate>
       ) : null}
 
       {/* SECTION 5: 18-Point Analysis */}
-      <div className="animate-fade-in" style={{ animationDelay: '0.25s' }}>
+      <ScrollAnimate delay={150}>
         <DeepDiveSection
         criteriaScores={dashboardData.criteriaScores}
         criteriaBreakdown={dashboardData.criteriaBreakdown}
@@ -537,26 +542,26 @@ export default function Dashboard() {
         criticalRisks={dashboardData.criticalRisks}
         isLoading={analysisLoading && !hasAnalysis}
         />
-      </div>
+      </ScrollAnimate>
 
       {/* SECTION 5: Customer Intelligence */}
-      <div className="animate-fade-in" style={{ animationDelay: '0.3s' }}>
+      <ScrollAnimate delay={200}>
         <CustomerIntelligence
         customerInsights={dashboardData.customerIntelligence}
         isLoading={analysisLoading && !hasAnalysis}
         />
-      </div>
+      </ScrollAnimate>
 
       {/* SECTION 6: Financial Projections */}
-      <div className="animate-fade-in" style={{ animationDelay: '0.35s' }}>
+      <ScrollAnimate delay={250}>
         <FinancialProjections 
           financials={dashboardData.financials as Record<string, unknown> | null} 
           isLoading={analysisLoading && !hasAnalysis}
         />
-      </div>
+      </ScrollAnimate>
 
       {/* SECTION 7: Launch Strategy + Action Plan */}
-      <div className="animate-fade-in" style={{ animationDelay: '0.4s' }}>
+      <ScrollAnimate delay={300}>
         <LaunchPlanSection
         goToMarket={dashboardData.goToMarket as {
           positioning?: string;
@@ -571,15 +576,15 @@ export default function Dashboard() {
         actionItems={dashboardData.actionItems}
         isLoading={analysisLoading && !hasAnalysis}
         />
-      </div>
+      </ScrollAnimate>
 
       {/* SECTION 8: Risk Analysis */}
-      <div className="animate-fade-in" style={{ animationDelay: '0.45s' }}>
+      <ScrollAnimate delay={350}>
         <RiskAnalysis 
           risks={dashboardData.risks as Record<string, unknown> | null} 
           isLoading={analysisLoading && !hasAnalysis}
         />
-      </div>
+      </ScrollAnimate>
     </div>
   );
 }

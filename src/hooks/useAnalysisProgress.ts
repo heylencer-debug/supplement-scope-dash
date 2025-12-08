@@ -60,9 +60,18 @@ export function useAnalysisProgress(
   });
 
   // Calculate phases with weights
-  const expectedProducts = 100; // Expected products per category
+  // Products scraped phase: consider complete once we have products (even if < 100)
+  // We determine "complete" by checking if subsequent phases have started (OCR, marketing, reviews)
   const scrapedProducts = productStats?.total || 0;
   const productsWithImages = productStats?.withImages || 0;
+  const hasOcrStarted = (productStats?.withOcr || 0) > 0;
+  const hasMarketingStarted = (productStats?.withMarketing || 0) > 0;
+  const hasReviewsStarted = (productStats?.withReviews || 0) > 0;
+  
+  // If downstream analysis has started, products scraping is complete
+  const isScrapingComplete = scrapedProducts > 0 && (hasOcrStarted || hasMarketingStarted || hasReviewsStarted || hasAnalysis);
+  const scrapingTotal = isScrapingComplete ? scrapedProducts : Math.max(scrapedProducts, 100);
+  const scrapingPercentage = isScrapingComplete ? 100 : (scrapedProducts > 0 ? Math.min(95, Math.round((scrapedProducts / 100) * 100)) : 0);
 
   const phases: AnalysisPhase[] = [
     {
@@ -75,14 +84,14 @@ export function useAnalysisProgress(
     {
       name: "Products Scraped",
       completed: scrapedProducts,
-      total: expectedProducts,
-      percentage: Math.min(100, Math.round((scrapedProducts / expectedProducts) * 100)),
+      total: scrapingTotal,
+      percentage: scrapingPercentage,
       weight: 25,
     },
     {
       name: "Visual Analysis",
       completed: productStats?.withOcr || 0,
-      total: productsWithImages || expectedProducts,
+      total: productsWithImages || scrapedProducts || 1,
       percentage: productsWithImages > 0 
         ? Math.round(((productStats?.withOcr || 0) / productsWithImages) * 100)
         : 0,
@@ -91,7 +100,7 @@ export function useAnalysisProgress(
     {
       name: "Marketing Analysis",
       completed: productStats?.withMarketing || 0,
-      total: scrapedProducts || expectedProducts,
+      total: scrapedProducts || 1,
       percentage: scrapedProducts > 0 
         ? Math.round(((productStats?.withMarketing || 0) / scrapedProducts) * 100)
         : 0,
@@ -100,7 +109,7 @@ export function useAnalysisProgress(
     {
       name: "Review Analysis",
       completed: productStats?.withReviews || 0,
-      total: scrapedProducts || expectedProducts,
+      total: scrapedProducts || 1,
       percentage: scrapedProducts > 0 
         ? Math.round(((productStats?.withReviews || 0) / scrapedProducts) * 100)
         : 0,

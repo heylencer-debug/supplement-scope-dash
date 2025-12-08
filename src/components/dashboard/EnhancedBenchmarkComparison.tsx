@@ -783,13 +783,13 @@ export function EnhancedBenchmarkComparison({
                       <div className="flex items-center justify-between gap-2">
                         <div className="p-1.5 bg-secondary rounded text-center flex-1">
                           <p className="text-[10px] text-muted-foreground">Price</p>
-                          <p className="text-sm md:text-base font-bold">${product.price?.toFixed(2) || 'N/A'}</p>
+                          <p className="text-sm md:text-base font-bold">{product.price ? `$${product.price.toFixed(2)}` : <span className="inline-flex"><span className="w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse mx-0.5" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse [animation-delay:150ms] mx-0.5" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse [animation-delay:300ms] mx-0.5" /></span>}</p>
                         </div>
                         <div className="p-1.5 bg-secondary rounded text-center flex-1">
                           <p className="text-[10px] text-muted-foreground">Rating</p>
                         <div className="flex items-center justify-center gap-0.5">
                             <Star className="w-3 h-3 fill-chart-2 text-chart-2" />
-                            <span className="text-sm md:text-base font-bold">{product.rating?.toFixed(1) || 'N/A'}</span>
+                            <span className="text-sm md:text-base font-bold">{product.rating ? product.rating.toFixed(1) : <span className="inline-flex"><span className="w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse mx-0.5" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse [animation-delay:150ms] mx-0.5" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse [animation-delay:300ms] mx-0.5" /></span>}</span>
                           </div>
                         </div>
                       </div>
@@ -957,7 +957,7 @@ export function EnhancedBenchmarkComparison({
                           (() => {
                             const topWin = getCompetitorTopWin(product);
                             if (!topWin) {
-                              return <p className="text-[10px] text-muted-foreground">No data</p>;
+                              return <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground"><span className="w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse [animation-delay:150ms]" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse [animation-delay:300ms]" /></span>;
                             }
                             return (
                               <div className="flex items-center gap-1">
@@ -986,7 +986,7 @@ export function EnhancedBenchmarkComparison({
                             {(() => {
                               const strengths = getCompetitorStrengths(product);
                               if (strengths.length === 0) {
-                                return <p className="text-[10px] text-muted-foreground">No data</p>;
+                                return <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground"><span className="w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse [animation-delay:150ms]" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse [animation-delay:300ms]" /></span>;
                               }
                               return strengths.map((s, i) => (
                                 <div key={i} className="flex items-start gap-1 text-[10px] text-muted-foreground">
@@ -1038,8 +1038,13 @@ export function EnhancedBenchmarkComparison({
 
                 {/* Empty slots to show capacity */}
                 {Array.from({ length: Math.max(0, MAX_COMPETITORS - displayedProducts.length) }).map((_, idx) => (
-                  <div key={`empty-${idx}`} className="w-[280px] md:w-[320px] shrink-0 rounded-lg border border-dashed border-border bg-muted/20 flex items-center justify-center min-h-[480px]">
-                    <p className="text-xs text-muted-foreground">No data</p>
+                  <div key={`empty-${idx}`} className="w-[280px] md:w-[320px] shrink-0 rounded-lg border border-dashed border-border bg-muted/20 flex flex-col items-center justify-center min-h-[480px] gap-2">
+                    <span className="inline-flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-primary/40 animate-pulse" />
+                      <span className="w-2 h-2 rounded-full bg-primary/40 animate-pulse [animation-delay:150ms]" />
+                      <span className="w-2 h-2 rounded-full bg-primary/40 animate-pulse [animation-delay:300ms]" />
+                    </span>
+                    <p className="text-xs text-muted-foreground">Loading...</p>
                   </div>
                 ))}
               </div>

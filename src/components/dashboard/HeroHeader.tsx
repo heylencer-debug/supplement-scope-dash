@@ -75,7 +75,7 @@ export function HeroHeader({
                 <Skeleton className="h-8 w-64 bg-white/20" />
                 <Skeleton className="h-6 w-32 bg-white/20" />
               </> : <>
-                <div className="space-y-2 animate-fade-in">
+                <div className="space-y-2 animate-enter">
                   <h1 className="text-xl md:text-2xl lg:text-3xl font-bold tracking-tight text-primary-foreground">
                     {cleanCategoryName}
                   </h1>
@@ -85,7 +85,7 @@ export function HeroHeader({
                 </div>
 
                 {/* Compact Score Display */}
-                <div className="flex flex-wrap items-center gap-3 md:gap-4 animate-fade-in" style={{ animationDelay: '0.1s' }}>
+                <div className="flex flex-wrap items-center gap-3 md:gap-4 animate-enter" style={{ animationDelay: '0.1s' }}>
                   <div className="flex items-center gap-2 md:gap-3">
                     <div className="flex items-baseline gap-1">
                       <span className="text-2xl md:text-3xl font-bold">{displayScore}</span>
@@ -139,7 +139,7 @@ export function HeroHeader({
         </div>
 
         {/* Executive Summary */}
-        {!isLoading && executiveSummary && <div className="pt-3 border-t border-white/10 animate-fade-in" style={{ animationDelay: '0.2s' }}>
+        {!isLoading && executiveSummary && <div className="pt-3 border-t border-white/10 animate-enter" style={{ animationDelay: '0.2s' }}>
             <p className="text-xs md:text-sm text-white/80 leading-relaxed line-clamp-3 md:line-clamp-none">
               {executiveSummary}
             </p>

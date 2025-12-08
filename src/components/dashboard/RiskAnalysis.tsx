@@ -59,7 +59,7 @@ export function RiskAnalysis({ risks, isLoading }: RiskAnalysisProps) {
         <CardDescription>Category challenges, failure patterns, and risk factors to consider</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid md:grid-cols-2 gap-8 animate-fade-in">
+        <div className="grid md:grid-cols-2 gap-8 animate-enter">
           {/* Category Challenges */}
           {category_challenges && category_challenges.length > 0 && (
             <div className="space-y-4">

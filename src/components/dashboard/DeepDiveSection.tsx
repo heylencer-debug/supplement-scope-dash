@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Info, Filter } from "lucide-react";
+import { Info, Filter, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -213,8 +213,9 @@ export function DeepDiveSection({
             </ResponsiveContainer>
           </div>
         ) : (
-          <div className="flex items-center justify-center h-[300px] text-muted-foreground">
-            No criteria scores available
+          <div className="flex flex-col items-center justify-center h-[300px] text-muted-foreground gap-3">
+            <Loader2 className="w-8 h-8 animate-spin text-primary/50" />
+            <p className="text-sm">Loading criteria scores...</p>
           </div>
         )}
 

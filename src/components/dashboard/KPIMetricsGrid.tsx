@@ -1,6 +1,7 @@
 import { TrendingUp, DollarSign, Users, Shield } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { LoadingPulse } from "@/components/ui/loading-indicator";
 
 interface KPIMetricsGridProps {
   marketSize: number | null;
@@ -20,7 +21,7 @@ export function KPIMetricsGrid({
   isLoading = false,
 }: KPIMetricsGridProps) {
   const formatMarketSize = (value: number | null) => {
-    if (!value) return "N/A";
+    if (!value) return null;
     if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
     if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
     return `$${value.toFixed(0)}`;
@@ -37,31 +38,31 @@ export function KPIMetricsGrid({
     {
       label: "Market Size",
       value: formatMarketSize(marketSize),
-      subtext: "/ month",
+      subtext: marketSize ? "/ month" : null,
       icon: TrendingUp,
       iconBg: "bg-primary/10",
       iconColor: "text-primary",
     },
     {
       label: "Profit Margin",
-      value: profitMargin ? `${profitMargin}%` : "N/A",
-      subtext: "Avg",
+      value: profitMargin ? `${profitMargin}%` : null,
+      subtext: profitMargin ? "Avg" : null,
       icon: DollarSign,
       iconBg: "bg-chart-4/10",
       iconColor: "text-chart-4",
     },
     {
       label: "Competition",
-      value: competitionLevel || "N/A",
-      subtext: brandCount ? `${brandCount} Brands` : "",
+      value: competitionLevel || null,
+      subtext: brandCount ? `${brandCount} Brands` : null,
       icon: Users,
       iconBg: "bg-chart-2/10",
       iconColor: "text-chart-2",
     },
     {
       label: "Risk Score",
-      value: riskScore !== null ? `${riskScore.toFixed(0)}/100` : "N/A",
-      subtext: getRiskLevel(riskScore).label,
+      value: riskScore !== null ? `${riskScore.toFixed(0)}/100` : null,
+      subtext: riskScore !== null ? getRiskLevel(riskScore).label : null,
       subtextColor: getRiskLevel(riskScore).color,
       icon: Shield,
       iconBg: "bg-chart-5/10",
@@ -87,7 +88,7 @@ export function KPIMetricsGrid({
                     {kpi.label}
                   </p>
                   <p className="text-2xl font-bold text-foreground">
-                    {kpi.value}
+                    {kpi.value !== null ? kpi.value : <LoadingPulse />}
                   </p>
                   {kpi.subtext && (
                     <p className={`text-xs mt-1 ${kpi.subtextColor || "text-muted-foreground"}`}>

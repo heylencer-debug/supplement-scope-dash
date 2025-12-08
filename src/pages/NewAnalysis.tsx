@@ -315,6 +315,16 @@ export default function NewAnalysis() {
             </div>
           </div>
 
+          {/* Category Name Preview */}
+          {category.trim() && productForm && demographics.length > 0 && (
+            <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
+              <p className="text-xs text-muted-foreground mb-1">Analysis will be created as:</p>
+              <p className="font-semibold text-foreground">
+                {category.trim()} {productForm} for {demographics.join(' & ')}
+              </p>
+            </div>
+          )}
+
           <Button
             onClick={handleAnalysis}
             className="w-full h-12 text-base"

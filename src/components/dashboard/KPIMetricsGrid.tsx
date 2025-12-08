@@ -81,7 +81,7 @@ export function KPIMetricsGrid({
                 <Skeleton className="h-3 w-16" />
               </div>
             ) : (
-              <div className="animate-fade-in flex items-start justify-between">
+              <div className="animate-enter flex items-start justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground mb-1">
                     {kpi.label}

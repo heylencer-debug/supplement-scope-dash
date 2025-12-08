@@ -162,7 +162,7 @@ export function DeepDiveSection({
             </div>
           </div>
         ) : radarData.length > 0 ? (
-          <div className="animate-fade-in">
+          <div className="animate-enter">
             <ResponsiveContainer width="100%" height={350}>
               <RadarChart data={radarData} margin={{ top: 20, right: 30, bottom: 20, left: 30 }}>
                 <PolarGrid stroke="hsl(var(--border))" />

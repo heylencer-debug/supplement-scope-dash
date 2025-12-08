@@ -95,7 +95,7 @@ export function FinancialProjections({ financials, isLoading }: FinancialProject
         <CardDescription>Startup investment, revenue targets, and margin projections</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid lg:grid-cols-2 gap-8 animate-fade-in">
+        <div className="grid lg:grid-cols-2 gap-8 animate-enter">
           {/* Startup Investment Breakdown */}
           {(investmentData.length > 0 || startup_investment?.total) && (
             <div className="space-y-4">

@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Search, Filter, Download, Star, TrendingUp, Loader2, Eye, ChevronDown, ChevronRight } from "lucide-react";
+import { Search, Filter, Download, Star, TrendingUp, Loader2, Eye, ChevronDown, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -34,6 +34,9 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 
 const MAX_COMPARISON_PRODUCTS = 5;
 
+type SortField = "price" | "rating" | "reviews" | "monthly_sales" | "monthly_revenue" | null;
+type SortDirection = "asc" | "desc";
+
 export default function ProductExplorer() {
   const [searchParams] = useSearchParams();
   const urlCategoryName = searchParams.get("category");
@@ -44,6 +47,15 @@ export default function ProductExplorer() {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  
+  // Sorting state
+  const [sortField, setSortField] = useState<SortField>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  
+  // Filter states
+  const [priceRange, setPriceRange] = useState<string>("all");
+  const [ratingFilter, setRatingFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
 
   const { currentCategoryId, categoryName: contextCategoryName, setCategoryContext } = useCategoryContext();
   
@@ -78,13 +90,89 @@ export default function ProductExplorer() {
 
   const isLoading = productsLoading || categoriesLoading;
 
-  const filteredProducts = (products ?? []).filter((product) => {
-    const matchesSearch =
-      (product.title?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false) ||
-      (product.brand?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false) ||
-      (product.asin?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
-    return matchesSearch;
-  });
+  // Sorting handler
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDirection("desc");
+    }
+  };
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return <ArrowUpDown className="w-3 h-3 ml-1 opacity-50" />;
+    return sortDirection === "asc" 
+      ? <ArrowUp className="w-3 h-3 ml-1" /> 
+      : <ArrowDown className="w-3 h-3 ml-1" />;
+  };
+
+  // Filter and sort products
+  const filteredProducts = useMemo(() => {
+    let result = (products ?? []).filter((product) => {
+      // Search filter
+      const matchesSearch =
+        (product.title?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false) ||
+        (product.brand?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false) ||
+        (product.asin?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
+      
+      // Price filter
+      const price = product.price ?? 0;
+      const matchesPrice = priceRange === "all" ||
+        (priceRange === "under20" && price < 20) ||
+        (priceRange === "20to50" && price >= 20 && price <= 50) ||
+        (priceRange === "over50" && price > 50);
+      
+      // Rating filter
+      const rating = product.rating ?? 0;
+      const matchesRating = ratingFilter === "all" ||
+        (ratingFilter === "4plus" && rating >= 4) ||
+        (ratingFilter === "3to4" && rating >= 3 && rating < 4) ||
+        (ratingFilter === "under3" && rating < 3);
+      
+      // Status filter
+      const matchesStatus = statusFilter === "all" ||
+        (statusFilter === "bestseller" && product.bestseller) ||
+        (statusFilter === "amazonchoice" && product.amazon_choice) ||
+        (statusFilter === "young" && product.is_young_competitor);
+      
+      return matchesSearch && matchesPrice && matchesRating && matchesStatus;
+    });
+
+    // Apply sorting
+    if (sortField) {
+      result = [...result].sort((a, b) => {
+        let aVal: number, bVal: number;
+        switch (sortField) {
+          case "price":
+            aVal = a.price ?? 0;
+            bVal = b.price ?? 0;
+            break;
+          case "rating":
+            aVal = a.rating ?? 0;
+            bVal = b.rating ?? 0;
+            break;
+          case "reviews":
+            aVal = a.reviews ?? 0;
+            bVal = b.reviews ?? 0;
+            break;
+          case "monthly_sales":
+            aVal = a.monthly_sales ?? 0;
+            bVal = b.monthly_sales ?? 0;
+            break;
+          case "monthly_revenue":
+            aVal = a.monthly_revenue ?? 0;
+            bVal = b.monthly_revenue ?? 0;
+            break;
+          default:
+            return 0;
+        }
+        return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
+      });
+    }
+
+    return result;
+  }, [products, searchQuery, priceRange, ratingFilter, statusFilter, sortField, sortDirection]);
 
   const selectedProducts = filteredProducts.filter(p => selectedProductIds.has(p.id));
 
@@ -194,35 +282,90 @@ export default function ProductExplorer() {
 
       <Card>
         <CardHeader>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-              <Input
-                placeholder="Search products, brands, or ASINs..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                <Input
+                  placeholder="Search products, brands, or ASINs..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger className="w-56">
+                  <Filter className="w-4 h-4 mr-2" />
+                  <SelectValue placeholder="Filter by Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(currentCategoryId || categoryName) && (
+                    <SelectItem value="current">
+                      Current: {categoryName || "Selected Category"}
+                    </SelectItem>
+                  )}
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {categories?.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-56">
-                <Filter className="w-4 h-4 mr-2" />
-                <SelectValue placeholder="Filter by Category" />
-              </SelectTrigger>
-              <SelectContent>
-                {(currentCategoryId || categoryName) && (
-                  <SelectItem value="current">
-                    Current: {categoryName || "Selected Category"}
-                  </SelectItem>
-                )}
-                <SelectItem value="all">All Categories</SelectItem>
-                {categories?.map((cat) => (
-                  <SelectItem key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            
+            {/* Filter row */}
+            <div className="flex flex-wrap gap-3">
+              <Select value={priceRange} onValueChange={setPriceRange}>
+                <SelectTrigger className="w-36">
+                  <SelectValue placeholder="Price" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Prices</SelectItem>
+                  <SelectItem value="under20">Under $20</SelectItem>
+                  <SelectItem value="20to50">$20 - $50</SelectItem>
+                  <SelectItem value="over50">Over $50</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              <Select value={ratingFilter} onValueChange={setRatingFilter}>
+                <SelectTrigger className="w-36">
+                  <SelectValue placeholder="Rating" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Ratings</SelectItem>
+                  <SelectItem value="4plus">4+ Stars</SelectItem>
+                  <SelectItem value="3to4">3-4 Stars</SelectItem>
+                  <SelectItem value="under3">Under 3 Stars</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Products</SelectItem>
+                  <SelectItem value="bestseller">Bestsellers</SelectItem>
+                  <SelectItem value="amazonchoice">Amazon's Choice</SelectItem>
+                  <SelectItem value="young">Young Competitors</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              {(priceRange !== "all" || ratingFilter !== "all" || statusFilter !== "all") && (
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => {
+                    setPriceRange("all");
+                    setRatingFilter("all");
+                    setStatusFilter("all");
+                  }}
+                >
+                  Clear Filters
+                </Button>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -242,11 +385,46 @@ export default function ProductExplorer() {
                     </div>
                   </TableHead>
                   <TableHead className="min-w-0">Product</TableHead>
-                  <TableHead className="text-right w-16">Price</TableHead>
-                  <TableHead className="text-center w-16">Rating</TableHead>
-                  <TableHead className="text-right w-20">Reviews</TableHead>
-                  <TableHead className="text-right w-20 hidden lg:table-cell">Mo. Sales</TableHead>
-                  <TableHead className="text-right w-24">Revenue</TableHead>
+                  <TableHead className="text-right w-16">
+                    <button 
+                      className="flex items-center justify-end w-full hover:text-foreground transition-colors"
+                      onClick={() => handleSort("price")}
+                    >
+                      Price <SortIcon field="price" />
+                    </button>
+                  </TableHead>
+                  <TableHead className="text-center w-16">
+                    <button 
+                      className="flex items-center justify-center w-full hover:text-foreground transition-colors"
+                      onClick={() => handleSort("rating")}
+                    >
+                      Rating <SortIcon field="rating" />
+                    </button>
+                  </TableHead>
+                  <TableHead className="text-right w-20">
+                    <button 
+                      className="flex items-center justify-end w-full hover:text-foreground transition-colors"
+                      onClick={() => handleSort("reviews")}
+                    >
+                      Reviews <SortIcon field="reviews" />
+                    </button>
+                  </TableHead>
+                  <TableHead className="text-right w-20 hidden lg:table-cell">
+                    <button 
+                      className="flex items-center justify-end w-full hover:text-foreground transition-colors"
+                      onClick={() => handleSort("monthly_sales")}
+                    >
+                      Mo. Sales <SortIcon field="monthly_sales" />
+                    </button>
+                  </TableHead>
+                  <TableHead className="text-right w-24">
+                    <button 
+                      className="flex items-center justify-end w-full hover:text-foreground transition-colors"
+                      onClick={() => handleSort("monthly_revenue")}
+                    >
+                      Revenue <SortIcon field="monthly_revenue" />
+                    </button>
+                  </TableHead>
                   <TableHead className="text-center w-28">Scores</TableHead>
                   <TableHead className="text-center w-24 hidden lg:table-cell">Status</TableHead>
                   <TableHead className="text-center w-12"></TableHead>

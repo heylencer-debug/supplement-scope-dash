@@ -86,7 +86,7 @@ export function FinancialProjections({ financials, isLoading }: FinancialProject
   if (!hasData) return null;
 
   return (
-    <Card className="border-chart-4/20">
+    <Card className="border-chart-4/20 animate-enter [animation-duration:400ms]">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <DollarSign className="w-5 h-5 text-chart-4" />
@@ -95,7 +95,7 @@ export function FinancialProjections({ financials, isLoading }: FinancialProject
         <CardDescription>Startup investment, revenue targets, and margin projections</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid lg:grid-cols-2 gap-8 animate-enter">
+        <div className="grid lg:grid-cols-2 gap-8">
           {/* Startup Investment Breakdown */}
           {(investmentData.length > 0 || startup_investment?.total) && (
             <div className="space-y-4">

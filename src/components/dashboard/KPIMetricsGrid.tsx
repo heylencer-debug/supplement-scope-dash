@@ -73,7 +73,11 @@ export function KPIMetricsGrid({
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
       {kpis.map((kpi, idx) => (
-        <Card key={idx} className="border-border/50 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-default">
+        <Card 
+          key={idx} 
+          className="border-border/50 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-default animate-enter"
+          style={{ animationDelay: `${idx * 50}ms`, animationDuration: '400ms' }}
+        >
           <CardContent className="p-6">
             {isLoading ? (
               <div className="space-y-3">

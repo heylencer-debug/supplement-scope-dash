@@ -50,7 +50,7 @@ export function RiskAnalysis({ risks, isLoading }: RiskAnalysisProps) {
   if (!hasData) return null;
 
   return (
-    <Card className="border-destructive/20">
+    <Card className="border-destructive/20 animate-enter [animation-duration:400ms]">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <AlertTriangle className="w-5 h-5 text-destructive" />

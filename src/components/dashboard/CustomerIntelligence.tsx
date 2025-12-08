@@ -102,7 +102,7 @@ export default function CustomerIntelligence({
   const { buyer_profile, primary_pain_points, unmet_needs, love_most, decision_drivers } = customerInsights;
 
   return (
-    <Card>
+    <Card className="animate-enter [animation-duration:400ms]">
       <CardHeader>
         <div className="flex items-center gap-2">
           <Users className="w-5 h-5 text-primary" />

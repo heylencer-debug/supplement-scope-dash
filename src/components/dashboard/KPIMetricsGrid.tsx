@@ -75,8 +75,8 @@ export function KPIMetricsGrid({
       {kpis.map((kpi, idx) => (
         <Card 
           key={idx} 
-          className="border-border/50 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-default animate-enter"
-          style={{ animationDelay: `${idx * 50}ms`, animationDuration: '400ms' }}
+          className="border-border/50 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-default opacity-0 animate-fade-in"
+          style={{ animationDelay: `${idx * 100}ms`, animationFillMode: 'forwards' }}
         >
           <CardContent className="p-6">
             {isLoading ? (

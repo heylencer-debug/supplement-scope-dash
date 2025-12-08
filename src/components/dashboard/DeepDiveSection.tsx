@@ -118,7 +118,7 @@ export function DeepDiveSection({
   });
 
   return (
-    <Card>
+    <Card className="animate-enter [animation-duration:400ms]">
       <CardHeader>
         <CardTitle className="text-lg font-semibold text-foreground">
           18-Point Analysis

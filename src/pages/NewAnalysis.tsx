@@ -24,6 +24,23 @@ const amazonCategoryOptions = [
   { id: "pet-supplies", label: "Pet Supplies" },
 ];
 
+const demographicsOptions = [
+  { id: "men", label: "Men" },
+  { id: "women", label: "Women" },
+  { id: "adults", label: "Adults" },
+  { id: "kids", label: "Kids" },
+  { id: "seniors", label: "Seniors" },
+];
+
+const productFormOptions = [
+  { id: "gummy", label: "Gummy" },
+  { id: "liquid", label: "Liquid" },
+  { id: "powder", label: "Powder" },
+  { id: "capsule", label: "Capsule" },
+  { id: "tablet", label: "Tablet" },
+  { id: "softgel", label: "Softgel" },
+];
+
 
 const getRecommendationStyle = (recommendation: string | null) => {
   if (!recommendation) return "bg-muted text-muted-foreground border-border";
@@ -40,6 +57,8 @@ export default function NewAnalysis() {
   const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
   const [category, setCategory] = useState("");
+  const [demographics, setDemographics] = useState<string[]>([]);
+  const [productForm, setProductForm] = useState("");
   const [asin, setAsin] = useState("");
   const [amazonCategories, setAmazonCategories] = useState<string[]>([]);
 
@@ -61,6 +80,14 @@ export default function NewAnalysis() {
     }
   };
 
+  const handleDemographicsToggle = (demo: string, checked: boolean) => {
+    if (checked) {
+      setDemographics((prev) => [...prev, demo]);
+    } else {
+      setDemographics((prev) => prev.filter((d) => d !== demo));
+    }
+  };
+
   const handleAnalysis = async () => {
     if (!category.trim()) {
       toast({
@@ -71,10 +98,34 @@ export default function NewAnalysis() {
       return;
     }
 
+    if (demographics.length === 0) {
+      toast({
+        title: "Error",
+        description: "Please select at least one demographic.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!productForm) {
+      toast({
+        title: "Error",
+        description: "Please select a product form.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
 
+    // Build combined category name: "Magnesium Glycinate Gummy for Women"
+    let fullCategoryName = category.trim();
+    fullCategoryName = `${fullCategoryName} ${productForm}`;
+    const demoString = demographics.join(' & ');
+    fullCategoryName = `${fullCategoryName} for ${demoString}`;
+
     const payload = {
-      category: category.trim(),
+      category: fullCategoryName,
       ASIN: asin.trim() || null,
       amazon_categories: amazonCategories.length > 0 ? amazonCategories : null,
     };
@@ -95,7 +146,7 @@ export default function NewAnalysis() {
       // Add to pending analyses in localStorage
       const pending = JSON.parse(localStorage.getItem(PENDING_ANALYSES_KEY) || '[]');
       pending.push({ 
-        categoryName: category.trim(), 
+        categoryName: fullCategoryName, 
         startedAt: new Date().toISOString() 
       });
       localStorage.setItem(PENDING_ANALYSES_KEY, JSON.stringify(pending));
@@ -112,7 +163,7 @@ export default function NewAnalysis() {
       });
 
       // Navigate to dashboard with category parameter
-      navigate(`/dashboard?category=${encodeURIComponent(category.trim())}`);
+      navigate(`/dashboard?category=${encodeURIComponent(fullCategoryName)}`);
     } catch (error) {
       console.error("Analysis request failed:", error);
       toast({
@@ -173,6 +224,57 @@ export default function NewAnalysis() {
             />
           </div>
 
+          {/* Demographics Field */}
+          <div className="space-y-4">
+            <Label>
+              Target Demographics <span className="text-destructive">*</span>
+            </Label>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {demographicsOptions.map((option) => (
+                <div
+                  key={option.id}
+                  className="flex items-center space-x-3 p-3 rounded-lg border bg-secondary/30 hover:bg-secondary/50 transition-colors"
+                >
+                  <Checkbox
+                    id={`demo-${option.id}`}
+                    checked={demographics.includes(option.label)}
+                    onCheckedChange={(checked) =>
+                      handleDemographicsToggle(option.label, checked as boolean)
+                    }
+                  />
+                  <Label
+                    htmlFor={`demo-${option.id}`}
+                    className="text-sm font-medium cursor-pointer flex-1"
+                  >
+                    {option.label}
+                  </Label>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Product Form Field */}
+          <div className="space-y-4">
+            <Label>
+              Product Form <span className="text-destructive">*</span>
+            </Label>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {productFormOptions.map((option) => (
+                <div
+                  key={option.id}
+                  onClick={() => setProductForm(option.label)}
+                  className={`flex items-center justify-center p-3 rounded-lg border cursor-pointer transition-all ${
+                    productForm === option.label
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-secondary/30 hover:bg-secondary/50 border-border"
+                  }`}
+                >
+                  <span className="text-sm font-medium">{option.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Target ASINs Field */}
           <div className="space-y-2">
             <Label htmlFor="ASIN">Specific Competitor ASINs</Label>
@@ -216,7 +318,7 @@ export default function NewAnalysis() {
           <Button
             onClick={handleAnalysis}
             className="w-full h-12 text-base"
-            disabled={isLoading || !category.trim()}
+            disabled={isLoading || !category.trim() || demographics.length === 0 || !productForm}
           >
             {isLoading ? (
               <>

@@ -70,8 +70,9 @@ export function useAnalysisProgress(
   
   // If downstream analysis has started, products scraping is complete
   const isScrapingComplete = scrapedProducts > 0 && (hasOcrStarted || hasMarketingStarted || hasReviewsStarted || hasAnalysis);
-  const scrapingTotal = isScrapingComplete ? scrapedProducts : Math.max(scrapedProducts, 100);
-  const scrapingPercentage = isScrapingComplete ? 100 : (scrapedProducts > 0 ? Math.min(95, Math.round((scrapedProducts / 100) * 100)) : 0);
+  // Show actual product count when scraping is complete, otherwise show current count while in progress
+  const scrapingTotal = isScrapingComplete ? scrapedProducts : (scrapedProducts > 0 ? scrapedProducts : 100);
+  const scrapingPercentage = isScrapingComplete ? 100 : (scrapedProducts > 0 ? Math.min(95, Math.round((scrapedProducts / scrapingTotal) * 100)) : 0);
 
   const phases: AnalysisPhase[] = [
     {

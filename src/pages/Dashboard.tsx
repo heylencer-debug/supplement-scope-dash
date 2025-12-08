@@ -17,6 +17,7 @@ import { FinancialProjections } from "@/components/dashboard/FinancialProjection
 import { RiskAnalysis } from "@/components/dashboard/RiskAnalysis";
 import { LaunchPlanSection } from "@/components/dashboard/LaunchPlanSection";
 import CustomerIntelligence from "@/components/dashboard/CustomerIntelligence";
+import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
 
 import {
   ResponsiveContainer,
@@ -306,12 +307,11 @@ export default function Dashboard() {
     return result;
   }, [products]);
 
-  if (categoryLoading && !hasCategory) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+  // Show full skeleton while initial data is loading
+  const isInitialLoading = categoryLoading || (analysisLoading && !hasAnalysis && !hasProducts);
+  
+  if (isInitialLoading && categoryName) {
+    return <DashboardSkeleton />;
   }
 
   if (!categoryName) {

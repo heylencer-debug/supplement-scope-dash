@@ -983,31 +983,29 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
             </div>
           </TabsContent>
 
-          {/* Packaging Tab */}
+          {/* Packaging Audit Tab */}
           <TabsContent value="packaging" className={`mt-4 ${scrollableContentClass} ${maxContentHeight}`}>
             <div className="space-y-4">
               {(() => {
-                const designBlueprint = (marketingAnalysis as Record<string, unknown> | null)?.design_blueprint as Record<string, unknown> | null;
+                // Primary source: packaging_intelligence from marketing_analysis
                 const packagingIntel = (marketingAnalysis as Record<string, unknown> | null)?.packaging_intelligence as Record<string, unknown> | null;
-                const sourceData = designBlueprint || packagingIntel;
+                // Fallback: design_blueprint
+                const designBlueprint = (marketingAnalysis as Record<string, unknown> | null)?.design_blueprint as Record<string, unknown> | null;
                 
-                const visualStyle = (sourceData?.visual_style as string) || (designBlueprint?.color_strategy as string);
-                const visualHierarchy = (sourceData?.visual_hierarchy as string) || (designBlueprint?.layout_structure as string);
-                const trustSignals = (sourceData?.trust_signals as string[]) || [];
-                const conversionTriggers = (sourceData?.conversion_triggers as string) || (designBlueprint?.differentiation_factor as string);
-                const colorStrategy = designBlueprint?.color_strategy as string;
-                const layoutStructure = designBlueprint?.layout_structure as string;
-                const typographyStyle = designBlueprint?.typography_style as string;
-                const differentiationFactor = designBlueprint?.differentiation_factor as string;
+                const visualStyle = (packagingIntel?.visual_style as string) || (designBlueprint?.visual_style as string) || (designBlueprint?.color_strategy as string);
+                const visualHierarchy = (packagingIntel?.visual_hierarchy as string) || (designBlueprint?.visual_hierarchy as string) || (designBlueprint?.layout_structure as string);
+                const trustSignals = (packagingIntel?.trust_signals as string[]) || (designBlueprint?.trust_signals as string[]) || [];
+                const frontOfPackClaims = (packagingIntel?.front_of_pack_claims as string[]) || [];
+                const conversionTriggers = (packagingIntel?.conversion_triggers as string) || (designBlueprint?.conversion_triggers as string) || (designBlueprint?.differentiation_factor as string);
                 
                 const hasData = visualStyle || visualHierarchy || trustSignals.length > 0 || conversionTriggers || 
-                               product.claims || (product.claims_on_label && product.claims_on_label.length > 0);
+                               frontOfPackClaims.length > 0 || product.claims || (product.claims_on_label && product.claims_on_label.length > 0);
                 
                 if (!hasData) {
                   return (
                     <Card>
                       <CardContent className="py-8 text-center text-muted-foreground">
-                        No packaging analysis data available for this product.
+                        No packaging audit data available for this product.
                       </CardContent>
                     </Card>
                   );
@@ -1015,36 +1013,35 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                 
                 return (
                   <>
-                    {/* Visual Style & Hierarchy Row */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {visualStyle && visualStyle !== "N/A" && (
-                        <Card>
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium flex items-center gap-2">
-                              <Image className="w-4 h-4 text-primary" />
-                              Visual Style
-                            </CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <p className="text-sm text-foreground">{visualStyle}</p>
-                          </CardContent>
-                        </Card>
-                      )}
-                      
-                      {visualHierarchy && visualHierarchy !== "N/A" && (
-                        <Card>
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium flex items-center gap-2">
-                              <BarChart3 className="w-4 h-4 text-chart-2" />
-                              Visual Hierarchy
-                            </CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <p className="text-sm text-foreground">{visualHierarchy}</p>
-                          </CardContent>
-                        </Card>
-                      )}
-                    </div>
+                    {/* Visual Style */}
+                    {visualStyle && visualStyle !== "N/A" && (
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-medium flex items-center gap-2">
+                            <Image className="w-4 h-4 text-primary" />
+                            Visual Style
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-sm text-foreground">{visualStyle}</p>
+                        </CardContent>
+                      </Card>
+                    )}
+                    
+                    {/* Visual Hierarchy */}
+                    {visualHierarchy && visualHierarchy !== "N/A" && (
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-medium flex items-center gap-2">
+                            <BarChart3 className="w-4 h-4 text-chart-2" />
+                            Visual Hierarchy
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-sm text-foreground">{visualHierarchy}</p>
+                        </CardContent>
+                      </Card>
+                    )}
                     
                     {/* Trust Signals */}
                     {trustSignals.length > 0 && (
@@ -1068,7 +1065,7 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                     )}
                     
                     {/* Front of Pack Claims */}
-                    {(product.claims || (product.claims_on_label && product.claims_on_label.length > 0)) && (
+                    {(frontOfPackClaims.length > 0 || product.claims || (product.claims_on_label && product.claims_on_label.length > 0)) && (
                       <Card>
                         <CardHeader className="pb-2">
                           <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -1078,7 +1075,14 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                         </CardHeader>
                         <CardContent>
                           <ul className="space-y-1.5">
-                            {product.claims_on_label && product.claims_on_label.length > 0 ? (
+                            {frontOfPackClaims.length > 0 ? (
+                              frontOfPackClaims.map((claim, idx) => (
+                                <li key={idx} className="flex items-start gap-2 text-sm">
+                                  <CheckCircle className="w-4 h-4 text-chart-4 mt-0.5 shrink-0" />
+                                  <span className="text-foreground">{claim}</span>
+                                </li>
+                              ))
+                            ) : product.claims_on_label && product.claims_on_label.length > 0 ? (
                               product.claims_on_label.map((claim, idx) => (
                                 <li key={idx} className="flex items-start gap-2 text-sm">
                                   <CheckCircle className="w-4 h-4 text-chart-4 mt-0.5 shrink-0" />
@@ -1106,49 +1110,10 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                             <Lightbulb className="w-4 h-4 text-primary" />
                             Conversion Triggers
                           </CardTitle>
+                          <p className="text-xs text-muted-foreground">Why this packaging converts</p>
                         </CardHeader>
                         <CardContent>
-                          <p className="text-sm text-foreground italic">"{conversionTriggers}"</p>
-                        </CardContent>
-                      </Card>
-                    )}
-                    
-                    {/* Additional Design Details */}
-                    {(colorStrategy || layoutStructure || typographyStyle || differentiationFactor) && (
-                      <Card>
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-sm font-medium flex items-center gap-2">
-                            <Info className="w-4 h-4 text-muted-foreground" />
-                            Design Details
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                            {colorStrategy && colorStrategy !== "N/A" && (
-                              <div>
-                                <p className="text-xs text-muted-foreground mb-1">Color Strategy</p>
-                                <p className="text-foreground">{colorStrategy}</p>
-                              </div>
-                            )}
-                            {layoutStructure && layoutStructure !== "N/A" && (
-                              <div>
-                                <p className="text-xs text-muted-foreground mb-1">Layout Structure</p>
-                                <p className="text-foreground">{layoutStructure}</p>
-                              </div>
-                            )}
-                            {typographyStyle && typographyStyle !== "N/A" && (
-                              <div>
-                                <p className="text-xs text-muted-foreground mb-1">Typography Style</p>
-                                <p className="text-foreground">{typographyStyle}</p>
-                              </div>
-                            )}
-                            {differentiationFactor && differentiationFactor !== "N/A" && (
-                              <div>
-                                <p className="text-xs text-muted-foreground mb-1">Differentiation Factor</p>
-                                <p className="text-foreground">{differentiationFactor}</p>
-                              </div>
-                            )}
-                          </div>
+                          <p className="text-sm text-foreground">{conversionTriggers}</p>
                         </CardContent>
                       </Card>
                     )}

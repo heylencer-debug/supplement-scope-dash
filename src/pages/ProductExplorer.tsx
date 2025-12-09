@@ -399,6 +399,7 @@ export default function ProductExplorer() {
                       )}
                     </div>
                   </TableHead>
+                  <TableHead className="w-14"></TableHead>
                   <TableHead className="min-w-0">Product</TableHead>
                   <TableHead className="text-right w-16">
                     <button 
@@ -483,6 +484,21 @@ export default function ProductExplorer() {
                             />
                           </TableCell>
                           <TableCell>
+                            <div className="w-10 h-10 rounded-md overflow-hidden bg-muted flex-shrink-0">
+                              {(product.main_image_url || product.image_url) ? (
+                                <img 
+                                  src={product.main_image_url || product.image_url || ''} 
+                                  alt={product.title || 'Product'}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
+                                  N/A
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
                             <div className="max-w-md">
                               <p className="font-medium text-foreground truncate">{product.title ?? "Untitled"}</p>
                               <p className="text-sm text-muted-foreground">{product.brand ?? "Unknown Brand"}</p>
@@ -547,7 +563,7 @@ export default function ProductExplorer() {
                         </TableRow>
                         <CollapsibleContent asChild>
                           <tr>
-                            <td colSpan={11} className="p-0">
+                            <td colSpan={12} className="p-0">
                               <ProductAnalysisPanel 
                                 marketingAnalysis={product.marketing_analysis as any} 
                                 reviewAnalysis={product.review_analysis as any}

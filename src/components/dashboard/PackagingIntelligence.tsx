@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Package, CheckCircle2, Award, Tag, Shield, DollarSign, Palette, Hash } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 
 interface PackagingData {
   type?: string;
@@ -31,6 +32,14 @@ interface PackagingIntelligenceProps {
 }
 
 export function PackagingIntelligence({ packagingData, productsClaims, productsData = [], isLoading }: PackagingIntelligenceProps) {
+  const CHART_COLORS = [
+    "hsl(var(--chart-1))",
+    "hsl(var(--chart-2))",
+    "hsl(var(--chart-3))",
+    "hsl(var(--chart-4))",
+    "hsl(var(--chart-5))",
+    "hsl(var(--primary))",
+  ];
   // Aggregate claims and calculate frequency
   const topClaims = useMemo(() => {
     const claimFrequency = new Map<string, number>();
@@ -92,6 +101,15 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
     // Most common packaging type
     const sortedTypes = Array.from(typeFrequency.entries()).sort((a, b) => b[1] - a[1]);
     const mostCommonType = sortedTypes[0] ? { type: sortedTypes[0][0], count: sortedTypes[0][1] } : null;
+    
+    // Full packaging type distribution for chart
+    const typeDistribution = sortedTypes.slice(0, 6).map(([type, count], idx) => ({
+      name: type.length > 12 ? type.substring(0, 12) + "..." : type,
+      fullName: type,
+      count,
+      percentage: Math.round((count / productsData.length) * 100),
+      fill: CHART_COLORS[idx % CHART_COLORS.length],
+    }));
 
     // Serving count distribution
     const servingFrequency = new Map<number, number>();
@@ -121,10 +139,12 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
 
     return {
       mostCommonType,
+      typeDistribution,
       topServings,
       priceRange: { min: minPrice, max: maxPrice, median: medianPrice, p25, p75 },
     };
   }, [productsData]);
+
 
   // Aggregate trust signals from design_blueprint
   const trustSignals = useMemo(() => {
@@ -394,6 +414,58 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Packaging Type Distribution Chart */}
+        {packagingStats?.typeDistribution && packagingStats.typeDistribution.length > 1 && (
+          <div>
+            <h4 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
+              <Package className="w-4 h-4 text-chart-3" />
+              Packaging Type Distribution
+            </h4>
+            <div className="h-[180px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart 
+                  data={packagingStats.typeDistribution} 
+                  layout="vertical"
+                  margin={{ top: 5, right: 30, left: 5, bottom: 5 }}
+                >
+                  <XAxis 
+                    type="number" 
+                    tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                    tickFormatter={(value) => `${value}%`}
+                  />
+                  <YAxis 
+                    type="category" 
+                    dataKey="name" 
+                    tick={{ fontSize: 11, fill: "hsl(var(--foreground))" }}
+                    width={90}
+                  />
+                  <Tooltip 
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-popover border border-border rounded-lg p-2 shadow-lg">
+                            <p className="text-sm font-medium text-foreground">{data.fullName}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {data.count} products ({data.percentage}%)
+                            </p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Bar dataKey="percentage" radius={[0, 4, 4, 0]}>
+                    {packagingStats.typeDistribution.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </div>
         )}

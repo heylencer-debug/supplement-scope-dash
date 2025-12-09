@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -68,104 +68,129 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
   const [isOpen, setIsOpen] = useState(true);
   const [viewMode, setViewMode] = useState<'chart' | 'table' | 'gaps'>('chart');
 
+  // DEBUG: Log what we receive
+  useEffect(() => {
+    console.log('[IngredientComparison] competitors count:', competitors.length);
+    competitors.forEach((p, i) => {
+      const ingList = getCompetitorIngredientsList(p);
+      const nutrients = getCompetitorNutrients(p);
+      console.log(`[IngredientComparison] Competitor ${i + 1} (${p.brand}):`, {
+        ingredientsCount: ingList.length,
+        nutrientsCount: nutrients.length,
+        sampleIngredients: ingList.slice(0, 5),
+        allIngredients: ingList
+      });
+    });
+  }, [competitors, getCompetitorIngredientsList, getCompetitorNutrients]);
+
   // Build unified data combining nutrients (with amounts) AND other ingredients
   const comparisonData = useMemo(() => {
+    // Use a simple Map where EVERY unique ingredient gets its own entry
     const ingredientMap = new Map<string, {
+      displayName: string;
       ourDosage: string | null;
       isNutrient: boolean;
       competitors: Array<{ brand: string; amount: string | null; dailyValue?: string | number }>;
     }>();
 
-    // Add our recommended dosages (these are nutrients)
+    // Helper to add an ingredient to the map
+    const addToMap = (
+      normalizedKey: string, 
+      displayName: string, 
+      isNutrient: boolean, 
+      dosage: string | null,
+      competitor?: { brand: string; amount: string | null; dailyValue?: string | number }
+    ) => {
+      if (!ingredientMap.has(normalizedKey)) {
+        ingredientMap.set(normalizedKey, {
+          displayName,
+          ourDosage: dosage,
+          isNutrient,
+          competitors: competitor ? [competitor] : []
+        });
+      } else {
+        const existing = ingredientMap.get(normalizedKey)!;
+        if (dosage && !existing.ourDosage) {
+          existing.ourDosage = dosage;
+        }
+        if (competitor) {
+          const alreadyHas = existing.competitors.some(c => c.brand === competitor.brand);
+          if (!alreadyHas) {
+            existing.competitors.push(competitor);
+          }
+        }
+      }
+    };
+
+    // 1. Add our recommended dosages (these are nutrients)
     ourDosages.forEach(item => {
       const normalizedName = item.ingredient.toLowerCase().trim();
-      ingredientMap.set(normalizedName, {
-        ourDosage: item.dosage || null,
-        isNutrient: true,
-        competitors: []
-      });
+      addToMap(normalizedName, item.ingredient, true, item.dosage || null);
     });
 
-    // Add competitor nutrients (with amounts)
+    // 2. Add ALL competitor data
     competitors.forEach(product => {
+      const brand = product.brand || 'Unknown';
+      
+      // 2a. Add nutrients (with amounts)
       const nutrients = getCompetitorNutrients(product);
       nutrients.forEach(nutrient => {
         const normalizedName = nutrient.name.toLowerCase().trim();
-        
-        // Check if this nutrient or similar exists
-        let matchedKey: string | null = null;
-        for (const [key] of ingredientMap) {
-          if (normalizedName.includes(key) || key.includes(normalizedName) ||
-              normalizedName.split(' ').some(word => key.includes(word) && word.length > 3)) {
-            matchedKey = key;
-            break;
+        addToMap(
+          normalizedName,
+          nutrient.name,
+          true,
+          null,
+          {
+            brand,
+            amount: nutrient.amount !== null ? `${nutrient.amount}${nutrient.unit}` : null,
+            dailyValue: nutrient.dailyValue
           }
-        }
-
-        const competitorEntry = {
-          brand: product.brand || 'Unknown',
-          amount: nutrient.amount !== null ? `${nutrient.amount}${nutrient.unit}` : null,
-          dailyValue: nutrient.dailyValue
-        };
-
-        if (matchedKey) {
-          ingredientMap.get(matchedKey)!.competitors.push(competitorEntry);
-        } else {
-          ingredientMap.set(normalizedName, {
-            ourDosage: null,
-            isNutrient: true,
-            competitors: [competitorEntry]
-          });
-        }
+        );
       });
 
-      // Add other ingredients (from ingredients + other_ingredients text fields - no amounts)
+      // 2b. Add ALL other ingredients (from ingredients + other_ingredients fields)
       const ingredientsList = getCompetitorIngredientsList(product);
       ingredientsList.forEach(ing => {
-        // Clean up the ingredient name - remove dosages like "170 mg" but keep the rest
+        // Clean up - remove dosage numbers but keep everything else
         const cleanedIng = ing.replace(/\d+(\.\d+)?\s*(mg|mcg|iu|g|ml|μg)\b/gi, '').trim();
-        if (!cleanedIng || cleanedIng.length < 2) return; // Skip empty or too short entries
+        if (!cleanedIng || cleanedIng.length < 2) return;
         
         const normalizedIng = cleanedIng.toLowerCase().trim();
         
-        // STRICT matching - only exact matches (after normalization)
-        // This prevents merging distinct ingredients like "Black Carrot" with "Carrot"
-        const exactKey = Array.from(ingredientMap.keys()).find(key => key === normalizedIng);
-        
-        if (exactKey) {
-          // Add as competitor with no amount if not already there
-          const existing = ingredientMap.get(exactKey)!;
-          const alreadyHas = existing.competitors.some(c => c.brand === (product.brand || 'Unknown'));
-          if (!alreadyHas) {
-            existing.competitors.push({
-              brand: product.brand || 'Unknown',
-              amount: null
-            });
-          }
-        } else {
-          // Add as new unique ingredient - no fuzzy matching
-          ingredientMap.set(normalizedIng, {
-            ourDosage: null,
-            isNutrient: false,
-            competitors: [{ brand: product.brand || 'Unknown', amount: null }]
-          });
-        }
+        // Add EVERY ingredient as its own entry - NO fuzzy matching
+        addToMap(
+          normalizedIng,
+          cleanedIng.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' '),
+          false,
+          null,
+          { brand, amount: null }
+        );
       });
     });
 
+    console.log('[IngredientComparison] Total unique ingredients in map:', ingredientMap.size);
+
     // Convert to array and sort: ours first, then nutrients, then other ingredients
-    return Array.from(ingredientMap.entries())
-      .map(([name, data]) => ({
-        name: name.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
-        ...data
+    const result = Array.from(ingredientMap.entries())
+      .map(([key, data]) => ({
+        name: data.displayName,
+        ourDosage: data.ourDosage,
+        isNutrient: data.isNutrient,
+        competitors: data.competitors
       }))
       .sort((a, b) => {
         if (a.ourDosage && !b.ourDosage) return -1;
         if (!a.ourDosage && b.ourDosage) return 1;
         if (a.isNutrient && !b.isNutrient) return -1;
         if (!a.isNutrient && b.isNutrient) return 1;
-        return 0;
+        return a.name.localeCompare(b.name);
       });
+
+    console.log('[IngredientComparison] Final comparisonData length:', result.length);
+    console.log('[IngredientComparison] Sample items:', result.slice(0, 10).map(r => r.name));
+    
+    return result;
   }, [ourDosages, competitors, getCompetitorNutrients, getCompetitorIngredientsList]);
 
   // Filter to only nutrients with amounts for chart
@@ -1104,7 +1129,7 @@ export function EnhancedBenchmarkComparison({
   };
 
   // Get competitor nutrients from all_nutrients or supplement_facts_complete - NO LIMIT (show all)
-  const getCompetitorNutrients = (product: Product): Array<{ name: string; amount: number | null; unit: string; dailyValue?: string | number }> => {
+  const getCompetitorNutrients = useCallback((product: Product): Array<{ name: string; amount: number | null; unit: string; dailyValue?: string | number }> => {
     // Try all_nutrients first (preferred - normalized data)
     const allNutrients = product.all_nutrients as Array<{ name: string; amount: number | null; unit: string; daily_value_percent?: string | number }> | null;
     if (allNutrients && allNutrients.length > 0) {
@@ -1129,18 +1154,19 @@ export function EnhancedBenchmarkComparison({
     }
     
     return [];
-  };
+  }, []);
 
   // Get ALL competitor ingredients (from BOTH ingredients AND other_ingredients fields) - COMBINED list
-  const getCompetitorIngredientsList = (product: Product): string[] => {
+  const getCompetitorIngredientsList = useCallback((product: Product): string[] => {
     const allIngredients: string[] = [];
     const seen = new Set<string>();
     
     const addIngredients = (text: string) => {
+      // Split by comma, semicolon, or parentheses to catch all parts
       const parts = text.split(/[,;]/).map(i => i.trim()).filter(Boolean);
       parts.forEach(part => {
-        const normalized = part.toLowerCase();
-        if (!seen.has(normalized)) {
+        const normalized = part.toLowerCase().trim();
+        if (normalized.length >= 2 && !seen.has(normalized)) {
           seen.add(normalized);
           allIngredients.push(part);
         }
@@ -1167,7 +1193,7 @@ export function EnhancedBenchmarkComparison({
     }
     
     return allIngredients;
-  };
+  }, []);
 
   // Get competitor claims/certifications
   const getCompetitorClaims = (product: Product): string[] => {

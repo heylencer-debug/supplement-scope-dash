@@ -719,23 +719,7 @@ export function EnhancedBenchmarkComparison({
     }
   };
 
-  if (loading) {
-    return (
-      <Card>
-        <CardHeader className="pb-2">
-          <Skeleton className="h-5 w-48" />
-          <Skeleton className="h-4 w-64" />
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-3">
-            {[1, 2, 3, 4].map((i) => (
-              <Skeleton key={i} className="h-[480px] w-[240px] shrink-0" />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+  // NOTE: Loading check moved AFTER all hooks are defined (see end of component)
 
   // Helper functions for Our Concept data
   const getOurPositioning = (): string => {
@@ -1264,6 +1248,25 @@ export function EnhancedBenchmarkComparison({
       };
     });
   };
+
+  // Loading check - placed AFTER all hooks to avoid hooks rules violation
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader className="pb-2">
+          <Skeleton className="h-5 w-48" />
+          <Skeleton className="h-4 w-64" />
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-3">
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-[480px] w-[240px] shrink-0" />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <>
@@ -1959,22 +1962,6 @@ export function EnhancedBenchmarkComparison({
       </Card>
 
       {/* UNIFIED INGREDIENT & DOSAGE COMPARISON */}
-      {/* DEBUG: Log what we're passing */}
-      {(() => {
-        console.log('=== [EnhancedBenchmarkComparison] Passing to IngredientComparisonSection ===');
-        console.log('displayedProducts count:', displayedProducts.length);
-        displayedProducts.forEach((p, i) => {
-          console.log(`Product ${i + 1} (${p.brand}):`, {
-            hasIngredients: !!p.ingredients,
-            ingredientsLength: p.ingredients?.length || 0,
-            hasOtherIngredients: !!p.other_ingredients,
-            otherIngredientsLength: p.other_ingredients?.length || 0,
-            ingredientsSample: p.ingredients?.substring(0, 100),
-            otherIngredientsSample: p.other_ingredients?.substring(0, 100)
-          });
-        });
-        return null;
-      })()}
       <IngredientComparisonSection 
         ourDosages={getOurRecommendedDosages()}
         competitors={displayedProducts}

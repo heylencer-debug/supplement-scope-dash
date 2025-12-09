@@ -52,35 +52,37 @@ interface EnhancedBenchmarkComparisonProps {
 
 const MAX_COMPETITORS = 3;
 
-// Nutrient Comparison Table Component
-interface NutrientComparisonTableProps {
+// Unified Ingredient & Nutrient Comparison Component
+interface IngredientComparisonProps {
   ourDosages: Array<{ ingredient: string; dosage?: string; rationale?: string }>;
   competitors: Product[];
   getCompetitorNutrients: (product: Product) => Array<{ name: string; amount: number | null; unit: string; dailyValue?: string | number }>;
+  getCompetitorIngredientsList: (product: Product) => string[];
 }
 
-function NutrientComparisonTable({ ourDosages, competitors, getCompetitorNutrients }: NutrientComparisonTableProps) {
+function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNutrients, getCompetitorIngredientsList }: IngredientComparisonProps) {
   const [isOpen, setIsOpen] = useState(true);
-  const [viewMode, setViewMode] = useState<'table' | 'chart'>('chart');
+  const [viewMode, setViewMode] = useState<'chart' | 'table' | 'gaps'>('chart');
 
-  // Build unified nutrient list from all sources
+  // Build unified data combining nutrients (with amounts) AND other ingredients
   const comparisonData = useMemo(() => {
-    // Collect all unique nutrient names
-    const nutrientMap = new Map<string, {
+    const ingredientMap = new Map<string, {
       ourDosage: string | null;
+      isNutrient: boolean;
       competitors: Array<{ brand: string; amount: string | null; dailyValue?: string | number }>;
     }>();
 
-    // Add our recommended dosages
+    // Add our recommended dosages (these are nutrients)
     ourDosages.forEach(item => {
       const normalizedName = item.ingredient.toLowerCase().trim();
-      nutrientMap.set(normalizedName, {
+      ingredientMap.set(normalizedName, {
         ourDosage: item.dosage || null,
+        isNutrient: true,
         competitors: []
       });
     });
 
-    // Add competitor nutrients
+    // Add competitor nutrients (with amounts)
     competitors.forEach(product => {
       const nutrients = getCompetitorNutrients(product);
       nutrients.forEach(nutrient => {
@@ -88,7 +90,7 @@ function NutrientComparisonTable({ ourDosages, competitors, getCompetitorNutrien
         
         // Check if this nutrient or similar exists
         let matchedKey: string | null = null;
-        for (const [key] of nutrientMap) {
+        for (const [key] of ingredientMap) {
           if (normalizedName.includes(key) || key.includes(normalizedName) ||
               normalizedName.split(' ').some(word => key.includes(word) && word.length > 3)) {
             matchedKey = key;
@@ -103,19 +105,53 @@ function NutrientComparisonTable({ ourDosages, competitors, getCompetitorNutrien
         };
 
         if (matchedKey) {
-          nutrientMap.get(matchedKey)!.competitors.push(competitorEntry);
+          ingredientMap.get(matchedKey)!.competitors.push(competitorEntry);
         } else {
-          // Add new nutrient from competitor
-          nutrientMap.set(normalizedName, {
+          ingredientMap.set(normalizedName, {
             ourDosage: null,
+            isNutrient: true,
             competitors: [competitorEntry]
+          });
+        }
+      });
+
+      // Add other ingredients (from ingredients text field - no amounts)
+      const ingredientsList = getCompetitorIngredientsList(product);
+      ingredientsList.forEach(ing => {
+        const normalizedIng = ing.toLowerCase().trim();
+        
+        // Check if already exists
+        let matchedKey: string | null = null;
+        for (const [key] of ingredientMap) {
+          if (normalizedIng.includes(key) || key.includes(normalizedIng) ||
+              normalizedIng.split(' ').some(word => key.includes(word) && word.length > 4)) {
+            matchedKey = key;
+            break;
+          }
+        }
+
+        if (matchedKey) {
+          // Add as competitor with no amount if not already there
+          const existing = ingredientMap.get(matchedKey)!;
+          const alreadyHas = existing.competitors.some(c => c.brand === (product.brand || 'Unknown'));
+          if (!alreadyHas) {
+            existing.competitors.push({
+              brand: product.brand || 'Unknown',
+              amount: null
+            });
+          }
+        } else {
+          ingredientMap.set(normalizedIng, {
+            ourDosage: null,
+            isNutrient: false,
+            competitors: [{ brand: product.brand || 'Unknown', amount: null }]
           });
         }
       });
     });
 
-    // Convert to array and sort by whether we have a dosage first - NO LIMIT (show all)
-    return Array.from(nutrientMap.entries())
+    // Convert to array and sort: ours first, then nutrients, then other ingredients
+    return Array.from(ingredientMap.entries())
       .map(([name, data]) => ({
         name: name.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
         ...data
@@ -123,11 +159,19 @@ function NutrientComparisonTable({ ourDosages, competitors, getCompetitorNutrien
       .sort((a, b) => {
         if (a.ourDosage && !b.ourDosage) return -1;
         if (!a.ourDosage && b.ourDosage) return 1;
+        if (a.isNutrient && !b.isNutrient) return -1;
+        if (!a.isNutrient && b.isNutrient) return 1;
         return 0;
       });
-  }, [ourDosages, competitors, getCompetitorNutrients]);
+  }, [ourDosages, competitors, getCompetitorNutrients, getCompetitorIngredientsList]);
 
-  // Build chart data - extract numeric values for visualization
+  // Filter to only nutrients with amounts for chart
+  const nutrientsOnly = useMemo(() => 
+    comparisonData.filter(item => item.isNutrient && (item.ourDosage || item.competitors.some(c => c.amount))),
+    [comparisonData]
+  );
+
+  // Build chart data
   const chartData = useMemo(() => {
     const parseNumeric = (value: string | null): number => {
       if (!value) return 0;
@@ -135,9 +179,8 @@ function NutrientComparisonTable({ ourDosages, competitors, getCompetitorNutrien
       return match ? parseFloat(match[0]) : 0;
     };
 
-    return comparisonData
-      .filter(row => row.ourDosage || row.competitors.some(c => c.amount))
-      .slice(0, 8) // Limit to 8 nutrients for readability
+    return nutrientsOnly
+      .slice(0, 10)
       .map(row => {
         const entry: Record<string, string | number> = {
           name: row.name.length > 20 ? row.name.substring(0, 18) + '...' : row.name,
@@ -152,29 +195,21 @@ function NutrientComparisonTable({ ourDosages, competitors, getCompetitorNutrien
         
         return entry;
       });
-  }, [comparisonData, competitors]);
+  }, [nutrientsOnly, competitors]);
 
   const chartConfig = useMemo(() => {
     const config: Record<string, { label: string; color: string }> = {
-      'Our Concept': {
-        label: 'Our Concept',
-        color: 'hsl(var(--chart-2))',
-      },
+      'Our Concept': { label: 'Our Concept', color: 'hsl(var(--chart-2))' },
     };
-    
     competitors.forEach((p, i) => {
       const key = `#${i + 1} ${p.brand?.substring(0, 10) || 'Unknown'}`;
       const colors = ['hsl(var(--chart-1))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))'];
-      config[key] = {
-        label: p.brand || 'Unknown',
-        color: colors[i % colors.length],
-      };
+      config[key] = { label: p.brand || 'Unknown', color: colors[i % colors.length] };
     });
-    
     return config;
   }, [competitors]);
 
-  // Formulation Gap Analysis - compare Our Concept vs competitor averages
+  // Gap analysis
   const gapAnalysis = useMemo(() => {
     const parseNumeric = (value: string | null): number => {
       if (!value) return 0;
@@ -194,67 +229,59 @@ function NutrientComparisonTable({ ourDosages, competitors, getCompetitorNutrien
       unit: string;
     }> = [];
 
-    comparisonData.forEach(row => {
+    nutrientsOnly.forEach(row => {
       const ourValue = parseNumeric(row.ourDosage);
       const competitorValues = row.competitors
         .map(c => parseNumeric(c.amount))
         .filter(v => v > 0);
       
       if (competitorValues.length === 0 && ourValue > 0) {
-        // Unique to our concept
         gaps.push({
-          nutrient: row.name,
-          ourValue,
-          ourDosage: row.ourDosage,
-          competitorAvg: 0,
-          competitorMax: 0,
-          competitorMin: 0,
-          percentDiff: 100,
-          status: 'unique',
+          nutrient: row.name, ourValue, ourDosage: row.ourDosage,
+          competitorAvg: 0, competitorMax: 0, competitorMin: 0,
+          percentDiff: 100, status: 'unique',
           unit: row.ourDosage?.replace(/[\d.]+/g, '').trim() || 'mg'
         });
       } else if (competitorValues.length > 0 && ourValue === 0) {
-        // Missing from our concept
         const avg = competitorValues.reduce((a, b) => a + b, 0) / competitorValues.length;
         gaps.push({
-          nutrient: row.name,
-          ourValue: 0,
-          ourDosage: null,
-          competitorAvg: avg,
-          competitorMax: Math.max(...competitorValues),
+          nutrient: row.name, ourValue: 0, ourDosage: null,
+          competitorAvg: avg, competitorMax: Math.max(...competitorValues),
           competitorMin: Math.min(...competitorValues),
-          percentDiff: -100,
-          status: 'missing',
-          unit: 'mg'
+          percentDiff: -100, status: 'missing', unit: 'mg'
         });
       } else if (competitorValues.length > 0 && ourValue > 0) {
-        // Compare values
         const avg = competitorValues.reduce((a, b) => a + b, 0) / competitorValues.length;
         const percentDiff = avg > 0 ? ((ourValue - avg) / avg) * 100 : 0;
-        
         let status: 'leading' | 'trailing' | 'matching';
         if (percentDiff > 15) status = 'leading';
         else if (percentDiff < -15) status = 'trailing';
         else status = 'matching';
         
         gaps.push({
-          nutrient: row.name,
-          ourValue,
-          ourDosage: row.ourDosage,
-          competitorAvg: avg,
-          competitorMax: Math.max(...competitorValues),
+          nutrient: row.name, ourValue, ourDosage: row.ourDosage,
+          competitorAvg: avg, competitorMax: Math.max(...competitorValues),
           competitorMin: Math.min(...competitorValues),
-          percentDiff,
-          status,
-          unit: row.ourDosage?.replace(/[\d.]+/g, '').trim() || 'mg'
+          percentDiff, status, unit: row.ourDosage?.replace(/[\d.]+/g, '').trim() || 'mg'
         });
       }
     });
 
-    // Sort: leading first, then unique, then matching, then trailing, then missing
     const statusOrder = { leading: 0, unique: 1, matching: 2, trailing: 3, missing: 4 };
     return gaps.sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
-  }, [comparisonData]);
+  }, [nutrientsOnly]);
+
+  // Stats
+  const stats = useMemo(() => ({
+    total: comparisonData.length,
+    nutrients: comparisonData.filter(i => i.isNutrient).length,
+    otherIngredients: comparisonData.filter(i => !i.isNutrient).length,
+    inOurFormula: comparisonData.filter(i => i.ourDosage).length,
+    leading: gapAnalysis.filter(g => g.status === 'leading').length,
+    trailing: gapAnalysis.filter(g => g.status === 'trailing').length,
+    unique: gapAnalysis.filter(g => g.status === 'unique').length,
+    missing: gapAnalysis.filter(g => g.status === 'missing').length,
+  }), [comparisonData, gapAnalysis]);
 
   if (comparisonData.length === 0) return null;
 
@@ -266,34 +293,31 @@ function NutrientComparisonTable({ ourDosages, competitors, getCompetitorNutrien
             <CollapsibleTrigger asChild>
               <div className="cursor-pointer hover:opacity-80 transition-opacity">
                 <CardTitle className="flex items-center gap-2 text-base">
-                  <Scale className="w-4 h-4 text-primary" />
-                  Nutrient Dosage Comparison
+                  <FlaskConical className="w-4 h-4 text-primary" />
+                  Ingredient & Dosage Comparison
+                  <Badge variant="secondary" className="ml-2 text-[10px]">
+                    {stats.total} total
+                  </Badge>
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Side-by-side comparison of ingredient amounts across products
+                  {stats.nutrients} active nutrients • {stats.otherIngredients} other ingredients
                 </CardDescription>
               </div>
             </CollapsibleTrigger>
             <div className="flex items-center gap-2">
               {/* View Toggle */}
               <div className="flex items-center bg-muted rounded-lg p-0.5">
-                <Button
-                  variant={viewMode === 'chart' ? 'secondary' : 'ghost'}
-                  size="sm"
-                  className="h-7 px-2 text-xs"
-                  onClick={(e) => { e.stopPropagation(); setViewMode('chart'); }}
-                >
-                  <BarChart3 className="w-3 h-3 mr-1" />
-                  Chart
+                <Button variant={viewMode === 'chart' ? 'secondary' : 'ghost'} size="sm" className="h-7 px-2 text-xs"
+                  onClick={(e) => { e.stopPropagation(); setViewMode('chart'); }}>
+                  <BarChart3 className="w-3 h-3 mr-1" />Chart
                 </Button>
-                <Button
-                  variant={viewMode === 'table' ? 'secondary' : 'ghost'}
-                  size="sm"
-                  className="h-7 px-2 text-xs"
-                  onClick={(e) => { e.stopPropagation(); setViewMode('table'); }}
-                >
-                  <Scale className="w-3 h-3 mr-1" />
-                  Table
+                <Button variant={viewMode === 'gaps' ? 'secondary' : 'ghost'} size="sm" className="h-7 px-2 text-xs"
+                  onClick={(e) => { e.stopPropagation(); setViewMode('gaps'); }}>
+                  <Scale className="w-3 h-3 mr-1" />Gaps
+                </Button>
+                <Button variant={viewMode === 'table' ? 'secondary' : 'ghost'} size="sm" className="h-7 px-2 text-xs"
+                  onClick={(e) => { e.stopPropagation(); setViewMode('table'); }}>
+                  <Pill className="w-3 h-3 mr-1" />All
                 </Button>
               </div>
               <CollapsibleTrigger asChild>
@@ -306,113 +330,166 @@ function NutrientComparisonTable({ ourDosages, competitors, getCompetitorNutrien
         </CardHeader>
         <CollapsibleContent>
           <CardContent className="pt-0">
-            {viewMode === 'chart' ? (
+            {viewMode === 'chart' && (
               /* BAR CHART VIEW */
               <div className="space-y-4">
                 <ChartContainer config={chartConfig} className="h-[350px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={chartData}
-                      layout="vertical"
-                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                    >
+                    <BarChart data={chartData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} className="stroke-muted" />
                       <XAxis type="number" tick={{ fontSize: 10 }} className="text-muted-foreground" />
-                      <YAxis 
-                        dataKey="name" 
-                        type="category" 
-                        width={100} 
-                        tick={{ fontSize: 10 }} 
-                        className="text-muted-foreground"
-                      />
-                      <ChartTooltip 
-                        content={<ChartTooltipContent />}
-                        cursor={{ fill: 'hsl(var(--muted))', opacity: 0.3 }}
-                      />
-                      <Legend 
-                        wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }}
-                      />
-                      <Bar 
-                        dataKey="Our Concept" 
-                        fill="hsl(var(--chart-2))" 
-                        radius={[0, 4, 4, 0]}
-                        barSize={12}
-                      />
+                      <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 10 }} className="text-muted-foreground" />
+                      <ChartTooltip content={<ChartTooltipContent />} cursor={{ fill: 'hsl(var(--muted))', opacity: 0.3 }} />
+                      <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
+                      <Bar dataKey="Our Concept" fill="hsl(var(--chart-2))" radius={[0, 4, 4, 0]} barSize={12} />
                       {competitors.map((p, i) => {
                         const key = `#${i + 1} ${p.brand?.substring(0, 10) || 'Unknown'}`;
                         const colors = ['hsl(var(--chart-1))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))'];
-                        return (
-                          <Bar 
-                            key={p.id}
-                            dataKey={key} 
-                            fill={colors[i % colors.length]} 
-                            radius={[0, 4, 4, 0]}
-                            barSize={12}
-                          />
-                        );
+                        return <Bar key={p.id} dataKey={key} fill={colors[i % colors.length]} radius={[0, 4, 4, 0]} barSize={12} />;
                       })}
                     </BarChart>
                   </ResponsiveContainer>
                 </ChartContainer>
-                
-                {/* Chart Legend Note */}
-                <p className="text-[10px] text-muted-foreground text-center">
-                  Values shown in mg (or original units). Larger bars indicate higher dosages.
-                </p>
+                <div className="text-[10px] text-muted-foreground text-center">
+                  Showing top {Math.min(10, nutrientsOnly.length)} nutrients with dosage data
+                </div>
               </div>
-            ) : (
-              /* TABLE VIEW */
-              <div className="space-y-3">
-                <ScrollArea className="w-full">
+            )}
+
+            {viewMode === 'gaps' && (
+              /* GAP ANALYSIS VIEW */
+              <div className="space-y-4">
+                {/* Summary badges */}
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="secondary" className="bg-chart-4/20 text-chart-4">
+                    <TrendingUp className="w-3 h-3 mr-1" />{stats.leading} Leading
+                  </Badge>
+                  <Badge variant="secondary" className="bg-primary/20 text-primary">
+                    <Award className="w-3 h-3 mr-1" />{stats.unique} Unique
+                  </Badge>
+                  <Badge variant="secondary" className="bg-chart-1/20 text-chart-1">
+                    <AlertTriangle className="w-3 h-3 mr-1" />{stats.trailing} Trailing
+                  </Badge>
+                  <Badge variant="secondary" className="bg-destructive/20 text-destructive">
+                    <XCircle className="w-3 h-3 mr-1" />{stats.missing} Missing
+                  </Badge>
+                </div>
+
+                {/* Gap cards */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[400px] overflow-y-auto">
+                  {gapAnalysis.slice(0, 12).map((gap, idx) => (
+                    <div key={idx} className={`p-2 rounded-lg border text-xs ${
+                      gap.status === 'leading' ? 'bg-chart-4/10 border-chart-4/30' :
+                      gap.status === 'unique' ? 'bg-primary/10 border-primary/30' :
+                      gap.status === 'trailing' ? 'bg-chart-1/10 border-chart-1/30' :
+                      gap.status === 'missing' ? 'bg-destructive/10 border-destructive/30' :
+                      'bg-muted/30 border-border'
+                    }`}>
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <span className="font-medium truncate flex-1" title={gap.nutrient}>{gap.nutrient}</span>
+                        <Badge variant="secondary" className={`text-[9px] shrink-0 ${
+                          gap.status === 'leading' ? 'bg-chart-4/20 text-chart-4' :
+                          gap.status === 'unique' ? 'bg-primary/20 text-primary' :
+                          gap.status === 'trailing' ? 'bg-chart-1/20 text-chart-1' :
+                          gap.status === 'missing' ? 'bg-destructive/20 text-destructive' : ''
+                        }`}>
+                          {gap.status === 'leading' && `+${Math.round(gap.percentDiff)}%`}
+                          {gap.status === 'trailing' && `${Math.round(gap.percentDiff)}%`}
+                          {gap.status === 'unique' && 'Unique'}
+                          {gap.status === 'missing' && 'Missing'}
+                          {gap.status === 'matching' && '~Match'}
+                        </Badge>
+                      </div>
+                      <div className="space-y-1 text-[10px]">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Ours</span>
+                          <span className={gap.status === 'leading' || gap.status === 'unique' ? 'text-chart-4 font-semibold' : ''}>
+                            {gap.ourDosage || '—'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Avg</span>
+                          <span>{gap.competitorAvg > 0 ? `${Math.round(gap.competitorAvg)}${gap.unit}` : '—'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {viewMode === 'table' && (
+              /* FULL TABLE VIEW */
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <div className="bg-primary/10 rounded-lg p-2 text-center">
+                    <p className="text-lg font-bold text-primary">{stats.inOurFormula}</p>
+                    <p className="text-[10px] text-muted-foreground">In Our Formula</p>
+                  </div>
+                  <div className="bg-chart-4/10 rounded-lg p-2 text-center">
+                    <p className="text-lg font-bold text-chart-4">{stats.nutrients}</p>
+                    <p className="text-[10px] text-muted-foreground">Active Nutrients</p>
+                  </div>
+                  <div className="bg-muted rounded-lg p-2 text-center">
+                    <p className="text-lg font-bold">{stats.otherIngredients}</p>
+                    <p className="text-[10px] text-muted-foreground">Other Ingredients</p>
+                  </div>
+                  <div className="bg-muted rounded-lg p-2 text-center">
+                    <p className="text-lg font-bold">{stats.total}</p>
+                    <p className="text-[10px] text-muted-foreground">Total Unique</p>
+                  </div>
+                </div>
+
+                <ScrollArea className="max-h-[400px]">
                   <Table>
                     <TableHeader>
-                      <TableRow className="hover:bg-transparent">
-                        <TableHead className="w-[180px] text-xs font-semibold">Nutrient</TableHead>
-                        <TableHead className="text-xs font-semibold text-center bg-chart-2/10 border-x border-chart-2/20">
-                          <div className="flex items-center justify-center gap-1">
-                            <Target className="w-3 h-3 text-chart-2" />
-                            Our Concept
+                      <TableRow>
+                        <TableHead className="w-[180px] sticky left-0 bg-background z-10">Ingredient</TableHead>
+                        <TableHead className="min-w-[100px]">
+                          <div className="flex items-center gap-1">
+                            <Award className="w-3 h-3 text-primary" />Our Concept
                           </div>
                         </TableHead>
-                        {competitors.map((p, i) => (
-                          <TableHead key={p.id} className="text-xs font-semibold text-center min-w-[100px]">
-                            <div className="truncate max-w-[120px]" title={p.brand || 'Unknown'}>
+                        {competitors.slice(0, 3).map((p, i) => (
+                          <TableHead key={p.id} className="min-w-[100px]">
+                            <span className="truncate block max-w-[80px]" title={p.brand || 'Unknown'}>
                               #{i + 1} {p.brand || 'Unknown'}
-                            </div>
+                            </span>
                           </TableHead>
                         ))}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {comparisonData.map((row, idx) => (
-                        <TableRow key={idx} className="hover:bg-muted/30">
-                          <TableCell className="text-xs font-medium py-2">
-                            {row.name}
+                      {comparisonData.map((ing, idx) => (
+                        <TableRow key={idx} className={idx % 2 === 0 ? 'bg-muted/30' : ''}>
+                          <TableCell className="font-medium text-xs sticky left-0 bg-inherit z-10">
+                            <div className="flex items-center gap-1">
+                              {ing.ourDosage ? (
+                                <Check className="w-3 h-3 text-chart-4 shrink-0" />
+                              ) : (
+                                <span className="w-3 h-3 flex items-center justify-center shrink-0">
+                                  <span className={`w-1 h-1 rounded-full ${ing.isNutrient ? 'bg-primary' : 'bg-muted-foreground'}`} />
+                                </span>
+                              )}
+                              <span className="truncate" title={ing.name}>{ing.name}</span>
+                              {ing.isNutrient && <Beaker className="w-2.5 h-2.5 text-primary shrink-0" />}
+                            </div>
                           </TableCell>
-                          <TableCell className="text-center bg-chart-2/5 border-x border-chart-2/10 py-2">
-                            {row.ourDosage ? (
-                              <Badge variant="secondary" className="text-[10px] bg-chart-2/20 text-chart-2 font-semibold">
-                                {row.ourDosage}
-                              </Badge>
+                          <TableCell>
+                            {ing.ourDosage ? (
+                              <Badge variant="secondary" className="text-[10px] bg-primary/10 text-primary">{ing.ourDosage}</Badge>
                             ) : (
                               <span className="text-[10px] text-muted-foreground">—</span>
                             )}
                           </TableCell>
-                          {competitors.map((p, i) => {
-                            const compData = row.competitors.find(c => c.brand === (p.brand || 'Unknown'));
+                          {competitors.slice(0, 3).map((p) => {
+                            const compData = ing.competitors.find(c => c.brand === (p.brand || 'Unknown'));
                             return (
-                              <TableCell key={p.id} className="text-center py-2">
+                              <TableCell key={p.id}>
                                 {compData?.amount ? (
-                                  <div className="flex flex-col items-center gap-0.5">
-                                    <Badge variant="outline" className="text-[10px] font-medium">
-                                      {compData.amount}
-                                    </Badge>
-                                    {compData.dailyValue && (
-                                      <span className="text-[9px] text-muted-foreground">
-                                        {compData.dailyValue}% DV
-                                      </span>
-                                    )}
-                                  </div>
+                                  <Badge variant="outline" className="text-[10px]">{compData.amount}</Badge>
+                                ) : compData ? (
+                                  <Check className="w-3 h-3 text-muted-foreground" />
                                 ) : (
                                   <span className="text-[10px] text-muted-foreground">—</span>
                                 )}
@@ -423,398 +500,15 @@ function NutrientComparisonTable({ ourDosages, competitors, getCompetitorNutrien
                       ))}
                     </TableBody>
                   </Table>
-                  <ScrollBar orientation="horizontal" />
                 </ScrollArea>
-                
-                {/* Legend */}
+
                 <div className="flex items-center gap-4 pt-3 border-t text-[10px] text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <div className="w-2 h-2 rounded-full bg-chart-2" />
-                    <span>Our Recommended</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span>DV = Daily Value</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span>— = Not specified</span>
-                  </div>
+                  <div className="flex items-center gap-1"><Check className="w-3 h-3 text-chart-4" /><span>In Our Formula</span></div>
+                  <div className="flex items-center gap-1"><Beaker className="w-2.5 h-2.5 text-primary" /><span>Active Nutrient</span></div>
+                  <div className="flex items-center gap-1"><Check className="w-3 h-3 text-muted-foreground" /><span>Present</span></div>
                 </div>
               </div>
             )}
-
-            {/* FORMULATION GAP ANALYSIS */}
-            {gapAnalysis.length > 0 && (
-              <div className="mt-6 pt-4 border-t">
-                <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 text-primary" />
-                  Formulation Gap Analysis
-                </h4>
-                
-                {/* Summary Stats */}
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4">
-                  {[
-                    { label: 'Leading', count: gapAnalysis.filter(g => g.status === 'leading').length, color: 'bg-chart-4', textColor: 'text-chart-4' },
-                    { label: 'Unique', count: gapAnalysis.filter(g => g.status === 'unique').length, color: 'bg-primary', textColor: 'text-primary' },
-                    { label: 'Matching', count: gapAnalysis.filter(g => g.status === 'matching').length, color: 'bg-muted-foreground', textColor: 'text-muted-foreground' },
-                    { label: 'Trailing', count: gapAnalysis.filter(g => g.status === 'trailing').length, color: 'bg-chart-1', textColor: 'text-chart-1' },
-                    { label: 'Missing', count: gapAnalysis.filter(g => g.status === 'missing').length, color: 'bg-destructive', textColor: 'text-destructive' },
-                  ].map(stat => (
-                    <div key={stat.label} className="flex items-center gap-2 p-2 rounded-lg bg-muted/50">
-                      <div className={`w-2 h-2 rounded-full ${stat.color}`} />
-                      <span className="text-[10px] text-muted-foreground">{stat.label}</span>
-                      <span className={`text-sm font-bold ml-auto ${stat.textColor}`}>{stat.count}</span>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Gap Details Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                  {gapAnalysis.slice(0, 9).map((gap, idx) => (
-                    <div
-                      key={idx}
-                      className={`p-3 rounded-lg border ${
-                        gap.status === 'leading' ? 'bg-chart-4/10 border-chart-4/30' :
-                        gap.status === 'unique' ? 'bg-primary/10 border-primary/30' :
-                        gap.status === 'trailing' ? 'bg-chart-1/10 border-chart-1/30' :
-                        gap.status === 'missing' ? 'bg-destructive/10 border-destructive/30' :
-                        'bg-muted/30 border-border'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <span className="text-xs font-medium truncate flex-1" title={gap.nutrient}>
-                          {gap.nutrient}
-                        </span>
-                        <Badge
-                          variant="secondary"
-                          className={`text-[9px] shrink-0 ${
-                            gap.status === 'leading' ? 'bg-chart-4/20 text-chart-4' :
-                            gap.status === 'unique' ? 'bg-primary/20 text-primary' :
-                            gap.status === 'trailing' ? 'bg-chart-1/20 text-chart-1' :
-                            gap.status === 'missing' ? 'bg-destructive/20 text-destructive' :
-                            ''
-                          }`}
-                        >
-                          {gap.status === 'leading' && `+${Math.round(gap.percentDiff)}%`}
-                          {gap.status === 'trailing' && `${Math.round(gap.percentDiff)}%`}
-                          {gap.status === 'unique' && 'Unique'}
-                          {gap.status === 'missing' && 'Missing'}
-                          {gap.status === 'matching' && '~Match'}
-                        </Badge>
-                      </div>
-                      
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between text-[10px]">
-                          <span className="text-muted-foreground">Our Concept</span>
-                          <span className={`font-semibold ${gap.status === 'leading' || gap.status === 'unique' ? 'text-chart-4' : ''}`}>
-                            {gap.ourDosage || '—'}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between text-[10px]">
-                          <span className="text-muted-foreground">Competitor Avg</span>
-                          <span className="font-medium">
-                            {gap.competitorAvg > 0 ? `${Math.round(gap.competitorAvg)}${gap.unit}` : '—'}
-                          </span>
-                        </div>
-                        {gap.competitorMax > 0 && gap.competitorMax !== gap.competitorMin && (
-                          <div className="flex items-center justify-between text-[10px]">
-                            <span className="text-muted-foreground">Range</span>
-                            <span className="text-muted-foreground">
-                              {Math.round(gap.competitorMin)}-{Math.round(gap.competitorMax)}{gap.unit}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Visual bar comparison */}
-                      {gap.status !== 'unique' && gap.status !== 'missing' && (
-                        <div className="mt-2 pt-2 border-t border-border/50">
-                          <div className="flex items-center gap-1">
-                            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                              <div 
-                                className={`h-full rounded-full ${
-                                  gap.status === 'leading' ? 'bg-chart-4' :
-                                  gap.status === 'trailing' ? 'bg-chart-1' :
-                                  'bg-muted-foreground'
-                                }`}
-                                style={{ 
-                                  width: `${Math.min(100, Math.max(10, (gap.ourValue / Math.max(gap.ourValue, gap.competitorMax)) * 100))}%` 
-                                }}
-                              />
-                            </div>
-                            <span className="text-[9px] text-muted-foreground w-8 text-right">Ours</span>
-                          </div>
-                          <div className="flex items-center gap-1 mt-1">
-                            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                              <div 
-                                className="h-full bg-muted-foreground/50 rounded-full"
-                                style={{ 
-                                  width: `${Math.min(100, Math.max(10, (gap.competitorAvg / Math.max(gap.ourValue, gap.competitorMax)) * 100))}%` 
-                                }}
-                              />
-                            </div>
-                            <span className="text-[9px] text-muted-foreground w-8 text-right">Avg</span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                {gapAnalysis.length > 9 && (
-                  <p className="text-[10px] text-muted-foreground text-center mt-2">
-                    +{gapAnalysis.length - 9} more nutrients analyzed
-                  </p>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </CollapsibleContent>
-      </Card>
-    </Collapsible>
-  );
-}
-
-// Full Ingredients Comparison Component - shows ALL ingredients with amounts
-interface IngredientsComparisonTableProps {
-  ourIngredients: Array<{ ingredient: string; dosage?: string; rationale?: string }>;
-  competitors: Product[];
-  getCompetitorNutrients: (product: Product) => Array<{ name: string; amount: number | null; unit: string; dailyValue?: string | number }>;
-  getCompetitorIngredientsList: (product: Product) => string[];
-}
-
-function IngredientsComparisonTable({ ourIngredients, competitors, getCompetitorNutrients, getCompetitorIngredientsList }: IngredientsComparisonTableProps) {
-  const [isOpen, setIsOpen] = useState(false);
-
-  // Build comprehensive ingredient data for each competitor
-  const ingredientData = useMemo(() => {
-    return competitors.map(product => {
-      const nutrients = getCompetitorNutrients(product);
-      const ingredientsList = getCompetitorIngredientsList(product);
-      
-      // Combine nutrients (with amounts) and other ingredients
-      const allItems: Array<{ name: string; amount: string | null; isNutrient: boolean }> = [];
-      
-      // Add all nutrients with their amounts
-      nutrients.forEach(n => {
-        allItems.push({
-          name: n.name,
-          amount: n.amount !== null ? `${n.amount}${n.unit}${n.dailyValue ? ` (${n.dailyValue}% DV)` : ''}` : null,
-          isNutrient: true
-        });
-      });
-      
-      // Add other ingredients (without amounts - these are inactive/other ingredients)
-      ingredientsList.forEach(ing => {
-        // Don't add if already in nutrients list
-        const normalizedIng = ing.toLowerCase().trim();
-        const alreadyExists = allItems.some(item => 
-          item.name.toLowerCase().includes(normalizedIng) || 
-          normalizedIng.includes(item.name.toLowerCase())
-        );
-        if (!alreadyExists) {
-          allItems.push({
-            name: ing,
-            amount: null,
-            isNutrient: false
-          });
-        }
-      });
-      
-      return {
-        brand: product.brand || 'Unknown',
-        title: product.title || '',
-        items: allItems,
-        nutrientCount: nutrients.length,
-        ingredientCount: ingredientsList.length,
-        totalCount: allItems.length
-      };
-    });
-  }, [competitors, getCompetitorNutrients, getCompetitorIngredientsList]);
-
-  // Get all unique ingredient names across all products
-  const allUniqueIngredients = useMemo(() => {
-    const ingredientMap = new Map<string, {
-      ourDosage: string | null;
-      competitorAmounts: Array<{ brand: string; amount: string | null }>;
-    }>();
-    
-    // Add our ingredients
-    ourIngredients.forEach(item => {
-      ingredientMap.set(item.ingredient.toLowerCase(), {
-        ourDosage: item.dosage || null,
-        competitorAmounts: []
-      });
-    });
-    
-    // Add competitor ingredients
-    ingredientData.forEach(comp => {
-      comp.items.forEach(item => {
-        const key = item.name.toLowerCase().trim();
-        // Try to find matching key
-        let matchedKey: string | null = null;
-        for (const [existingKey] of ingredientMap) {
-          const keyWords = existingKey.split(' ').filter(w => w.length > 3);
-          const itemWords = key.split(' ').filter(w => w.length > 3);
-          const hasOverlap = keyWords.some(kw => itemWords.some(iw => kw.includes(iw) || iw.includes(kw)));
-          if (hasOverlap || existingKey.includes(key) || key.includes(existingKey)) {
-            matchedKey = existingKey;
-            break;
-          }
-        }
-        
-        if (matchedKey) {
-          ingredientMap.get(matchedKey)!.competitorAmounts.push({
-            brand: comp.brand,
-            amount: item.amount
-          });
-        } else {
-          ingredientMap.set(key, {
-            ourDosage: null,
-            competitorAmounts: [{ brand: comp.brand, amount: item.amount }]
-          });
-        }
-      });
-    });
-    
-    return Array.from(ingredientMap.entries())
-      .map(([name, data]) => ({
-        name: name.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
-        ...data
-      }))
-      .sort((a, b) => {
-        // Sort: ours first, then by number of competitors having it
-        if (a.ourDosage && !b.ourDosage) return -1;
-        if (!a.ourDosage && b.ourDosage) return 1;
-        return b.competitorAmounts.length - a.competitorAmounts.length;
-      });
-  }, [ourIngredients, ingredientData]);
-
-  if (competitors.length === 0 || allUniqueIngredients.length === 0) return null;
-
-  return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <Card className="mt-4">
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <CollapsibleTrigger asChild>
-              <div className="cursor-pointer hover:opacity-80 transition-opacity flex-1">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Pill className="w-4 h-4 text-chart-4" />
-                  Full Ingredients Comparison
-                  <Badge variant="secondary" className="ml-2 text-[10px]">
-                    {allUniqueIngredients.length} ingredients
-                  </Badge>
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Complete ingredient list with all dosages and amounts across products
-                </CardDescription>
-              </div>
-            </CollapsibleTrigger>
-            <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-              </Button>
-            </CollapsibleTrigger>
-          </div>
-        </CardHeader>
-        <CollapsibleContent>
-          <CardContent className="pt-0">
-            {/* Summary Stats */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
-              <div className="bg-primary/10 rounded-lg p-2 text-center">
-                <p className="text-lg font-bold text-primary">{ourIngredients.length}</p>
-                <p className="text-[10px] text-muted-foreground">Our Ingredients</p>
-              </div>
-              {ingredientData.slice(0, 3).map((comp, i) => (
-                <div key={i} className="bg-muted rounded-lg p-2 text-center">
-                  <p className="text-lg font-bold">{comp.totalCount}</p>
-                  <p className="text-[10px] text-muted-foreground truncate" title={comp.brand}>{comp.brand}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Full Table */}
-            <ScrollArea className="max-h-[500px]">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[200px] sticky left-0 bg-background z-10">Ingredient</TableHead>
-                    <TableHead className="min-w-[120px]">
-                      <div className="flex items-center gap-1">
-                        <Award className="w-3 h-3 text-primary" />
-                        Our Concept
-                      </div>
-                    </TableHead>
-                    {competitors.slice(0, 3).map((p, i) => (
-                      <TableHead key={p.id} className="min-w-[120px]">
-                        <span className="truncate block max-w-[100px]" title={p.brand || 'Unknown'}>
-                          #{i + 1} {p.brand || 'Unknown'}
-                        </span>
-                      </TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {allUniqueIngredients.map((ing, idx) => (
-                    <TableRow key={idx} className={idx % 2 === 0 ? 'bg-muted/30' : ''}>
-                      <TableCell className="font-medium text-xs sticky left-0 bg-inherit z-10">
-                        <div className="flex items-center gap-1">
-                          {ing.ourDosage ? (
-                            <Check className="w-3 h-3 text-chart-4 shrink-0" />
-                          ) : (
-                            <span className="w-3 h-3 flex items-center justify-center shrink-0">
-                              <span className="w-1 h-1 rounded-full bg-muted-foreground" />
-                            </span>
-                          )}
-                          <span className="truncate" title={ing.name}>{ing.name}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {ing.ourDosage ? (
-                          <Badge variant="secondary" className="text-[10px] bg-primary/10 text-primary">
-                            {ing.ourDosage}
-                          </Badge>
-                        ) : (
-                          <span className="text-[10px] text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                      {competitors.slice(0, 3).map((p) => {
-                        const compAmount = ing.competitorAmounts.find(c => c.brand === (p.brand || 'Unknown'));
-                        return (
-                          <TableCell key={p.id}>
-                            {compAmount?.amount ? (
-                              <Badge variant="outline" className="text-[10px]">
-                                {compAmount.amount}
-                              </Badge>
-                            ) : compAmount ? (
-                              <Check className="w-3 h-3 text-muted-foreground" />
-                            ) : (
-                              <span className="text-[10px] text-muted-foreground">—</span>
-                            )}
-                          </TableCell>
-                        );
-                      })}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </ScrollArea>
-
-            {/* Legend */}
-            <div className="flex items-center gap-4 mt-3 pt-3 border-t text-[10px] text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <Check className="w-3 h-3 text-chart-4" />
-                <span>In Our Formula</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <Badge variant="secondary" className="text-[9px] h-4">Amount</Badge>
-                <span>Has dosage data</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <Check className="w-3 h-3 text-muted-foreground" />
-                <span>Present (no amount)</span>
-              </div>
-            </div>
           </CardContent>
         </CollapsibleContent>
       </Card>
@@ -2093,16 +1787,9 @@ export function EnhancedBenchmarkComparison({
         </CardContent>
       </Card>
 
-      {/* NUTRIENT DOSAGE COMPARISON TABLE */}
-      <NutrientComparisonTable 
+      {/* UNIFIED INGREDIENT & DOSAGE COMPARISON */}
+      <IngredientComparisonSection 
         ourDosages={getOurRecommendedDosages()}
-        competitors={displayedProducts}
-        getCompetitorNutrients={getCompetitorNutrients}
-      />
-
-      {/* FULL INGREDIENTS COMPARISON TABLE */}
-      <IngredientsComparisonTable 
-        ourIngredients={getOurRecommendedDosages()}
         competitors={displayedProducts}
         getCompetitorNutrients={getCompetitorNutrients}
         getCompetitorIngredientsList={getCompetitorIngredientsList}

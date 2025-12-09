@@ -8,7 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Star, TrendingUp, Pill, Target, MessageSquare, Package, Users, Megaphone, AlertTriangle, CheckCircle, XCircle, Palette, Search, Filter, X, Trophy, ThumbsUp, ThumbsDown, Check, FlaskConical, Scale, Award, Beaker, ChevronDown, ChevronUp, BarChart3, DollarSign } from "lucide-react";
+import { Star, TrendingUp, Pill, Target, MessageSquare, Package, Users, Megaphone, AlertTriangle, CheckCircle, XCircle, Palette, Search, Filter, X, Trophy, ThumbsUp, ThumbsDown, Check, FlaskConical, Scale, Award, Beaker, ChevronDown, ChevronUp, BarChart3, DollarSign, Eye, Layers, Shield, Tag, Sparkles } from "lucide-react";
 import { useProducts, Product } from "@/hooks/useProducts";
 import ProductDetailModal from "@/components/ProductDetailModal";
 import { useToast } from "@/hooks/use-toast";
@@ -62,6 +62,234 @@ interface IngredientComparisonProps {
   getCompetitorIngredientsList: (product: Product) => string[];
   ourPrice?: number;
   ourServings?: number;
+}
+
+// Packaging Comparison Component
+interface PackagingComparisonProps {
+  ourPackaging: {
+    type?: string;
+    quantity?: string | number;
+    design_elements?: string[];
+  } | null;
+  competitors: Product[];
+  getCompetitorPackaging: (product: Product) => {
+    visualStyle: string | null;
+    trustSignals: string[];
+    conversionTriggers: string | null;
+    claims: string[];
+  };
+}
+
+function PackagingComparisonSection({ ourPackaging, competitors, getCompetitorPackaging }: PackagingComparisonProps) {
+  const [isOpen, setIsOpen] = useState(true);
+
+  // Aggregate all claims and trust signals across competitors
+  const aggregatedData = useMemo(() => {
+    const claimCounts = new Map<string, number>();
+    const trustSignalCounts = new Map<string, number>();
+    
+    competitors.forEach(product => {
+      const packaging = getCompetitorPackaging(product);
+      
+      // Count claims
+      packaging.claims.forEach(claim => {
+        const normalized = claim.toLowerCase().trim();
+        if (normalized.length > 2) {
+          const key = claim.trim();
+          claimCounts.set(key, (claimCounts.get(key) || 0) + 1);
+        }
+      });
+      
+      // Count trust signals
+      packaging.trustSignals.forEach(signal => {
+        const normalized = signal.toLowerCase().trim();
+        if (normalized.length > 2) {
+          const key = signal.trim();
+          trustSignalCounts.set(key, (trustSignalCounts.get(key) || 0) + 1);
+        }
+      });
+    });
+
+    const topClaims = Array.from(claimCounts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8);
+    
+    const topTrustSignals = Array.from(trustSignalCounts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6);
+
+    return { topClaims, topTrustSignals };
+  }, [competitors, getCompetitorPackaging]);
+
+  if (competitors.length === 0) return null;
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <Card className="mt-4">
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CollapsibleTrigger asChild>
+              <div className="cursor-pointer hover:opacity-80 transition-opacity">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Package className="w-4 h-4 text-primary" />
+                  Packaging Strategy Comparison
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Visual styles, trust signals, and claims across competitors
+                </CardDescription>
+              </div>
+            </CollapsibleTrigger>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </Button>
+            </CollapsibleTrigger>
+          </div>
+        </CardHeader>
+        <CollapsibleContent>
+          <CardContent className="pt-0">
+            {/* Comparison Grid */}
+            <div className="space-y-4">
+              {/* Our Concept Packaging */}
+              {ourPackaging && (ourPackaging.type || ourPackaging.design_elements?.length) && (
+                <div className="p-3 bg-primary/5 rounded-lg border border-primary/20">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
+                      <Sparkles className="w-3 h-3 text-primary-foreground" />
+                    </div>
+                    <span className="text-sm font-semibold text-foreground">Our Concept</span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {ourPackaging.type && (
+                      <div className="bg-background/60 rounded p-2">
+                        <p className="text-[10px] text-muted-foreground mb-0.5">Recommended Format</p>
+                        <p className="text-sm font-medium text-primary">{ourPackaging.type}</p>
+                        {ourPackaging.quantity && (
+                          <p className="text-[10px] text-muted-foreground">({ourPackaging.quantity} count)</p>
+                        )}
+                      </div>
+                    )}
+                    {ourPackaging.design_elements && ourPackaging.design_elements.length > 0 && (
+                      <div className="bg-background/60 rounded p-2 md:col-span-2">
+                        <p className="text-[10px] text-muted-foreground mb-1">Design Elements</p>
+                        <div className="flex flex-wrap gap-1">
+                          {ourPackaging.design_elements.map((el, i) => (
+                            <Badge key={i} variant="secondary" className="text-[9px]">{el}</Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Competitor Packaging Comparison Table */}
+              <div className="rounded-lg border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="text-[10px] font-semibold w-[120px]">Brand</TableHead>
+                      <TableHead className="text-[10px] font-semibold">Visual Style</TableHead>
+                      <TableHead className="text-[10px] font-semibold">Trust Signals</TableHead>
+                      <TableHead className="text-[10px] font-semibold hidden md:table-cell">Conversion Focus</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {competitors.map((product, idx) => {
+                      const packaging = getCompetitorPackaging(product);
+                      return (
+                        <TableRow key={product.id} className={idx % 2 === 0 ? 'bg-background' : 'bg-muted/20'}>
+                          <TableCell className="py-2">
+                            <div className="flex items-center gap-2">
+                              {product.main_image_url ? (
+                                <img src={product.main_image_url} alt="" className="w-8 h-8 rounded object-contain bg-white border" />
+                              ) : (
+                                <div className="w-8 h-8 rounded bg-muted flex items-center justify-center">
+                                  <Package className="w-4 h-4 text-muted-foreground/30" />
+                                </div>
+                              )}
+                              <span className="text-[10px] font-medium truncate max-w-[80px]">{product.brand || 'Unknown'}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-2">
+                            <p className="text-[10px] text-muted-foreground line-clamp-2">
+                              {packaging.visualStyle || <span className="text-muted-foreground/50">—</span>}
+                            </p>
+                          </TableCell>
+                          <TableCell className="py-2">
+                            <div className="flex flex-wrap gap-0.5">
+                              {packaging.trustSignals.length > 0 ? (
+                                packaging.trustSignals.slice(0, 3).map((signal, i) => (
+                                  <Badge key={i} variant="outline" className="text-[8px] h-4 px-1">
+                                    {signal.length > 15 ? signal.substring(0, 15) + '...' : signal}
+                                  </Badge>
+                                ))
+                              ) : (
+                                <span className="text-[10px] text-muted-foreground/50">—</span>
+                              )}
+                              {packaging.trustSignals.length > 3 && (
+                                <Badge variant="secondary" className="text-[8px] h-4 px-1">
+                                  +{packaging.trustSignals.length - 3}
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-2 hidden md:table-cell">
+                            <p className="text-[10px] text-muted-foreground line-clamp-2">
+                              {packaging.conversionTriggers || <span className="text-muted-foreground/50">—</span>}
+                            </p>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Aggregated Insights */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Top Claims */}
+                {aggregatedData.topClaims.length > 0 && (
+                  <div className="bg-chart-4/5 rounded-lg p-3 border border-chart-4/20">
+                    <p className="text-[10px] font-semibold mb-2 flex items-center gap-1 text-chart-4">
+                      <Tag className="w-3 h-3" />
+                      Most Common Claims
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {aggregatedData.topClaims.map(([claim, count], i) => (
+                        <Badge key={i} variant="secondary" className="text-[9px]">
+                          {claim}
+                          <span className="ml-1 text-muted-foreground">({count})</span>
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Top Trust Signals */}
+                {aggregatedData.topTrustSignals.length > 0 && (
+                  <div className="bg-primary/5 rounded-lg p-3 border border-primary/20">
+                    <p className="text-[10px] font-semibold mb-2 flex items-center gap-1 text-primary">
+                      <Shield className="w-3 h-3" />
+                      Common Trust Signals
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {aggregatedData.topTrustSignals.map(([signal, count], i) => (
+                        <Badge key={i} variant="outline" className="text-[9px] border-primary/30">
+                          {signal}
+                          <span className="ml-1 text-muted-foreground">({count})</span>
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
+  );
 }
 
 function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNutrients, getCompetitorIngredientsList, ourPrice, ourServings }: IngredientComparisonProps) {
@@ -1281,6 +1509,52 @@ export function EnhancedBenchmarkComparison({
     });
   };
 
+  // Get competitor packaging data for comparison
+  const getCompetitorPackaging = (product: Product): {
+    visualStyle: string | null;
+    trustSignals: string[];
+    conversionTriggers: string | null;
+    claims: string[];
+  } => {
+    const marketingAnalysis = product.marketing_analysis as Record<string, unknown> | null;
+    const designBlueprint = marketingAnalysis?.design_blueprint as Record<string, unknown> | null;
+    const packagingIntel = marketingAnalysis?.packaging_intelligence as Record<string, unknown> | null;
+    const sourceData = designBlueprint || packagingIntel;
+    
+    // Visual Style
+    const visualStyle = (sourceData?.visual_style as string) || 
+                        (designBlueprint?.color_strategy as string) ||
+                        null;
+    
+    // Trust Signals
+    let trustSignals: string[] = [];
+    if (sourceData?.trust_signals && Array.isArray(sourceData.trust_signals)) {
+      trustSignals = sourceData.trust_signals as string[];
+    }
+    
+    // Conversion Triggers
+    const conversionTriggers = (sourceData?.conversion_triggers as string) || 
+                               (designBlueprint?.differentiation_factor as string) ||
+                               null;
+    
+    // Claims
+    const claims = getCompetitorClaims(product);
+    
+    return { visualStyle, trustSignals, conversionTriggers, claims };
+  };
+
+  // Get Our Concept packaging data
+  const getOurPackaging = (): { type?: string; quantity?: string | number; design_elements?: string[] } | null => {
+    const productDev = analysisData?.analysis_1_category_scores?.product_development as Record<string, unknown> | undefined;
+    const packaging = productDev?.packaging as Record<string, unknown> | undefined;
+    if (!packaging) return null;
+    return {
+      type: packaging.type as string | undefined,
+      quantity: packaging.quantity as string | number | undefined,
+      design_elements: packaging.design_elements as string[] | undefined,
+    };
+  };
+
   // Loading check - placed AFTER all hooks to avoid hooks rules violation
   if (loading) {
     return (
@@ -2001,6 +2275,13 @@ export function EnhancedBenchmarkComparison({
         getCompetitorIngredientsList={getCompetitorIngredientsList}
         ourPrice={analysisData?.formula_brief?.target_price as number | undefined}
         ourServings={getOurFormulationSpecs().servingsPerContainer || undefined}
+      />
+
+      {/* PACKAGING STRATEGY COMPARISON */}
+      <PackagingComparisonSection
+        ourPackaging={getOurPackaging()}
+        competitors={displayedProducts}
+        getCompetitorPackaging={getCompetitorPackaging}
       />
 
       {/* Product Detail Modal */}

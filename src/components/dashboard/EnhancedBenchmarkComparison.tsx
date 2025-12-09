@@ -8,11 +8,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Star, TrendingUp, Pill, Target, MessageSquare, Package, Users, Megaphone, AlertTriangle, CheckCircle, XCircle, Palette, Search, Filter, X, Trophy, ThumbsUp, ThumbsDown, Check, FlaskConical, Scale, Award, Beaker, ChevronDown, ChevronUp } from "lucide-react";
+import { Star, TrendingUp, Pill, Target, MessageSquare, Package, Users, Megaphone, AlertTriangle, CheckCircle, XCircle, Palette, Search, Filter, X, Trophy, ThumbsUp, ThumbsDown, Check, FlaskConical, Scale, Award, Beaker, ChevronDown, ChevronUp, BarChart3 } from "lucide-react";
 import { useProducts, Product } from "@/hooks/useProducts";
 import ProductDetailModal from "@/components/ProductDetailModal";
 import { useToast } from "@/hooks/use-toast";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 interface EnhancedBenchmarkComparisonProps {
   categoryId?: string;
   analysisData?: {
@@ -59,6 +61,7 @@ interface NutrientComparisonTableProps {
 
 function NutrientComparisonTable({ ourDosages, competitors, getCompetitorNutrients }: NutrientComparisonTableProps) {
   const [isOpen, setIsOpen] = useState(true);
+  const [viewMode, setViewMode] = useState<'table' | 'chart'>('chart');
 
   // Build unified nutrient list from all sources
   const comparisonData = useMemo(() => {
@@ -125,15 +128,62 @@ function NutrientComparisonTable({ ourDosages, competitors, getCompetitorNutrien
       .slice(0, 15); // Limit to 15 rows
   }, [ourDosages, competitors, getCompetitorNutrients]);
 
+  // Build chart data - extract numeric values for visualization
+  const chartData = useMemo(() => {
+    const parseNumeric = (value: string | null): number => {
+      if (!value) return 0;
+      const match = value.match(/[\d.]+/);
+      return match ? parseFloat(match[0]) : 0;
+    };
+
+    return comparisonData
+      .filter(row => row.ourDosage || row.competitors.some(c => c.amount))
+      .slice(0, 8) // Limit to 8 nutrients for readability
+      .map(row => {
+        const entry: Record<string, string | number> = {
+          name: row.name.length > 20 ? row.name.substring(0, 18) + '...' : row.name,
+          fullName: row.name,
+          'Our Concept': parseNumeric(row.ourDosage),
+        };
+        
+        competitors.forEach((p, i) => {
+          const compData = row.competitors.find(c => c.brand === (p.brand || 'Unknown'));
+          entry[`#${i + 1} ${p.brand?.substring(0, 10) || 'Unknown'}`] = parseNumeric(compData?.amount || null);
+        });
+        
+        return entry;
+      });
+  }, [comparisonData, competitors]);
+
+  const chartConfig = useMemo(() => {
+    const config: Record<string, { label: string; color: string }> = {
+      'Our Concept': {
+        label: 'Our Concept',
+        color: 'hsl(var(--chart-2))',
+      },
+    };
+    
+    competitors.forEach((p, i) => {
+      const key = `#${i + 1} ${p.brand?.substring(0, 10) || 'Unknown'}`;
+      const colors = ['hsl(var(--chart-1))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))'];
+      config[key] = {
+        label: p.brand || 'Unknown',
+        color: colors[i % colors.length],
+      };
+    });
+    
+    return config;
+  }, [competitors]);
+
   if (comparisonData.length === 0) return null;
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <Card className="mt-4">
-        <CollapsibleTrigger asChild>
-          <CardHeader className="pb-2 cursor-pointer hover:bg-muted/50 transition-colors">
-            <div className="flex items-center justify-between">
-              <div>
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CollapsibleTrigger asChild>
+              <div className="cursor-pointer hover:opacity-80 transition-opacity">
                 <CardTitle className="flex items-center gap-2 text-base">
                   <Scale className="w-4 h-4 text-primary" />
                   Nutrient Dosage Comparison
@@ -142,90 +192,174 @@ function NutrientComparisonTable({ ourDosages, competitors, getCompetitorNutrien
                   Side-by-side comparison of ingredient amounts across products
                 </CardDescription>
               </div>
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-              </Button>
+            </CollapsibleTrigger>
+            <div className="flex items-center gap-2">
+              {/* View Toggle */}
+              <div className="flex items-center bg-muted rounded-lg p-0.5">
+                <Button
+                  variant={viewMode === 'chart' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={(e) => { e.stopPropagation(); setViewMode('chart'); }}
+                >
+                  <BarChart3 className="w-3 h-3 mr-1" />
+                  Chart
+                </Button>
+                <Button
+                  variant={viewMode === 'table' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={(e) => { e.stopPropagation(); setViewMode('table'); }}
+                >
+                  <Scale className="w-3 h-3 mr-1" />
+                  Table
+                </Button>
+              </div>
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                  {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </Button>
+              </CollapsibleTrigger>
             </div>
-          </CardHeader>
-        </CollapsibleTrigger>
+          </div>
+        </CardHeader>
         <CollapsibleContent>
           <CardContent className="pt-0">
-            <ScrollArea className="w-full">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="w-[180px] text-xs font-semibold">Nutrient</TableHead>
-                    <TableHead className="text-xs font-semibold text-center bg-chart-2/10 border-x border-chart-2/20">
-                      <div className="flex items-center justify-center gap-1">
-                        <Target className="w-3 h-3 text-chart-2" />
-                        Our Concept
-                      </div>
-                    </TableHead>
-                    {competitors.map((p, i) => (
-                      <TableHead key={p.id} className="text-xs font-semibold text-center min-w-[100px]">
-                        <div className="truncate max-w-[120px]" title={p.brand || 'Unknown'}>
-                          #{i + 1} {p.brand || 'Unknown'}
-                        </div>
-                      </TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {comparisonData.map((row, idx) => (
-                    <TableRow key={idx} className="hover:bg-muted/30">
-                      <TableCell className="text-xs font-medium py-2">
-                        {row.name}
-                      </TableCell>
-                      <TableCell className="text-center bg-chart-2/5 border-x border-chart-2/10 py-2">
-                        {row.ourDosage ? (
-                          <Badge variant="secondary" className="text-[10px] bg-chart-2/20 text-chart-2 font-semibold">
-                            {row.ourDosage}
-                          </Badge>
-                        ) : (
-                          <span className="text-[10px] text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
+            {viewMode === 'chart' ? (
+              /* BAR CHART VIEW */
+              <div className="space-y-4">
+                <ChartContainer config={chartConfig} className="h-[350px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={chartData}
+                      layout="vertical"
+                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} className="stroke-muted" />
+                      <XAxis type="number" tick={{ fontSize: 10 }} className="text-muted-foreground" />
+                      <YAxis 
+                        dataKey="name" 
+                        type="category" 
+                        width={100} 
+                        tick={{ fontSize: 10 }} 
+                        className="text-muted-foreground"
+                      />
+                      <ChartTooltip 
+                        content={<ChartTooltipContent />}
+                        cursor={{ fill: 'hsl(var(--muted))', opacity: 0.3 }}
+                      />
+                      <Legend 
+                        wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }}
+                      />
+                      <Bar 
+                        dataKey="Our Concept" 
+                        fill="hsl(var(--chart-2))" 
+                        radius={[0, 4, 4, 0]}
+                        barSize={12}
+                      />
                       {competitors.map((p, i) => {
-                        const compData = row.competitors.find(c => c.brand === (p.brand || 'Unknown'));
+                        const key = `#${i + 1} ${p.brand?.substring(0, 10) || 'Unknown'}`;
+                        const colors = ['hsl(var(--chart-1))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))'];
                         return (
-                          <TableCell key={p.id} className="text-center py-2">
-                            {compData?.amount ? (
-                              <div className="flex flex-col items-center gap-0.5">
-                                <Badge variant="outline" className="text-[10px] font-medium">
-                                  {compData.amount}
-                                </Badge>
-                                {compData.dailyValue && (
-                                  <span className="text-[9px] text-muted-foreground">
-                                    {compData.dailyValue}% DV
-                                  </span>
-                                )}
-                              </div>
+                          <Bar 
+                            key={p.id}
+                            dataKey={key} 
+                            fill={colors[i % colors.length]} 
+                            radius={[0, 4, 4, 0]}
+                            barSize={12}
+                          />
+                        );
+                      })}
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+                
+                {/* Chart Legend Note */}
+                <p className="text-[10px] text-muted-foreground text-center">
+                  Values shown in mg (or original units). Larger bars indicate higher dosages.
+                </p>
+              </div>
+            ) : (
+              /* TABLE VIEW */
+              <div className="space-y-3">
+                <ScrollArea className="w-full">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="w-[180px] text-xs font-semibold">Nutrient</TableHead>
+                        <TableHead className="text-xs font-semibold text-center bg-chart-2/10 border-x border-chart-2/20">
+                          <div className="flex items-center justify-center gap-1">
+                            <Target className="w-3 h-3 text-chart-2" />
+                            Our Concept
+                          </div>
+                        </TableHead>
+                        {competitors.map((p, i) => (
+                          <TableHead key={p.id} className="text-xs font-semibold text-center min-w-[100px]">
+                            <div className="truncate max-w-[120px]" title={p.brand || 'Unknown'}>
+                              #{i + 1} {p.brand || 'Unknown'}
+                            </div>
+                          </TableHead>
+                        ))}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {comparisonData.map((row, idx) => (
+                        <TableRow key={idx} className="hover:bg-muted/30">
+                          <TableCell className="text-xs font-medium py-2">
+                            {row.name}
+                          </TableCell>
+                          <TableCell className="text-center bg-chart-2/5 border-x border-chart-2/10 py-2">
+                            {row.ourDosage ? (
+                              <Badge variant="secondary" className="text-[10px] bg-chart-2/20 text-chart-2 font-semibold">
+                                {row.ourDosage}
+                              </Badge>
                             ) : (
                               <span className="text-[10px] text-muted-foreground">—</span>
                             )}
                           </TableCell>
-                        );
-                      })}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              <ScrollBar orientation="horizontal" />
-            </ScrollArea>
-            
-            {/* Legend */}
-            <div className="flex items-center gap-4 mt-3 pt-3 border-t text-[10px] text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <div className="w-2 h-2 rounded-full bg-chart-2" />
-                <span>Our Recommended</span>
+                          {competitors.map((p, i) => {
+                            const compData = row.competitors.find(c => c.brand === (p.brand || 'Unknown'));
+                            return (
+                              <TableCell key={p.id} className="text-center py-2">
+                                {compData?.amount ? (
+                                  <div className="flex flex-col items-center gap-0.5">
+                                    <Badge variant="outline" className="text-[10px] font-medium">
+                                      {compData.amount}
+                                    </Badge>
+                                    {compData.dailyValue && (
+                                      <span className="text-[9px] text-muted-foreground">
+                                        {compData.dailyValue}% DV
+                                      </span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-[10px] text-muted-foreground">—</span>
+                                )}
+                              </TableCell>
+                            );
+                          })}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  <ScrollBar orientation="horizontal" />
+                </ScrollArea>
+                
+                {/* Legend */}
+                <div className="flex items-center gap-4 pt-3 border-t text-[10px] text-muted-foreground">
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 rounded-full bg-chart-2" />
+                    <span>Our Recommended</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span>DV = Daily Value</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span>— = Not specified</span>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center gap-1">
-                <span>DV = Daily Value</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span>— = Not specified</span>
-              </div>
-            </div>
+            )}
           </CardContent>
         </CollapsibleContent>
       </Card>

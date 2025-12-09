@@ -542,6 +542,18 @@ export default function Dashboard() {
             return productDev?.packaging as { type?: string; quantity?: string | number; design_elements?: string[] } | null;
           })()}
           productsClaims={products?.map(p => p.claims) || []}
+          productsData={products?.map(p => ({
+            packaging_type: p.packaging_type,
+            servings_per_container: p.servings_per_container,
+            price: p.price,
+            marketing_analysis: p.marketing_analysis as {
+              design_blueprint?: {
+                trust_signals?: string;
+                color_strategy?: string;
+                visual_style?: string;
+              };
+            } | null,
+          })) || []}
           isLoading={analysisLoading && !hasAnalysis}
         />
       </ScrollAnimate>

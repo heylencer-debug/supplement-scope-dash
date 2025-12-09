@@ -484,15 +484,15 @@ export default function ProductExplorer() {
                             />
                           </TableCell>
                           <TableCell>
-                            <div className="w-10 h-10 rounded-md overflow-visible bg-muted flex-shrink-0 relative group">
+                            <div className="w-10 h-10 rounded-lg overflow-visible bg-muted flex-shrink-0 relative group">
                               {(product.main_image_url || product.image_url) ? (
                                 <img 
                                   src={product.main_image_url || product.image_url || ''} 
                                   alt={product.title || 'Product'}
-                                  className="w-full h-full object-cover rounded-md transition-transform duration-200 group-hover:scale-[3] group-hover:z-50 group-hover:shadow-lg group-hover:relative"
+                                  className="w-full h-full object-cover rounded-lg transition-transform duration-200 group-hover:scale-[3] group-hover:z-50 group-hover:shadow-lg group-hover:relative"
                                 />
                               ) : (
-                                <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs rounded-md">
+                                <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs rounded-lg">
                                   N/A
                                 </div>
                               )}

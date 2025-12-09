@@ -8,7 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Star, TrendingUp, Pill, Target, MessageSquare, Package, Users, Megaphone, AlertTriangle, CheckCircle, XCircle, Palette, Search, Filter, X, Trophy, ThumbsUp, ThumbsDown, Check, FlaskConical, Scale, Award, Beaker, ChevronDown, ChevronUp, BarChart3 } from "lucide-react";
+import { Star, TrendingUp, Pill, Target, MessageSquare, Package, Users, Megaphone, AlertTriangle, CheckCircle, XCircle, Palette, Search, Filter, X, Trophy, ThumbsUp, ThumbsDown, Check, FlaskConical, Scale, Award, Beaker, ChevronDown, ChevronUp, BarChart3, DollarSign } from "lucide-react";
 import { useProducts, Product } from "@/hooks/useProducts";
 import ProductDetailModal from "@/components/ProductDetailModal";
 import { useToast } from "@/hooks/use-toast";
@@ -45,6 +45,8 @@ interface EnhancedBenchmarkComparisonProps {
     formula_brief?: {
       key_differentiators?: string[];
       risk_factors?: string[];
+      target_price?: number;
+      servings_per_container?: number;
     };
   } | null;
   isLoading?: boolean;
@@ -58,9 +60,11 @@ interface IngredientComparisonProps {
   competitors: Product[];
   getCompetitorNutrients: (product: Product) => Array<{ name: string; amount: number | null; unit: string; dailyValue?: string | number }>;
   getCompetitorIngredientsList: (product: Product) => string[];
+  ourPrice?: number;
+  ourServings?: number;
 }
 
-function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNutrients, getCompetitorIngredientsList }: IngredientComparisonProps) {
+function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNutrients, getCompetitorIngredientsList, ourPrice, ourServings }: IngredientComparisonProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [viewMode, setViewMode] = useState<'chart' | 'table' | 'gaps'>('chart');
 
@@ -272,16 +276,65 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
   }, [nutrientsOnly]);
 
   // Stats
-  const stats = useMemo(() => ({
-    total: comparisonData.length,
-    nutrients: comparisonData.filter(i => i.isNutrient).length,
-    otherIngredients: comparisonData.filter(i => !i.isNutrient).length,
-    inOurFormula: comparisonData.filter(i => i.ourDosage).length,
-    leading: gapAnalysis.filter(g => g.status === 'leading').length,
-    trailing: gapAnalysis.filter(g => g.status === 'trailing').length,
-    unique: gapAnalysis.filter(g => g.status === 'unique').length,
-    missing: gapAnalysis.filter(g => g.status === 'missing').length,
-  }), [comparisonData, gapAnalysis]);
+  const stats = useMemo(() => {
+    // Count ingredients that competitors have
+    const competitorIngredients = comparisonData.filter(i => i.competitors.length > 0);
+    const coveredByUs = competitorIngredients.filter(i => i.ourDosage);
+    const coverageScore = competitorIngredients.length > 0 
+      ? Math.round((coveredByUs.length / competitorIngredients.length) * 100)
+      : 0;
+
+    return {
+      total: comparisonData.length,
+      nutrients: comparisonData.filter(i => i.isNutrient).length,
+      otherIngredients: comparisonData.filter(i => !i.isNutrient).length,
+      inOurFormula: comparisonData.filter(i => i.ourDosage).length,
+      leading: gapAnalysis.filter(g => g.status === 'leading').length,
+      trailing: gapAnalysis.filter(g => g.status === 'trailing').length,
+      unique: gapAnalysis.filter(g => g.status === 'unique').length,
+      missing: gapAnalysis.filter(g => g.status === 'missing').length,
+      coverageScore,
+      competitorIngredientCount: competitorIngredients.length,
+    };
+  }, [comparisonData, gapAnalysis]);
+
+  // Price per serving calculations
+  const pricePerServing = useMemo(() => {
+    const data: Array<{ name: string; price: number | null; servings: number | null; pps: number | null; isOurs?: boolean }> = [];
+    
+    // Our concept
+    if (ourPrice && ourServings && ourServings > 0) {
+      data.push({
+        name: 'Our Concept',
+        price: ourPrice,
+        servings: ourServings,
+        pps: ourPrice / ourServings,
+        isOurs: true
+      });
+    }
+    
+    // Competitors
+    competitors.forEach(p => {
+      const servings = p.servings_per_container;
+      const price = p.price;
+      if (price && servings && servings > 0) {
+        data.push({
+          name: p.brand || 'Unknown',
+          price,
+          servings,
+          pps: price / servings
+        });
+      }
+    });
+
+    // Calculate average pps of competitors for comparison
+    const competitorPps = data.filter(d => !d.isOurs).map(d => d.pps).filter(Boolean) as number[];
+    const avgCompetitorPps = competitorPps.length > 0 
+      ? competitorPps.reduce((a, b) => a + b, 0) / competitorPps.length 
+      : null;
+
+    return { data, avgCompetitorPps };
+  }, [ourPrice, ourServings, competitors]);
 
   if (comparisonData.length === 0) return null;
 
@@ -421,6 +474,7 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
             {viewMode === 'table' && (
               /* FULL TABLE VIEW */
               <div className="space-y-4">
+                {/* Stats Row 1: Ingredient counts */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <div className="bg-primary/10 rounded-lg p-2 text-center">
                     <p className="text-lg font-bold text-primary">{stats.inOurFormula}</p>
@@ -434,11 +488,67 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                     <p className="text-lg font-bold">{stats.otherIngredients}</p>
                     <p className="text-[10px] text-muted-foreground">Other Ingredients</p>
                   </div>
-                  <div className="bg-muted rounded-lg p-2 text-center">
-                    <p className="text-lg font-bold">{stats.total}</p>
-                    <p className="text-[10px] text-muted-foreground">Total Unique</p>
+                  <div className={`rounded-lg p-2 text-center ${stats.coverageScore >= 80 ? 'bg-chart-4/10' : stats.coverageScore >= 50 ? 'bg-chart-2/10' : 'bg-destructive/10'}`}>
+                    <p className={`text-lg font-bold ${stats.coverageScore >= 80 ? 'text-chart-4' : stats.coverageScore >= 50 ? 'text-chart-2' : 'text-destructive'}`}>
+                      {stats.coverageScore}%
+                    </p>
+                    <p className="text-[10px] text-muted-foreground">Coverage Score</p>
                   </div>
                 </div>
+
+                {/* Stats Row 2: Price-per-Serving Comparison */}
+                {pricePerServing.data.length > 0 && (
+                  <div className="bg-muted/30 rounded-lg p-3">
+                    <p className="text-xs font-semibold mb-2 flex items-center gap-1">
+                      <DollarSign className="w-3.5 h-3.5 text-primary" />
+                      Price-per-Serving Comparison
+                    </p>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {pricePerServing.data.map((item, idx) => {
+                        const isOurs = item.isOurs;
+                        const isLowest = pricePerServing.data.every(d => !d.pps || (item.pps && item.pps <= d.pps));
+                        const isAboveAvg = pricePerServing.avgCompetitorPps && item.pps && item.pps > pricePerServing.avgCompetitorPps;
+                        const isBelowAvg = pricePerServing.avgCompetitorPps && item.pps && item.pps < pricePerServing.avgCompetitorPps;
+                        
+                        return (
+                          <div 
+                            key={idx} 
+                            className={`rounded-lg p-2 text-center border ${
+                              isOurs 
+                                ? 'bg-chart-2/10 border-chart-2/30' 
+                                : isLowest 
+                                  ? 'bg-chart-4/10 border-chart-4/30' 
+                                  : 'bg-background border-border'
+                            }`}
+                          >
+                            <p className="text-[10px] text-muted-foreground truncate" title={item.name}>
+                              {isOurs ? '🎯 ' : ''}{item.name}
+                            </p>
+                            <p className={`text-sm font-bold ${isOurs ? 'text-chart-2' : isLowest ? 'text-chart-4' : ''}`}>
+                              {item.pps ? `$${item.pps.toFixed(2)}` : '—'}
+                            </p>
+                            <p className="text-[9px] text-muted-foreground">
+                              ${item.price?.toFixed(0)} / {item.servings} srv
+                            </p>
+                            {!isOurs && item.pps && pricePerServing.avgCompetitorPps && (
+                              <Badge 
+                                variant="secondary" 
+                                className={`text-[8px] mt-1 ${isBelowAvg ? 'bg-chart-4/20 text-chart-4' : isAboveAvg ? 'bg-chart-1/20 text-chart-1' : ''}`}
+                              >
+                                {isLowest ? 'Best Value' : isBelowAvg ? 'Below Avg' : isAboveAvg ? 'Above Avg' : 'Avg'}
+                              </Badge>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {pricePerServing.avgCompetitorPps && (
+                      <p className="text-[10px] text-muted-foreground text-center mt-2">
+                        Competitor Average: ${pricePerServing.avgCompetitorPps.toFixed(2)}/serving
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 <ScrollArea className="max-h-[400px]">
                   <Table>
@@ -1807,6 +1917,8 @@ export function EnhancedBenchmarkComparison({
         competitors={displayedProducts}
         getCompetitorNutrients={getCompetitorNutrients}
         getCompetitorIngredientsList={getCompetitorIngredientsList}
+        ourPrice={analysisData?.formula_brief?.target_price as number | undefined}
+        ourServings={getOurFormulationSpecs().servingsPerContainer || undefined}
       />
 
       {/* Product Detail Modal */}

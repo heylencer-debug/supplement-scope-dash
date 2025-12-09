@@ -114,7 +114,7 @@ function NutrientComparisonTable({ ourDosages, competitors, getCompetitorNutrien
       });
     });
 
-    // Convert to array and sort by whether we have a dosage first
+    // Convert to array and sort by whether we have a dosage first - NO LIMIT (show all)
     return Array.from(nutrientMap.entries())
       .map(([name, data]) => ({
         name: name.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
@@ -124,8 +124,7 @@ function NutrientComparisonTable({ ourDosages, competitors, getCompetitorNutrien
         if (a.ourDosage && !b.ourDosage) return -1;
         if (!a.ourDosage && b.ourDosage) return 1;
         return 0;
-      })
-      .slice(0, 15); // Limit to 15 rows
+      });
   }, [ourDosages, competitors, getCompetitorNutrients]);
 
   // Build chart data - extract numeric values for visualization
@@ -568,6 +567,254 @@ function NutrientComparisonTable({ ourDosages, competitors, getCompetitorNutrien
                 )}
               </div>
             )}
+          </CardContent>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
+  );
+}
+
+// Full Ingredients Comparison Component - shows ALL ingredients with amounts
+interface IngredientsComparisonTableProps {
+  ourIngredients: Array<{ ingredient: string; dosage?: string; rationale?: string }>;
+  competitors: Product[];
+  getCompetitorNutrients: (product: Product) => Array<{ name: string; amount: number | null; unit: string; dailyValue?: string | number }>;
+  getCompetitorIngredientsList: (product: Product) => string[];
+}
+
+function IngredientsComparisonTable({ ourIngredients, competitors, getCompetitorNutrients, getCompetitorIngredientsList }: IngredientsComparisonTableProps) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  // Build comprehensive ingredient data for each competitor
+  const ingredientData = useMemo(() => {
+    return competitors.map(product => {
+      const nutrients = getCompetitorNutrients(product);
+      const ingredientsList = getCompetitorIngredientsList(product);
+      
+      // Combine nutrients (with amounts) and other ingredients
+      const allItems: Array<{ name: string; amount: string | null; isNutrient: boolean }> = [];
+      
+      // Add all nutrients with their amounts
+      nutrients.forEach(n => {
+        allItems.push({
+          name: n.name,
+          amount: n.amount !== null ? `${n.amount}${n.unit}${n.dailyValue ? ` (${n.dailyValue}% DV)` : ''}` : null,
+          isNutrient: true
+        });
+      });
+      
+      // Add other ingredients (without amounts - these are inactive/other ingredients)
+      ingredientsList.forEach(ing => {
+        // Don't add if already in nutrients list
+        const normalizedIng = ing.toLowerCase().trim();
+        const alreadyExists = allItems.some(item => 
+          item.name.toLowerCase().includes(normalizedIng) || 
+          normalizedIng.includes(item.name.toLowerCase())
+        );
+        if (!alreadyExists) {
+          allItems.push({
+            name: ing,
+            amount: null,
+            isNutrient: false
+          });
+        }
+      });
+      
+      return {
+        brand: product.brand || 'Unknown',
+        title: product.title || '',
+        items: allItems,
+        nutrientCount: nutrients.length,
+        ingredientCount: ingredientsList.length,
+        totalCount: allItems.length
+      };
+    });
+  }, [competitors, getCompetitorNutrients, getCompetitorIngredientsList]);
+
+  // Get all unique ingredient names across all products
+  const allUniqueIngredients = useMemo(() => {
+    const ingredientMap = new Map<string, {
+      ourDosage: string | null;
+      competitorAmounts: Array<{ brand: string; amount: string | null }>;
+    }>();
+    
+    // Add our ingredients
+    ourIngredients.forEach(item => {
+      ingredientMap.set(item.ingredient.toLowerCase(), {
+        ourDosage: item.dosage || null,
+        competitorAmounts: []
+      });
+    });
+    
+    // Add competitor ingredients
+    ingredientData.forEach(comp => {
+      comp.items.forEach(item => {
+        const key = item.name.toLowerCase().trim();
+        // Try to find matching key
+        let matchedKey: string | null = null;
+        for (const [existingKey] of ingredientMap) {
+          const keyWords = existingKey.split(' ').filter(w => w.length > 3);
+          const itemWords = key.split(' ').filter(w => w.length > 3);
+          const hasOverlap = keyWords.some(kw => itemWords.some(iw => kw.includes(iw) || iw.includes(kw)));
+          if (hasOverlap || existingKey.includes(key) || key.includes(existingKey)) {
+            matchedKey = existingKey;
+            break;
+          }
+        }
+        
+        if (matchedKey) {
+          ingredientMap.get(matchedKey)!.competitorAmounts.push({
+            brand: comp.brand,
+            amount: item.amount
+          });
+        } else {
+          ingredientMap.set(key, {
+            ourDosage: null,
+            competitorAmounts: [{ brand: comp.brand, amount: item.amount }]
+          });
+        }
+      });
+    });
+    
+    return Array.from(ingredientMap.entries())
+      .map(([name, data]) => ({
+        name: name.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
+        ...data
+      }))
+      .sort((a, b) => {
+        // Sort: ours first, then by number of competitors having it
+        if (a.ourDosage && !b.ourDosage) return -1;
+        if (!a.ourDosage && b.ourDosage) return 1;
+        return b.competitorAmounts.length - a.competitorAmounts.length;
+      });
+  }, [ourIngredients, ingredientData]);
+
+  if (competitors.length === 0 || allUniqueIngredients.length === 0) return null;
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <Card className="mt-4">
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CollapsibleTrigger asChild>
+              <div className="cursor-pointer hover:opacity-80 transition-opacity flex-1">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Pill className="w-4 h-4 text-chart-4" />
+                  Full Ingredients Comparison
+                  <Badge variant="secondary" className="ml-2 text-[10px]">
+                    {allUniqueIngredients.length} ingredients
+                  </Badge>
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Complete ingredient list with all dosages and amounts across products
+                </CardDescription>
+              </div>
+            </CollapsibleTrigger>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </Button>
+            </CollapsibleTrigger>
+          </div>
+        </CardHeader>
+        <CollapsibleContent>
+          <CardContent className="pt-0">
+            {/* Summary Stats */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+              <div className="bg-primary/10 rounded-lg p-2 text-center">
+                <p className="text-lg font-bold text-primary">{ourIngredients.length}</p>
+                <p className="text-[10px] text-muted-foreground">Our Ingredients</p>
+              </div>
+              {ingredientData.slice(0, 3).map((comp, i) => (
+                <div key={i} className="bg-muted rounded-lg p-2 text-center">
+                  <p className="text-lg font-bold">{comp.totalCount}</p>
+                  <p className="text-[10px] text-muted-foreground truncate" title={comp.brand}>{comp.brand}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Full Table */}
+            <ScrollArea className="max-h-[500px]">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[200px] sticky left-0 bg-background z-10">Ingredient</TableHead>
+                    <TableHead className="min-w-[120px]">
+                      <div className="flex items-center gap-1">
+                        <Award className="w-3 h-3 text-primary" />
+                        Our Concept
+                      </div>
+                    </TableHead>
+                    {competitors.slice(0, 3).map((p, i) => (
+                      <TableHead key={p.id} className="min-w-[120px]">
+                        <span className="truncate block max-w-[100px]" title={p.brand || 'Unknown'}>
+                          #{i + 1} {p.brand || 'Unknown'}
+                        </span>
+                      </TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {allUniqueIngredients.map((ing, idx) => (
+                    <TableRow key={idx} className={idx % 2 === 0 ? 'bg-muted/30' : ''}>
+                      <TableCell className="font-medium text-xs sticky left-0 bg-inherit z-10">
+                        <div className="flex items-center gap-1">
+                          {ing.ourDosage ? (
+                            <Check className="w-3 h-3 text-chart-4 shrink-0" />
+                          ) : (
+                            <span className="w-3 h-3 flex items-center justify-center shrink-0">
+                              <span className="w-1 h-1 rounded-full bg-muted-foreground" />
+                            </span>
+                          )}
+                          <span className="truncate" title={ing.name}>{ing.name}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {ing.ourDosage ? (
+                          <Badge variant="secondary" className="text-[10px] bg-primary/10 text-primary">
+                            {ing.ourDosage}
+                          </Badge>
+                        ) : (
+                          <span className="text-[10px] text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      {competitors.slice(0, 3).map((p) => {
+                        const compAmount = ing.competitorAmounts.find(c => c.brand === (p.brand || 'Unknown'));
+                        return (
+                          <TableCell key={p.id}>
+                            {compAmount?.amount ? (
+                              <Badge variant="outline" className="text-[10px]">
+                                {compAmount.amount}
+                              </Badge>
+                            ) : compAmount ? (
+                              <Check className="w-3 h-3 text-muted-foreground" />
+                            ) : (
+                              <span className="text-[10px] text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                        );
+                      })}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </ScrollArea>
+
+            {/* Legend */}
+            <div className="flex items-center gap-4 mt-3 pt-3 border-t text-[10px] text-muted-foreground">
+              <div className="flex items-center gap-1">
+                <Check className="w-3 h-3 text-chart-4" />
+                <span>In Our Formula</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Badge variant="secondary" className="text-[9px] h-4">Amount</Badge>
+                <span>Has dosage data</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Check className="w-3 h-3 text-muted-foreground" />
+                <span>Present (no amount)</span>
+              </div>
+            </div>
           </CardContent>
         </CollapsibleContent>
       </Card>
@@ -1053,12 +1300,12 @@ export function EnhancedBenchmarkComparison({
     };
   };
 
-  // Get competitor nutrients from all_nutrients or supplement_facts_complete
+  // Get competitor nutrients from all_nutrients or supplement_facts_complete - NO LIMIT (show all)
   const getCompetitorNutrients = (product: Product): Array<{ name: string; amount: number | null; unit: string; dailyValue?: string | number }> => {
     // Try all_nutrients first (preferred - normalized data)
     const allNutrients = product.all_nutrients as Array<{ name: string; amount: number | null; unit: string; daily_value_percent?: string | number }> | null;
     if (allNutrients && allNutrients.length > 0) {
-      return allNutrients.slice(0, 8).map(n => ({
+      return allNutrients.map(n => ({
         name: n.name,
         amount: n.amount,
         unit: n.unit,
@@ -1070,12 +1317,39 @@ export function EnhancedBenchmarkComparison({
     const supplementFacts = product.supplement_facts_complete as Record<string, unknown> | null;
     const sfNutrients = supplementFacts?.all_nutrients as Array<{ name: string; amount: number | null; unit: string; daily_value_percent?: string | number }> | undefined;
     if (sfNutrients && sfNutrients.length > 0) {
-      return sfNutrients.slice(0, 8).map(n => ({
+      return sfNutrients.map(n => ({
         name: n.name,
         amount: n.amount,
         unit: n.unit,
         dailyValue: n.daily_value_percent
       }));
+    }
+    
+    return [];
+  };
+
+  // Get ALL competitor ingredients (from ingredients text field) - parsed list
+  const getCompetitorIngredientsList = (product: Product): string[] => {
+    // Primary: product.ingredients - parse and show ALL
+    if (product.ingredients) {
+      const parts = product.ingredients.split(/[,;]/).map(i => i.trim()).filter(Boolean);
+      if (parts.length > 0) return parts;
+    }
+    
+    // Fallback: other_ingredients field
+    if (product.other_ingredients) {
+      const parts = product.other_ingredients.split(/[,;]/).map(i => i.trim()).filter(Boolean);
+      if (parts.length > 0) return parts;
+    }
+    
+    // Fallback: specifications.Ingredients
+    const specs = product.specifications as Record<string, unknown> | null;
+    if (specs) {
+      const ingredientsSpec = specs.Ingredients || specs.ingredients || specs.Material || specs.material;
+      if (ingredientsSpec && typeof ingredientsSpec === 'string') {
+        const parts = ingredientsSpec.split(/[,;]/).map(i => i.trim()).filter(Boolean);
+        if (parts.length > 0) return parts;
+      }
     }
     
     return [];
@@ -1824,6 +2098,14 @@ export function EnhancedBenchmarkComparison({
         ourDosages={getOurRecommendedDosages()}
         competitors={displayedProducts}
         getCompetitorNutrients={getCompetitorNutrients}
+      />
+
+      {/* FULL INGREDIENTS COMPARISON TABLE */}
+      <IngredientsComparisonTable 
+        ourIngredients={getOurRecommendedDosages()}
+        competitors={displayedProducts}
+        getCompetitorNutrients={getCompetitorNutrients}
+        getCompetitorIngredientsList={getCompetitorIngredientsList}
       />
 
       {/* Product Detail Modal */}

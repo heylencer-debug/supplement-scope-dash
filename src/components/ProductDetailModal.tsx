@@ -8,7 +8,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { 
   Star, TrendingUp, TrendingDown, AlertCircle, CheckCircle, Target, Users, Beaker, 
   Lightbulb, ShoppingCart, Package, Image, BarChart3, DollarSign, Calendar, 
-  ExternalLink, Play, Award, Info, ChevronDown, Truck, FileText, Box, Link2
+  ExternalLink, Play, Award, Info, ChevronDown, Truck, FileText, Box, Link2, Tag
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis } from "recharts";
 import type { Product } from "@/hooks/useProducts";
@@ -217,7 +217,7 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
         </DialogHeader>
 
         <Tabs defaultValue="overview" className="flex-1 min-h-0 flex flex-col">
-          <TabsList className="grid w-full grid-cols-5 shrink-0">
+          <TabsList className="grid w-full grid-cols-6 shrink-0">
             <TabsTrigger value="overview" className="gap-1 text-xs">
               <Image className="w-3 h-3" />
               Overview
@@ -233,6 +233,10 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
             <TabsTrigger value="reviews" className="gap-1 text-xs">
               <Users className="w-3 h-3" />
               Reviews
+            </TabsTrigger>
+            <TabsTrigger value="packaging" className="gap-1 text-xs">
+              <Package className="w-3 h-3" />
+              Packaging
             </TabsTrigger>
             <TabsTrigger value="formula" className="gap-1 text-xs">
               <Beaker className="w-3 h-3" />
@@ -976,6 +980,181 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                 </Card>
               )}
               {!reviewAnalysis && <Card><CardContent className="py-8 text-center text-muted-foreground">No review analysis data available for this product.</CardContent></Card>}
+            </div>
+          </TabsContent>
+
+          {/* Packaging Tab */}
+          <TabsContent value="packaging" className={`mt-4 ${scrollableContentClass} ${maxContentHeight}`}>
+            <div className="space-y-4">
+              {(() => {
+                const designBlueprint = (marketingAnalysis as Record<string, unknown> | null)?.design_blueprint as Record<string, unknown> | null;
+                const packagingIntel = (marketingAnalysis as Record<string, unknown> | null)?.packaging_intelligence as Record<string, unknown> | null;
+                const sourceData = designBlueprint || packagingIntel;
+                
+                const visualStyle = (sourceData?.visual_style as string) || (designBlueprint?.color_strategy as string);
+                const visualHierarchy = (sourceData?.visual_hierarchy as string) || (designBlueprint?.layout_structure as string);
+                const trustSignals = (sourceData?.trust_signals as string[]) || [];
+                const conversionTriggers = (sourceData?.conversion_triggers as string) || (designBlueprint?.differentiation_factor as string);
+                const colorStrategy = designBlueprint?.color_strategy as string;
+                const layoutStructure = designBlueprint?.layout_structure as string;
+                const typographyStyle = designBlueprint?.typography_style as string;
+                const differentiationFactor = designBlueprint?.differentiation_factor as string;
+                
+                const hasData = visualStyle || visualHierarchy || trustSignals.length > 0 || conversionTriggers || 
+                               product.claims || (product.claims_on_label && product.claims_on_label.length > 0);
+                
+                if (!hasData) {
+                  return (
+                    <Card>
+                      <CardContent className="py-8 text-center text-muted-foreground">
+                        No packaging analysis data available for this product.
+                      </CardContent>
+                    </Card>
+                  );
+                }
+                
+                return (
+                  <>
+                    {/* Visual Style & Hierarchy Row */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {visualStyle && visualStyle !== "N/A" && (
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium flex items-center gap-2">
+                              <Image className="w-4 h-4 text-primary" />
+                              Visual Style
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <p className="text-sm text-foreground">{visualStyle}</p>
+                          </CardContent>
+                        </Card>
+                      )}
+                      
+                      {visualHierarchy && visualHierarchy !== "N/A" && (
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium flex items-center gap-2">
+                              <BarChart3 className="w-4 h-4 text-chart-2" />
+                              Visual Hierarchy
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <p className="text-sm text-foreground">{visualHierarchy}</p>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </div>
+                    
+                    {/* Trust Signals */}
+                    {trustSignals.length > 0 && (
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-medium flex items-center gap-2">
+                            <Award className="w-4 h-4 text-chart-4" />
+                            Trust Signals
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="flex flex-wrap gap-2">
+                            {trustSignals.map((signal, idx) => (
+                              <Badge key={idx} variant="secondary" className="text-xs">
+                                {signal}
+                              </Badge>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                    
+                    {/* Front of Pack Claims */}
+                    {(product.claims || (product.claims_on_label && product.claims_on_label.length > 0)) && (
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-medium flex items-center gap-2">
+                            <Tag className="w-4 h-4 text-chart-3" />
+                            Front of Pack Claims
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <ul className="space-y-1.5">
+                            {product.claims_on_label && product.claims_on_label.length > 0 ? (
+                              product.claims_on_label.map((claim, idx) => (
+                                <li key={idx} className="flex items-start gap-2 text-sm">
+                                  <CheckCircle className="w-4 h-4 text-chart-4 mt-0.5 shrink-0" />
+                                  <span className="text-foreground">{claim}</span>
+                                </li>
+                              ))
+                            ) : product.claims ? (
+                              product.claims.split(/[,;]/).filter(Boolean).map((claim, idx) => (
+                                <li key={idx} className="flex items-start gap-2 text-sm">
+                                  <CheckCircle className="w-4 h-4 text-chart-4 mt-0.5 shrink-0" />
+                                  <span className="text-foreground">{claim.trim()}</span>
+                                </li>
+                              ))
+                            ) : null}
+                          </ul>
+                        </CardContent>
+                      </Card>
+                    )}
+                    
+                    {/* Conversion Triggers */}
+                    {conversionTriggers && conversionTriggers !== "N/A" && (
+                      <Card className="border-primary/30 bg-primary/5">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-medium flex items-center gap-2">
+                            <Lightbulb className="w-4 h-4 text-primary" />
+                            Conversion Triggers
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-sm text-foreground italic">"{conversionTriggers}"</p>
+                        </CardContent>
+                      </Card>
+                    )}
+                    
+                    {/* Additional Design Details */}
+                    {(colorStrategy || layoutStructure || typographyStyle || differentiationFactor) && (
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-medium flex items-center gap-2">
+                            <Info className="w-4 h-4 text-muted-foreground" />
+                            Design Details
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                            {colorStrategy && colorStrategy !== "N/A" && (
+                              <div>
+                                <p className="text-xs text-muted-foreground mb-1">Color Strategy</p>
+                                <p className="text-foreground">{colorStrategy}</p>
+                              </div>
+                            )}
+                            {layoutStructure && layoutStructure !== "N/A" && (
+                              <div>
+                                <p className="text-xs text-muted-foreground mb-1">Layout Structure</p>
+                                <p className="text-foreground">{layoutStructure}</p>
+                              </div>
+                            )}
+                            {typographyStyle && typographyStyle !== "N/A" && (
+                              <div>
+                                <p className="text-xs text-muted-foreground mb-1">Typography Style</p>
+                                <p className="text-foreground">{typographyStyle}</p>
+                              </div>
+                            )}
+                            {differentiationFactor && differentiationFactor !== "N/A" && (
+                              <div>
+                                <p className="text-xs text-muted-foreground mb-1">Differentiation Factor</p>
+                                <p className="text-foreground">{differentiationFactor}</p>
+                              </div>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           </TabsContent>
 

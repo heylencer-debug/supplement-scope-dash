@@ -68,20 +68,31 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
   const [isOpen, setIsOpen] = useState(true);
   const [viewMode, setViewMode] = useState<'chart' | 'table' | 'gaps'>('chart');
 
-  // DEBUG: Log what we receive
+  // DEBUG: Log what we receive - EXTENSIVE
   useEffect(() => {
-    console.log('[IngredientComparison] competitors count:', competitors.length);
+    console.log('=== [IngredientComparison] DEBUG START ===');
+    console.log('[IngredientComparison] competitors received:', competitors.length);
+    console.log('[IngredientComparison] ourDosages received:', ourDosages.length, ourDosages);
+    
+    if (competitors.length === 0) {
+      console.log('[IngredientComparison] NO COMPETITORS - table will be empty');
+      return;
+    }
+    
     competitors.forEach((p, i) => {
+      console.log(`[IngredientComparison] Processing competitor ${i + 1}:`, p.brand);
+      console.log(`  - product.ingredients:`, p.ingredients?.substring(0, 100));
+      console.log(`  - product.other_ingredients:`, p.other_ingredients?.substring(0, 100));
+      
       const ingList = getCompetitorIngredientsList(p);
       const nutrients = getCompetitorNutrients(p);
-      console.log(`[IngredientComparison] Competitor ${i + 1} (${p.brand}):`, {
-        ingredientsCount: ingList.length,
-        nutrientsCount: nutrients.length,
-        sampleIngredients: ingList.slice(0, 5),
-        allIngredients: ingList
-      });
+      
+      console.log(`  - Parsed ingredients count:`, ingList.length);
+      console.log(`  - Parsed nutrients count:`, nutrients.length);
+      console.log(`  - ALL parsed ingredients:`, ingList);
     });
-  }, [competitors, getCompetitorIngredientsList, getCompetitorNutrients]);
+    console.log('=== [IngredientComparison] DEBUG END ===');
+  }, [competitors, ourDosages, getCompetitorIngredientsList, getCompetitorNutrients]);
 
   // Build unified data combining nutrients (with amounts) AND other ingredients
   const comparisonData = useMemo(() => {

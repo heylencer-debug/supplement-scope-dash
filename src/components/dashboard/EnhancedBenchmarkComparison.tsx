@@ -175,6 +175,88 @@ function NutrientComparisonTable({ ourDosages, competitors, getCompetitorNutrien
     return config;
   }, [competitors]);
 
+  // Formulation Gap Analysis - compare Our Concept vs competitor averages
+  const gapAnalysis = useMemo(() => {
+    const parseNumeric = (value: string | null): number => {
+      if (!value) return 0;
+      const match = value.match(/[\d.]+/);
+      return match ? parseFloat(match[0]) : 0;
+    };
+
+    const gaps: Array<{
+      nutrient: string;
+      ourValue: number;
+      ourDosage: string | null;
+      competitorAvg: number;
+      competitorMax: number;
+      competitorMin: number;
+      percentDiff: number;
+      status: 'leading' | 'trailing' | 'matching' | 'unique' | 'missing';
+      unit: string;
+    }> = [];
+
+    comparisonData.forEach(row => {
+      const ourValue = parseNumeric(row.ourDosage);
+      const competitorValues = row.competitors
+        .map(c => parseNumeric(c.amount))
+        .filter(v => v > 0);
+      
+      if (competitorValues.length === 0 && ourValue > 0) {
+        // Unique to our concept
+        gaps.push({
+          nutrient: row.name,
+          ourValue,
+          ourDosage: row.ourDosage,
+          competitorAvg: 0,
+          competitorMax: 0,
+          competitorMin: 0,
+          percentDiff: 100,
+          status: 'unique',
+          unit: row.ourDosage?.replace(/[\d.]+/g, '').trim() || 'mg'
+        });
+      } else if (competitorValues.length > 0 && ourValue === 0) {
+        // Missing from our concept
+        const avg = competitorValues.reduce((a, b) => a + b, 0) / competitorValues.length;
+        gaps.push({
+          nutrient: row.name,
+          ourValue: 0,
+          ourDosage: null,
+          competitorAvg: avg,
+          competitorMax: Math.max(...competitorValues),
+          competitorMin: Math.min(...competitorValues),
+          percentDiff: -100,
+          status: 'missing',
+          unit: 'mg'
+        });
+      } else if (competitorValues.length > 0 && ourValue > 0) {
+        // Compare values
+        const avg = competitorValues.reduce((a, b) => a + b, 0) / competitorValues.length;
+        const percentDiff = avg > 0 ? ((ourValue - avg) / avg) * 100 : 0;
+        
+        let status: 'leading' | 'trailing' | 'matching';
+        if (percentDiff > 15) status = 'leading';
+        else if (percentDiff < -15) status = 'trailing';
+        else status = 'matching';
+        
+        gaps.push({
+          nutrient: row.name,
+          ourValue,
+          ourDosage: row.ourDosage,
+          competitorAvg: avg,
+          competitorMax: Math.max(...competitorValues),
+          competitorMin: Math.min(...competitorValues),
+          percentDiff,
+          status,
+          unit: row.ourDosage?.replace(/[\d.]+/g, '').trim() || 'mg'
+        });
+      }
+    });
+
+    // Sort: leading first, then unique, then matching, then trailing, then missing
+    const statusOrder = { leading: 0, unique: 1, matching: 2, trailing: 3, missing: 4 };
+    return gaps.sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
+  }, [comparisonData]);
+
   if (comparisonData.length === 0) return null;
 
   return (
@@ -358,6 +440,132 @@ function NutrientComparisonTable({ ourDosages, competitors, getCompetitorNutrien
                     <span>— = Not specified</span>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* FORMULATION GAP ANALYSIS */}
+            {gapAnalysis.length > 0 && (
+              <div className="mt-6 pt-4 border-t">
+                <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-primary" />
+                  Formulation Gap Analysis
+                </h4>
+                
+                {/* Summary Stats */}
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4">
+                  {[
+                    { label: 'Leading', count: gapAnalysis.filter(g => g.status === 'leading').length, color: 'bg-chart-4', textColor: 'text-chart-4' },
+                    { label: 'Unique', count: gapAnalysis.filter(g => g.status === 'unique').length, color: 'bg-primary', textColor: 'text-primary' },
+                    { label: 'Matching', count: gapAnalysis.filter(g => g.status === 'matching').length, color: 'bg-muted-foreground', textColor: 'text-muted-foreground' },
+                    { label: 'Trailing', count: gapAnalysis.filter(g => g.status === 'trailing').length, color: 'bg-chart-1', textColor: 'text-chart-1' },
+                    { label: 'Missing', count: gapAnalysis.filter(g => g.status === 'missing').length, color: 'bg-destructive', textColor: 'text-destructive' },
+                  ].map(stat => (
+                    <div key={stat.label} className="flex items-center gap-2 p-2 rounded-lg bg-muted/50">
+                      <div className={`w-2 h-2 rounded-full ${stat.color}`} />
+                      <span className="text-[10px] text-muted-foreground">{stat.label}</span>
+                      <span className={`text-sm font-bold ml-auto ${stat.textColor}`}>{stat.count}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Gap Details Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {gapAnalysis.slice(0, 9).map((gap, idx) => (
+                    <div
+                      key={idx}
+                      className={`p-3 rounded-lg border ${
+                        gap.status === 'leading' ? 'bg-chart-4/10 border-chart-4/30' :
+                        gap.status === 'unique' ? 'bg-primary/10 border-primary/30' :
+                        gap.status === 'trailing' ? 'bg-chart-1/10 border-chart-1/30' :
+                        gap.status === 'missing' ? 'bg-destructive/10 border-destructive/30' :
+                        'bg-muted/30 border-border'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <span className="text-xs font-medium truncate flex-1" title={gap.nutrient}>
+                          {gap.nutrient}
+                        </span>
+                        <Badge
+                          variant="secondary"
+                          className={`text-[9px] shrink-0 ${
+                            gap.status === 'leading' ? 'bg-chart-4/20 text-chart-4' :
+                            gap.status === 'unique' ? 'bg-primary/20 text-primary' :
+                            gap.status === 'trailing' ? 'bg-chart-1/20 text-chart-1' :
+                            gap.status === 'missing' ? 'bg-destructive/20 text-destructive' :
+                            ''
+                          }`}
+                        >
+                          {gap.status === 'leading' && `+${Math.round(gap.percentDiff)}%`}
+                          {gap.status === 'trailing' && `${Math.round(gap.percentDiff)}%`}
+                          {gap.status === 'unique' && 'Unique'}
+                          {gap.status === 'missing' && 'Missing'}
+                          {gap.status === 'matching' && '~Match'}
+                        </Badge>
+                      </div>
+                      
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-[10px]">
+                          <span className="text-muted-foreground">Our Concept</span>
+                          <span className={`font-semibold ${gap.status === 'leading' || gap.status === 'unique' ? 'text-chart-4' : ''}`}>
+                            {gap.ourDosage || '—'}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-[10px]">
+                          <span className="text-muted-foreground">Competitor Avg</span>
+                          <span className="font-medium">
+                            {gap.competitorAvg > 0 ? `${Math.round(gap.competitorAvg)}${gap.unit}` : '—'}
+                          </span>
+                        </div>
+                        {gap.competitorMax > 0 && gap.competitorMax !== gap.competitorMin && (
+                          <div className="flex items-center justify-between text-[10px]">
+                            <span className="text-muted-foreground">Range</span>
+                            <span className="text-muted-foreground">
+                              {Math.round(gap.competitorMin)}-{Math.round(gap.competitorMax)}{gap.unit}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Visual bar comparison */}
+                      {gap.status !== 'unique' && gap.status !== 'missing' && (
+                        <div className="mt-2 pt-2 border-t border-border/50">
+                          <div className="flex items-center gap-1">
+                            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                              <div 
+                                className={`h-full rounded-full ${
+                                  gap.status === 'leading' ? 'bg-chart-4' :
+                                  gap.status === 'trailing' ? 'bg-chart-1' :
+                                  'bg-muted-foreground'
+                                }`}
+                                style={{ 
+                                  width: `${Math.min(100, Math.max(10, (gap.ourValue / Math.max(gap.ourValue, gap.competitorMax)) * 100))}%` 
+                                }}
+                              />
+                            </div>
+                            <span className="text-[9px] text-muted-foreground w-8 text-right">Ours</span>
+                          </div>
+                          <div className="flex items-center gap-1 mt-1">
+                            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-muted-foreground/50 rounded-full"
+                                style={{ 
+                                  width: `${Math.min(100, Math.max(10, (gap.competitorAvg / Math.max(gap.ourValue, gap.competitorMax)) * 100))}%` 
+                                }}
+                              />
+                            </div>
+                            <span className="text-[9px] text-muted-foreground w-8 text-right">Avg</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {gapAnalysis.length > 9 && (
+                  <p className="text-[10px] text-muted-foreground text-center mt-2">
+                    +{gapAnalysis.length - 9} more nutrients analyzed
+                  </p>
+                )}
               </div>
             )}
           </CardContent>

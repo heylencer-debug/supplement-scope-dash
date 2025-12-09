@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Star, TrendingUp, Pill, Target, MessageSquare, Package, Users, Megaphone, AlertTriangle, CheckCircle, XCircle, Palette, Search, Filter, X, Trophy, ThumbsUp, ThumbsDown, Check } from "lucide-react";
+import { Star, TrendingUp, Pill, Target, MessageSquare, Package, Users, Megaphone, AlertTriangle, CheckCircle, XCircle, Palette, Search, Filter, X, Trophy, ThumbsUp, ThumbsDown, Check, FlaskConical, Scale, Award, Beaker } from "lucide-react";
 import { useProducts, Product } from "@/hooks/useProducts";
 import ProductDetailModal from "@/components/ProductDetailModal";
 import { useToast } from "@/hooks/use-toast";
@@ -504,6 +504,101 @@ export function EnhancedBenchmarkComparison({
     setSelectedIds([]);
   };
 
+  // === FORMULATION DETAILS HELPERS ===
+  
+  // Get Our Concept formulation specs
+  const getOurFormulationSpecs = () => {
+    const formulation = analysisData?.analysis_1_category_scores?.product_development?.formulation as Record<string, unknown> | undefined;
+    return {
+      servingsPerContainer: (formulation?.servings_per_container as number | null) || null,
+      servingSize: (formulation?.serving_size as string | null) || null,
+      packagingType: (formulation?.form_factor as string | null) || null,
+    };
+  };
+
+  // Get competitor formulation specs
+  const getCompetitorFormulationSpecs = (product: Product) => {
+    const supplementFacts = product.supplement_facts_complete as Record<string, unknown> | null;
+    return {
+      servingsPerContainer: product.servings_per_container || (supplementFacts?.servings_per_container as number | null) || null,
+      servingSize: product.serving_size || (supplementFacts?.serving_size as string | null) || null,
+      packagingType: product.packaging_type || null,
+    };
+  };
+
+  // Get competitor nutrients from all_nutrients or supplement_facts_complete
+  const getCompetitorNutrients = (product: Product): Array<{ name: string; amount: number | null; unit: string; dailyValue?: string | number }> => {
+    // Try all_nutrients first (preferred - normalized data)
+    const allNutrients = product.all_nutrients as Array<{ name: string; amount: number | null; unit: string; daily_value_percent?: string | number }> | null;
+    if (allNutrients && allNutrients.length > 0) {
+      return allNutrients.slice(0, 8).map(n => ({
+        name: n.name,
+        amount: n.amount,
+        unit: n.unit,
+        dailyValue: n.daily_value_percent
+      }));
+    }
+    
+    // Fallback to supplement_facts_complete.all_nutrients
+    const supplementFacts = product.supplement_facts_complete as Record<string, unknown> | null;
+    const sfNutrients = supplementFacts?.all_nutrients as Array<{ name: string; amount: number | null; unit: string; daily_value_percent?: string | number }> | undefined;
+    if (sfNutrients && sfNutrients.length > 0) {
+      return sfNutrients.slice(0, 8).map(n => ({
+        name: n.name,
+        amount: n.amount,
+        unit: n.unit,
+        dailyValue: n.daily_value_percent
+      }));
+    }
+    
+    return [];
+  };
+
+  // Get competitor claims/certifications
+  const getCompetitorClaims = (product: Product): string[] => {
+    // Try claims_on_label first
+    if (product.claims_on_label && Array.isArray(product.claims_on_label)) {
+      return product.claims_on_label.slice(0, 6);
+    }
+    
+    // Fallback to supplement_facts_complete.claims_on_label
+    const supplementFacts = product.supplement_facts_complete as Record<string, unknown> | null;
+    const sfClaims = supplementFacts?.claims_on_label as string[] | undefined;
+    if (sfClaims && sfClaims.length > 0) {
+      return sfClaims.slice(0, 6);
+    }
+    
+    // Try parsing from claims field
+    if (product.claims && typeof product.claims === 'string') {
+      return product.claims.split(/[,;]/).map(c => c.trim()).filter(Boolean).slice(0, 6);
+    }
+    
+    return [];
+  };
+
+  // Get Our Concept recommended ingredients with dosages from analysis
+  const getOurRecommendedDosages = (): Array<{ ingredient: string; dosage?: string; rationale?: string }> => {
+    const ingredients = analysisData?.analysis_1_category_scores?.product_development?.formulation?.recommended_ingredients;
+    if (!ingredients || !Array.isArray(ingredients)) return [];
+    
+    return ingredients.slice(0, 8).map(ing => {
+      if (typeof ing === 'string') {
+        // Parse dosage from string like "Magnesium Glycinate 400mg"
+        const match = ing.match(/^(.+?)\s*(\d+\s*(?:mg|mcg|iu|g|ml))?$/i);
+        return {
+          ingredient: match ? match[1].trim() : ing,
+          dosage: match?.[2] || undefined
+        };
+      }
+      const ingObj = ing as Record<string, unknown>;
+      return {
+        ingredient: (ingObj.ingredient as string) || (ingObj.name as string) || 'Unknown',
+        dosage: (ingObj.dosage as string) || (ingObj.amount as string) || undefined,
+        rationale: (ingObj.rationale as string) || undefined
+      };
+    });
+  };
+
   return (
     <>
       <Card>
@@ -665,6 +760,57 @@ export function EnhancedBenchmarkComparison({
                       );
                     })}
                   </div>
+                </div>
+
+                {/* FORMULATION DETAILS SECTION */}
+                <div className="bg-primary/5 dark:bg-primary/10 rounded-lg p-2 border border-primary/20 space-y-2">
+                  <p className="text-[10px] font-semibold flex items-center gap-1 text-primary">
+                    <FlaskConical className="w-3 h-3" />
+                    Formulation Details
+                  </p>
+                  
+                  {/* Specs Grid */}
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {(() => {
+                      const specs = getOurFormulationSpecs();
+                      return (
+                        <>
+                          <div className="bg-background/60 rounded p-1.5">
+                            <p className="text-[9px] text-muted-foreground">Servings</p>
+                            <p className="text-[10px] font-medium">{specs.servingsPerContainer || '—'}</p>
+                          </div>
+                          <div className="bg-background/60 rounded p-1.5">
+                            <p className="text-[9px] text-muted-foreground">Serving Size</p>
+                            <p className="text-[10px] font-medium">{specs.servingSize || '—'}</p>
+                          </div>
+                          <div className="bg-background/60 rounded p-1.5 col-span-2">
+                            <p className="text-[9px] text-muted-foreground">Form</p>
+                            <p className="text-[10px] font-medium">{specs.packagingType || getOurFormFactor()}</p>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Recommended Dosages */}
+                  {getOurRecommendedDosages().length > 0 && (
+                    <div>
+                      <p className="text-[9px] font-medium text-muted-foreground mb-1 flex items-center gap-1">
+                        <Beaker className="w-2.5 h-2.5" />
+                        Recommended Dosages
+                      </p>
+                      <div className="space-y-0.5 max-h-20 overflow-y-auto">
+                        {getOurRecommendedDosages().map((item, i) => (
+                          <div key={i} className="flex items-center justify-between text-[10px] gap-1">
+                            <span className="text-muted-foreground truncate flex-1">{item.ingredient}</span>
+                            {item.dosage && (
+                              <Badge variant="secondary" className="text-[9px] h-4 shrink-0">{item.dosage}</Badge>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Flavors & Form Factor */}
@@ -859,6 +1005,98 @@ export function EnhancedBenchmarkComparison({
                             });
                           })()}
                         </div>
+                      </div>
+
+                      {/* FORMULATION DETAILS SECTION */}
+                      <div className="bg-primary/5 dark:bg-primary/10 rounded-lg p-2 border border-primary/20 space-y-2">
+                        <p className="text-[10px] font-semibold flex items-center gap-1 text-primary">
+                          <FlaskConical className="w-3 h-3" />
+                          Formulation Details
+                        </p>
+                        
+                        {/* Specs Grid */}
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {(() => {
+                            const specs = getCompetitorFormulationSpecs(product);
+                            return (
+                              <>
+                                <div className="bg-background/60 rounded p-1.5">
+                                  <p className="text-[9px] text-muted-foreground">Servings</p>
+                                  <p className="text-[10px] font-medium">{specs.servingsPerContainer || '—'}</p>
+                                </div>
+                                <div className="bg-background/60 rounded p-1.5">
+                                  <p className="text-[9px] text-muted-foreground">Serving Size</p>
+                                  <p className="text-[10px] font-medium">{specs.servingSize || '—'}</p>
+                                </div>
+                                <div className="bg-background/60 rounded p-1.5 col-span-2">
+                                  <p className="text-[9px] text-muted-foreground">Form</p>
+                                  <p className="text-[10px] font-medium">{specs.packagingType || '—'}</p>
+                                </div>
+                              </>
+                            );
+                          })()}
+                        </div>
+
+                        {/* Nutrient Dosages */}
+                        {(() => {
+                          const nutrients = getCompetitorNutrients(product);
+                          if (nutrients.length === 0) {
+                            return (
+                              <div className="text-[10px] text-muted-foreground">
+                                <span className="inline-flex items-center gap-1">
+                                  <span className="w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse" />
+                                  <span className="w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse [animation-delay:150ms]" />
+                                  <span className="w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse [animation-delay:300ms]" />
+                                  <span className="ml-1">Awaiting label scan</span>
+                                </span>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div>
+                              <p className="text-[9px] font-medium text-muted-foreground mb-1 flex items-center gap-1">
+                                <Beaker className="w-2.5 h-2.5" />
+                                Key Nutrients
+                              </p>
+                              <div className="space-y-0.5 max-h-24 overflow-y-auto">
+                                {nutrients.map((n, i) => (
+                                  <div key={i} className="flex items-center justify-between text-[10px] gap-1">
+                                    <span className="text-muted-foreground truncate flex-1">{n.name}</span>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      <Badge variant="secondary" className="text-[9px] h-4">
+                                        {n.amount !== null ? `${n.amount}${n.unit}` : '—'}
+                                      </Badge>
+                                      {n.dailyValue && (
+                                        <span className="text-[9px] text-muted-foreground">({n.dailyValue}% DV)</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })()}
+
+                        {/* Claims/Certifications */}
+                        {(() => {
+                          const claims = getCompetitorClaims(product);
+                          if (claims.length === 0) return null;
+                          return (
+                            <div>
+                              <p className="text-[9px] font-medium text-muted-foreground mb-1 flex items-center gap-1">
+                                <Award className="w-2.5 h-2.5" />
+                                Claims
+                              </p>
+                              <div className="flex flex-wrap gap-1">
+                                {claims.map((claim, i) => (
+                                  <Badge key={i} variant="outline" className="text-[9px] h-4 font-normal">
+                                    {claim}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
 
                       {/* Flavors & Variants */}

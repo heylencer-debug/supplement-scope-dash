@@ -119,32 +119,22 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
         }
       });
 
-      // Add other ingredients (from ingredients text field - no amounts)
+      // Add other ingredients (from ingredients + other_ingredients text fields - no amounts)
       const ingredientsList = getCompetitorIngredientsList(product);
       ingredientsList.forEach(ing => {
         // Clean up the ingredient name - remove dosages like "170 mg" but keep the rest
         const cleanedIng = ing.replace(/\d+(\.\d+)?\s*(mg|mcg|iu|g|ml|μg)\b/gi, '').trim();
-        if (!cleanedIng || cleanedIng.length < 3) return; // Skip empty or too short entries
+        if (!cleanedIng || cleanedIng.length < 2) return; // Skip empty or too short entries
         
         const normalizedIng = cleanedIng.toLowerCase().trim();
         
-        // Skip if this looks like a nutrient that would already be in all_nutrients
-        // (nutrients usually have dosages, ingredients usually don't after cleaning)
+        // STRICT matching - only exact matches (after normalization)
+        // This prevents merging distinct ingredients like "Black Carrot" with "Carrot"
+        const exactKey = Array.from(ingredientMap.keys()).find(key => key === normalizedIng);
         
-        // Check if already exists - use stricter matching for non-nutrient ingredients
-        let matchedKey: string | null = null;
-        for (const [key] of ingredientMap) {
-          // Only match if names are nearly identical (not just partial word match)
-          if (normalizedIng === key || 
-              normalizedIng.replace(/[^a-z]/g, '') === key.replace(/[^a-z]/g, '')) {
-            matchedKey = key;
-            break;
-          }
-        }
-
-        if (matchedKey) {
+        if (exactKey) {
           // Add as competitor with no amount if not already there
-          const existing = ingredientMap.get(matchedKey)!;
+          const existing = ingredientMap.get(exactKey)!;
           const alreadyHas = existing.competitors.some(c => c.brand === (product.brand || 'Unknown'));
           if (!alreadyHas) {
             existing.competitors.push({
@@ -153,7 +143,7 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
             });
           }
         } else {
-          // Add as new unique ingredient
+          // Add as new unique ingredient - no fuzzy matching
           ingredientMap.set(normalizedIng, {
             ourDosage: null,
             isNutrient: false,
@@ -1141,31 +1131,42 @@ export function EnhancedBenchmarkComparison({
     return [];
   };
 
-  // Get ALL competitor ingredients (from ingredients text field) - parsed list
+  // Get ALL competitor ingredients (from BOTH ingredients AND other_ingredients fields) - COMBINED list
   const getCompetitorIngredientsList = (product: Product): string[] => {
-    // Primary: product.ingredients - parse and show ALL
+    const allIngredients: string[] = [];
+    const seen = new Set<string>();
+    
+    const addIngredients = (text: string) => {
+      const parts = text.split(/[,;]/).map(i => i.trim()).filter(Boolean);
+      parts.forEach(part => {
+        const normalized = part.toLowerCase();
+        if (!seen.has(normalized)) {
+          seen.add(normalized);
+          allIngredients.push(part);
+        }
+      });
+    };
+    
+    // Add from ingredients field
     if (product.ingredients) {
-      const parts = product.ingredients.split(/[,;]/).map(i => i.trim()).filter(Boolean);
-      if (parts.length > 0) return parts;
+      addIngredients(product.ingredients);
     }
     
-    // Fallback: other_ingredients field
+    // Also add from other_ingredients field (combine, not fallback)
     if (product.other_ingredients) {
-      const parts = product.other_ingredients.split(/[,;]/).map(i => i.trim()).filter(Boolean);
-      if (parts.length > 0) return parts;
+      addIngredients(product.other_ingredients);
     }
     
-    // Fallback: specifications.Ingredients
+    // Also add from specifications.Ingredients if available
     const specs = product.specifications as Record<string, unknown> | null;
     if (specs) {
       const ingredientsSpec = specs.Ingredients || specs.ingredients || specs.Material || specs.material;
       if (ingredientsSpec && typeof ingredientsSpec === 'string') {
-        const parts = ingredientsSpec.split(/[,;]/).map(i => i.trim()).filter(Boolean);
-        if (parts.length > 0) return parts;
+        addIngredients(ingredientsSpec);
       }
     }
     
-    return [];
+    return allIngredients;
   };
 
   // Get competitor claims/certifications

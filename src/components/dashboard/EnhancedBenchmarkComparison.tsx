@@ -122,13 +122,21 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
       // Add other ingredients (from ingredients text field - no amounts)
       const ingredientsList = getCompetitorIngredientsList(product);
       ingredientsList.forEach(ing => {
-        const normalizedIng = ing.toLowerCase().trim();
+        // Clean up the ingredient name - remove dosages like "170 mg" but keep the rest
+        const cleanedIng = ing.replace(/\d+(\.\d+)?\s*(mg|mcg|iu|g|ml|μg)\b/gi, '').trim();
+        if (!cleanedIng || cleanedIng.length < 3) return; // Skip empty or too short entries
         
-        // Check if already exists
+        const normalizedIng = cleanedIng.toLowerCase().trim();
+        
+        // Skip if this looks like a nutrient that would already be in all_nutrients
+        // (nutrients usually have dosages, ingredients usually don't after cleaning)
+        
+        // Check if already exists - use stricter matching for non-nutrient ingredients
         let matchedKey: string | null = null;
         for (const [key] of ingredientMap) {
-          if (normalizedIng.includes(key) || key.includes(normalizedIng) ||
-              normalizedIng.split(' ').some(word => key.includes(word) && word.length > 4)) {
+          // Only match if names are nearly identical (not just partial word match)
+          if (normalizedIng === key || 
+              normalizedIng.replace(/[^a-z]/g, '') === key.replace(/[^a-z]/g, '')) {
             matchedKey = key;
             break;
           }
@@ -145,6 +153,7 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
             });
           }
         } else {
+          // Add as new unique ingredient
           ingredientMap.set(normalizedIng, {
             ourDosage: null,
             isNutrient: false,

@@ -15,6 +15,12 @@ interface ProductData {
   packaging_type?: string | null;
   servings_per_container?: number | null;
   price?: number | null;
+  brand?: string | null;
+  title?: string | null;
+  main_image_url?: string | null;
+  claims?: string | null;
+  claims_on_label?: string[] | null;
+  monthly_revenue?: number | null;
   marketing_analysis?: {
     design_blueprint?: {
       trust_signals?: string;
@@ -491,6 +497,107 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
             </div>
           </div>
         )}
+
+        {/* Competitor Packaging Audit */}
+        {productsData && productsData.length > 0 && (() => {
+          // Get top 5 competitors by revenue
+          const topCompetitors = [...productsData]
+            .filter(p => p.brand && (p.marketing_analysis?.design_blueprint?.trust_signals || p.claims || p.claims_on_label))
+            .sort((a, b) => (b.monthly_revenue || 0) - (a.monthly_revenue || 0))
+            .slice(0, 5);
+          
+          if (topCompetitors.length === 0) return null;
+
+          return (
+            <div>
+              <h4 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
+                <Award className="w-4 h-4 text-chart-5" />
+                Competitor Packaging Audit
+              </h4>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="text-left py-2 px-2 font-medium text-muted-foreground">Brand</th>
+                      <th className="text-left py-2 px-2 font-medium text-muted-foreground">Trust Signals</th>
+                      <th className="text-left py-2 px-2 font-medium text-muted-foreground">Key Claims</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {topCompetitors.map((product, idx) => {
+                      // Parse trust signals
+                      const trustSignalsRaw = product.marketing_analysis?.design_blueprint?.trust_signals || "";
+                      const trustSignalsList = trustSignalsRaw
+                        .split(/[,;]/)
+                        .map(s => s.trim())
+                        .filter(s => s.length > 2)
+                        .slice(0, 3);
+                      
+                      // Parse claims (from claims_on_label or claims field)
+                      const claimsList = product.claims_on_label?.slice(0, 3) || 
+                        (product.claims?.split(/[,;]/).map(c => c.trim()).filter(Boolean).slice(0, 3)) || 
+                        [];
+
+                      return (
+                        <tr key={idx} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                          <td className="py-3 px-2">
+                            <div className="flex items-center gap-2">
+                              {product.main_image_url && (
+                                <img 
+                                  src={product.main_image_url} 
+                                  alt={product.brand || ""} 
+                                  className="w-8 h-8 rounded object-cover border border-border/50"
+                                />
+                              )}
+                              <div className="min-w-0">
+                                <p className="font-medium text-foreground truncate max-w-[120px]">
+                                  {product.brand || "Unknown"}
+                                </p>
+                                {product.price && (
+                                  <p className="text-xs text-muted-foreground">${product.price.toFixed(2)}</p>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-3 px-2">
+                            <div className="flex flex-wrap gap-1">
+                              {trustSignalsList.length > 0 ? trustSignalsList.map((signal, sIdx) => (
+                                <Badge 
+                                  key={sIdx} 
+                                  variant="outline" 
+                                  className="text-[10px] py-0.5 px-1.5 bg-chart-1/5 border-chart-1/20 text-chart-1"
+                                >
+                                  {signal.length > 20 ? signal.substring(0, 20) + "..." : signal}
+                                </Badge>
+                              )) : (
+                                <span className="text-xs text-muted-foreground">—</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-3 px-2">
+                            <div className="flex flex-wrap gap-1">
+                              {claimsList.length > 0 ? claimsList.map((claim, cIdx) => (
+                                <Badge 
+                                  key={cIdx} 
+                                  variant="secondary" 
+                                  className="text-[10px] py-0.5 px-1.5"
+                                >
+                                  {claim.length > 20 ? claim.substring(0, 20) + "..." : claim}
+                                </Badge>
+                              )) : (
+                                <span className="text-xs text-muted-foreground">—</span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        })()}
       </CardContent>
     </Card>
   );

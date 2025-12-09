@@ -546,6 +546,12 @@ export default function Dashboard() {
             packaging_type: p.packaging_type,
             servings_per_container: p.servings_per_container,
             price: p.price,
+            brand: p.brand,
+            title: p.title,
+            main_image_url: p.main_image_url,
+            claims: p.claims,
+            claims_on_label: p.claims_on_label,
+            monthly_revenue: p.monthly_revenue,
             marketing_analysis: p.marketing_analysis as {
               design_blueprint?: {
                 trust_signals?: string;

@@ -1589,16 +1589,21 @@ export function EnhancedBenchmarkComparison({
                         (designBlueprint?.color_strategy as string) ||
                         null;
     
-    // Trust Signals
+    // Trust Signals - handle both array and comma-separated string formats
     let trustSignals: string[] = [];
-    if (sourceData?.trust_signals && Array.isArray(sourceData.trust_signals)) {
-      trustSignals = sourceData.trust_signals as string[];
+    const rawTrustSignals = sourceData?.trust_signals;
+    if (Array.isArray(rawTrustSignals)) {
+      trustSignals = rawTrustSignals as string[];
+    } else if (typeof rawTrustSignals === 'string' && rawTrustSignals.trim()) {
+      trustSignals = rawTrustSignals.split(',').map(s => s.trim()).filter(Boolean);
     }
     
-    // Conversion Triggers
-    const conversionTriggers = (sourceData?.conversion_triggers as string) || 
-                               (designBlueprint?.differentiation_factor as string) ||
-                               null;
+    // Conversion Triggers - handle comma-separated string format
+    let conversionTriggers: string | null = null;
+    const rawConversionTriggers = sourceData?.conversion_triggers || designBlueprint?.differentiation_factor;
+    if (typeof rawConversionTriggers === 'string' && rawConversionTriggers.trim()) {
+      conversionTriggers = rawConversionTriggers;
+    }
     
     // Claims
     const claims = getCompetitorClaims(product);

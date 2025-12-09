@@ -8,7 +8,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { 
   Star, TrendingUp, TrendingDown, AlertCircle, CheckCircle, Target, Users, Beaker, 
   Lightbulb, ShoppingCart, Package, Image, BarChart3, DollarSign, Calendar, 
-  ExternalLink, Play, Award, Info, ChevronDown, Truck, FileText, Box, Link2, Tag
+  ExternalLink, Play, Award, Info, ChevronDown, Truck, FileText, Box, Link2, Tag,
+  Palette, Type, LayoutGrid, Sparkles
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis } from "recharts";
 import type { Product } from "@/hooks/useProducts";
@@ -989,16 +990,36 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
               {(() => {
                 // Primary source: packaging_intelligence from marketing_analysis
                 const packagingIntel = (marketingAnalysis as Record<string, unknown> | null)?.packaging_intelligence as Record<string, unknown> | null;
-                // Fallback: design_blueprint
+                // Fallback: design_blueprint (actual data source from n8n)
                 const designBlueprint = (marketingAnalysis as Record<string, unknown> | null)?.design_blueprint as Record<string, unknown> | null;
                 
-                const visualStyle = (packagingIntel?.visual_style as string) || (designBlueprint?.visual_style as string) || (designBlueprint?.color_strategy as string);
-                const visualHierarchy = (packagingIntel?.visual_hierarchy as string) || (designBlueprint?.visual_hierarchy as string) || (designBlueprint?.layout_structure as string);
-                const trustSignals = (packagingIntel?.trust_signals as string[]) || (designBlueprint?.trust_signals as string[]) || [];
-                const frontOfPackClaims = (packagingIntel?.front_of_pack_claims as string[]) || [];
-                const conversionTriggers = (packagingIntel?.conversion_triggers as string) || (designBlueprint?.conversion_triggers as string) || (designBlueprint?.differentiation_factor as string);
+                const visualStyle = (packagingIntel?.design_style as string) || (designBlueprint?.visual_style as string);
+                const visualHierarchy = (packagingIntel?.visual_hierarchy as string) || (designBlueprint?.visual_hierarchy as string);
+                const colorStrategy = designBlueprint?.color_strategy as string;
+                const typographyStyle = designBlueprint?.typography_style as string;
+                const layoutStructure = designBlueprint?.layout_structure as string;
+                const differentiationFactor = designBlueprint?.differentiation_factor as string;
                 
-                const hasData = visualStyle || visualHierarchy || trustSignals.length > 0 || conversionTriggers || 
+                // Parse trust_signals - handle both array and comma-separated string formats
+                let trustSignals: string[] = [];
+                const rawTrustSignals = packagingIntel?.trust_signals || designBlueprint?.trust_signals;
+                if (Array.isArray(rawTrustSignals)) {
+                  trustSignals = rawTrustSignals;
+                } else if (typeof rawTrustSignals === 'string' && rawTrustSignals.trim()) {
+                  trustSignals = rawTrustSignals.split(',').map(s => s.trim()).filter(Boolean);
+                }
+                
+                // Parse conversion_triggers - handle both string and comma-separated formats
+                let conversionTriggersList: string[] = [];
+                const rawConversionTriggers = packagingIntel?.conversion_triggers || designBlueprint?.conversion_triggers;
+                if (typeof rawConversionTriggers === 'string' && rawConversionTriggers.trim()) {
+                  conversionTriggersList = rawConversionTriggers.split(',').map(s => s.trim()).filter(Boolean);
+                }
+                
+                const frontOfPackClaims = (packagingIntel?.front_of_pack_claims as string[]) || [];
+                
+                const hasData = visualStyle || visualHierarchy || trustSignals.length > 0 || conversionTriggersList.length > 0 || 
+                               colorStrategy || typographyStyle || layoutStructure || differentiationFactor ||
                                frontOfPackClaims.length > 0 || product.claims || (product.claims_on_label && product.claims_on_label.length > 0);
                 
                 if (!hasData) {
@@ -1102,8 +1123,53 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                       </Card>
                     )}
                     
+                    {/* Color Strategy */}
+                    {colorStrategy && colorStrategy !== "N/A" && (
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-medium flex items-center gap-2">
+                            <Palette className="w-4 h-4 text-chart-1" />
+                            Color Strategy
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-sm text-foreground">{colorStrategy}</p>
+                        </CardContent>
+                      </Card>
+                    )}
+                    
+                    {/* Typography Style */}
+                    {typographyStyle && typographyStyle !== "N/A" && (
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-medium flex items-center gap-2">
+                            <Type className="w-4 h-4 text-chart-2" />
+                            Typography Style
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-sm text-foreground">{typographyStyle}</p>
+                        </CardContent>
+                      </Card>
+                    )}
+                    
+                    {/* Layout Structure */}
+                    {layoutStructure && layoutStructure !== "N/A" && (
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-medium flex items-center gap-2">
+                            <LayoutGrid className="w-4 h-4 text-chart-3" />
+                            Layout Structure
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-sm text-foreground">{layoutStructure}</p>
+                        </CardContent>
+                      </Card>
+                    )}
+                    
                     {/* Conversion Triggers */}
-                    {conversionTriggers && conversionTriggers !== "N/A" && (
+                    {conversionTriggersList.length > 0 && (
                       <Card className="border-primary/30 bg-primary/5">
                         <CardHeader className="pb-2">
                           <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -1113,7 +1179,29 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                           <p className="text-xs text-muted-foreground">Why this packaging converts</p>
                         </CardHeader>
                         <CardContent>
-                          <p className="text-sm text-foreground">{conversionTriggers}</p>
+                          <div className="flex flex-wrap gap-2">
+                            {conversionTriggersList.map((trigger, idx) => (
+                              <Badge key={idx} variant="secondary" className="text-xs">
+                                {trigger}
+                              </Badge>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                    
+                    {/* Differentiation Factor */}
+                    {differentiationFactor && differentiationFactor !== "N/A" && (
+                      <Card className="border-chart-4/30 bg-chart-4/5">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-medium flex items-center gap-2">
+                            <Sparkles className="w-4 h-4 text-chart-4" />
+                            Differentiation Factor
+                          </CardTitle>
+                          <p className="text-xs text-muted-foreground">Unique shelf positioning</p>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-sm text-foreground">{differentiationFactor}</p>
                         </CardContent>
                       </Card>
                     )}

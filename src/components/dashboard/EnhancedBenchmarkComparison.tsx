@@ -1071,19 +1071,33 @@ export function EnhancedBenchmarkComparison({
     return [];
   };
 
-  // Get Our Concept recommended ingredients with dosages from analysis
+  // Get Our Concept recommended ingredients with dosages from analysis - NO LIMIT (show all)
   const getOurRecommendedDosages = (): Array<{ ingredient: string; dosage?: string; rationale?: string }> => {
     const ingredients = analysisData?.analysis_1_category_scores?.product_development?.formulation?.recommended_ingredients;
     if (!ingredients || !Array.isArray(ingredients)) return [];
     
-    return ingredients.slice(0, 8).map(ing => {
+    return ingredients.map(ing => {
       if (typeof ing === 'string') {
-        // Parse dosage from string like "Magnesium Glycinate 400mg"
-        const match = ing.match(/^(.+?)\s*(\d+\s*(?:mg|mcg|iu|g|ml))?$/i);
-        return {
-          ingredient: match ? match[1].trim() : ing,
-          dosage: match?.[2] || undefined
-        };
+        // Improved regex to parse dosage from string like "Apple Cider Vinegar Powder 500mg" or "Vitamin B12 1.2mcg"
+        // Match pattern: ingredient name followed by optional number+unit at the end
+        const match = ing.match(/^(.+?)\s+(\d+(?:\.\d+)?\s*(?:mg|mcg|iu|g|ml|μg)(?:\s+.*?)?)$/i);
+        if (match) {
+          return {
+            ingredient: match[1].trim(),
+            dosage: match[2].trim()
+          };
+        }
+        // Try alternate pattern for "ingredient amount unit reason" format
+        const altMatch = ing.match(/^(.+?)\s+(\d+(?:\.\d+)?)\s*(mg|mcg|iu|g|ml|μg)\b(.*)$/i);
+        if (altMatch) {
+          return {
+            ingredient: altMatch[1].trim(),
+            dosage: `${altMatch[2]}${altMatch[3]}`,
+            rationale: altMatch[4]?.trim() || undefined
+          };
+        }
+        // No dosage found, return as-is
+        return { ingredient: ing.trim() };
       }
       const ingObj = ing as Record<string, unknown>;
       return {

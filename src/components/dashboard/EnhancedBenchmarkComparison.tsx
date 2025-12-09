@@ -68,31 +68,6 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
   const [isOpen, setIsOpen] = useState(true);
   const [viewMode, setViewMode] = useState<'chart' | 'table' | 'gaps'>('chart');
 
-  // DEBUG: Log what we receive - EXTENSIVE
-  useEffect(() => {
-    console.log('=== [IngredientComparison] DEBUG START ===');
-    console.log('[IngredientComparison] competitors received:', competitors.length);
-    console.log('[IngredientComparison] ourDosages received:', ourDosages.length, ourDosages);
-    
-    if (competitors.length === 0) {
-      console.log('[IngredientComparison] NO COMPETITORS - table will be empty');
-      return;
-    }
-    
-    competitors.forEach((p, i) => {
-      console.log(`[IngredientComparison] Processing competitor ${i + 1}:`, p.brand);
-      console.log(`  - product.ingredients:`, p.ingredients?.substring(0, 100));
-      console.log(`  - product.other_ingredients:`, p.other_ingredients?.substring(0, 100));
-      
-      const ingList = getCompetitorIngredientsList(p);
-      const nutrients = getCompetitorNutrients(p);
-      
-      console.log(`  - Parsed ingredients count:`, ingList.length);
-      console.log(`  - Parsed nutrients count:`, nutrients.length);
-      console.log(`  - ALL parsed ingredients:`, ingList);
-    });
-    console.log('=== [IngredientComparison] DEBUG END ===');
-  }, [competitors, ourDosages, getCompetitorIngredientsList, getCompetitorNutrients]);
 
   // Build unified data combining nutrients (with amounts) AND other ingredients
   const comparisonData = useMemo(() => {
@@ -180,10 +155,8 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
       });
     });
 
-    console.log('[IngredientComparison] Total unique ingredients in map:', ingredientMap.size);
-
     // Convert to array and sort: ours first, then nutrients, then other ingredients
-    const result = Array.from(ingredientMap.entries())
+    return Array.from(ingredientMap.entries())
       .map(([key, data]) => ({
         name: data.displayName,
         ourDosage: data.ourDosage,
@@ -197,16 +170,16 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
         if (!a.isNutrient && b.isNutrient) return 1;
         return a.name.localeCompare(b.name);
       });
-
-    console.log('[IngredientComparison] Final comparisonData length:', result.length);
-    console.log('[IngredientComparison] Sample items:', result.slice(0, 10).map(r => r.name));
-    
-    return result;
   }, [ourDosages, competitors, getCompetitorNutrients, getCompetitorIngredientsList]);
 
-  // Filter to only nutrients with amounts for chart
+  // Separate nutrients and other ingredients for display
   const nutrientsOnly = useMemo(() => 
     comparisonData.filter(item => item.isNutrient && (item.ourDosage || item.competitors.some(c => c.amount))),
+    [comparisonData]
+  );
+
+  const otherIngredientsOnly = useMemo(() => 
+    comparisonData.filter(item => !item.isNutrient),
     [comparisonData]
   );
 
@@ -585,7 +558,7 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                   </div>
                 )}
 
-                <ScrollArea className="max-h-[400px]">
+                <ScrollArea className="max-h-[500px]">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -605,19 +578,29 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {comparisonData.map((ing, idx) => (
-                        <TableRow key={idx} className={idx % 2 === 0 ? 'bg-muted/30' : ''}>
+                      {/* Active Nutrients Section */}
+                      {nutrientsOnly.length > 0 && (
+                        <TableRow className="bg-primary/5">
+                          <TableCell colSpan={competitors.length + 2} className="py-2">
+                            <div className="flex items-center gap-2 text-xs font-semibold text-primary">
+                              <Beaker className="w-3.5 h-3.5" />
+                              Active Nutrients ({nutrientsOnly.length})
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      {nutrientsOnly.map((ing, idx) => (
+                        <TableRow key={`nutrient-${idx}`} className={idx % 2 === 0 ? 'bg-muted/30' : ''}>
                           <TableCell className="font-medium text-xs sticky left-0 bg-inherit z-10">
                             <div className="flex items-center gap-1">
                               {ing.ourDosage ? (
                                 <Check className="w-3 h-3 text-chart-4 shrink-0" />
                               ) : (
                                 <span className="w-3 h-3 flex items-center justify-center shrink-0">
-                                  <span className={`w-1 h-1 rounded-full ${ing.isNutrient ? 'bg-primary' : 'bg-muted-foreground'}`} />
+                                  <span className="w-1 h-1 rounded-full bg-primary" />
                                 </span>
                               )}
                               <span className="truncate" title={ing.name}>{ing.name}</span>
-                              {ing.isNutrient && <Beaker className="w-2.5 h-2.5 text-primary shrink-0" />}
                             </div>
                           </TableCell>
                           <TableCell>
@@ -643,6 +626,55 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                           })}
                         </TableRow>
                       ))}
+
+                      {/* Other Ingredients Section */}
+                      {otherIngredientsOnly.length > 0 && (
+                        <>
+                          <TableRow className="bg-muted/50">
+                            <TableCell colSpan={competitors.length + 2} className="py-2">
+                              <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+                                <FlaskConical className="w-3.5 h-3.5" />
+                                Other Ingredients ({otherIngredientsOnly.length})
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                          {otherIngredientsOnly.map((ing, idx) => (
+                            <TableRow key={`other-${idx}`} className={idx % 2 === 0 ? 'bg-muted/20' : ''}>
+                              <TableCell className="font-medium text-xs sticky left-0 bg-inherit z-10">
+                                <div className="flex items-center gap-1">
+                                  {ing.ourDosage ? (
+                                    <Check className="w-3 h-3 text-chart-4 shrink-0" />
+                                  ) : ing.competitors.length > 0 ? (
+                                    <Check className="w-3 h-3 text-muted-foreground shrink-0" />
+                                  ) : (
+                                    <span className="w-3 shrink-0" />
+                                  )}
+                                  <span className="truncate" title={ing.name}>{ing.name}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                {ing.ourDosage ? (
+                                  <Badge variant="secondary" className="text-[10px] bg-primary/10 text-primary">{ing.ourDosage}</Badge>
+                                ) : (
+                                  <span className="text-[10px] text-muted-foreground">—</span>
+                                )}
+                              </TableCell>
+                              {competitors.slice(0, 3).map((p) => {
+                                const compData = ing.competitors.find(c => c.brand === (p.brand || 'Unknown'));
+                                return (
+                                  <TableCell key={p.id}>
+                                    {compData ? (
+                                      <Check className="w-3 h-3 text-chart-4" />
+                                    ) : (
+                                      <span className="text-[10px] text-muted-foreground">—</span>
+                                    )}
+                                  </TableCell>
+                                );
+                              })}
+                            </TableRow>
+                          ))}
+                        </>
+                      )}
                     </TableBody>
                   </Table>
                 </ScrollArea>

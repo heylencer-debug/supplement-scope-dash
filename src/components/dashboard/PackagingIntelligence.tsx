@@ -21,6 +21,7 @@ interface ProductData {
   claims?: string | null;
   claims_on_label?: string[] | null;
   monthly_revenue?: number | null;
+  monthly_sales?: number | null;
   marketing_analysis?: {
     design_blueprint?: {
       trust_signals?: string;
@@ -503,7 +504,7 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
           // Get top 5 competitors by revenue
           const topCompetitors = [...productsData]
             .filter(p => p.brand && (p.marketing_analysis?.design_blueprint?.trust_signals || p.claims || p.claims_on_label))
-            .sort((a, b) => (b.monthly_revenue || 0) - (a.monthly_revenue || 0))
+            .sort((a, b) => (b.monthly_sales || 0) - (a.monthly_sales || 0))
             .slice(0, 5);
           
           if (topCompetitors.length === 0) return null;

@@ -552,6 +552,7 @@ export default function Dashboard() {
             claims: p.claims,
             claims_on_label: p.claims_on_label,
             monthly_revenue: p.monthly_revenue,
+            monthly_sales: p.monthly_sales,
             marketing_analysis: p.marketing_analysis as {
               design_blueprint?: {
                 trust_signals?: string;

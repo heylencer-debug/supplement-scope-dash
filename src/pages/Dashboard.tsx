@@ -19,6 +19,7 @@ import { RiskAnalysis } from "@/components/dashboard/RiskAnalysis";
 import { LaunchPlanSection } from "@/components/dashboard/LaunchPlanSection";
 import CustomerIntelligence from "@/components/dashboard/CustomerIntelligence";
 import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
+import { PackagingIntelligence } from "@/components/dashboard/PackagingIntelligence";
 
 import {
   ResponsiveContainer,
@@ -532,8 +533,21 @@ export default function Dashboard() {
         </ScrollAnimate>
       ) : null}
 
-      {/* SECTION 5: 18-Point Analysis */}
+      {/* SECTION 5: Packaging Intelligence */}
       <ScrollAnimate delay={150}>
+        <PackagingIntelligence
+          packagingData={(() => {
+            const analysis1 = analysis?.analysis_1_category_scores as Record<string, unknown> | null;
+            const productDev = analysis1?.product_development as Record<string, unknown> | null;
+            return productDev?.packaging as { type?: string; quantity?: string | number; design_elements?: string[] } | null;
+          })()}
+          productsClaims={products?.map(p => p.claims) || []}
+          isLoading={analysisLoading && !hasAnalysis}
+        />
+      </ScrollAnimate>
+
+      {/* SECTION 6: 18-Point Analysis */}
+      <ScrollAnimate delay={175}>
         <DeepDiveSection
         criteriaScores={dashboardData.criteriaScores}
         criteriaBreakdown={dashboardData.criteriaBreakdown}
@@ -544,24 +558,24 @@ export default function Dashboard() {
         />
       </ScrollAnimate>
 
-      {/* SECTION 5: Customer Intelligence */}
-      <ScrollAnimate delay={200}>
+      {/* SECTION 7: Customer Intelligence */}
+      <ScrollAnimate delay={225}>
         <CustomerIntelligence
         customerInsights={dashboardData.customerIntelligence}
         isLoading={analysisLoading && !hasAnalysis}
         />
       </ScrollAnimate>
 
-      {/* SECTION 6: Financial Projections */}
-      <ScrollAnimate delay={250}>
+      {/* SECTION 8: Financial Projections */}
+      <ScrollAnimate delay={275}>
         <FinancialProjections 
           financials={dashboardData.financials as Record<string, unknown> | null} 
           isLoading={analysisLoading && !hasAnalysis}
         />
       </ScrollAnimate>
 
-      {/* SECTION 7: Launch Strategy + Action Plan */}
-      <ScrollAnimate delay={300}>
+      {/* SECTION 9: Launch Strategy + Action Plan */}
+      <ScrollAnimate delay={325}>
         <LaunchPlanSection
         goToMarket={dashboardData.goToMarket as {
           positioning?: string;
@@ -578,8 +592,8 @@ export default function Dashboard() {
         />
       </ScrollAnimate>
 
-      {/* SECTION 8: Risk Analysis */}
-      <ScrollAnimate delay={350}>
+      {/* SECTION 10: Risk Analysis */}
+      <ScrollAnimate delay={375}>
         <RiskAnalysis 
           risks={dashboardData.risks as Record<string, unknown> | null} 
           isLoading={analysisLoading && !hasAnalysis}

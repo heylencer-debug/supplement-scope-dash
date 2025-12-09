@@ -1959,6 +1959,22 @@ export function EnhancedBenchmarkComparison({
       </Card>
 
       {/* UNIFIED INGREDIENT & DOSAGE COMPARISON */}
+      {/* DEBUG: Log what we're passing */}
+      {(() => {
+        console.log('=== [EnhancedBenchmarkComparison] Passing to IngredientComparisonSection ===');
+        console.log('displayedProducts count:', displayedProducts.length);
+        displayedProducts.forEach((p, i) => {
+          console.log(`Product ${i + 1} (${p.brand}):`, {
+            hasIngredients: !!p.ingredients,
+            ingredientsLength: p.ingredients?.length || 0,
+            hasOtherIngredients: !!p.other_ingredients,
+            otherIngredientsLength: p.other_ingredients?.length || 0,
+            ingredientsSample: p.ingredients?.substring(0, 100),
+            otherIngredientsSample: p.other_ingredients?.substring(0, 100)
+          });
+        });
+        return null;
+      })()}
       <IngredientComparisonSection 
         ourDosages={getOurRecommendedDosages()}
         competitors={displayedProducts}

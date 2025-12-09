@@ -997,9 +997,9 @@ export function EnhancedBenchmarkComparison({
   const [filterOpen, setFilterOpen] = useState(false);
   const { toast } = useToast();
   
-  // All products sorted by reviews for selection pool
+  // All products sorted by monthly sales for selection pool
   const allProductsSorted = useMemo(() => 
-    [...(products || [])].sort((a, b) => (b.reviews || 0) - (a.reviews || 0)),
+    [...(products || [])].sort((a, b) => (b.monthly_sales || 0) - (a.monthly_sales || 0)),
     [products]
   );
 

@@ -83,13 +83,55 @@ interface PackagingComparisonProps {
 function PackagingComparisonSection({ ourPackaging, competitors, getCompetitorPackaging }: PackagingComparisonProps) {
   const [isOpen, setIsOpen] = useState(true);
 
+  // Calculate packaging score for each competitor
+  const calculatePackagingScore = (packaging: {
+    visualStyle: string | null;
+    trustSignals: string[];
+    conversionTriggers: string | null;
+    claims: string[];
+  }): number => {
+    let score = 0;
+    
+    // Trust signals: up to 30 points (5 points each, max 6)
+    score += Math.min(packaging.trustSignals.length * 5, 30);
+    
+    // Claims: up to 30 points (3 points each, max 10)
+    score += Math.min(packaging.claims.length * 3, 30);
+    
+    // Visual style defined: 20 points
+    if (packaging.visualStyle && packaging.visualStyle !== 'N/A') {
+      score += 20;
+    }
+    
+    // Conversion triggers defined: 20 points
+    if (packaging.conversionTriggers && packaging.conversionTriggers !== 'N/A') {
+      score += 20;
+    }
+    
+    return Math.min(score, 100);
+  };
+
+  const getScoreColor = (score: number): string => {
+    if (score >= 70) return 'text-chart-4';
+    if (score >= 40) return 'text-chart-2';
+    return 'text-muted-foreground';
+  };
+
+  const getScoreBgColor = (score: number): string => {
+    if (score >= 70) return 'bg-chart-4/10 border-chart-4/30';
+    if (score >= 40) return 'bg-chart-2/10 border-chart-2/30';
+    return 'bg-muted/50 border-muted';
+  };
+
   // Aggregate all claims and trust signals across competitors
   const aggregatedData = useMemo(() => {
     const claimCounts = new Map<string, number>();
     const trustSignalCounts = new Map<string, number>();
+    const scores: number[] = [];
     
     competitors.forEach(product => {
       const packaging = getCompetitorPackaging(product);
+      scores.push(calculatePackagingScore(packaging));
       
       // Count claims
       packaging.claims.forEach(claim => {
@@ -118,7 +160,9 @@ function PackagingComparisonSection({ ourPackaging, competitors, getCompetitorPa
       .sort((a, b) => b[1] - a[1])
       .slice(0, 6);
 
-    return { topClaims, topTrustSignals };
+    const avgScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+
+    return { topClaims, topTrustSignals, avgScore };
   }, [competitors, getCompetitorPackaging]);
 
   if (competitors.length === 0) return null;
@@ -188,15 +232,17 @@ function PackagingComparisonSection({ ourPackaging, competitors, getCompetitorPa
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/50">
-                      <TableHead className="text-[10px] font-semibold w-[120px]">Brand</TableHead>
-                      <TableHead className="text-[10px] font-semibold">Visual Style</TableHead>
+                      <TableHead className="text-[10px] font-semibold w-[100px]">Brand</TableHead>
+                      <TableHead className="text-[10px] font-semibold w-[60px] text-center">Score</TableHead>
+                      <TableHead className="text-[10px] font-semibold hidden sm:table-cell">Visual Style</TableHead>
                       <TableHead className="text-[10px] font-semibold">Trust Signals</TableHead>
-                      <TableHead className="text-[10px] font-semibold hidden md:table-cell">Conversion Focus</TableHead>
+                      <TableHead className="text-[10px] font-semibold hidden lg:table-cell">Conversion Focus</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {competitors.map((product, idx) => {
                       const packaging = getCompetitorPackaging(product);
+                      const score = calculatePackagingScore(packaging);
                       return (
                         <TableRow key={product.id} className={idx % 2 === 0 ? 'bg-background' : 'bg-muted/20'}>
                           <TableCell className="py-2">
@@ -208,10 +254,15 @@ function PackagingComparisonSection({ ourPackaging, competitors, getCompetitorPa
                                   <Package className="w-4 h-4 text-muted-foreground/30" />
                                 </div>
                               )}
-                              <span className="text-[10px] font-medium truncate max-w-[80px]">{product.brand || 'Unknown'}</span>
+                              <span className="text-[10px] font-medium truncate max-w-[60px]">{product.brand || 'Unknown'}</span>
                             </div>
                           </TableCell>
-                          <TableCell className="py-2">
+                          <TableCell className="py-2 text-center">
+                            <div className={`inline-flex items-center justify-center w-10 h-10 rounded-full border ${getScoreBgColor(score)}`}>
+                              <span className={`text-sm font-bold ${getScoreColor(score)}`}>{score}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-2 hidden sm:table-cell">
                             <p className="text-[10px] text-muted-foreground line-clamp-2">
                               {packaging.visualStyle || <span className="text-muted-foreground/50">—</span>}
                             </p>
@@ -234,7 +285,7 @@ function PackagingComparisonSection({ ourPackaging, competitors, getCompetitorPa
                               )}
                             </div>
                           </TableCell>
-                          <TableCell className="py-2 hidden md:table-cell">
+                          <TableCell className="py-2 hidden lg:table-cell">
                             <p className="text-[10px] text-muted-foreground line-clamp-2">
                               {packaging.conversionTriggers || <span className="text-muted-foreground/50">—</span>}
                             </p>
@@ -244,6 +295,18 @@ function PackagingComparisonSection({ ourPackaging, competitors, getCompetitorPa
                     })}
                   </TableBody>
                 </Table>
+              </div>
+
+              {/* Average Score Banner */}
+              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border">
+                <div className="flex items-center gap-2">
+                  <Award className="w-4 h-4 text-primary" />
+                  <span className="text-xs font-medium text-foreground">Category Average Packaging Score</span>
+                </div>
+                <div className={`flex items-center gap-2 ${getScoreColor(aggregatedData.avgScore)}`}>
+                  <span className="text-lg font-bold">{aggregatedData.avgScore}</span>
+                  <span className="text-[10px] text-muted-foreground">/100</span>
+                </div>
               </div>
 
               {/* Aggregated Insights */}

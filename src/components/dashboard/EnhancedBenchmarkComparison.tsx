@@ -560,7 +560,7 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
 
                 <div className="max-h-[500px] overflow-auto rounded-md border">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-10 bg-card">
                       <TableRow>
                         <TableHead className="w-[180px] sticky left-0 bg-background z-10">Ingredient</TableHead>
                         <TableHead className="min-w-[100px]">

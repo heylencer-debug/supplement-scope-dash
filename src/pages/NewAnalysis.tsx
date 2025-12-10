@@ -44,15 +44,6 @@ const amazonCategoryOptions = [
   "Video Games",
 ];
 
-const demographicsOptions = [
-  { id: "men", label: "Men" },
-  { id: "women", label: "Women" },
-  { id: "adults", label: "Adults" },
-  { id: "kids", label: "Kids" },
-  { id: "seniors", label: "Seniors" },
-  { id: "dogs", label: "Dogs" },
-  { id: "cats", label: "Cats" },
-];
 
 const productFormOptions = [
   { id: "gummy", label: "Gummy" },
@@ -86,7 +77,6 @@ export default function NewAnalysis() {
   const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
   const [category, setCategory] = useState("");
-  const [demographics, setDemographics] = useState<string[]>([]);
   const [productForm, setProductForm] = useState("");
   const [amazonCategories, setAmazonCategories] = useState<string[]>([]);
 
@@ -108,13 +98,6 @@ export default function NewAnalysis() {
     }
   };
 
-  const handleDemographicsToggle = (demo: string, checked: boolean) => {
-    if (checked) {
-      setDemographics((prev) => [...prev, demo]);
-    } else {
-      setDemographics((prev) => prev.filter((d) => d !== demo));
-    }
-  };
 
   const handleAnalysis = async () => {
     if (!category.trim()) {
@@ -138,19 +121,14 @@ export default function NewAnalysis() {
 
     setIsLoading(true);
 
-    // Build combined category name: "Magnesium Glycinate Gummy for Women" or "Magnesium Glycinate Gummy"
-    let fullCategoryName = category.trim();
-    fullCategoryName = `${fullCategoryName} ${productForm}`;
-    if (demographics.length > 0) {
-      const demoString = demographics.join(' & ');
-      fullCategoryName = `${fullCategoryName} for ${demoString}`;
-    }
-
     const payload = {
-      category: fullCategoryName,
+      category: category.trim(),
       product_form: productForm,
       amazon_categories: amazonCategories.length > 0 ? amazonCategories : null,
     };
+
+    // For display/navigation purposes
+    const displayCategoryName = `${category.trim()} ${productForm}`;
 
     try {
       const response = await fetch(WEBHOOK_URL, {
@@ -168,7 +146,7 @@ export default function NewAnalysis() {
       // Add to pending analyses in localStorage
       const pending = JSON.parse(localStorage.getItem(PENDING_ANALYSES_KEY) || '[]');
       pending.push({ 
-        categoryName: fullCategoryName, 
+        categoryName: displayCategoryName, 
         startedAt: new Date().toISOString() 
       });
       localStorage.setItem(PENDING_ANALYSES_KEY, JSON.stringify(pending));
@@ -185,7 +163,7 @@ export default function NewAnalysis() {
       });
 
       // Navigate to dashboard with category parameter
-      navigate(`/dashboard?category=${encodeURIComponent(fullCategoryName)}`);
+      navigate(`/dashboard?category=${encodeURIComponent(displayCategoryName)}`);
     } catch (error) {
       console.error("Analysis request failed:", error);
       toast({
@@ -246,34 +224,6 @@ export default function NewAnalysis() {
             />
           </div>
 
-          {/* Demographics Field */}
-          <div className="space-y-4">
-            <Label>
-              Target Demographics
-            </Label>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {demographicsOptions.map((option) => (
-                <div
-                  key={option.id}
-                  className="flex items-center space-x-3 p-3 rounded-lg border bg-secondary/30 hover:bg-secondary/50 transition-colors"
-                >
-                  <Checkbox
-                    id={`demo-${option.id}`}
-                    checked={demographics.includes(option.label)}
-                    onCheckedChange={(checked) =>
-                      handleDemographicsToggle(option.label, checked as boolean)
-                    }
-                  />
-                  <Label
-                    htmlFor={`demo-${option.id}`}
-                    className="text-sm font-medium cursor-pointer flex-1"
-                  >
-                    {option.label}
-                  </Label>
-                </div>
-              ))}
-            </div>
-          </div>
 
           {/* Product Form Field */}
           <div className="space-y-4">
@@ -330,7 +280,7 @@ export default function NewAnalysis() {
             <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
               <p className="text-xs text-muted-foreground mb-1">Analysis will be created as:</p>
               <p className="font-semibold text-foreground">
-                {category.trim()} {productForm}{demographics.length > 0 ? ` for ${demographics.join(' & ')}` : ''}
+                {category.trim()} {productForm}
               </p>
             </div>
           )}

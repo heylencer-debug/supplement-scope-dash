@@ -2394,8 +2394,8 @@ export function EnhancedBenchmarkComparison({
           {/* Mobile: Vertical stack, Desktop: Horizontal scroll */}
           <div className="flex flex-col lg:flex-row gap-3 lg:gap-2 md:gap-3 overflow-x-hidden">
             {/* Our Concept Column - Full width on mobile, fixed on desktop */}
-            <div className="w-full lg:w-[280px] xl:w-[320px] lg:shrink-0 rounded-lg border-2 border-chart-2/50 bg-gradient-to-b from-chart-2/10 to-background dark:from-chart-2/20 overflow-hidden">
-              <div className="bg-gradient-to-r from-chart-2 to-chart-2/80 px-2 sm:px-3 py-1.5 sm:py-2">
+            <div className="w-full lg:w-[280px] xl:w-[320px] lg:shrink-0 rounded-lg border-2 border-chart-2/50 bg-gradient-to-b from-chart-2/10 to-background dark:from-chart-2/20 overflow-hidden flex flex-col">
+              <div className="bg-gradient-to-r from-chart-2 to-chart-2/80 px-2 sm:px-3 py-1.5 sm:py-2 shrink-0">
                 <div className="flex items-center gap-2">
                   <div className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 rounded-full bg-white/20 flex items-center justify-center">
                     <Target className="w-2.5 h-2.5 sm:w-3 sm:h-3 md:w-4 md:h-4 text-white" />
@@ -2407,7 +2407,7 @@ export function EnhancedBenchmarkComparison({
                 </div>
               </div>
               
-              <div className="p-2 md:p-3 space-y-2 sm:space-y-3 max-h-[800px] overflow-y-auto">
+              <div className="p-2 md:p-3 space-y-2 sm:space-y-3 flex-1 overflow-y-auto">
                 {/* COMPETITIVE ADVANTAGE SUMMARY BADGE */}
                 {(() => {
                   const advantages = getCompetitiveAdvantages();

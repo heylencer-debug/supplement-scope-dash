@@ -12,17 +12,26 @@ import {
   Sparkles,
   Loader2,
   ImageIcon,
-  Download
+  Download,
+  RefreshCw
 } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface AIPackagingResultsProps {
   analysis: PackagingDesignAnalysis;
   mockupImageUrl?: string | null;
   onSaveMockup?: (imageUrl: string) => Promise<void>;
+  onRegenerateCopy?: (style: string) => void;
+  isRegenerating?: boolean;
 }
 
 // Visual mockup component for front panel
@@ -198,11 +207,20 @@ function FrontPanelMockup({
   );
 }
 
-export function AIPackagingResults({ analysis, mockupImageUrl, onSaveMockup }: AIPackagingResultsProps) {
+export function AIPackagingResults({ analysis, mockupImageUrl, onSaveMockup, onRegenerateCopy, isRegenerating }: AIPackagingResultsProps) {
   const { toast } = useToast();
   const [rationaleOpen, setRationaleOpen] = useState(false);
   const [generatedMockup, setGeneratedMockup] = useState<string | null>(mockupImageUrl || null);
   const [isGenerating, setIsGenerating] = useState(false);
+
+  const copyStyles = [
+    { id: 'premium', label: 'Premium & Luxurious', description: 'High-end, sophisticated copy for premium positioning' },
+    { id: 'clinical', label: 'Clinical & Scientific', description: 'Research-backed, clinical-sounding copy' },
+    { id: 'friendly', label: 'Friendly & Approachable', description: 'Warm, conversational, everyday language' },
+    { id: 'urgent', label: 'Urgent & Action-Driven', description: 'FOMO, scarcity, calls-to-action' },
+    { id: 'natural', label: 'Natural & Clean', description: 'Organic, clean-label, wellness-focused' },
+    { id: 'bold', label: 'Bold & Disruptive', description: 'Stand out, challenge the norm, edgy' },
+  ];
 
   if (!analysis) {
     return null;
@@ -318,6 +336,56 @@ export function AIPackagingResults({ analysis, mockupImageUrl, onSaveMockup }: A
 
   return (
     <div className="space-y-6 mt-6">
+      {/* Regenerate Copy Section */}
+      {onRegenerateCopy && (
+        <div className="flex items-center justify-between p-4 bg-gradient-to-r from-primary/5 to-chart-2/5 rounded-xl border border-primary/20">
+          <div>
+            <h3 className="text-sm font-semibold flex items-center gap-2">
+              <RefreshCw className="w-4 h-4 text-primary" />
+              Not Convinced? Regenerate Copy
+            </h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Try a different style to find copy that converts better.
+            </p>
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="gap-2"
+                disabled={isRegenerating}
+              >
+                {isRegenerating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Regenerating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    Try Different Style
+                    <ChevronDown className="w-3 h-3" />
+                  </>
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-64">
+              {copyStyles.map((style) => (
+                <DropdownMenuItem 
+                  key={style.id}
+                  onClick={() => onRegenerateCopy(style.id)}
+                  className="flex flex-col items-start gap-0.5 py-2"
+                >
+                  <span className="font-medium">{style.label}</span>
+                  <span className="text-xs text-muted-foreground">{style.description}</span>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      )}
+
       {/* Section 0: Visual Mockup Preview */}
       <Card className="border-chart-2/20 bg-gradient-to-br from-muted/30 to-muted/10">
         <CardHeader className="pb-4">

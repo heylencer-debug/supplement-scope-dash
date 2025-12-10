@@ -408,7 +408,7 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
             <Button
               variant={hasAnalysis ? "outline" : "default"}
               size="sm"
-              onClick={runAnalysis}
+              onClick={() => runAnalysis()}
               disabled={isAnalyzing || isLoadingFromDb || !categoryId}
               className="text-xs h-7"
             >
@@ -465,7 +465,15 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
           </div>
         )}
 
-        {aiAnalysis && <AIPackagingResults analysis={aiAnalysis} mockupImageUrl={mockupImageUrl} onSaveMockup={saveMockupImage} />}
+        {aiAnalysis && (
+          <AIPackagingResults 
+            analysis={aiAnalysis} 
+            mockupImageUrl={mockupImageUrl} 
+            onSaveMockup={saveMockupImage}
+            onRegenerateCopy={(style) => runAnalysis(style)}
+            isRegenerating={isAnalyzing}
+          />
+        )}
 
         {/* Top Row: Format Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

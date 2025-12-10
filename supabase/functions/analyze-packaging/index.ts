@@ -18,7 +18,7 @@ serve(async (req) => {
   }
 
   try {
-    const { categoryId } = await req.json();
+    const { categoryId, copyStyle } = await req.json();
     
     if (!categoryId) {
       return new Response(
@@ -26,6 +26,8 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    console.log(`Packaging analysis request - categoryId: ${categoryId}, copyStyle: ${copyStyle || 'default'}`);
 
     const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
     if (!ANTHROPIC_API_KEY) {
@@ -136,9 +138,64 @@ THEIR VISUAL STRATEGY:
 - Differentiation: ${designBlueprint.differentiation_factor || 'N/A'}`;
     }).join('\n\n') || 'No competitor data available';
 
+    // Helper function to get copy style instructions
+    function getCopyStyleInstructions(style: string | undefined): string {
+      switch (style) {
+        case 'premium':
+          return `STYLE: PREMIUM & LUXURIOUS
+- Use sophisticated, elegant language that signals high-end quality
+- Words like: Artisan, Curated, Exceptional, Exquisite, Refined
+- Emphasize exclusivity, craftsmanship, and superior quality
+- Color palette should be rich and elegant (deep navy, gold accents, cream)
+- Think Rolex, Louis Vuitton, premium skincare vibes`;
+        case 'clinical':
+          return `STYLE: CLINICAL & SCIENTIFIC
+- Use clinical, research-backed language that builds trust through science
+- Words like: Clinically Proven, Lab-Tested, Research-Backed, Pharmaceutical-Grade
+- Include specific dosages, clinical study references, doctor recommendations
+- Color palette should be clean and medical (white, blue, clinical green)
+- Think pharmaceutical packaging, doctor-approved supplements`;
+        case 'friendly':
+          return `STYLE: FRIENDLY & APPROACHABLE
+- Use warm, conversational language like talking to a friend
+- Words like: Feel Great, Your Daily Wellness Partner, Made for You
+- Emphasize ease, simplicity, and everyday benefits
+- Color palette should be warm and inviting (soft blues, friendly oranges, gentle greens)
+- Think farmer's market, homemade, approachable wellness`;
+        case 'urgent':
+          return `STYLE: URGENT & ACTION-DRIVEN
+- Create urgency and FOMO that drives immediate action
+- Words like: Don't Wait, Limited Edition, Maximum Strength, Fast-Acting
+- Use bold claims, strong CTAs, and scarcity messaging
+- Color palette should be bold and energetic (reds, blacks, power colors)
+- Think infomercial energy, must-have-NOW feeling`;
+        case 'natural':
+          return `STYLE: NATURAL & CLEAN
+- Use organic, clean-label language that emphasizes purity
+- Words like: Pure, Clean, Natural, Plant-Based, Earth-Friendly
+- Emphasize minimal ingredients, sustainable sourcing, eco-conscious
+- Color palette should be earthy and organic (forest greens, browns, cream, sage)
+- Think Whole Foods, farmers market, sustainable wellness`;
+        case 'bold':
+          return `STYLE: BOLD & DISRUPTIVE
+- Challenge the status quo with edgy, bold language
+- Words like: Revolutionary, Game-Changer, Disrupting, Next-Level
+- Break conventions, challenge competitors directly
+- Color palette should be unexpected and bold (neon accents, black, unconventional combos)
+- Think startup energy, category disruptor, rule-breaker`;
+        default:
+          return `STYLE: BALANCED & CONVERSION-FOCUSED
+- Use proven conversion copy principles
+- Balance trust-building with benefit-driven messaging
+- Use power words: Premium, Clinical-Strength, Doctor-Formulated, Bioavailable
+- Focus on addressing customer pain points and clear value proposition
+- Think best practices from top Amazon supplement sellers`;
+      }
+    }
+
     // Background task to call Claude and save results
     async function runPackagingAnalysisInBackground() {
-      console.log('Starting background Claude API call for packaging analysis...');
+      console.log(`Starting background Claude API call for packaging analysis with style: ${copyStyle || 'default'}...`);
       
       try {
         const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -281,11 +338,13 @@ Study the competitor product images I've included above. Look at their:
 
 Now create packaging that is EVEN BETTER - more premium, more trustworthy, more compelling.
 
+## COPY STYLE DIRECTION:
+${getCopyStyleInstructions(copyStyle)}
+
 ## COPY RULES (NON-NEGOTIABLE):
 - Primary claim: 3-8 words that STOP the scroll
 - Bullet points: 5-10 words each, BENEFIT-FOCUSED not feature-focused
 - Every word must SELL - no fluff, no filler
-- Use power words: Premium, Clinical-Strength, Doctor-Formulated, Bioavailable
 - Address the #1 customer pain point directly
 - Include specific numbers when possible (300mg, 90-day supply, 3X absorption)
 

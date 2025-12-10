@@ -150,7 +150,7 @@ export function usePackagingAnalysis(categoryId?: string) {
     }
   }, [categoryId]);
 
-  const runAnalysis = useCallback(async () => {
+  const runAnalysis = useCallback(async (copyStyle?: string) => {
     if (!categoryId) {
       toast({
         title: 'Error',
@@ -173,9 +173,9 @@ export function usePackagingAnalysis(categoryId?: string) {
       
       setAnalysis(null);
 
-      console.log('Calling analyze-packaging edge function...');
+      console.log('Calling analyze-packaging edge function with style:', copyStyle);
       const { data, error: fnError } = await supabase.functions.invoke('analyze-packaging', {
-        body: { categoryId }
+        body: { categoryId, copyStyle }
       });
 
       if (fnError) {
@@ -192,7 +192,7 @@ export function usePackagingAnalysis(categoryId?: string) {
       // Poll database for results
       if (data?.status === 'processing') {
         toast({
-          title: 'Packaging Analysis Started',
+          title: copyStyle ? `Regenerating with "${copyStyle}" Style` : 'Packaging Analysis Started',
           description: 'AI design analysis is running in background. This may take 1-2 minutes...',
         });
 

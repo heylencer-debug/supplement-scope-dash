@@ -124,6 +124,11 @@ interface IngredientAnalysis {
   };
 }
 
+// Declare EdgeRuntime for background tasks
+declare const EdgeRuntime: {
+  waitUntil: (promise: Promise<any>) => void;
+};
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -176,7 +181,7 @@ serve(async (req) => {
     // Fetch top 3 competitors by monthly_sales
     const { data: competitors, error: competitorsError } = await supabase
       .from('products')
-      .select('brand, all_nutrients, ingredients, other_ingredients, price, servings_per_container, review_analysis')
+      .select('brand, title, all_nutrients, ingredients, other_ingredients, price, servings_per_container, review_analysis')
       .eq('category_id', categoryId)
       .order('monthly_sales', { ascending: false })
       .limit(3);
@@ -207,7 +212,7 @@ serve(async (req) => {
       const positiveThemes = reviewAnalysis?.positive_themes?.slice(0, 5)?.map((t: any) => t.theme || t).join(', ') || 'N/A';
       const keyInsights = reviewAnalysis?.key_insights?.slice(0, 3)?.join(', ') || 'N/A';
       
-      return `Competitor ${idx + 1} (${c.brand || 'Unknown'}):
+      return `Competitor ${idx + 1} (${c.brand || 'Unknown'} - ${c.title || 'Unknown Product'}):
 - Nutrients: ${nutrientList}
 - Ingredients: ${c.ingredients || 'N/A'}
 - Other Ingredients: ${c.other_ingredients || 'N/A'}
@@ -217,328 +222,324 @@ serve(async (req) => {
 - Key Insights: ${keyInsights}`;
     }).join('\n\n') || 'No competitor data available';
 
-    console.log('Calling Claude API for ingredient analysis...');
-
-    // Call Claude API with tool use for structured output
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-5',
-        max_tokens: 16384,
-        tools: [
-          {
-            name: 'analyze_ingredients',
-            description: 'Comprehensive ingredient formulation analysis with clinical insights, competitive matrix, customer pain point solutions, SWOT analysis, and priority roadmap.',
-            input_schema: {
-              type: 'object',
-              properties: {
-                summary: {
+    // Background task to call Claude and save results
+    async function runAnalysisInBackground() {
+      console.log('Starting background Claude API call...');
+      
+      try {
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': ANTHROPIC_API_KEY!,
+            'anthropic-version': '2023-06-01',
+          },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-5',
+            max_tokens: 16384,
+            tools: [
+              {
+                name: 'analyze_ingredients',
+                description: 'Comprehensive ingredient formulation analysis with clinical insights, competitive matrix, customer pain point solutions, SWOT analysis, and priority roadmap.',
+                input_schema: {
                   type: 'object',
                   properties: {
-                    overall_assessment: { 
-                      type: 'string', 
-                      enum: ['Strong', 'Moderate', 'Weak'],
-                      description: 'Overall competitive position of our formulation'
-                    },
-                    key_strengths: { 
-                      type: 'array', 
-                      items: { type: 'string' },
-                      description: 'Top 3-5 formulation advantages'
-                    },
-                    key_gaps: { 
-                      type: 'array', 
-                      items: { type: 'string' },
-                      description: 'Top 3-5 missing opportunities or weaknesses'
-                    },
-                    recommendation: { 
-                      type: 'string',
-                      description: 'One-sentence strategic recommendation'
-                    }
-                  },
-                  required: ['overall_assessment', 'key_strengths', 'key_gaps', 'recommendation']
-                },
-                ingredients: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    properties: {
-                      name: { type: 'string' },
-                      our_dosage: { type: 'string', nullable: true },
-                      avg_competitor_dosage: { type: 'string', nullable: true },
-                      gap_status: { 
-                        type: 'string', 
-                        enum: ['leading', 'matching', 'trailing', 'missing', 'unique']
-                      },
-                      gap_percentage: { type: 'number', nullable: true },
-                      clinical_note: { type: 'string' },
-                      priority: { type: 'string', enum: ['high', 'medium', 'low'] }
-                    },
-                    required: ['name', 'gap_status', 'clinical_note', 'priority']
-                  },
-                  description: 'Detailed analysis of each key ingredient'
-                },
-                charts: {
-                  type: 'object',
-                  properties: {
-                    dosage_comparison: {
-                      type: 'array',
-                      items: {
-                        type: 'object',
-                        properties: {
-                          ingredient: { type: 'string' },
-                          our_amount: { type: 'number' },
-                          competitor_avg: { type: 'number' },
-                          unit: { type: 'string' }
-                        },
-                        required: ['ingredient', 'our_amount', 'competitor_avg', 'unit']
-                      }
-                    },
-                    coverage_score: { type: 'number', description: '0-100 how well we cover competitor ingredients' },
-                    uniqueness_score: { type: 'number', description: '0-100 how many unique ingredients we have' },
-                    efficacy_score: { type: 'number', description: '0-100 based on clinical dosage adequacy' }
-                  },
-                  required: ['dosage_comparison', 'coverage_score', 'uniqueness_score', 'efficacy_score']
-                },
-                actionable_insights: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    properties: {
-                      type: { type: 'string', enum: ['add', 'increase', 'decrease', 'remove', 'keep'] },
-                      ingredient: { type: 'string' },
-                      reason: { type: 'string' },
-                      impact: { type: 'string', enum: ['high', 'medium', 'low'] }
-                    },
-                    required: ['type', 'ingredient', 'reason', 'impact']
-                  },
-                  description: 'Specific actionable recommendations'
-                },
-                // NEW: Customer-Formulation Connection
-                customer_insights: {
-                  type: 'object',
-                  properties: {
-                    pain_point_solutions: {
-                      type: 'array',
-                      items: {
-                        type: 'object',
-                        properties: {
-                          pain_point: { type: 'string', description: 'Customer complaint from reviews' },
-                          solving_ingredient: { type: 'string', description: 'Ingredient or feature that addresses this' },
-                          confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
-                          evidence: { type: 'string', description: 'Clinical or market rationale' }
-                        },
-                        required: ['pain_point', 'solving_ingredient', 'confidence', 'evidence']
-                      }
-                    },
-                    unaddressed_complaints: {
-                      type: 'array',
-                      items: {
-                        type: 'object',
-                        properties: {
-                          complaint: { type: 'string' },
-                          suggested_solution: { type: 'string' },
-                          ingredient_recommendation: { type: 'string' }
-                        },
-                        required: ['complaint', 'suggested_solution', 'ingredient_recommendation']
-                      }
-                    }
-                  },
-                  required: ['pain_point_solutions', 'unaddressed_complaints']
-                },
-                // NEW: Competitive Advantage Matrix
-                competitive_matrix: {
-                  type: 'object',
-                  properties: {
-                    advantages: {
-                      type: 'array',
-                      items: {
-                        type: 'object',
-                        properties: {
-                          category: { type: 'string', description: 'Dosage, Form, Quality, Value, Ingredients' },
-                          our_position: { type: 'string' },
-                          vs_competitors: { type: 'string' },
-                          impact: { type: 'string', enum: ['high', 'medium', 'low'] }
-                        },
-                        required: ['category', 'our_position', 'vs_competitors', 'impact']
-                      }
-                    },
-                    vulnerabilities: {
-                      type: 'array',
-                      items: {
-                        type: 'object',
-                        properties: {
-                          category: { type: 'string' },
-                          risk_description: { type: 'string' },
-                          mitigation: { type: 'string' }
-                        },
-                        required: ['category', 'risk_description', 'mitigation']
-                      }
-                    }
-                  },
-                  required: ['advantages', 'vulnerabilities']
-                },
-                // NEW: Clinical Efficacy Breakdown
-                clinical_analysis: {
-                  type: 'object',
-                  properties: {
-                    dosage_adequacy: {
-                      type: 'array',
-                      items: {
-                        type: 'object',
-                        properties: {
-                          ingredient: { type: 'string' },
-                          our_dosage: { type: 'string' },
-                          clinical_range: { type: 'string', description: 'Research-backed dosage range' },
-                          adequacy: { type: 'string', enum: ['optimal', 'adequate', 'suboptimal', 'insufficient'] },
-                          research_note: { type: 'string' }
-                        },
-                        required: ['ingredient', 'our_dosage', 'clinical_range', 'adequacy', 'research_note']
-                      }
-                    },
-                    synergy_pairs: {
-                      type: 'array',
-                      items: {
-                        type: 'object',
-                        properties: {
-                          ingredients: { type: 'array', items: { type: 'string' }, description: 'Two ingredients that work together' },
-                          synergy_type: { type: 'string', description: 'Enhanced absorption, Bioavailability, etc.' },
-                          present_in_formula: { type: 'boolean' }
-                        },
-                        required: ['ingredients', 'synergy_type', 'present_in_formula']
-                      }
-                    }
-                  },
-                  required: ['dosage_adequacy', 'synergy_pairs']
-                },
-                // NEW: SWOT Summary
-                swot: {
-                  type: 'object',
-                  properties: {
-                    strengths: { type: 'array', items: { type: 'string' }, description: 'Internal advantages of our formulation' },
-                    weaknesses: { type: 'array', items: { type: 'string' }, description: 'Internal disadvantages' },
-                    opportunities: { type: 'array', items: { type: 'string' }, description: 'External opportunities to exploit' },
-                    threats: { type: 'array', items: { type: 'string' }, description: 'External risks and challenges' }
-                  },
-                  required: ['strengths', 'weaknesses', 'opportunities', 'threats']
-                },
-                // Priority Roadmap
-                priority_roadmap: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    properties: {
-                      phase: { type: 'number', enum: [1, 2, 3], description: '1=immediate, 2=next batch, 3=future' },
-                      action: { type: 'string' },
-                      ingredient: { type: 'string' },
-                      expected_impact: { type: 'string' },
-                      complexity: { type: 'string', enum: ['easy', 'moderate', 'complex'] },
-                      timeline: { type: 'string', description: 'Immediate, Next formulation, Future' }
-                    },
-                    required: ['phase', 'action', 'ingredient', 'expected_impact', 'complexity', 'timeline']
-                  },
-                  description: 'Phased improvement roadmap'
-                },
-                // NEW: Comprehensive Ingredient Comparison Table
-                ingredient_comparison_table: {
-                  type: 'object',
-                  description: 'Complete ingredient-by-ingredient comparison table of Our Concept vs all competitors',
-                  properties: {
-                    our_concept_name: { type: 'string', description: 'Name of our product concept' },
-                    competitors: {
-                      type: 'array',
-                      items: {
-                        type: 'object',
-                        properties: {
-                          brand: { type: 'string' },
-                          product_name: { type: 'string' }
-                        },
-                        required: ['brand', 'product_name']
-                      }
-                    },
-                    rows: {
-                      type: 'array',
-                      description: 'ALL ingredients from both Our Concept and competitors - include EVERY ingredient',
-                      items: {
-                        type: 'object',
-                        properties: {
-                          ingredient: { type: 'string', description: 'Full ingredient name (e.g., Cranberry Extract, Pectin, Sodium Citrate)' },
-                          category: { 
-                            type: 'string', 
-                            enum: ['primary_active', 'secondary_active', 'tertiary_active', 'excipient', 'other'],
-                            description: 'Ingredient category'
-                          },
-                          our_concept: {
-                            type: 'object',
-                            properties: {
-                              amount: { type: 'string', nullable: true, description: 'Dosage amount (e.g., 500mg, 100IU) or null if not present' },
-                              form: { type: 'string', nullable: true, description: 'Form/standardization (e.g., KSM-66, 36:1 extract) or null' }
-                            },
-                            required: ['amount', 'form']
-                          },
-                          competitor_1: {
-                            type: 'object',
-                            properties: {
-                              amount: { type: 'string', nullable: true, description: 'Dosage or null' },
-                              present: { type: 'boolean', description: 'Whether ingredient is present' }
-                            },
-                            required: ['amount', 'present']
-                          },
-                          competitor_2: {
-                            type: 'object',
-                            properties: {
-                              amount: { type: 'string', nullable: true },
-                              present: { type: 'boolean' }
-                            },
-                            required: ['amount', 'present']
-                          },
-                          competitor_3: {
-                            type: 'object',
-                            properties: {
-                              amount: { type: 'string', nullable: true },
-                              present: { type: 'boolean' }
-                            },
-                            required: ['amount', 'present']
-                          },
-                          status: { 
-                            type: 'string', 
-                            enum: ['in_all', 'unique_to_us', 'missing_from_us', 'partial'],
-                            description: 'in_all=all have it, unique_to_us=only we have it, missing_from_us=competitors have but we dont, partial=some have it'
-                          },
-                          comparison_note: { type: 'string', description: 'AI-generated insight about this ingredient comparison (e.g., Our dosage leads by 25%, Standard excipient, Differentiator)' }
-                        },
-                        required: ['ingredient', 'category', 'our_concept', 'competitor_1', 'competitor_2', 'competitor_3', 'status', 'comparison_note']
-                      }
-                    },
                     summary: {
                       type: 'object',
                       properties: {
-                        total_our_ingredients: { type: 'number', description: 'Total ingredients in Our Concept' },
-                        total_competitor_avg: { type: 'number', description: 'Average ingredient count across competitors' },
-                        overlap_count: { type: 'number', description: 'Number of ingredients shared by all' },
-                        unique_to_us_count: { type: 'number', description: 'Ingredients only we have' },
-                        missing_from_us_count: { type: 'number', description: 'Ingredients competitors have that we lack' },
-                        overall_assessment: { type: 'string', description: 'Brief overall comparison summary' }
+                        overall_assessment: { 
+                          type: 'string', 
+                          enum: ['Strong', 'Moderate', 'Weak'],
+                          description: 'Overall competitive position of our formulation'
+                        },
+                        key_strengths: { 
+                          type: 'array', 
+                          items: { type: 'string' },
+                          description: 'Top 3-5 formulation advantages'
+                        },
+                        key_gaps: { 
+                          type: 'array', 
+                          items: { type: 'string' },
+                          description: 'Top 3-5 missing opportunities or weaknesses'
+                        },
+                        recommendation: { 
+                          type: 'string',
+                          description: 'One-sentence strategic recommendation'
+                        }
                       },
-                      required: ['total_our_ingredients', 'total_competitor_avg', 'overlap_count', 'unique_to_us_count', 'missing_from_us_count', 'overall_assessment']
+                      required: ['overall_assessment', 'key_strengths', 'key_gaps', 'recommendation']
+                    },
+                    ingredients: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          name: { type: 'string' },
+                          our_dosage: { type: 'string', nullable: true },
+                          avg_competitor_dosage: { type: 'string', nullable: true },
+                          gap_status: { 
+                            type: 'string', 
+                            enum: ['leading', 'matching', 'trailing', 'missing', 'unique']
+                          },
+                          gap_percentage: { type: 'number', nullable: true },
+                          clinical_note: { type: 'string' },
+                          priority: { type: 'string', enum: ['high', 'medium', 'low'] }
+                        },
+                        required: ['name', 'gap_status', 'clinical_note', 'priority']
+                      },
+                      description: 'Detailed analysis of each key ingredient'
+                    },
+                    charts: {
+                      type: 'object',
+                      properties: {
+                        dosage_comparison: {
+                          type: 'array',
+                          items: {
+                            type: 'object',
+                            properties: {
+                              ingredient: { type: 'string' },
+                              our_amount: { type: 'number' },
+                              competitor_avg: { type: 'number' },
+                              unit: { type: 'string' }
+                            },
+                            required: ['ingredient', 'our_amount', 'competitor_avg', 'unit']
+                          }
+                        },
+                        coverage_score: { type: 'number', description: '0-100 how well we cover competitor ingredients' },
+                        uniqueness_score: { type: 'number', description: '0-100 how many unique ingredients we have' },
+                        efficacy_score: { type: 'number', description: '0-100 based on clinical dosage adequacy' }
+                      },
+                      required: ['dosage_comparison', 'coverage_score', 'uniqueness_score', 'efficacy_score']
+                    },
+                    actionable_insights: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          type: { type: 'string', enum: ['add', 'increase', 'decrease', 'remove', 'keep'] },
+                          ingredient: { type: 'string' },
+                          reason: { type: 'string' },
+                          impact: { type: 'string', enum: ['high', 'medium', 'low'] }
+                        },
+                        required: ['type', 'ingredient', 'reason', 'impact']
+                      },
+                      description: 'Specific actionable recommendations'
+                    },
+                    customer_insights: {
+                      type: 'object',
+                      properties: {
+                        pain_point_solutions: {
+                          type: 'array',
+                          items: {
+                            type: 'object',
+                            properties: {
+                              pain_point: { type: 'string', description: 'Customer complaint from reviews' },
+                              solving_ingredient: { type: 'string', description: 'Ingredient or feature that addresses this' },
+                              confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
+                              evidence: { type: 'string', description: 'Clinical or market rationale' }
+                            },
+                            required: ['pain_point', 'solving_ingredient', 'confidence', 'evidence']
+                          }
+                        },
+                        unaddressed_complaints: {
+                          type: 'array',
+                          items: {
+                            type: 'object',
+                            properties: {
+                              complaint: { type: 'string' },
+                              suggested_solution: { type: 'string' },
+                              ingredient_recommendation: { type: 'string' }
+                            },
+                            required: ['complaint', 'suggested_solution', 'ingredient_recommendation']
+                          }
+                        }
+                      },
+                      required: ['pain_point_solutions', 'unaddressed_complaints']
+                    },
+                    competitive_matrix: {
+                      type: 'object',
+                      properties: {
+                        advantages: {
+                          type: 'array',
+                          items: {
+                            type: 'object',
+                            properties: {
+                              category: { type: 'string', description: 'Dosage, Form, Quality, Value, Ingredients' },
+                              our_position: { type: 'string' },
+                              vs_competitors: { type: 'string' },
+                              impact: { type: 'string', enum: ['high', 'medium', 'low'] }
+                            },
+                            required: ['category', 'our_position', 'vs_competitors', 'impact']
+                          }
+                        },
+                        vulnerabilities: {
+                          type: 'array',
+                          items: {
+                            type: 'object',
+                            properties: {
+                              category: { type: 'string' },
+                              risk_description: { type: 'string' },
+                              mitigation: { type: 'string' }
+                            },
+                            required: ['category', 'risk_description', 'mitigation']
+                          }
+                        }
+                      },
+                      required: ['advantages', 'vulnerabilities']
+                    },
+                    clinical_analysis: {
+                      type: 'object',
+                      properties: {
+                        dosage_adequacy: {
+                          type: 'array',
+                          items: {
+                            type: 'object',
+                            properties: {
+                              ingredient: { type: 'string' },
+                              our_dosage: { type: 'string' },
+                              clinical_range: { type: 'string', description: 'Research-backed dosage range' },
+                              adequacy: { type: 'string', enum: ['optimal', 'adequate', 'suboptimal', 'insufficient'] },
+                              research_note: { type: 'string' }
+                            },
+                            required: ['ingredient', 'our_dosage', 'clinical_range', 'adequacy', 'research_note']
+                          }
+                        },
+                        synergy_pairs: {
+                          type: 'array',
+                          items: {
+                            type: 'object',
+                            properties: {
+                              ingredients: { type: 'array', items: { type: 'string' }, description: 'Two ingredients that work together' },
+                              synergy_type: { type: 'string', description: 'Enhanced absorption, Bioavailability, etc.' },
+                              present_in_formula: { type: 'boolean' }
+                            },
+                            required: ['ingredients', 'synergy_type', 'present_in_formula']
+                          }
+                        }
+                      },
+                      required: ['dosage_adequacy', 'synergy_pairs']
+                    },
+                    swot: {
+                      type: 'object',
+                      properties: {
+                        strengths: { type: 'array', items: { type: 'string' }, description: 'Internal advantages of our formulation' },
+                        weaknesses: { type: 'array', items: { type: 'string' }, description: 'Internal disadvantages' },
+                        opportunities: { type: 'array', items: { type: 'string' }, description: 'External opportunities to exploit' },
+                        threats: { type: 'array', items: { type: 'string' }, description: 'External risks and challenges' }
+                      },
+                      required: ['strengths', 'weaknesses', 'opportunities', 'threats']
+                    },
+                    priority_roadmap: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          phase: { type: 'number', enum: [1, 2, 3], description: '1=immediate, 2=next batch, 3=future' },
+                          action: { type: 'string' },
+                          ingredient: { type: 'string' },
+                          expected_impact: { type: 'string' },
+                          complexity: { type: 'string', enum: ['easy', 'moderate', 'complex'] },
+                          timeline: { type: 'string', description: 'Immediate, Next formulation, Future' }
+                        },
+                        required: ['phase', 'action', 'ingredient', 'expected_impact', 'complexity', 'timeline']
+                      },
+                      description: 'Phased improvement roadmap'
+                    },
+                    ingredient_comparison_table: {
+                      type: 'object',
+                      description: 'Complete ingredient-by-ingredient comparison table of Our Concept vs all competitors',
+                      properties: {
+                        our_concept_name: { type: 'string', description: 'Name of our product concept' },
+                        competitors: {
+                          type: 'array',
+                          items: {
+                            type: 'object',
+                            properties: {
+                              brand: { type: 'string' },
+                              product_name: { type: 'string' }
+                            },
+                            required: ['brand', 'product_name']
+                          }
+                        },
+                        rows: {
+                          type: 'array',
+                          description: 'ALL ingredients from both Our Concept and competitors - include EVERY ingredient',
+                          items: {
+                            type: 'object',
+                            properties: {
+                              ingredient: { type: 'string', description: 'Full ingredient name (e.g., Cranberry Extract, Pectin, Sodium Citrate)' },
+                              category: { 
+                                type: 'string', 
+                                enum: ['primary_active', 'secondary_active', 'tertiary_active', 'excipient', 'other'],
+                                description: 'Ingredient category'
+                              },
+                              our_concept: {
+                                type: 'object',
+                                properties: {
+                                  amount: { type: 'string', nullable: true, description: 'Dosage amount (e.g., 500mg, 100IU) or null if not present' },
+                                  form: { type: 'string', nullable: true, description: 'Form/standardization (e.g., KSM-66, 36:1 extract) or null' }
+                                },
+                                required: ['amount', 'form']
+                              },
+                              competitor_1: {
+                                type: 'object',
+                                properties: {
+                                  amount: { type: 'string', nullable: true, description: 'Dosage or null' },
+                                  present: { type: 'boolean', description: 'Whether ingredient is present' }
+                                },
+                                required: ['amount', 'present']
+                              },
+                              competitor_2: {
+                                type: 'object',
+                                properties: {
+                                  amount: { type: 'string', nullable: true },
+                                  present: { type: 'boolean' }
+                                },
+                                required: ['amount', 'present']
+                              },
+                              competitor_3: {
+                                type: 'object',
+                                properties: {
+                                  amount: { type: 'string', nullable: true },
+                                  present: { type: 'boolean' }
+                                },
+                                required: ['amount', 'present']
+                              },
+                              status: { 
+                                type: 'string', 
+                                enum: ['in_all', 'unique_to_us', 'missing_from_us', 'partial'],
+                                description: 'in_all=all have it, unique_to_us=only we have it, missing_from_us=competitors have but we dont, partial=some have it'
+                              },
+                              comparison_note: { type: 'string', description: 'AI-generated insight about this ingredient comparison (e.g., Our dosage leads by 25%, Standard excipient, Differentiator)' }
+                            },
+                            required: ['ingredient', 'category', 'our_concept', 'competitor_1', 'competitor_2', 'competitor_3', 'status', 'comparison_note']
+                          }
+                        },
+                        summary: {
+                          type: 'object',
+                          properties: {
+                            total_our_ingredients: { type: 'number', description: 'Total ingredients in Our Concept' },
+                            total_competitor_avg: { type: 'number', description: 'Average ingredient count across competitors' },
+                            overlap_count: { type: 'number', description: 'Number of ingredients shared by all' },
+                            unique_to_us_count: { type: 'number', description: 'Ingredients only we have' },
+                            missing_from_us_count: { type: 'number', description: 'Ingredients competitors have that we lack' },
+                            overall_assessment: { type: 'string', description: 'Brief overall comparison summary' }
+                          },
+                          required: ['total_our_ingredients', 'total_competitor_avg', 'overlap_count', 'unique_to_us_count', 'missing_from_us_count', 'overall_assessment']
+                        }
+                      },
+                      required: ['our_concept_name', 'competitors', 'rows', 'summary']
                     }
                   },
-                  required: ['our_concept_name', 'competitors', 'rows', 'summary']
+                  required: ['summary', 'ingredients', 'charts', 'actionable_insights', 'customer_insights', 'competitive_matrix', 'clinical_analysis', 'swot', 'priority_roadmap', 'ingredient_comparison_table']
                 }
-              },
-              required: ['summary', 'ingredients', 'charts', 'actionable_insights', 'customer_insights', 'competitive_matrix', 'clinical_analysis', 'swot', 'priority_roadmap', 'ingredient_comparison_table']
-            }
-          }
-        ],
-        tool_choice: { type: 'tool', name: 'analyze_ingredients' },
-        messages: [
-          {
-            role: 'user',
-            content: `You are an expert supplement formulator, clinical nutritionist, and competitive analyst. Analyze the following formulation data for "${categoryName}" and provide a COMPREHENSIVE ingredient analysis.
+              }
+            ],
+            tool_choice: { type: 'tool', name: 'analyze_ingredients' },
+            messages: [
+              {
+                role: 'user',
+                content: `You are an expert supplement formulator, clinical nutritionist, and competitive analyst. Analyze the following formulation data for "${categoryName}" and provide a COMPREHENSIVE ingredient analysis.
 
 ## OUR FORMULATION BRIEF:
 ${formulaBriefContent}
@@ -574,63 +575,64 @@ Please provide a thorough analysis including:
 Include EVERY single ingredient - do not skip any. Include excipients like pectin, citric acid, natural flavors, etc.
 
 Be specific about dosages, cite clinical ranges where relevant, and provide actionable insights.`
-          }
-        ]
-      })
-    });
+              }
+            ]
+          })
+        });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Claude API error:', response.status, errorText);
-      return new Response(
-        JSON.stringify({ error: 'AI analysis failed', details: errorText }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Claude API error:', response.status, errorText);
+          return;
+        }
+
+        const claudeResponse = await response.json();
+        console.log('Claude response received');
+        console.log('Claude stop_reason:', claudeResponse.stop_reason);
+        console.log('Claude usage:', JSON.stringify(claudeResponse.usage));
+
+        // Extract the tool use result
+        const toolUse = claudeResponse.content?.find((c: any) => c.type === 'tool_use');
+        if (!toolUse || !toolUse.input) {
+          console.error('No tool use in response. Content types:', claudeResponse.content?.map((c: any) => c.type));
+          console.error('Full response:', JSON.stringify(claudeResponse).substring(0, 1000));
+          return;
+        }
+
+        const analysis: IngredientAnalysis = toolUse.input;
+        console.log('Analysis complete:', analysis.summary.overall_assessment);
+        
+        // Log whether ingredient_comparison_table is present
+        console.log('Has ingredient_comparison_table:', !!analysis.ingredient_comparison_table);
+        if (analysis.ingredient_comparison_table) {
+          console.log('Comparison table rows count:', analysis.ingredient_comparison_table.rows?.length || 0);
+        }
+
+        // Save analysis to database (upsert)
+        const { error: upsertError } = await supabase
+          .from('ingredient_analyses')
+          .upsert({
+            category_id: categoryId,
+            analysis: analysis,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'category_id' });
+
+        if (upsertError) {
+          console.error('Error saving analysis to database:', upsertError);
+        } else {
+          console.log('Analysis saved to database successfully');
+        }
+      } catch (error) {
+        console.error('Background analysis error:', error);
+      }
     }
 
-    const claudeResponse = await response.json();
-    console.log('Claude response received');
-    console.log('Claude stop_reason:', claudeResponse.stop_reason);
-    console.log('Claude usage:', JSON.stringify(claudeResponse.usage));
-
-    // Extract the tool use result
-    const toolUse = claudeResponse.content?.find((c: any) => c.type === 'tool_use');
-    if (!toolUse || !toolUse.input) {
-      console.error('No tool use in response. Content types:', claudeResponse.content?.map((c: any) => c.type));
-      console.error('Full response:', JSON.stringify(claudeResponse).substring(0, 1000));
-      return new Response(
-        JSON.stringify({ error: 'Invalid AI response format', details: 'No tool use in response' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const analysis: IngredientAnalysis = toolUse.input;
-    console.log('Analysis complete:', analysis.summary.overall_assessment);
-    
-    // Log whether ingredient_comparison_table is present
-    console.log('Has ingredient_comparison_table:', !!analysis.ingredient_comparison_table);
-    if (analysis.ingredient_comparison_table) {
-      console.log('Comparison table rows count:', analysis.ingredient_comparison_table.rows?.length || 0);
-    }
-
-    // Save analysis to database (upsert)
-    const { error: upsertError } = await supabase
-      .from('ingredient_analyses')
-      .upsert({
-        category_id: categoryId,
-        analysis: analysis,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'category_id' });
-
-    if (upsertError) {
-      console.error('Error saving analysis to database:', upsertError);
-      // Don't fail the request, just log the error
-    } else {
-      console.log('Analysis saved to database');
-    }
+    // Start background task and return immediately
+    console.log('Starting background analysis task...');
+    EdgeRuntime.waitUntil(runAnalysisInBackground());
 
     return new Response(
-      JSON.stringify({ success: true, analysis }),
+      JSON.stringify({ success: true, status: 'processing', message: 'Analysis started in background. Poll database for results.' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 

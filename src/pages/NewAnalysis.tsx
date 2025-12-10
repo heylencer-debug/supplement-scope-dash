@@ -30,6 +30,8 @@ const demographicsOptions = [
   { id: "adults", label: "Adults" },
   { id: "kids", label: "Kids" },
   { id: "seniors", label: "Seniors" },
+  { id: "dogs", label: "Dogs" },
+  { id: "cats", label: "Cats" },
 ];
 
 const productFormOptions = [
@@ -39,6 +41,9 @@ const productFormOptions = [
   { id: "capsule", label: "Capsule" },
   { id: "tablet", label: "Tablet" },
   { id: "softgel", label: "Softgel" },
+  { id: "soft-chew", label: "Soft Chew" },
+  { id: "treat", label: "Treat" },
+  { id: "chewable", label: "Chewable" },
 ];
 
 

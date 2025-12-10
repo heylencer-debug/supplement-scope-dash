@@ -195,15 +195,70 @@ export function useIngredientAnalysis(categoryId?: string) {
         throw new Error(data.error + (data.details ? `: ${data.details}` : ''));
       }
 
-      if (data?.analysis) {
-        setAnalysis(data.analysis);
-        
-        const hasComparisonTable = !!data.analysis.ingredient_comparison_table;
-        const tableRowCount = data.analysis.ingredient_comparison_table?.rows?.length || 0;
+      // Function now returns immediately with status: 'processing'
+      // Poll database for results
+      if (data?.status === 'processing') {
+        toast({
+          title: 'Analysis Started',
+          description: 'AI analysis is running in background. This may take 1-2 minutes...',
+        });
 
+        // Poll for results every 10 seconds, up to 10 minutes
+        const maxAttempts = 60;
+        let attempts = 0;
+        
+        const pollForResults = async (): Promise<IngredientAnalysis | null> => {
+          while (attempts < maxAttempts) {
+            attempts++;
+            console.log(`Polling for results... attempt ${attempts}/${maxAttempts}`);
+            
+            await new Promise(resolve => setTimeout(resolve, 10000)); // Wait 10 seconds
+            
+            const { data: dbData, error: dbError } = await supabase
+              .from('ingredient_analyses')
+              .select('analysis, updated_at')
+              .eq('category_id', categoryId)
+              .maybeSingle();
+
+            if (dbError) {
+              console.error('Error polling for results:', dbError);
+              continue;
+            }
+
+            if (dbData?.analysis) {
+              // Check if this is a fresh analysis (updated within last 5 minutes)
+              const updatedAt = new Date(dbData.updated_at);
+              const now = new Date();
+              const diffMinutes = (now.getTime() - updatedAt.getTime()) / (1000 * 60);
+              
+              if (diffMinutes < 5) {
+                return dbData.analysis as unknown as IngredientAnalysis;
+              }
+            }
+          }
+          return null;
+        };
+
+        const result = await pollForResults();
+        
+        if (result) {
+          setAnalysis(result);
+          const hasComparisonTable = !!result.ingredient_comparison_table;
+          const tableRowCount = result.ingredient_comparison_table?.rows?.length || 0;
+
+          toast({
+            title: 'Analysis Complete',
+            description: `Analysis complete with ${result.ingredients?.length || 0} ingredients${hasComparisonTable ? ` and ${tableRowCount}-row comparison table` : ''}.`,
+          });
+        } else {
+          throw new Error('Analysis timed out. Please try again.');
+        }
+      } else if (data?.analysis) {
+        // Legacy path - direct response
+        setAnalysis(data.analysis);
         toast({
           title: 'Analysis Complete',
-          description: `Analysis complete with ${data.analysis.ingredients?.length || 0} ingredients${hasComparisonTable ? ` and ${tableRowCount}-row comparison table` : ''}.`,
+          description: `Analysis complete with ${data.analysis.ingredients?.length || 0} ingredients.`,
         });
       }
     } catch (err) {

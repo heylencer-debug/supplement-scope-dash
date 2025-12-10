@@ -328,7 +328,7 @@ export default function Dashboard() {
   const isDataLoading = analysisLoading || productsLoading;
 
   return (
-    <div className="space-y-10 pb-16">
+    <div className="space-y-6 md:space-y-10 pb-12 md:pb-16">
       {/* SECTION 1: Hero Header with Executive Summary */}
       <div className="animate-fade-in">
         <HeroHeader
@@ -369,7 +369,7 @@ export default function Dashboard() {
               <Progress value={progress.overallPercentage} className="h-2" />
               
               {/* Phase-by-phase breakdown */}
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3 mt-4">
                 {progress.phases.map((phase, idx) => {
                   const PhaseIcon = [CheckCircle2, Package, Eye, BarChart3, MessageSquare, Sparkles][idx] || Circle;
                   const isComplete = phase.percentage >= 100;

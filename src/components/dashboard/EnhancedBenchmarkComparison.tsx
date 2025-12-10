@@ -8,7 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Star, TrendingUp, Pill, Target, MessageSquare, Package, Users, Megaphone, AlertTriangle, CheckCircle, XCircle, Palette, Search, Filter, X, Trophy, ThumbsUp, ThumbsDown, Check, FlaskConical, Scale, Award, Beaker, ChevronDown, ChevronUp, BarChart3, DollarSign, Eye, Layers, Shield, Tag, Sparkles } from "lucide-react";
+import { Star, TrendingUp, Pill, Target, MessageSquare, Package, Users, Megaphone, AlertTriangle, CheckCircle, XCircle, Palette, Search, Filter, X, Trophy, ThumbsUp, ThumbsDown, Check, FlaskConical, Scale, Award, Beaker, ChevronDown, ChevronUp, BarChart3, DollarSign, Eye, Layers, Shield, Tag, Sparkles, FileText } from "lucide-react";
 import { useProducts, Product } from "@/hooks/useProducts";
 import ProductDetailModal from "@/components/ProductDetailModal";
 import { useToast } from "@/hooks/use-toast";
@@ -1323,7 +1323,7 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                           <Fragment key={categoryName}>
                             {/* Category Header */}
                             <TableRow className={style.bg}>
-                              <TableCell colSpan={competitors.length + 2} className="py-2">
+                              <TableCell colSpan={competitors.length + 3} className="py-2">
                                 <div className={`flex items-center gap-2 text-xs font-semibold ${style.text}`}>
                                   {style.icon}
                                   {style.label} ({categoryIngredients.length})
@@ -1357,6 +1357,13 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                                     <span className="text-[10px] text-muted-foreground">—</span>
                                   )}
                                 </TableCell>
+                                <TableCell>
+                                  {ing.ourLabelClaim ? (
+                                    <Badge variant="outline" className="text-[10px] border-chart-4/50 text-chart-4 bg-chart-4/5">{ing.ourLabelClaim}</Badge>
+                                  ) : (
+                                    <span className="text-[10px] text-muted-foreground">—</span>
+                                  )}
+                                </TableCell>
                                 {competitors.slice(0, 3).map((p) => {
                                   const compData = ing.competitors.find(c => c.brand === (p.brand || 'Unknown'));
                                   return (
@@ -1381,7 +1388,7 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                       {groupedNutrients['Other'] && groupedNutrients['Other'].length > 0 && (
                         <Fragment>
                           <TableRow className="bg-muted/30">
-                            <TableCell colSpan={competitors.length + 2} className="py-2">
+                            <TableCell colSpan={competitors.length + 3} className="py-2">
                               <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
                                 <Pill className="w-3.5 h-3.5" />
                                 Other Ingredients ({groupedNutrients['Other'].length})
@@ -1409,6 +1416,13 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                                   <span className="text-[10px] text-muted-foreground">—</span>
                                 )}
                               </TableCell>
+                              <TableCell>
+                                {ing.ourLabelClaim ? (
+                                  <Badge variant="outline" className="text-[10px] border-chart-4/50 text-chart-4 bg-chart-4/5">{ing.ourLabelClaim}</Badge>
+                                ) : (
+                                  <span className="text-[10px] text-muted-foreground">—</span>
+                                )}
+                              </TableCell>
                               {competitors.slice(0, 3).map((p) => {
                                 const compData = ing.competitors.find(c => c.brand === (p.brand || 'Unknown'));
                                 return (
@@ -1432,7 +1446,7 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                       {otherIngredientsOnly.length > 0 && (
                         <Fragment>
                           <TableRow className="bg-destructive/5">
-                            <TableCell colSpan={competitors.length + 2} className="py-2">
+                            <TableCell colSpan={competitors.length + 3} className="py-2">
                               <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
                                 <AlertTriangle className="w-3.5 h-3.5" />
                                 Competitor-Only Ingredients ({otherIngredientsOnly.length})
@@ -1448,6 +1462,9 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                                   </span>
                                   <span title={ing.name}>{ing.name}</span>
                                 </div>
+                              </TableCell>
+                              <TableCell>
+                                <span className="text-[10px] text-muted-foreground">—</span>
                               </TableCell>
                               <TableCell>
                                 <span className="text-[10px] text-muted-foreground">—</span>

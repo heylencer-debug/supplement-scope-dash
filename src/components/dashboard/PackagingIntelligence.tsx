@@ -308,6 +308,19 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
         <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
           <Package className="w-5 h-5 text-primary" />
           Winning Packaging Strategy
+          {/* AI Analysis Status Indicator */}
+          {hasAnalysis && (
+            <Badge variant="secondary" className="ml-2 bg-chart-4/10 text-chart-4 border-chart-4/20 text-[10px] font-medium">
+              <Sparkles className="w-3 h-3 mr-1" />
+              AI Enhanced
+            </Badge>
+          )}
+          {isLoadingFromDb && (
+            <Badge variant="secondary" className="ml-2 bg-muted text-muted-foreground text-[10px] font-medium">
+              <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+              Loading...
+            </Badge>
+          )}
         </CardTitle>
         <CardDescription className="flex items-center justify-between flex-wrap gap-2">
           <span>Market intelligence for optimal packaging format, pricing, and positioning</span>
@@ -353,12 +366,23 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* AI Analysis Results */}
+        {/* AI Analysis Loading State */}
         {isLoadingFromDb && (
-          <div className="p-4 bg-muted/30 rounded-lg border border-border/50">
+          <div className="p-4 bg-muted/30 rounded-lg border border-border/50 animate-pulse">
             <div className="flex items-center gap-2">
               <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Loading saved analysis...</span>
+              <span className="text-sm text-muted-foreground">Loading saved AI analysis...</span>
+            </div>
+          </div>
+        )}
+
+        {/* AI Analysis Available Indicator */}
+        {aiAnalysis && !isLoadingFromDb && (
+          <div className="p-3 bg-chart-4/5 rounded-lg border border-chart-4/20 mb-4">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-chart-4" />
+              <span className="text-sm font-medium text-chart-4">AI Packaging Analysis Available</span>
+              <span className="text-xs text-muted-foreground ml-auto">Scroll down to view results</span>
             </div>
           </div>
         )}

@@ -2831,12 +2831,6 @@ export function EnhancedBenchmarkComparison({
         categoryId={categoryId}
       />
 
-      {/* PACKAGING STRATEGY COMPARISON */}
-      <PackagingComparisonSection
-        ourPackaging={getOurPackaging()}
-        competitors={displayedProducts}
-        getCompetitorPackaging={getCompetitorPackaging}
-      />
 
       {/* Product Detail Modal */}
       <ProductDetailModal 

@@ -1,9 +1,10 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Package, CheckCircle2, Award, Tag, Shield, DollarSign, Hash, Eye, Zap, Sparkles, Loader2, RefreshCw, Trash2 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Package, CheckCircle2, Award, Tag, Shield, DollarSign, Hash, Eye, Zap, Sparkles, Loader2, RefreshCw, Trash2, Clock } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { usePackagingAnalysis } from "@/hooks/usePackagingAnalysis";
 import { AIPackagingResults } from "./AIPackagingResults";
@@ -41,6 +42,72 @@ interface PackagingIntelligenceProps {
   productsData?: ProductData[];
   isLoading?: boolean;
   categoryId?: string;
+}
+
+// Progress indicator component for AI analysis
+function AnalysisProgressIndicator({ 
+  startedAt, 
+  attempt, 
+  maxAttempts 
+}: { 
+  startedAt: Date; 
+  attempt: number; 
+  maxAttempts: number;
+}) {
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const estimatedTotalSeconds = 90; // ~90 seconds typical analysis time
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = new Date();
+      const elapsed = Math.floor((now.getTime() - startedAt.getTime()) / 1000);
+      setElapsedSeconds(elapsed);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [startedAt]);
+
+  const progressPercent = Math.min((elapsedSeconds / estimatedTotalSeconds) * 100, 95);
+  const remainingSeconds = Math.max(estimatedTotalSeconds - elapsedSeconds, 5);
+  
+  const formatTime = (seconds: number) => {
+    if (seconds < 60) return `${seconds}s`;
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}m ${secs}s`;
+  };
+
+  const getStageMessage = () => {
+    if (elapsedSeconds < 10) return "Preparing data for AI analysis...";
+    if (elapsedSeconds < 30) return "AI analyzing competitor packaging...";
+    if (elapsedSeconds < 60) return "Generating design recommendations...";
+    if (elapsedSeconds < 90) return "Finalizing packaging strategy...";
+    return "Almost there, finishing up...";
+  };
+
+  return (
+    <div className="p-5 bg-primary/5 rounded-xl border border-primary/20">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-5 h-5 text-primary animate-pulse" />
+          <span className="font-medium text-foreground">AI Packaging Analysis</span>
+        </div>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Clock className="w-4 h-4" />
+          <span>~{formatTime(remainingSeconds)} remaining</span>
+        </div>
+      </div>
+      
+      <Progress value={progressPercent} className="h-2 mb-3" />
+      
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-muted-foreground">{getStageMessage()}</span>
+        <span className="text-xs text-muted-foreground">
+          {formatTime(elapsedSeconds)} elapsed
+        </span>
+      </div>
+    </div>
+  );
 }
 
 export function PackagingIntelligence({ packagingData, productsClaims, productsData = [], isLoading, categoryId }: PackagingIntelligenceProps) {
@@ -368,6 +435,15 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* AI Analysis Progress Indicator */}
+        {isAnalyzing && pollingStatus.isPolling && pollingStatus.startedAt && (
+          <AnalysisProgressIndicator 
+            startedAt={pollingStatus.startedAt}
+            attempt={pollingStatus.attempt}
+            maxAttempts={pollingStatus.maxAttempts}
+          />
+        )}
+
         {/* AI Analysis Loading State */}
         {isLoadingFromDb && (
           <div className="p-4 bg-muted/30 rounded-lg border border-border/50 animate-pulse">

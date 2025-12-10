@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -37,30 +37,42 @@ export interface IngredientAnalysis {
   }>;
 }
 
-const CACHE_KEY_PREFIX = 'ingredient_analysis_';
-const CACHE_TTL_MS = 1000 * 60 * 60; // 1 hour
-
 export function useIngredientAnalysis(categoryId?: string) {
-  const [analysis, setAnalysis] = useState<IngredientAnalysis | null>(() => {
-    // Try to load from cache on initial render
-    if (categoryId) {
-      try {
-        const cached = localStorage.getItem(`${CACHE_KEY_PREFIX}${categoryId}`);
-        if (cached) {
-          const { data, timestamp } = JSON.parse(cached);
-          if (Date.now() - timestamp < CACHE_TTL_MS) {
-            return data;
-          }
-        }
-      } catch (e) {
-        console.error('Error loading cached analysis:', e);
-      }
-    }
-    return null;
-  });
+  const [analysis, setAnalysis] = useState<IngredientAnalysis | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingFromDb, setIsLoadingFromDb] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
+
+  // Load from database on mount
+  useEffect(() => {
+    async function loadFromDb() {
+      if (!categoryId) {
+        setIsLoadingFromDb(false);
+        return;
+      }
+
+      try {
+        const { data, error: dbError } = await supabase
+          .from('ingredient_analyses')
+          .select('analysis')
+          .eq('category_id', categoryId)
+          .maybeSingle();
+
+        if (dbError) {
+          console.error('Error loading analysis from DB:', dbError);
+        } else if (data?.analysis) {
+          setAnalysis(data.analysis as unknown as IngredientAnalysis);
+        }
+      } catch (e) {
+        console.error('Error loading analysis from DB:', e);
+      } finally {
+        setIsLoadingFromDb(false);
+      }
+    }
+
+    loadFromDb();
+  }, [categoryId]);
 
   const runAnalysis = useCallback(async () => {
     if (!categoryId) {
@@ -90,16 +102,6 @@ export function useIngredientAnalysis(categoryId?: string) {
 
       if (data?.analysis) {
         setAnalysis(data.analysis);
-        
-        // Cache the result
-        try {
-          localStorage.setItem(
-            `${CACHE_KEY_PREFIX}${categoryId}`,
-            JSON.stringify({ data: data.analysis, timestamp: Date.now() })
-          );
-        } catch (e) {
-          console.error('Error caching analysis:', e);
-        }
 
         toast({
           title: 'Analysis Complete',
@@ -119,14 +121,19 @@ export function useIngredientAnalysis(categoryId?: string) {
     }
   }, [categoryId, toast]);
 
-  const clearAnalysis = useCallback(() => {
+  const clearAnalysis = useCallback(async () => {
     setAnalysis(null);
     setError(null);
+    
+    // Delete from database
     if (categoryId) {
       try {
-        localStorage.removeItem(`${CACHE_KEY_PREFIX}${categoryId}`);
+        await supabase
+          .from('ingredient_analyses')
+          .delete()
+          .eq('category_id', categoryId);
       } catch (e) {
-        console.error('Error clearing cached analysis:', e);
+        console.error('Error clearing analysis from DB:', e);
       }
     }
   }, [categoryId]);
@@ -134,6 +141,7 @@ export function useIngredientAnalysis(categoryId?: string) {
   return {
     analysis,
     isLoading,
+    isLoadingFromDb,
     error,
     runAnalysis,
     clearAnalysis,

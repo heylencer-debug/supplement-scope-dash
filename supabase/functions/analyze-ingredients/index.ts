@@ -280,6 +280,22 @@ Focus on the most important active ingredients first. Be specific about dosages 
     const analysis: IngredientAnalysis = toolUse.input;
     console.log('Analysis complete:', analysis.summary.overall_assessment);
 
+    // Save analysis to database (upsert)
+    const { error: upsertError } = await supabase
+      .from('ingredient_analyses')
+      .upsert({
+        category_id: categoryId,
+        analysis: analysis,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'category_id' });
+
+    if (upsertError) {
+      console.error('Error saving analysis to database:', upsertError);
+      // Don't fail the request, just log the error
+    } else {
+      console.log('Analysis saved to database');
+    }
+
     return new Response(
       JSON.stringify({ success: true, analysis }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

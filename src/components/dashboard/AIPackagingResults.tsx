@@ -53,6 +53,10 @@ export function AIPackagingResults({ analysis }: AIPackagingResultsProps) {
     }
   };
 
+  if (!analysis) {
+    return null;
+  }
+
   return (
     <div className="space-y-6 mt-6">
       {/* Summary Card */}
@@ -64,10 +68,10 @@ export function AIPackagingResults({ analysis }: AIPackagingResultsProps) {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-sm text-foreground">{analysis.summary.design_strategy}</p>
+          <p className="text-sm text-foreground">{analysis.summary?.design_strategy}</p>
           
           <div className="flex flex-wrap gap-2">
-            {analysis.summary.key_differentiators.map((diff, idx) => (
+            {(analysis.summary?.key_differentiators || []).map((diff, idx) => (
               <Badge key={idx} variant="secondary" className="text-xs">
                 {diff}
               </Badge>
@@ -76,7 +80,7 @@ export function AIPackagingResults({ analysis }: AIPackagingResultsProps) {
           
           <div className="p-3 bg-background rounded-lg border border-border/50">
             <span className="text-xs font-medium text-muted-foreground">Shelf Positioning:</span>
-            <p className="text-sm text-foreground mt-1">{analysis.summary.target_shelf_positioning}</p>
+            <p className="text-sm text-foreground mt-1">{analysis.summary?.target_shelf_positioning}</p>
           </div>
         </CardContent>
       </Card>
@@ -194,7 +198,7 @@ export function AIPackagingResults({ analysis }: AIPackagingResultsProps) {
               <div>
                 <p className="text-xs font-medium text-muted-foreground mb-2">Visual Hierarchy</p>
                 <ol className="space-y-1">
-                  {analysis.front_panel.visual_hierarchy.map((item, idx) => (
+                  {(analysis.front_panel?.visual_hierarchy || []).map((item, idx) => (
                     <li key={idx} className="flex items-center gap-2 text-sm">
                       <span className="w-5 h-5 rounded-full bg-primary/10 text-primary text-xs flex items-center justify-center font-medium">
                         {idx + 1}
@@ -207,13 +211,13 @@ export function AIPackagingResults({ analysis }: AIPackagingResultsProps) {
 
               <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
                 <p className="text-xs font-medium text-primary mb-1">Primary Claim</p>
-                <p className="text-lg font-bold text-foreground">{analysis.front_panel.primary_claim}</p>
+                <p className="text-lg font-bold text-foreground">{analysis.front_panel?.primary_claim}</p>
               </div>
 
               <div>
                 <p className="text-xs font-medium text-muted-foreground mb-2">Secondary Claims</p>
                 <div className="flex flex-wrap gap-2">
-                  {analysis.front_panel.secondary_claims.map((claim, idx) => (
+                  {(analysis.front_panel?.secondary_claims || []).map((claim, idx) => (
                     <Badge key={idx} variant="outline" className="text-xs">
                       {claim}
                     </Badge>
@@ -223,13 +227,13 @@ export function AIPackagingResults({ analysis }: AIPackagingResultsProps) {
 
               <div>
                 <p className="text-xs font-medium text-muted-foreground mb-1">Brand Positioning</p>
-                <p className="text-sm italic">"{analysis.front_panel.brand_positioning_statement}"</p>
+                <p className="text-sm italic">"{analysis.front_panel?.brand_positioning_statement}"</p>
               </div>
 
               <div>
                 <p className="text-xs font-medium text-muted-foreground mb-2">Required Elements</p>
                 <ul className="space-y-1">
-                  {analysis.front_panel.required_elements.map((element, idx) => (
+                  {(analysis.front_panel?.required_elements || []).map((element, idx) => (
                     <li key={idx} className="flex items-center gap-2 text-sm">
                       <CheckCircle2 className="w-3 h-3 text-chart-4" />
                       {element}
@@ -248,7 +252,7 @@ export function AIPackagingResults({ analysis }: AIPackagingResultsProps) {
               <CardTitle className="text-sm">Recommended Certifications</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {analysis.trust_signals.recommended_certifications.map((cert, idx) => (
+              {(analysis.trust_signals?.recommended_certifications || []).map((cert, idx) => (
                 <div key={idx} className="p-3 rounded-lg border border-border/50 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="font-medium text-sm">{cert.badge}</span>
@@ -268,7 +272,7 @@ export function AIPackagingResults({ analysis }: AIPackagingResultsProps) {
             </CardHeader>
             <CardContent>
               <ul className="space-y-2">
-                {analysis.trust_signals.trust_building_elements.map((element, idx) => (
+                {(analysis.trust_signals?.trust_building_elements || []).map((element, idx) => (
                   <li key={idx} className="flex items-center gap-2 text-sm">
                     <Shield className="w-3 h-3 text-chart-1" />
                     {element}
@@ -299,7 +303,7 @@ export function AIPackagingResults({ analysis }: AIPackagingResultsProps) {
               <div>
                 <p className="text-xs font-medium text-muted-foreground mb-2">Bullet Points</p>
                 <ul className="space-y-2">
-                  {analysis.copy_content.bullet_points.map((bullet, idx) => (
+                  {(analysis.copy_content?.bullet_points || []).map((bullet, idx) => (
                     <li key={idx} className="flex items-start gap-2 text-sm">
                       <span className="w-1.5 h-1.5 rounded-full bg-primary mt-2" />
                       {bullet}
@@ -332,7 +336,7 @@ export function AIPackagingResults({ analysis }: AIPackagingResultsProps) {
               <CardTitle className="text-sm">Psychological Conversion Triggers</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {analysis.conversion_triggers.map((trigger, idx) => (
+              {(analysis.conversion_triggers || []).map((trigger, idx) => (
                 <div key={idx} className="p-3 rounded-lg border border-border/50 space-y-2">
                   <div className="flex items-center gap-2">
                     <Zap className="w-4 h-4 text-chart-2" />
@@ -362,19 +366,19 @@ export function AIPackagingResults({ analysis }: AIPackagingResultsProps) {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="p-4 bg-chart-4/5 rounded-lg border border-chart-4/20">
-                <p className="text-xs font-medium text-chart-4 mb-1">vs. Market Leader: {analysis.competitive_positioning.vs_leader.competitor}</p>
-                <p className="text-sm">{analysis.competitive_positioning.vs_leader.our_advantage}</p>
+                <p className="text-xs font-medium text-chart-4 mb-1">vs. Market Leader: {analysis.competitive_positioning?.vs_leader?.competitor}</p>
+                <p className="text-sm">{analysis.competitive_positioning?.vs_leader?.our_advantage}</p>
               </div>
 
               <div>
                 <p className="text-xs font-medium text-muted-foreground mb-1">Market Gap Filled</p>
-                <p className="text-sm">{analysis.competitive_positioning.market_gap_filled}</p>
+                <p className="text-sm">{analysis.competitive_positioning?.market_gap_filled}</p>
               </div>
 
               <div>
                 <p className="text-xs font-medium text-muted-foreground mb-2">Differentiation Elements</p>
                 <div className="flex flex-wrap gap-2">
-                  {analysis.competitive_positioning.differentiation_elements.map((element, idx) => (
+                  {(analysis.competitive_positioning?.differentiation_elements || []).map((element, idx) => (
                     <Badge key={idx} variant="secondary" className="text-xs">
                       {element}
                     </Badge>
@@ -390,7 +394,7 @@ export function AIPackagingResults({ analysis }: AIPackagingResultsProps) {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {analysis.competitor_comparison.map((comp, idx) => (
+                {(analysis.competitor_comparison || []).map((comp, idx) => (
                   <div key={idx} className="p-3 rounded-lg border border-border/50 space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="font-medium text-sm">{comp.competitor}</span>
@@ -418,7 +422,7 @@ export function AIPackagingResults({ analysis }: AIPackagingResultsProps) {
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                {analysis.implementation_priorities.map((item, idx) => (
+                {(analysis.implementation_priorities || []).map((item, idx) => (
                   <div key={idx} className="flex items-center gap-3 p-2 rounded-lg border border-border/50">
                     <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
                       item.priority === 1 ? 'bg-destructive/10 text-destructive' :
@@ -471,7 +475,7 @@ export function AIPackagingResults({ analysis }: AIPackagingResultsProps) {
             </CardHeader>
             <CardContent>
               <ul className="space-y-2">
-                {analysis.mock_content.side_panel_suggestions.map((suggestion, idx) => (
+                {(analysis.mock_content?.side_panel_suggestions || []).map((suggestion, idx) => (
                   <li key={idx} className="flex items-start gap-2 text-sm">
                     <AlertCircle className="w-3 h-3 text-chart-3 mt-1" />
                     {suggestion}

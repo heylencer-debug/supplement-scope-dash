@@ -127,7 +127,7 @@ export function DeepDiveSection({
           Performance across key market criteria (hover for details)
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-4 sm:p-6">
         {isLoading ? (
           <div className="space-y-6">
             {/* Radar Chart Skeleton */}

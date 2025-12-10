@@ -31,8 +31,8 @@ export function FinancialProjections({ financials, isLoading }: FinancialProject
           </CardTitle>
           <CardDescription>Startup investment, revenue targets, and margin projections</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="grid lg:grid-cols-2 gap-8">
+        <CardContent className="p-4 sm:p-6">
+          <div className="grid lg:grid-cols-2 gap-6 sm:gap-8">
             <div className="space-y-4">
               <Skeleton className="h-4 w-32" />
               <Skeleton className="h-[200px] w-full rounded-lg" />
@@ -94,8 +94,8 @@ export function FinancialProjections({ financials, isLoading }: FinancialProject
         </CardTitle>
         <CardDescription>Startup investment, revenue targets, and margin projections</CardDescription>
       </CardHeader>
-      <CardContent>
-        <div className="grid lg:grid-cols-2 gap-8">
+      <CardContent className="p-4 sm:p-6">
+        <div className="grid lg:grid-cols-2 gap-6 sm:gap-8">
           {/* Startup Investment Breakdown */}
           {(investmentData.length > 0 || startup_investment?.total) && (
             <div className="space-y-4">

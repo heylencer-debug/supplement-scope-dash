@@ -55,7 +55,7 @@ export function LaunchPlanSection({
             Go-to-market strategy and execution roadmap
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-8">
+        <CardContent className="p-4 sm:p-6 space-y-6 sm:space-y-8">
           {/* Winning Hook Skeleton */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
@@ -176,7 +176,7 @@ export function LaunchPlanSection({
           Go-to-market strategy and execution roadmap
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-8 animate-enter">
+      <CardContent className="p-4 sm:p-6 space-y-6 sm:space-y-8 animate-enter">
         {/* Launch Strategy Section */}
         {hasLaunchStrategy && (
           <div className="space-y-6">

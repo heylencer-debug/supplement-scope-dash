@@ -1518,29 +1518,26 @@ export function EnhancedBenchmarkComparison({
     return null;
   };
 
-  // Get competitor USPs from product listing data (feature bullets, claims)
+  // Get competitor USPs from marketing analysis creative_brief.unique_selling_props
   const getCompetitorUSPs = (product: Product): string[] | null => {
-    const usps: string[] = [];
+    const marketingAnalysis = product.marketing_analysis as Record<string, unknown> | null;
+    if (!marketingAnalysis) return null;
     
-    // Primary source: feature_bullets from product listing
-    if (product.feature_bullets && Array.isArray(product.feature_bullets)) {
-      usps.push(...product.feature_bullets);
+    // Primary source: creative_brief.unique_selling_props (AI-extracted USPs)
+    const creativeBrief = marketingAnalysis.creative_brief as Record<string, unknown> | undefined;
+    const usps = creativeBrief?.unique_selling_props as string[] | undefined;
+    if (usps && Array.isArray(usps) && usps.length > 0) {
+      return usps;
     }
     
-    // Secondary source: claims_on_label
-    if (product.claims_on_label && Array.isArray(product.claims_on_label)) {
-      usps.push(...product.claims_on_label);
+    // Fallback: competitive_analysis.unique_selling_points
+    const competitiveAnalysis = marketingAnalysis.competitive_analysis as Record<string, unknown> | undefined;
+    const uniqueSellingPoints = competitiveAnalysis?.unique_selling_points as string[] | undefined;
+    if (uniqueSellingPoints && Array.isArray(uniqueSellingPoints) && uniqueSellingPoints.length > 0) {
+      return uniqueSellingPoints;
     }
     
-    // Tertiary source: claims field (may be comma-separated string)
-    if (product.claims && typeof product.claims === 'string') {
-      const claimsList = product.claims.split(',').map(c => c.trim()).filter(Boolean);
-      usps.push(...claimsList);
-    }
-    
-    // Remove duplicates and return unique items
-    const uniqueUSPs = [...new Set(usps)].filter(Boolean);
-    return uniqueUSPs.length > 0 ? uniqueUSPs : null;
+    return null;
   };
 
   // Fixed: Multi-source Target Audience extraction using correct data paths

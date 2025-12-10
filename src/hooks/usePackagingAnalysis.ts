@@ -86,7 +86,14 @@ export function usePackagingAnalysis(categoryId?: string) {
   }>({ isPolling: false, attempt: 0, maxAttempts: 60, startedAt: null });
   const { toast } = useToast();
 
-  // Load from database on mount
+  // Reset state when categoryId changes
+  useEffect(() => {
+    setAnalysis(null);
+    setIsLoadingFromDb(true);
+    setError(null);
+  }, [categoryId]);
+
+  // Load from database on mount/when categoryId changes
   useEffect(() => {
     async function loadFromDb() {
       if (!categoryId) {

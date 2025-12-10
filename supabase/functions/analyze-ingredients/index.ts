@@ -236,7 +236,7 @@ serve(async (req) => {
           },
           body: JSON.stringify({
             model: 'claude-sonnet-4-5',
-            max_tokens: 16384,
+            max_tokens: 32768,
             tools: [
               {
                 name: 'analyze_ingredients',

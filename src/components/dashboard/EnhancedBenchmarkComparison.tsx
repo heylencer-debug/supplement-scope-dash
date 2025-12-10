@@ -48,7 +48,10 @@ interface EnhancedBenchmarkComparisonProps {
       };
       product_development?: {
         formulation?: {
-          recommended_ingredients?: Array<string | { ingredient?: string; name?: string }>;
+          recommended_ingredients?: Array<string | { ingredient?: string; name?: string; dosage?: string; amount?: string; rationale?: string }>;
+          key_ingredients?: Array<string | { ingredient?: string; name?: string; dosage?: string; amount?: string }>;
+          active_ingredients?: Array<string | { ingredient?: string; name?: string; dosage?: string; amount?: string }>;
+          other_ingredients?: Array<string | { ingredient?: string; name?: string }>;
           form_factor?: string;
           key_features?: string[];
           serving_size?: string;
@@ -75,6 +78,7 @@ interface EnhancedBenchmarkComparisonProps {
       risk_factors?: string[];
       target_price?: number;
       servings_per_container?: number;
+      ingredients?: Array<string | { ingredient?: string; name?: string; dosage?: string; amount?: string; rationale?: string }>;
     };
     opportunity_index?: number;
     recommended_price?: number;
@@ -1722,20 +1726,18 @@ export function EnhancedBenchmarkComparison({
   };
 
   // Get Our Concept recommended ingredients with dosages from analysis - NO LIMIT (show all)
+  // This function pulls from MULTIPLE sources to ensure complete ingredient data
   const getOurRecommendedDosages = (): Array<{ ingredient: string; dosage?: string; rationale?: string }> => {
-    const ingredients = analysisData?.analysis_1_category_scores?.product_development?.formulation?.recommended_ingredients;
-    if (!ingredients || !Array.isArray(ingredients)) return [];
+    const results: Array<{ ingredient: string; dosage?: string; rationale?: string }> = [];
+    const seenIngredients = new Set<string>();
     
-    return ingredients.map(ing => {
+    // Helper to parse ingredient string and extract dosage
+    const parseIngredient = (ing: string | Record<string, unknown>): { ingredient: string; dosage?: string; rationale?: string } | null => {
       if (typeof ing === 'string') {
         // Improved regex to parse dosage from string like "Apple Cider Vinegar Powder 500mg" or "Vitamin B12 1.2mcg"
-        // Match pattern: ingredient name followed by optional number+unit at the end
         const match = ing.match(/^(.+?)\s+(\d+(?:\.\d+)?\s*(?:mg|mcg|iu|g|ml|μg)(?:\s+.*?)?)$/i);
         if (match) {
-          return {
-            ingredient: match[1].trim(),
-            dosage: match[2].trim()
-          };
+          return { ingredient: match[1].trim(), dosage: match[2].trim() };
         }
         // Try alternate pattern for "ingredient amount unit reason" format
         const altMatch = ing.match(/^(.+?)\s+(\d+(?:\.\d+)?)\s*(mg|mcg|iu|g|ml|μg)\b(.*)$/i);
@@ -1755,7 +1757,41 @@ export function EnhancedBenchmarkComparison({
         dosage: (ingObj.dosage as string) || (ingObj.amount as string) || undefined,
         rationale: (ingObj.rationale as string) || undefined
       };
-    });
+    };
+    
+    // Helper to add ingredients while avoiding duplicates
+    const addIngredients = (ingredientList: unknown[] | undefined) => {
+      if (!ingredientList || !Array.isArray(ingredientList)) return;
+      ingredientList.forEach(ing => {
+        const parsed = parseIngredient(ing as string | Record<string, unknown>);
+        if (parsed) {
+          const normalizedName = parsed.ingredient.toLowerCase().trim();
+          if (!seenIngredients.has(normalizedName)) {
+            seenIngredients.add(normalizedName);
+            results.push(parsed);
+          }
+        }
+      });
+    };
+    
+    const formulation = analysisData?.analysis_1_category_scores?.product_development?.formulation;
+    
+    // Source 1: recommended_ingredients (PRIMARY - most complete)
+    addIngredients(formulation?.recommended_ingredients as unknown[]);
+    
+    // Source 2: key_ingredients (may have additional items)
+    addIngredients(formulation?.key_ingredients as unknown[]);
+    
+    // Source 3: active_ingredients (may have additional items)
+    addIngredients(formulation?.active_ingredients as unknown[]);
+    
+    // Source 4: other_ingredients (inactive/filler ingredients)
+    addIngredients(formulation?.other_ingredients as unknown[]);
+    
+    // Source 5: formula_brief.ingredients (backup source)
+    addIngredients(analysisData?.formula_brief?.ingredients as unknown[]);
+    
+    return results;
   };
 
   // Get competitor packaging data for comparison

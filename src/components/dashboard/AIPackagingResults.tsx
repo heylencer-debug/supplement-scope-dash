@@ -270,7 +270,12 @@ export function AIPackagingResults({ analysis, mockupImageUrl, onSaveMockup }: A
             bulletPoints,
             callToAction,
             headlineFont,
-            bodyFont
+            bodyFont,
+            // Include the full mock content for accurate label text
+            frontPanelText,
+            backPanelText,
+            keyDifferentiators,
+            trustSignals
           }
         }
       });

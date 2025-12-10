@@ -36,6 +36,11 @@ serve(async (req) => {
     const callToAction = designBrief.callToAction;
     const headlineFont = designBrief.headlineFont;
     const bodyFont = designBrief.bodyFont;
+    
+    // NEW: Get the actual mock content text for the label
+    const frontPanelText = designBrief.frontPanelText;
+    const keyDifferentiators = designBrief.keyDifferentiators;
+    const trustSignals = designBrief.trustSignals;
 
     // Build certification string
     const certBadges = certifications?.length > 0 
@@ -47,14 +52,46 @@ serve(async (req) => {
       ? bulletPoints.slice(0, 3).join("; ")
       : null;
 
-    // Build a detailed, data-driven prompt
+    // Build differentiators string
+    const differentiatorsList = keyDifferentiators?.length > 0
+      ? keyDifferentiators.slice(0, 4).join(", ")
+      : null;
+
+    // Build trust signals string  
+    const trustSignalsList = trustSignals?.length > 0
+      ? trustSignals.slice(0, 3).join(", ")
+      : null;
+
+    // Build a detailed, data-driven prompt using MOCK CONTENT
     const promptParts = [
       "Professional product photography of a premium supplement gummy bottle on a clean white studio background.",
       "",
-      "EXACT DESIGN SPECIFICATIONS FROM BRAND BRIEF:"
+      "EXACT LABEL TEXT TO DISPLAY (use this exact text on the bottle label):"
     ];
 
-    // Colors - only include if we have actual data
+    // Use the front panel mock content if available - this is the PRIMARY source
+    if (frontPanelText) {
+      promptParts.push("");
+      promptParts.push("--- FRONT LABEL TEXT (copy exactly) ---");
+      promptParts.push(frontPanelText);
+      promptParts.push("--- END FRONT LABEL ---");
+    } else {
+      // Fallback to individual fields if no mock content
+      if (primaryClaim) {
+        promptParts.push(`- Main headline: "${primaryClaim}"`);
+      }
+      if (benefitsList) {
+        promptParts.push(`- Benefit bullets: ${benefitsList}`);
+      }
+      if (callToAction) {
+        promptParts.push(`- Call to action: "${callToAction}"`);
+      }
+    }
+
+    promptParts.push("");
+    promptParts.push("DESIGN SPECIFICATIONS:");
+
+    // Colors
     if (primaryColorName && primaryColorHex) {
       promptParts.push(`- Primary bottle/label color: ${primaryColorName} (${primaryColorHex})`);
     }
@@ -67,24 +104,21 @@ serve(async (req) => {
 
     // Typography
     if (headlineFont) {
-      promptParts.push(`- Headline typography style: ${headlineFont}`);
+      promptParts.push(`- Headline typography: ${headlineFont}`);
     }
     if (bodyFont) {
-      promptParts.push(`- Body text style: ${bodyFont}`);
+      promptParts.push(`- Body text: ${bodyFont}`);
     }
 
-    // Copy content
-    if (primaryClaim) {
-      promptParts.push(`- Main product headline on label: "${primaryClaim}"`);
-    }
+    // Badges and certifications
     if (certBadges) {
-      promptParts.push(`- Certification badges visible: ${certBadges}`);
+      promptParts.push(`- Certification badges: ${certBadges}`);
     }
-    if (benefitsList) {
-      promptParts.push(`- Key benefits shown: ${benefitsList}`);
+    if (differentiatorsList) {
+      promptParts.push(`- Key differentiator badges: ${differentiatorsList}`);
     }
-    if (callToAction) {
-      promptParts.push(`- Call to action text: "${callToAction}"`);
+    if (trustSignalsList) {
+      promptParts.push(`- Trust signals: ${trustSignalsList}`);
     }
 
     promptParts.push("");
@@ -93,6 +127,7 @@ serve(async (req) => {
     promptParts.push("- Clean white or light gradient studio background");
     promptParts.push("- Professional studio lighting with soft shadows");
     promptParts.push("- Premium supplement bottle with modern, clean label design");
+    promptParts.push("- IMPORTANT: The label text must be legible and match the exact text provided above");
     promptParts.push("- High-end pharmaceutical aesthetic");
     promptParts.push("- 4K detail, sharp focus on product");
     promptParts.push("- Slight surface reflection for premium feel");

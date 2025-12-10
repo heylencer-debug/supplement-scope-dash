@@ -120,10 +120,10 @@ export function DeepDiveSection({
   return (
     <Card className="animate-enter [animation-duration:400ms]">
       <CardHeader>
-        <CardTitle className="text-lg font-semibold text-foreground">
+        <CardTitle className="text-base sm:text-lg font-semibold text-foreground">
           18-Point Analysis
         </CardTitle>
-        <CardDescription>
+        <CardDescription className="text-xs sm:text-sm">
           Performance across key market criteria (hover for details)
         </CardDescription>
       </CardHeader>
@@ -215,7 +215,7 @@ export function DeepDiveSection({
         ) : (
           <div className="flex flex-col items-center justify-center h-[300px] text-muted-foreground gap-3">
             <Loader2 className="w-8 h-8 animate-spin text-primary/50" />
-            <p className="text-sm">Loading criteria scores...</p>
+            <p className="text-xs sm:text-sm">Loading criteria scores...</p>
           </div>
         )}
 
@@ -266,15 +266,15 @@ function CriteriaBreakdownPanel({
   if (breakdown.length === 0) return null;
 
   return (
-    <div className="mt-8 pt-8 border-t">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+    <div className="mt-6 sm:mt-8 pt-6 sm:pt-8 border-t">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 sm:mb-6">
         <div className="flex items-center gap-2">
-        <h4 className="text-sm font-semibold text-foreground">
+        <h4 className="text-xs sm:text-sm font-semibold text-foreground">
             Criteria Breakdown
           </h4>
           <Tooltip>
             <TooltipTrigger>
-              <Info className="w-4 h-4 text-muted-foreground" />
+              <Info className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground" />
             </TooltipTrigger>
             <TooltipContent>
               <p className="max-w-xs text-xs">
@@ -302,12 +302,12 @@ function CriteriaBreakdownPanel({
       </div>
 
       {/* Filter Chips */}
-      <div className="flex flex-wrap items-center gap-2 mb-6">
-        <Filter className="w-4 h-4 text-muted-foreground" />
+      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-4 sm:mb-6">
+        <Filter className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground" />
         <Button
           variant={filter === "all" ? "default" : "outline"}
           size="sm"
-          className="h-7 text-xs"
+          className="h-6 sm:h-7 text-[10px] sm:text-xs px-2 sm:px-3"
           onClick={() => setFilter("all")}
         >
           All ({counts.total})
@@ -315,7 +315,7 @@ function CriteriaBreakdownPanel({
         <Button
           variant={filter === "high" ? "default" : "outline"}
           size="sm"
-          className="h-7 text-xs"
+          className="h-6 sm:h-7 text-[10px] sm:text-xs px-2 sm:px-3"
           onClick={() => setFilter("high")}
         >
           Strengths ({counts.high})
@@ -323,7 +323,7 @@ function CriteriaBreakdownPanel({
         <Button
           variant={filter === "medium" ? "default" : "outline"}
           size="sm"
-          className="h-7 text-xs"
+          className="h-6 sm:h-7 text-[10px] sm:text-xs px-2 sm:px-3"
           onClick={() => setFilter("medium")}
         >
           Moderate ({counts.medium})
@@ -331,7 +331,7 @@ function CriteriaBreakdownPanel({
         <Button
           variant={filter === "low" ? "default" : "outline"}
           size="sm"
-          className="h-7 text-xs"
+          className="h-6 sm:h-7 text-[10px] sm:text-xs px-2 sm:px-3"
           onClick={() => setFilter("low")}
         >
           Weaknesses ({counts.low})

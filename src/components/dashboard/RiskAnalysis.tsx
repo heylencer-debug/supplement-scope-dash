@@ -52,25 +52,25 @@ export function RiskAnalysis({ risks, isLoading }: RiskAnalysisProps) {
   return (
     <Card className="border-destructive/20 animate-enter [animation-duration:400ms]">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <AlertTriangle className="w-5 h-5 text-destructive" />
+        <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+          <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-destructive" />
           Risk Analysis
         </CardTitle>
-        <CardDescription>Category challenges, failure patterns, and risk factors to consider</CardDescription>
+        <CardDescription className="text-xs sm:text-sm">Category challenges, failure patterns, and risk factors to consider</CardDescription>
       </CardHeader>
       <CardContent className="p-4 sm:p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 animate-enter">
           {/* Category Challenges */}
           {category_challenges && category_challenges.length > 0 && (
-            <div className="space-y-4">
-              <h4 className="font-medium text-sm flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-chart-2" />
+            <div className="space-y-3 sm:space-y-4">
+              <h4 className="font-medium text-xs sm:text-sm flex items-center gap-2">
+                <AlertCircle className="w-3 h-3 sm:w-4 sm:h-4 text-chart-2" />
                 Category Challenges
               </h4>
               <div className="space-y-2">
                 {category_challenges.map((challenge, idx) => (
-                  <div key={idx} className="p-3 bg-chart-2/5 border border-chart-2/20 rounded-lg">
-                    <p className="text-sm text-foreground">{challenge}</p>
+                  <div key={idx} className="p-2 sm:p-3 bg-chart-2/5 border border-chart-2/20 rounded-lg">
+                    <p className="text-xs sm:text-sm text-foreground">{challenge}</p>
                   </div>
                 ))}
               </div>
@@ -79,18 +79,18 @@ export function RiskAnalysis({ risks, isLoading }: RiskAnalysisProps) {
 
           {/* Failure Patterns to Avoid */}
           {failure_patterns && failure_patterns.length > 0 && (
-            <div className="space-y-4">
-              <h4 className="font-medium text-sm flex items-center gap-2">
-                <XCircle className="w-4 h-4 text-destructive" />
+            <div className="space-y-3 sm:space-y-4">
+              <h4 className="font-medium text-xs sm:text-sm flex items-center gap-2">
+                <XCircle className="w-3 h-3 sm:w-4 sm:h-4 text-destructive" />
                 Failure Patterns to Avoid
               </h4>
               <div className="space-y-2">
                 {failure_patterns.map((pattern, idx) => (
-                  <div key={idx} className="p-3 bg-destructive/5 border border-destructive/20 rounded-lg flex items-start gap-2">
-                    <Badge variant="destructive" className="shrink-0 text-xs">
+                  <div key={idx} className="p-2 sm:p-3 bg-destructive/5 border border-destructive/20 rounded-lg flex items-start gap-2">
+                    <Badge variant="destructive" className="shrink-0 text-[10px] sm:text-xs">
                       Avoid
                     </Badge>
-                    <p className="text-sm text-foreground">{pattern}</p>
+                    <p className="text-xs sm:text-sm text-foreground">{pattern}</p>
                   </div>
                 ))}
               </div>
@@ -99,18 +99,18 @@ export function RiskAnalysis({ risks, isLoading }: RiskAnalysisProps) {
 
           {/* Regulatory Requirements */}
           {regulatory && regulatory.length > 0 && (
-            <div className="space-y-4">
-              <h4 className="font-medium text-sm flex items-center gap-2">
-                <FileWarning className="w-4 h-4 text-chart-2" />
+            <div className="space-y-3 sm:space-y-4">
+              <h4 className="font-medium text-xs sm:text-sm flex items-center gap-2">
+                <FileWarning className="w-3 h-3 sm:w-4 sm:h-4 text-chart-2" />
                 Regulatory Requirements
               </h4>
               <div className="space-y-2">
                 {regulatory.map((req, idx) => (
-                  <div key={idx} className="p-3 bg-chart-2/5 border border-chart-2/20 rounded-lg flex items-start gap-2">
-                    <div className="w-5 h-5 rounded-full bg-chart-2/20 flex items-center justify-center shrink-0">
-                      <span className="text-xs text-chart-2">{idx + 1}</span>
+                  <div key={idx} className="p-2 sm:p-3 bg-chart-2/5 border border-chart-2/20 rounded-lg flex items-start gap-2">
+                    <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-chart-2/20 flex items-center justify-center shrink-0">
+                      <span className="text-[10px] sm:text-xs text-chart-2">{idx + 1}</span>
                     </div>
-                    <p className="text-sm text-foreground">{req}</p>
+                    <p className="text-xs sm:text-sm text-foreground">{req}</p>
                   </div>
                 ))}
               </div>
@@ -119,15 +119,15 @@ export function RiskAnalysis({ risks, isLoading }: RiskAnalysisProps) {
 
           {/* Supply Chain Risks */}
           {supply_chain && supply_chain.length > 0 && (
-            <div className="space-y-4">
-              <h4 className="font-medium text-sm flex items-center gap-2">
-                <Truck className="w-4 h-4 text-chart-5" />
+            <div className="space-y-3 sm:space-y-4">
+              <h4 className="font-medium text-xs sm:text-sm flex items-center gap-2">
+                <Truck className="w-3 h-3 sm:w-4 sm:h-4 text-chart-5" />
                 Supply Chain Risks
               </h4>
               <div className="space-y-2">
                 {supply_chain.map((risk, idx) => (
-                  <div key={idx} className="p-3 bg-chart-5/5 border border-chart-5/20 rounded-lg">
-                    <p className="text-sm text-foreground">{risk}</p>
+                  <div key={idx} className="p-2 sm:p-3 bg-chart-5/5 border border-chart-5/20 rounded-lg">
+                    <p className="text-xs sm:text-sm text-foreground">{risk}</p>
                   </div>
                 ))}
               </div>

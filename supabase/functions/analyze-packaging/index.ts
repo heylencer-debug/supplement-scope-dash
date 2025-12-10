@@ -60,10 +60,16 @@ serve(async (req) => {
       );
     }
 
-    // Fetch top 10 competitors by monthly_sales with packaging data
+    // Extract analysis data
+    const formulaBriefContent = analysisData?.analysis_3_formula_brief?.formula_brief_content || '';
+    const categoryScores = analysisData?.analysis_1_category_scores || {};
+    const categoryName = analysisData?.category_name || 'Unknown Category';
+    const recommendedPackaging = categoryScores?.product_development?.packaging || {};
+
+    // Fetch top 5 competitors by monthly_sales with packaging data and images
     const { data: competitors, error: competitorsError } = await supabase
       .from('products')
-      .select('brand, title, main_image_url, price, claims, claims_on_label, marketing_analysis, monthly_sales, servings_per_container, packaging_type')
+      .select('brand, title, main_image_url, image_urls, price, claims, claims_on_label, marketing_analysis, monthly_sales, servings_per_container, packaging_type, feature_bullets, review_analysis')
       .eq('category_id', categoryId)
       .order('monthly_sales', { ascending: false })
       .limit(5);
@@ -76,33 +82,59 @@ serve(async (req) => {
       );
     }
 
-    // Extract data
-    const formulaBriefContent = analysisData?.analysis_3_formula_brief?.formula_brief_content || '';
-    const categoryScores = analysisData?.analysis_1_category_scores || {};
-    const categoryName = analysisData?.category_name || 'Unknown Category';
-    const recommendedPackaging = categoryScores?.product_development?.packaging || {};
+    // Extract competitor image URLs for Claude to analyze
+    const competitorImages: { type: string; source: { type: string; url: string } }[] = [];
+    competitors?.forEach((c, idx) => {
+      // Get the first available image URL
+      const imageUrl = c.main_image_url || (c.image_urls as string[])?.[0];
+      if (imageUrl && competitorImages.length < 5) {
+        competitorImages.push({
+          type: 'image',
+          source: {
+            type: 'url',
+            url: imageUrl
+          }
+        });
+      }
+    });
 
-    // Format competitor packaging data
+    console.log(`Found ${competitorImages.length} competitor images to analyze`);
+
+    // Format competitor packaging data with richer details
     const competitorPackagingSummary = competitors?.map((c, idx) => {
       const designBlueprint = (c.marketing_analysis as any)?.design_blueprint || {};
       const claimsArray = c.claims_on_label || (c.claims ? c.claims.split(',').map((cl: string) => cl.trim()) : []);
+      const bullets = c.feature_bullets || [];
+      const reviewData = c.review_analysis as any;
+      const painPoints = reviewData?.pain_points?.slice(0, 3).map((p: any) => p.issue || p).join('; ') || 'N/A';
+      const positiveThemes = reviewData?.positive_themes?.slice(0, 3).map((t: any) => t.theme || t).join('; ') || 'N/A';
       
       return `
-Competitor ${idx + 1}: ${c.brand || 'Unknown'} - ${c.title || 'Unknown Product'}
-- Monthly Sales: ${c.monthly_sales || 'N/A'}
-- Price: $${c.price || 'N/A'}
-- Packaging Type: ${c.packaging_type || 'N/A'}
-- Servings: ${c.servings_per_container || 'N/A'}
-- Claims on Label: ${claimsArray.slice(0, 10).join(', ') || 'N/A'}
+COMPETITOR ${idx + 1}: ${c.brand || 'Unknown'} - BEST SELLER ($${c.monthly_sales?.toLocaleString() || 'N/A'}/month)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Title: ${c.title || 'N/A'}
+- Price: $${c.price || 'N/A'} | Servings: ${c.servings_per_container || 'N/A'}
+- Packaging: ${c.packaging_type || 'Bottle'}
+- Image URL: ${c.main_image_url || 'N/A'}
+
+THEIR LABEL CLAIMS:
+${claimsArray.slice(0, 8).map((cl: string) => `  • ${cl}`).join('\n') || '  N/A'}
+
+THEIR BULLET POINTS (from Amazon listing):
+${bullets.slice(0, 4).map((b: string) => `  • ${b}`).join('\n') || '  N/A'}
+
+WHAT CUSTOMERS LOVE ABOUT THEM:
+${positiveThemes}
+
+CUSTOMER COMPLAINTS (opportunities for us):
+${painPoints}
+
+THEIR VISUAL STRATEGY:
 - Visual Style: ${designBlueprint.visual_style || 'N/A'}
-- Visual Hierarchy: ${designBlueprint.visual_hierarchy || 'N/A'}
 - Trust Signals: ${designBlueprint.trust_signals || 'N/A'}
-- Color Strategy: ${designBlueprint.color_strategy || 'N/A'}
-- Typography Style: ${designBlueprint.typography_style || 'N/A'}
-- Layout Structure: ${designBlueprint.layout_structure || 'N/A'}
 - Conversion Triggers: ${designBlueprint.conversion_triggers || 'N/A'}
-- Differentiation Factor: ${designBlueprint.differentiation_factor || 'N/A'}`;
-    }).join('\n') || 'No competitor data available';
+- Differentiation: ${designBlueprint.differentiation_factor || 'N/A'}`;
+    }).join('\n\n') || 'No competitor data available';
 
     // Background task to call Claude and save results
     async function runPackagingAnalysisInBackground() {
@@ -232,40 +264,75 @@ Competitor ${idx + 1}: ${c.brand || 'Unknown'} - ${c.title || 'Unknown Product'}
             messages: [
               {
                 role: 'user',
-                content: `You are an expert packaging designer creating a DESIGNER-READY BRIEF for "${categoryName}".
+                content: [
+                  // Include competitor product images for visual analysis
+                  ...competitorImages,
+                  {
+                    type: 'text',
+                    text: `You are an EXPERT PACKAGING COPYWRITER & DESIGNER analyzing the BEST-SELLING competitor products in "${categoryName}" to create IRRESISTIBLE packaging that OUTSELLS them.
 
-## CRITICAL REQUIREMENTS:
-- ALL COPY MUST BE SHORT - this is packaging, not marketing material
-- Headlines: 3-8 words MAX
-- Subheadlines: 5-12 words MAX  
-- Bullet points: 5-10 words each
-- Claims/badges: 2-5 words each
-- Think ACTUAL PACKAGE TEXT, not descriptions
+## YOUR MISSION:
+Study the competitor product images I've included above. Look at their:
+- Color schemes and visual hierarchy
+- How they display claims and benefits  
+- Typography choices
+- Trust signals and certifications placement
+- What makes shoppers pick them off the shelf
 
-## OUR PRODUCT:
+Now create packaging that is EVEN BETTER - more premium, more trustworthy, more compelling.
+
+## COPY RULES (NON-NEGOTIABLE):
+- Primary claim: 3-8 words that STOP the scroll
+- Bullet points: 5-10 words each, BENEFIT-FOCUSED not feature-focused
+- Every word must SELL - no fluff, no filler
+- Use power words: Premium, Clinical-Strength, Doctor-Formulated, Bioavailable
+- Address the #1 customer pain point directly
+- Include specific numbers when possible (300mg, 90-day supply, 3X absorption)
+
+## OUR PRODUCT FORMULATION:
 ${formulaBriefContent}
 
-## RECOMMENDED PACKAGING:
-- Type: ${recommendedPackaging.type || 'Not specified'}
-- Design Elements: ${recommendedPackaging.design_elements?.join(', ') || 'Not specified'}
+## RECOMMENDED PACKAGING FORMAT:
+- Type: ${recommendedPackaging.type || 'Premium Bottle'}
+- Key Design Elements: ${recommendedPackaging.design_elements?.join(', ') || 'Modern, clean, premium aesthetic'}
 
-## TOP COMPETITORS:
+## COMPETITOR INTELLIGENCE (LEARN FROM THE BEST, THEN BEAT THEM):
 ${competitorPackagingSummary}
+
+## WHAT WILL MAKE CUSTOMERS CHOOSE US:
+1. Address the pain points competitors are failing on
+2. Match or exceed the trust signals of best sellers  
+3. Cleaner, more premium visual design
+4. Clearer benefit communication
+5. Better value proposition
 
 ## YOUR DELIVERABLES:
 
-1. **DESIGN BRIEF**: Color palette (3 hex codes), typography (2 fonts), primary claim (SHORT!), key differentiators (badges), certifications to include
+**1. DESIGN BRIEF**: 
+   - Color palette (3 hex codes) - should feel premium and trustworthy for this category
+   - Typography - modern, clean, highly legible
+   - Primary claim that STOPS the scroll
+   - Key differentiator badges (what makes us special)
+   - Required certifications
 
-2. **ELEMENTS CHECKLIST**: What goes on the package in priority order, short bullet points ready to print, CTA, trust signals
+**2. ELEMENTS CHECKLIST**: 
+   - Front panel elements in visual hierarchy order
+   - 5 KILLER bullet points that sell
+   - CTA that drives action
+   - Trust signals that build confidence
 
-3. **MOCK CONTENT**: 
-   - Front panel text EXACTLY as it appears (with line breaks, formatted)
-   - Back panel text EXACTLY as it appears (with sections)
-   - Side panel suggestions
+**3. MOCK CONTENT** (COPY-PASTE READY):
+   - Front panel: Exact text with line breaks as it appears
+   - Back panel: Complete with benefit section, why it works, directions, disclaimer
+   - Think: Would I buy this product? Does this copy make me NEED it?
 
-4. **CLIENT RATIONALE**: Brief explanations for why these choices beat competitors (for presenting to stakeholders)
+**4. CLIENT RATIONALE**: 
+   - Why this design beats the top sellers
+   - What gap in the market we're filling
 
-Make the mock content READY TO SEND TO A DESIGNER - exact text, proper formatting, copy-paste ready.`
+CREATE COPY THAT MAKES SHOPPERS THINK: "This is THE ONE I've been looking for."`
+                  }
+                ]
               }
             ]
           })

@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Package, CheckCircle2, Award, Tag, Shield, DollarSign, Palette, Hash, Eye, Zap, Sparkles, Loader2, RefreshCw, Trash2 } from "lucide-react";
+import { Package, CheckCircle2, Award, Tag, Shield, DollarSign, Hash, Eye, Zap, Sparkles, Loader2, RefreshCw, Trash2 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { usePackagingAnalysis } from "@/hooks/usePackagingAnalysis";
 import { AIPackagingResults } from "./AIPackagingResults";
@@ -202,57 +202,6 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
       .map(([signal, count]) => ({ signal, count }));
   }, [productsData]);
 
-  // Aggregate color strategies
-  const colorStrategies = useMemo(() => {
-    if (!productsData || productsData.length === 0) return [];
-
-    const colorFrequency = new Map<string, number>();
-
-    productsData.forEach(product => {
-      const colorStrategy = product.marketing_analysis?.design_blueprint?.color_strategy;
-      if (!colorStrategy) return;
-
-      // Extract key color words from the strategy text
-      const colorKeywords = colorStrategy.match(/\b(purple|blue|green|gold|white|black|red|orange|yellow|pink|natural|earth|warm|cool|vibrant|muted|pastel|bold)\b/gi);
-      
-      if (colorKeywords) {
-        colorKeywords.forEach(color => {
-          const normalized = color.toLowerCase();
-          colorFrequency.set(normalized, (colorFrequency.get(normalized) || 0) + 1);
-        });
-      }
-    });
-
-    const colorMeanings: Record<string, string> = {
-      purple: "Calm, premium, sleep",
-      blue: "Trust, clinical, reliability",
-      green: "Natural, health, organic",
-      gold: "Quality, premium, certification",
-      white: "Purity, clean, clinical",
-      black: "Luxury, sophistication",
-      red: "Energy, urgency, power",
-      orange: "Vitality, enthusiasm",
-      yellow: "Optimism, clarity",
-      pink: "Gentle, feminine",
-      natural: "Organic, earth-friendly",
-      earth: "Grounded, natural",
-      warm: "Approachable, inviting",
-      cool: "Professional, calm",
-      vibrant: "Energetic, eye-catching",
-      muted: "Sophisticated, subtle",
-      pastel: "Gentle, calming",
-      bold: "Confident, attention-grabbing",
-    };
-
-    return Array.from(colorFrequency.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([color, count]) => ({ 
-        color, 
-        count, 
-        meaning: colorMeanings[color] || "Brand differentiation" 
-      }));
-  }, [productsData]);
 
   // Aggregate visual styles
   const visualStyles = useMemo(() => {
@@ -568,35 +517,6 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
           </div>
         )}
 
-        {/* Color Strategies */}
-        {colorStrategies.length > 0 && (
-          <div>
-            <h4 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
-              <Palette className="w-4 h-4 text-chart-5" />
-              Winning Color Strategies
-            </h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-              {colorStrategies.map(({ color, count, meaning }, idx) => (
-                <div 
-                  key={idx} 
-                  className="flex items-center gap-2 p-2 rounded-lg bg-muted/30 border border-border/50"
-                >
-                  <div 
-                    className="w-4 h-4 rounded-full border border-border/50"
-                    style={{ 
-                      backgroundColor: getColorHex(color)
-                    }}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <span className="text-sm font-medium text-foreground capitalize">{color}</span>
-                    <span className="text-xs text-muted-foreground ml-1">({count})</span>
-                    <p className="text-[10px] text-muted-foreground truncate">{meaning}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Packaging Type Distribution Chart */}
         {packagingStats?.typeDistribution && packagingStats.typeDistribution.length > 1 && (
@@ -891,29 +811,4 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
       </CardContent>
     </Card>
   );
-}
-
-// Helper function to get approximate hex color for color names
-function getColorHex(colorName: string): string {
-  const colorMap: Record<string, string> = {
-    purple: "#9333ea",
-    blue: "#3b82f6",
-    green: "#22c55e",
-    gold: "#eab308",
-    white: "#f8fafc",
-    black: "#1e293b",
-    red: "#ef4444",
-    orange: "#f97316",
-    yellow: "#facc15",
-    pink: "#ec4899",
-    natural: "#a3a380",
-    earth: "#8b7355",
-    warm: "#fb923c",
-    cool: "#67e8f9",
-    vibrant: "#f472b6",
-    muted: "#94a3b8",
-    pastel: "#c4b5fd",
-    bold: "#dc2626",
-  };
-  return colorMap[colorName] || "#94a3b8";
 }

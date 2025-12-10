@@ -115,12 +115,13 @@ serve(async (req) => {
     const competitorSummary = competitors?.map((c, idx) => {
       const nutrients = c.all_nutrients || [];
       const nutrientList = Array.isArray(nutrients) 
-        ? nutrients.slice(0, 15).map((n: any) => `${n.name}: ${n.amount}${n.unit}`).join(', ')
+        ? nutrients.map((n: any) => `${n.name}: ${n.amount}${n.unit}`).join(', ')
         : 'No nutrient data';
       
       return `Competitor ${idx + 1} (${c.brand || 'Unknown'}):
 - Nutrients: ${nutrientList}
-- Other Ingredients: ${(c.other_ingredients || '').substring(0, 200)}
+- Ingredients: ${c.ingredients || 'N/A'}
+- Other Ingredients: ${c.other_ingredients || 'N/A'}
 - Price: $${c.price || 'N/A'}, Servings: ${c.servings_per_container || 'N/A'}`;
     }).join('\n\n') || 'No competitor data available';
 

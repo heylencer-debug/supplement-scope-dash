@@ -2588,46 +2588,65 @@ export function EnhancedBenchmarkComparison({
 
                       {/* USPs */}
                       <div>
-                        <p className="text-[10px] font-semibold mb-1 flex items-center gap-1">
-                          <Award className="w-3 h-3 text-primary" />
-                          USPs
-                        </p>
                         {(() => {
                           const usps = getCompetitorUSPs(product);
+                          const uspCount = usps?.length || 0;
+                          
                           if (!usps || usps.length === 0) {
-                            return <p className="text-[10px] text-muted-foreground">Not specified</p>;
+                            return (
+                              <>
+                                <p className="text-[10px] font-semibold mb-1 flex items-center gap-1">
+                                  <Award className="w-3 h-3 text-primary" />
+                                  USPs
+                                  <Badge variant="secondary" className="text-[9px] h-4 ml-auto">
+                                    0
+                                  </Badge>
+                                </p>
+                                <p className="text-[10px] text-muted-foreground">Not specified</p>
+                              </>
+                            );
                           }
+                          
                           const showCollapsible = usps.length > 5;
                           const visibleUsps = showCollapsible ? usps.slice(0, 5) : usps;
                           const hiddenUsps = showCollapsible ? usps.slice(5) : [];
                           
                           return (
-                            <div className="space-y-0.5">
-                              {visibleUsps.map((usp, i) => (
-                                <div key={i} className="flex items-start gap-1 text-[10px] text-muted-foreground">
-                                  <span className="w-1 h-1 rounded-full bg-primary mt-1.5 shrink-0" />
-                                  <span>{usp}</span>
-                                </div>
-                              ))}
-                              {showCollapsible && (
-                                <Collapsible>
-                                  <CollapsibleTrigger asChild>
-                                    <Button variant="ghost" size="sm" className="h-5 px-1.5 text-[9px] text-primary hover:text-primary/80 w-full justify-start gap-1 mt-1">
-                                      <ChevronDown className="w-3 h-3 transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
-                                      +{hiddenUsps.length} more
-                                    </Button>
-                                  </CollapsibleTrigger>
-                                  <CollapsibleContent className="space-y-0.5 mt-1">
-                                    {hiddenUsps.map((usp, i) => (
-                                      <div key={i} className="flex items-start gap-1 text-[10px] text-muted-foreground">
-                                        <span className="w-1 h-1 rounded-full bg-primary mt-1.5 shrink-0" />
-                                        <span>{usp}</span>
-                                      </div>
-                                    ))}
-                                  </CollapsibleContent>
-                                </Collapsible>
-                              )}
-                            </div>
+                            <>
+                              <p className="text-[10px] font-semibold mb-1 flex items-center gap-1">
+                                <Award className="w-3 h-3 text-primary" />
+                                USPs
+                                <Badge variant="secondary" className="text-[9px] h-4 ml-auto">
+                                  {uspCount}
+                                </Badge>
+                              </p>
+                              <div className="space-y-0.5">
+                                {visibleUsps.map((usp, i) => (
+                                  <div key={i} className="flex items-start gap-1 text-[10px] text-muted-foreground">
+                                    <span className="w-1 h-1 rounded-full bg-primary mt-1.5 shrink-0" />
+                                    <span>{usp}</span>
+                                  </div>
+                                ))}
+                                {showCollapsible && (
+                                  <Collapsible>
+                                    <CollapsibleTrigger asChild>
+                                      <Button variant="ghost" size="sm" className="h-5 px-1.5 text-[9px] text-primary hover:text-primary/80 w-full justify-start gap-1 mt-1">
+                                        <ChevronDown className="w-3 h-3 transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
+                                        +{hiddenUsps.length} more
+                                      </Button>
+                                    </CollapsibleTrigger>
+                                    <CollapsibleContent className="space-y-0.5 mt-1">
+                                      {hiddenUsps.map((usp, i) => (
+                                        <div key={i} className="flex items-start gap-1 text-[10px] text-muted-foreground">
+                                          <span className="w-1 h-1 rounded-full bg-primary mt-1.5 shrink-0" />
+                                          <span>{usp}</span>
+                                        </div>
+                                      ))}
+                                    </CollapsibleContent>
+                                  </Collapsible>
+                                )}
+                              </div>
+                            </>
                           );
                         })()}
                       </div>

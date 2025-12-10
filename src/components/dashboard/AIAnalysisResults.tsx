@@ -198,9 +198,9 @@ export function AIAnalysisResults({ analysis, onRefresh, isLoading }: AIAnalysis
 
           {/* Comparison Table */}
           <div className="bg-card rounded-lg border border-border/50 overflow-hidden">
-            <ScrollArea className="max-h-[500px]">
-              <div className="overflow-x-auto min-w-full">
-              <table className="w-full text-xs">
+            <div className="overflow-x-auto">
+              <ScrollArea className="max-h-[500px]">
+              <table className="w-full text-xs min-w-[800px]">
                 <thead className="bg-muted sticky top-0 z-10">
                   <tr>
                     <th className="text-left p-2 font-medium text-foreground">Ingredient</th>
@@ -306,8 +306,8 @@ export function AIAnalysisResults({ analysis, onRefresh, isLoading }: AIAnalysis
                   })}
                 </tbody>
               </table>
-              </div>
-            </ScrollArea>
+              </ScrollArea>
+            </div>
           </div>
         </div>
       )}

@@ -565,6 +565,7 @@ export default function Dashboard() {
             } | null,
           })) || []}
           isLoading={analysisLoading && !hasAnalysis}
+          categoryId={category?.id}
         />
       </ScrollAnimate>
 

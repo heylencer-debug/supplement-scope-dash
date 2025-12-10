@@ -3682,6 +3682,7 @@ export function EnhancedBenchmarkComparison({
         ourPrice={analysisData?.formula_brief?.target_price as number | undefined}
         ourServings={getOurFormulationSpecs().servingsPerContainer || undefined}
         labelClaims={analysisData?.formula_brief_content ? parseFinishedProductSpecifications(analysisData.formula_brief_content as string) : []}
+        categoryId={categoryId}
       />
 
       {/* PACKAGING STRATEGY COMPARISON */}

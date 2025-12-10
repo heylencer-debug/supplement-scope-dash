@@ -927,6 +927,89 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
             {viewMode === 'table' && (
               /* FULL TABLE VIEW */
               <div className="space-y-4">
+                {/* Formula Summary Card */}
+                {groupedNutrients && Object.keys(groupedNutrients).length > 0 && (
+                  <div className="bg-gradient-to-br from-primary/5 to-chart-2/5 rounded-xl border border-primary/20 p-4">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="p-2 rounded-xl bg-primary/10">
+                        <Beaker className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-foreground">Formula Summary</h3>
+                        <p className="text-xs text-muted-foreground">Complete ingredient breakdown</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                      {/* Total Ingredients */}
+                      <div className="bg-card rounded-xl p-3 border border-border/50 text-center">
+                        <div className="text-2xl font-bold text-foreground">
+                          {Object.values(groupedNutrients).reduce((sum, arr) => sum + arr.length, 0)}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground">Total Ingredients</div>
+                      </div>
+                      {/* Primary Actives */}
+                      <div className="bg-card rounded-xl p-3 border border-chart-4/30 text-center">
+                        <div className="text-2xl font-bold text-chart-4">
+                          {groupedNutrients['Primary Active']?.length || 0}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground">Primary Actives</div>
+                      </div>
+                      {/* Secondary Actives */}
+                      <div className="bg-card rounded-xl p-3 border border-chart-3/30 text-center">
+                        <div className="text-2xl font-bold text-chart-3">
+                          {groupedNutrients['Secondary Active']?.length || 0}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground">Secondary Actives</div>
+                      </div>
+                      {/* Tertiary Actives */}
+                      <div className="bg-card rounded-xl p-3 border border-chart-2/30 text-center">
+                        <div className="text-2xl font-bold text-chart-2">
+                          {groupedNutrients['Tertiary Active']?.length || 0}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground">Tertiary Actives</div>
+                      </div>
+                      {/* Excipients */}
+                      <div className="bg-card rounded-xl p-3 border border-muted-foreground/30 text-center">
+                        <div className="text-2xl font-bold text-muted-foreground">
+                          {groupedNutrients['Functional Excipient']?.length || 0}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground">Excipients</div>
+                      </div>
+                    </div>
+                    {/* Total Formula Weight */}
+                    {(() => {
+                      const totalWeight = Object.values(groupedNutrients)
+                        .flat()
+                        .reduce((sum, item) => {
+                          const match = item.ourDosage?.match(/(\d+(?:\.\d+)?)\s*(mg|g|mcg|iu)/i);
+                          if (match) {
+                            let value = parseFloat(match[1]);
+                            const unit = match[2].toLowerCase();
+                            if (unit === 'g') value *= 1000;
+                            else if (unit === 'mcg') value /= 1000;
+                            else if (unit === 'iu') value = 0;
+                            return sum + value;
+                          }
+                          return sum;
+                        }, 0);
+                      
+                      if (totalWeight > 0) {
+                        return (
+                          <div className="mt-4 pt-4 border-t border-border/50 flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">Estimated Active Formula Weight</span>
+                            <span className="text-lg font-semibold text-foreground">
+                              {totalWeight >= 1000 
+                                ? `${(totalWeight / 1000).toFixed(2)} g` 
+                                : `${totalWeight.toFixed(1)} mg`}
+                            </span>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </div>
+                )}
+
                 {/* Stats Row 1: Ingredient counts */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <div className="bg-primary/10 rounded-lg p-1.5 sm:p-2 text-center">

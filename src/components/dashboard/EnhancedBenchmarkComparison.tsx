@@ -22,22 +22,50 @@ interface EnhancedBenchmarkComparisonProps {
       go_to_market?: {
         positioning?: string;
         messaging?: string[];
+        key_differentiators?: string[];
+        launch_tactics?: string[];
       };
+      financials?: {
+        startup_investment?: string | number;
+        target_margin?: string | number;
+        breakeven_timeline?: string;
+        revenue_projection?: string;
+      };
+      risks?: Array<{ risk?: string; mitigation?: string }>;
     };
     analysis_1_category_scores?: {
+      opportunity_score?: {
+        overall?: number;
+        market_size?: number;
+        profit_potential?: number;
+        competition_intensity?: number;
+        barriers_to_entry?: number;
+      };
+      competitive_landscape?: {
+        exploitable_weaknesses?: string[];
+        market_gaps?: string[];
+        things_to_avoid?: string[];
+      };
       product_development?: {
         formulation?: {
           recommended_ingredients?: Array<string | { ingredient?: string; name?: string }>;
           form_factor?: string;
           key_features?: string[];
           serving_size?: string;
+          things_to_avoid?: string[];
+        };
+        pricing?: {
+          recommended_price?: number;
+          pricing_tier?: string;
+          justification?: string;
         };
       };
       customer_insights?: {
         buyer_profile?: string;
         love_most?: string[];
-        pain_points?: Array<{ pain_point?: string; frequency?: number }>;
+        pain_points?: Array<{ pain_point?: string; frequency?: number; evidence?: string }>;
         unmet_needs?: string[];
+        decision_drivers?: string[];
       };
     };
     top_strengths?: Array<{ strength?: string; description?: string }>;
@@ -48,6 +76,8 @@ interface EnhancedBenchmarkComparisonProps {
       target_price?: number;
       servings_per_container?: number;
     };
+    opportunity_index?: number;
+    recommended_price?: number;
   } | null;
   isLoading?: boolean;
 }
@@ -1095,16 +1125,119 @@ export function EnhancedBenchmarkComparison({
     });
   };
 
-  const getOurMessaging = (): string => {
+  const getOurMessaging = (): string[] => {
     const messaging = analysisData?.key_insights?.go_to_market?.messaging;
-    if (!messaging || !Array.isArray(messaging) || messaging.length === 0) return 'Pending analysis';
-    return messaging[0];
+    if (!messaging || !Array.isArray(messaging) || messaging.length === 0) return ['Pending analysis'];
+    return messaging;
   };
 
   const getOurBuyerProfile = (): string => {
     const profile = analysisData?.analysis_1_category_scores?.customer_insights?.buyer_profile;
     if (!profile) return 'Pending analysis';
     return profile;
+  };
+
+  // NEW: Get Pricing Strategy
+  const getOurPricing = (): { price: number | null; tier: string | null; justification: string | null } => {
+    const pricing = analysisData?.analysis_1_category_scores?.product_development?.pricing;
+    const formulaBriefPrice = analysisData?.formula_brief?.target_price;
+    const topLevelPrice = analysisData?.recommended_price;
+    
+    return {
+      price: pricing?.recommended_price || formulaBriefPrice || topLevelPrice || null,
+      tier: pricing?.pricing_tier || null,
+      justification: pricing?.justification || null
+    };
+  };
+
+  // NEW: Get Opportunity Score
+  const getOurOpportunityScore = (): { overall: number | null; details: { label: string; value: number }[] } => {
+    const oppScore = analysisData?.analysis_1_category_scores?.opportunity_score;
+    const topLevelIndex = analysisData?.opportunity_index;
+    
+    const overall = oppScore?.overall || topLevelIndex || null;
+    const details: { label: string; value: number }[] = [];
+    
+    if (oppScore?.market_size) details.push({ label: 'Market Size', value: oppScore.market_size });
+    if (oppScore?.profit_potential) details.push({ label: 'Profit Potential', value: oppScore.profit_potential });
+    if (oppScore?.competition_intensity) details.push({ label: 'Competition', value: oppScore.competition_intensity });
+    if (oppScore?.barriers_to_entry) details.push({ label: 'Barriers', value: oppScore.barriers_to_entry });
+    
+    return { overall, details };
+  };
+
+  // NEW: Get Competitive Intelligence
+  const getCompetitiveIntel = (): { weaknesses: string[]; gaps: string[] } => {
+    const landscape = analysisData?.analysis_1_category_scores?.competitive_landscape;
+    return {
+      weaknesses: landscape?.exploitable_weaknesses || [],
+      gaps: landscape?.market_gaps || []
+    };
+  };
+
+  // NEW: Get Things to Avoid
+  const getThingsToAvoid = (): string[] => {
+    const fromLandscape = analysisData?.analysis_1_category_scores?.competitive_landscape?.things_to_avoid;
+    const fromFormulation = analysisData?.analysis_1_category_scores?.product_development?.formulation?.things_to_avoid;
+    const fromRisks = analysisData?.formula_brief?.risk_factors;
+    
+    const allItems: string[] = [];
+    if (fromLandscape?.length) allItems.push(...fromLandscape);
+    if (fromFormulation?.length) allItems.push(...fromFormulation);
+    if (fromRisks?.length && allItems.length < 5) {
+      fromRisks.slice(0, 5 - allItems.length).forEach(r => {
+        if (!allItems.includes(r)) allItems.push(r);
+      });
+    }
+    
+    return allItems.slice(0, 5);
+  };
+
+  // NEW: Get Go-to-Market Differentiators
+  const getOurDifferentiators = (): string[] => {
+    const fromGTM = analysisData?.key_insights?.go_to_market?.key_differentiators;
+    const fromFormula = analysisData?.formula_brief?.key_differentiators;
+    
+    if (fromGTM?.length) return fromGTM;
+    if (fromFormula?.length) return fromFormula;
+    return [];
+  };
+
+  // NEW: Get Financial Highlights
+  const getFinancialHighlights = (): { investment: string | null; margin: string | null; breakeven: string | null } => {
+    const financials = analysisData?.key_insights?.financials;
+    return {
+      investment: financials?.startup_investment ? String(financials.startup_investment) : null,
+      margin: financials?.target_margin ? String(financials.target_margin) : null,
+      breakeven: financials?.breakeven_timeline || null
+    };
+  };
+
+  // NEW: Get Pain Points with Evidence
+  const getPainPointsWithEvidence = (): Array<{ painPoint: string; frequency?: number; evidence?: string }> => {
+    const painPoints = analysisData?.analysis_1_category_scores?.customer_insights?.pain_points;
+    if (!painPoints?.length) return [];
+    
+    return painPoints.slice(0, 4).map(pp => ({
+      painPoint: pp.pain_point || 'Unknown',
+      frequency: pp.frequency,
+      evidence: pp.evidence
+    }));
+  };
+
+  // NEW: Get Unmet Needs
+  const getUnmetNeeds = (): string[] => {
+    return analysisData?.analysis_1_category_scores?.customer_insights?.unmet_needs || [];
+  };
+
+  // NEW: Get What Customers Love
+  const getWhatCustomersLove = (): string[] => {
+    return analysisData?.analysis_1_category_scores?.customer_insights?.love_most || [];
+  };
+
+  // NEW: Get Decision Drivers
+  const getDecisionDrivers = (): string[] => {
+    return analysisData?.analysis_1_category_scores?.customer_insights?.decision_drivers || [];
   };
 
   // NEW: Get primary motivation for Our Concept from customer_insights
@@ -1761,13 +1894,67 @@ export function EnhancedBenchmarkComparison({
                 </div>
               </div>
               
-              <div className="p-2 md:p-3 space-y-2 sm:space-y-3">
-                <div className="w-full aspect-square rounded-lg bg-gradient-to-br from-chart-2/20 to-chart-2/10 dark:from-chart-2/30 dark:to-chart-2/20 flex items-center justify-center">
-                  <div className="text-center">
-                    <Target className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 text-chart-2/50 mx-auto" />
-                    <p className="text-[9px] sm:text-[10px] text-chart-2/70 mt-1">Your Product</p>
-                  </div>
-                </div>
+              <div className="p-2 md:p-3 space-y-2 sm:space-y-3 max-h-[800px] overflow-y-auto">
+                {/* PRICING & OPPORTUNITY SCORE - Hero Section */}
+                {(() => {
+                  const pricing = getOurPricing();
+                  const oppScore = getOurOpportunityScore();
+                  return (
+                    <div className="grid grid-cols-2 gap-2">
+                      {/* Pricing Card */}
+                      <div className="bg-chart-4/10 dark:bg-chart-4/20 rounded-lg p-2 border border-chart-4/20">
+                        <p className="text-[8px] sm:text-[9px] text-muted-foreground flex items-center gap-1">
+                          <DollarSign className="w-2.5 h-2.5" />
+                          Target Price
+                        </p>
+                        <p className="text-base sm:text-lg font-bold text-chart-4">
+                          {pricing.price ? `$${pricing.price.toFixed(2)}` : '—'}
+                        </p>
+                        {pricing.tier && (
+                          <Badge variant="secondary" className="text-[7px] sm:text-[8px] h-4 mt-1">
+                            {pricing.tier}
+                          </Badge>
+                        )}
+                      </div>
+                      {/* Opportunity Score Card */}
+                      <div className="bg-primary/10 dark:bg-primary/20 rounded-lg p-2 border border-primary/20">
+                        <p className="text-[8px] sm:text-[9px] text-muted-foreground flex items-center gap-1">
+                          <TrendingUp className="w-2.5 h-2.5" />
+                          Opportunity
+                        </p>
+                        <p className="text-base sm:text-lg font-bold text-primary">
+                          {oppScore.overall ? `${oppScore.overall}/10` : '—'}
+                        </p>
+                        {oppScore.overall && oppScore.overall >= 7 && (
+                          <Badge className="text-[7px] sm:text-[8px] h-4 mt-1 bg-chart-4 text-white">
+                            High Potential
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Opportunity Score Breakdown */}
+                {(() => {
+                  const oppScore = getOurOpportunityScore();
+                  if (oppScore.details.length === 0) return null;
+                  return (
+                    <div className="bg-muted/30 rounded-lg p-2 border">
+                      <p className="text-[8px] sm:text-[9px] font-medium text-muted-foreground mb-1.5">Score Breakdown</p>
+                      <div className="grid grid-cols-2 gap-1">
+                        {oppScore.details.map((d, i) => (
+                          <div key={i} className="flex items-center justify-between text-[8px] sm:text-[9px]">
+                            <span className="text-muted-foreground">{d.label}</span>
+                            <span className={`font-medium ${d.value >= 7 ? 'text-chart-4' : d.value >= 5 ? 'text-chart-2' : 'text-destructive'}`}>
+                              {d.value}/10
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Positioning */}
                 <div>
@@ -1780,12 +1967,263 @@ export function EnhancedBenchmarkComparison({
                   </p>
                 </div>
 
-                {/* Ingredients */}
+                {/* Key Differentiators */}
+                {(() => {
+                  const differentiators = getOurDifferentiators();
+                  if (differentiators.length === 0) return null;
+                  return (
+                    <div className="bg-chart-3/10 dark:bg-chart-3/20 rounded-lg p-2 border border-chart-3/20">
+                      <p className="text-[9px] sm:text-[10px] font-semibold mb-1 flex items-center gap-1 text-chart-3">
+                        <Sparkles className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                        Key Differentiators
+                      </p>
+                      <div className="space-y-0.5">
+                        {differentiators.slice(0, 4).map((d, i) => (
+                          <div key={i} className="flex items-start gap-1 text-[9px] sm:text-[10px] text-foreground">
+                            <CheckCircle className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-chart-3 mt-0.5 shrink-0" />
+                            <span>{d}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Go-to-Market Messaging */}
+                <div>
+                  <p className="text-[9px] sm:text-[10px] font-semibold mb-1 flex items-center gap-1">
+                    <Megaphone className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-chart-3" />
+                    Go-to-Market Messaging
+                  </p>
+                  <div className="space-y-0.5">
+                    {getOurMessaging().slice(0, 4).map((msg, i) => (
+                      <div key={i} className="flex items-start gap-1 text-[9px] sm:text-[10px] text-muted-foreground">
+                        <span className="w-1 h-1 rounded-full bg-chart-3 mt-1.5 shrink-0" />
+                        <span>{msg}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Competitive Intelligence */}
+                {(() => {
+                  const intel = getCompetitiveIntel();
+                  if (intel.weaknesses.length === 0 && intel.gaps.length === 0) return null;
+                  return (
+                    <div className="bg-chart-5/10 dark:bg-chart-5/20 rounded-lg p-2 border border-chart-5/20">
+                      <p className="text-[9px] sm:text-[10px] font-semibold mb-1.5 flex items-center gap-1 text-chart-5">
+                        <Eye className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                        Competitive Intelligence
+                      </p>
+                      {intel.weaknesses.length > 0 && (
+                        <div className="mb-2">
+                          <p className="text-[8px] sm:text-[9px] font-medium text-muted-foreground mb-0.5">Exploitable Weaknesses</p>
+                          <div className="space-y-0.5">
+                            {intel.weaknesses.slice(0, 3).map((w, i) => (
+                              <div key={i} className="flex items-start gap-1 text-[8px] sm:text-[9px] text-foreground">
+                                <XCircle className="w-2.5 h-2.5 text-destructive mt-0.5 shrink-0" />
+                                <span>{w}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {intel.gaps.length > 0 && (
+                        <div>
+                          <p className="text-[8px] sm:text-[9px] font-medium text-muted-foreground mb-0.5">Market Gaps</p>
+                          <div className="space-y-0.5">
+                            {intel.gaps.slice(0, 3).map((g, i) => (
+                              <div key={i} className="flex items-start gap-1 text-[8px] sm:text-[9px] text-foreground">
+                                <Target className="w-2.5 h-2.5 text-chart-4 mt-0.5 shrink-0" />
+                                <span>{g}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Things to Avoid */}
+                {(() => {
+                  const avoid = getThingsToAvoid();
+                  if (avoid.length === 0) return null;
+                  return (
+                    <div className="bg-destructive/10 dark:bg-destructive/20 rounded-lg p-2 border border-destructive/20">
+                      <p className="text-[9px] sm:text-[10px] font-semibold mb-1 flex items-center gap-1 text-destructive">
+                        <XCircle className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                        Things to Avoid
+                      </p>
+                      <div className="space-y-0.5">
+                        {avoid.map((item, i) => (
+                          <div key={i} className="flex items-start gap-1 text-[8px] sm:text-[9px] text-foreground">
+                            <AlertTriangle className="w-2.5 h-2.5 text-destructive mt-0.5 shrink-0" />
+                            <span>{item}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Financial Highlights */}
+                {(() => {
+                  const fin = getFinancialHighlights();
+                  if (!fin.investment && !fin.margin && !fin.breakeven) return null;
+                  return (
+                    <div className="bg-muted/50 rounded-lg p-2 border">
+                      <p className="text-[9px] sm:text-[10px] font-semibold mb-1.5 flex items-center gap-1">
+                        <DollarSign className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-chart-4" />
+                        Financial Highlights
+                      </p>
+                      <div className="grid grid-cols-3 gap-1">
+                        {fin.investment && (
+                          <div className="bg-background/60 rounded p-1.5 text-center">
+                            <p className="text-[7px] sm:text-[8px] text-muted-foreground">Investment</p>
+                            <p className="text-[9px] sm:text-[10px] font-medium">{fin.investment}</p>
+                          </div>
+                        )}
+                        {fin.margin && (
+                          <div className="bg-background/60 rounded p-1.5 text-center">
+                            <p className="text-[7px] sm:text-[8px] text-muted-foreground">Margin</p>
+                            <p className="text-[9px] sm:text-[10px] font-medium text-chart-4">{fin.margin}</p>
+                          </div>
+                        )}
+                        {fin.breakeven && (
+                          <div className="bg-background/60 rounded p-1.5 text-center">
+                            <p className="text-[7px] sm:text-[8px] text-muted-foreground">Breakeven</p>
+                            <p className="text-[9px] sm:text-[10px] font-medium">{fin.breakeven}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Pain Points with Evidence */}
+                {(() => {
+                  const painPoints = getPainPointsWithEvidence();
+                  if (painPoints.length === 0) return null;
+                  return (
+                    <div className="bg-chart-2/10 dark:bg-chart-2/20 rounded-lg p-2 border border-chart-2/20">
+                      <p className="text-[9px] sm:text-[10px] font-semibold mb-1.5 flex items-center gap-1 text-chart-2">
+                        <AlertTriangle className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                        Customer Pain Points
+                      </p>
+                      <div className="space-y-1.5">
+                        {painPoints.map((pp, i) => (
+                          <div key={i} className="text-[8px] sm:text-[9px]">
+                            <div className="flex items-center justify-between">
+                              <span className="text-foreground font-medium">{pp.painPoint}</span>
+                              {pp.frequency && (
+                                <Badge variant="secondary" className="text-[7px] h-3.5 bg-chart-2/20 text-chart-2">
+                                  {pp.frequency}%
+                                </Badge>
+                              )}
+                            </div>
+                            {pp.evidence && (
+                              <p className="text-muted-foreground italic mt-0.5 text-[7px] sm:text-[8px]">"{pp.evidence}"</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Unmet Needs */}
+                {(() => {
+                  const needs = getUnmetNeeds();
+                  if (needs.length === 0) return null;
+                  return (
+                    <div>
+                      <p className="text-[9px] sm:text-[10px] font-semibold mb-1 flex items-center gap-1">
+                        <Layers className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-primary" />
+                        Unmet Needs (Opportunities)
+                      </p>
+                      <div className="space-y-0.5">
+                        {needs.slice(0, 4).map((need, i) => (
+                          <div key={i} className="flex items-start gap-1 text-[8px] sm:text-[9px] text-muted-foreground">
+                            <CheckCircle className="w-2.5 h-2.5 text-chart-4 mt-0.5 shrink-0" />
+                            <span>{need}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* What Customers Love */}
+                {(() => {
+                  const love = getWhatCustomersLove();
+                  if (love.length === 0) return null;
+                  return (
+                    <div className="bg-chart-4/10 dark:bg-chart-4/20 rounded-lg p-2 border border-chart-4/20">
+                      <p className="text-[9px] sm:text-[10px] font-semibold mb-1 flex items-center gap-1 text-chart-4">
+                        <ThumbsUp className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                        What Customers Love
+                      </p>
+                      <div className="space-y-0.5">
+                        {love.slice(0, 4).map((item, i) => (
+                          <div key={i} className="flex items-start gap-1 text-[8px] sm:text-[9px] text-foreground">
+                            <span className="w-1 h-1 rounded-full bg-chart-4 mt-1.5 shrink-0" />
+                            <span>{item}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Decision Drivers */}
+                {(() => {
+                  const drivers = getDecisionDrivers();
+                  if (drivers.length === 0) return null;
+                  return (
+                    <div>
+                      <p className="text-[9px] sm:text-[10px] font-semibold mb-1 flex items-center gap-1">
+                        <Users className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-primary" />
+                        Purchase Decision Drivers
+                      </p>
+                      <div className="flex flex-wrap gap-1">
+                        {drivers.slice(0, 5).map((driver, i) => (
+                          <Badge key={i} variant="outline" className="text-[7px] sm:text-[8px] h-4">
+                            {driver}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Target Audience */}
+                <div>
+                  <p className="text-[9px] sm:text-[10px] font-semibold mb-1 flex items-center gap-1">
+                    <Users className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-primary" />
+                    Target Audience
+                  </p>
+                  <div className="space-y-1.5">
+                    <p className="text-[9px] sm:text-[10px] text-muted-foreground">
+                      {getOurBuyerProfile()}
+                    </p>
+                    {getOurMotivation() && (
+                      <div className="bg-primary/10 dark:bg-primary/20 rounded p-1.5 border border-primary/20 dark:border-primary/30">
+                        <p className="text-[8px] sm:text-[9px] font-medium text-primary mb-0.5">Primary Motivation</p>
+                        <p className="text-[8px] sm:text-[9px] text-muted-foreground">
+                          {getOurMotivation()}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Key Ingredients */}
                 <div>
                   <p className="text-[9px] sm:text-[10px] font-semibold mb-1 flex items-center gap-1">
                     <Pill className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-chart-4" />
                     Key Ingredients
-                    <Badge variant="secondary" className="text-[8px] sm:text-[9px] h-3.5 sm:h-4 ml-auto">
+                    <Badge variant="secondary" className="text-[7px] sm:text-[8px] h-3.5 sm:h-4 ml-auto">
                       {getOurIngredients().length}
                     </Badge>
                   </p>
@@ -1793,9 +2231,9 @@ export function EnhancedBenchmarkComparison({
                     {getOurIngredients().map((ing, i) => {
                       const hasMatch = isOurIngredientInCompetitors(ing);
                       return (
-                        <div key={i} className={`flex items-start gap-1 text-[9px] sm:text-[10px] ${hasMatch ? 'text-chart-4 font-medium' : 'text-muted-foreground'}`}>
+                        <div key={i} className={`flex items-start gap-1 text-[8px] sm:text-[9px] ${hasMatch ? 'text-chart-4 font-medium' : 'text-muted-foreground'}`}>
                           {hasMatch ? (
-                            <Check className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-chart-4 mt-0.5 shrink-0" />
+                            <Check className="w-2.5 h-2.5 text-chart-4 mt-0.5 shrink-0" />
                           ) : (
                             <span className="w-1 h-1 rounded-full bg-chart-4 mt-1.5 shrink-0 ml-1" />
                           )}
@@ -1808,7 +2246,7 @@ export function EnhancedBenchmarkComparison({
 
                 {/* FORMULATION DETAILS SECTION */}
                 <div className="bg-primary/5 dark:bg-primary/10 rounded-lg p-1.5 sm:p-2 border border-primary/20 space-y-1.5 sm:space-y-2">
-                  <p className="text-[9px] sm:text-[10px] font-semibold flex items-center gap-1 text-primary">
+                  <p className="text-[8px] sm:text-[9px] font-semibold flex items-center gap-1 text-primary">
                     <FlaskConical className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                     Formulation Details
                   </p>
@@ -1820,16 +2258,16 @@ export function EnhancedBenchmarkComparison({
                       return (
                         <>
                           <div className="bg-background/60 rounded p-1 sm:p-1.5">
-                            <p className="text-[8px] sm:text-[9px] text-muted-foreground">Servings</p>
-                            <p className="text-[9px] sm:text-[10px] font-medium">{specs.servingsPerContainer || '—'}</p>
+                            <p className="text-[7px] sm:text-[8px] text-muted-foreground">Servings</p>
+                            <p className="text-[8px] sm:text-[9px] font-medium">{specs.servingsPerContainer || '—'}</p>
                           </div>
                           <div className="bg-background/60 rounded p-1 sm:p-1.5">
-                            <p className="text-[8px] sm:text-[9px] text-muted-foreground">Serving Size</p>
-                            <p className="text-[9px] sm:text-[10px] font-medium">{specs.servingSize || '—'}</p>
+                            <p className="text-[7px] sm:text-[8px] text-muted-foreground">Serving Size</p>
+                            <p className="text-[8px] sm:text-[9px] font-medium">{specs.servingSize || '—'}</p>
                           </div>
                           <div className="bg-background/60 rounded p-1 sm:p-1.5 col-span-2">
-                            <p className="text-[8px] sm:text-[9px] text-muted-foreground">Form</p>
-                            <p className="text-[9px] sm:text-[10px] font-medium">{specs.packagingType || getOurFormFactor()}</p>
+                            <p className="text-[7px] sm:text-[8px] text-muted-foreground">Form</p>
+                            <p className="text-[8px] sm:text-[9px] font-medium">{specs.packagingType || getOurFormFactor()}</p>
                           </div>
                         </>
                       );
@@ -1839,16 +2277,16 @@ export function EnhancedBenchmarkComparison({
                   {/* Recommended Dosages */}
                   {getOurRecommendedDosages().length > 0 && (
                     <div>
-                      <p className="text-[8px] sm:text-[9px] font-medium text-muted-foreground mb-1 flex items-center gap-1">
+                      <p className="text-[7px] sm:text-[8px] font-medium text-muted-foreground mb-1 flex items-center gap-1">
                         <Beaker className="w-2 h-2 sm:w-2.5 sm:h-2.5" />
                         Recommended Dosages
                       </p>
                       <div className="space-y-0.5 max-h-20 overflow-y-auto">
                         {getOurRecommendedDosages().map((item, i) => (
-                          <div key={i} className="flex items-center justify-between text-[9px] sm:text-[10px] gap-1">
+                          <div key={i} className="flex items-center justify-between text-[8px] sm:text-[9px] gap-1">
                             <span className="text-muted-foreground truncate flex-1">{item.ingredient}</span>
                             {item.dosage && (
-                              <Badge variant="secondary" className="text-[9px] h-4 shrink-0">{item.dosage}</Badge>
+                              <Badge variant="secondary" className="text-[7px] sm:text-[8px] h-3.5 shrink-0">{item.dosage}</Badge>
                             )}
                           </div>
                         ))}
@@ -1857,58 +2295,15 @@ export function EnhancedBenchmarkComparison({
                   )}
                 </div>
 
-                {/* Flavors & Form Factor */}
-                <div>
-                  <p className="text-[10px] font-semibold mb-1 flex items-center gap-1">
-                    <Palette className="w-3 h-3 text-chart-5" />
-                    Flavors & Form
-                  </p>
-                  <span className="inline-flex items-center px-2 py-0.5 text-[10px] rounded-full bg-chart-5/10 text-chart-5">
-                    {getOurFormFactor()}
-                  </span>
-                </div>
-
-                {/* Marketing Strategy */}
-                <div>
-                  <p className="text-[10px] font-semibold mb-1 flex items-center gap-1">
-                    <Megaphone className="w-3 h-3 text-chart-3" />
-                    Marketing Strategy
-                  </p>
-                  <p className="text-[10px] text-muted-foreground">
-                    {getOurMessaging()}
-                  </p>
-                </div>
-
-                {/* Target Audience */}
-                <div>
-                  <p className="text-[10px] font-semibold mb-1 flex items-center gap-1">
-                    <Users className="w-3 h-3 text-primary" />
-                    Target Audience
-                  </p>
-                  <div className="space-y-1.5">
-                    <p className="text-[10px] text-muted-foreground max-h-20 overflow-y-auto">
-                      {getOurBuyerProfile()}
-                    </p>
-                    {getOurMotivation() && (
-                      <div className="bg-primary/10 dark:bg-primary/20 rounded p-1.5 border border-primary/20 dark:border-primary/30">
-                        <p className="text-[9px] font-medium text-primary mb-0.5">Primary Motivation</p>
-                        <p className="text-[10px] text-muted-foreground max-h-16 overflow-y-auto">
-                          {getOurMotivation()}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
                 {/* Our Strengths */}
                 <div className="bg-chart-4/10 dark:bg-chart-4/20 rounded-lg p-2 border border-chart-4/20 dark:border-chart-4/30">
-                  <p className="text-[10px] font-semibold mb-1 flex items-center gap-1 text-chart-4">
-                    <ThumbsUp className="w-3 h-3" />
+                  <p className="text-[9px] sm:text-[10px] font-semibold mb-1 flex items-center gap-1 text-chart-4">
+                    <ThumbsUp className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                     Our Strengths
                   </p>
                   <div className="space-y-0.5">
                     {getOurStrengths().map((strength, i) => (
-                      <div key={i} className="flex items-start gap-1 text-[10px] text-foreground">
+                      <div key={i} className="flex items-start gap-1 text-[8px] sm:text-[9px] text-foreground">
                         <span className="w-1 h-1 rounded-full bg-chart-4 mt-1.5 shrink-0" />
                         <span>{strength}</span>
                       </div>
@@ -1918,13 +2313,13 @@ export function EnhancedBenchmarkComparison({
 
                 {/* Our Risks/Challenges */}
                 <div className="bg-chart-2/10 dark:bg-chart-2/20 rounded-lg p-2 border border-chart-2/20 dark:border-chart-2/30">
-                  <p className="text-[10px] font-semibold mb-1 flex items-center gap-1 text-chart-2">
-                    <AlertTriangle className="w-3 h-3" />
+                  <p className="text-[9px] sm:text-[10px] font-semibold mb-1 flex items-center gap-1 text-chart-2">
+                    <AlertTriangle className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                     Risks & Challenges
                   </p>
                   <div className="space-y-0.5">
                     {getOurWeaknesses().map((weakness, i) => (
-                      <div key={i} className="flex items-start gap-1 text-[10px] text-foreground">
+                      <div key={i} className="flex items-start gap-1 text-[8px] sm:text-[9px] text-foreground">
                         <span className="w-1 h-1 rounded-full bg-chart-2 mt-1.5 shrink-0" />
                         <span>{weakness}</span>
                       </div>

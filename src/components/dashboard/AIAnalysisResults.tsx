@@ -199,6 +199,7 @@ export function AIAnalysisResults({ analysis, onRefresh, isLoading }: AIAnalysis
           {/* Comparison Table */}
           <div className="bg-card rounded-lg border border-border/50 overflow-hidden">
             <ScrollArea className="max-h-[500px]">
+              <div className="overflow-x-auto min-w-full">
               <table className="w-full text-xs">
                 <thead className="bg-muted sticky top-0 z-10">
                   <tr>
@@ -305,6 +306,7 @@ export function AIAnalysisResults({ analysis, onRefresh, isLoading }: AIAnalysis
                   })}
                 </tbody>
               </table>
+              </div>
             </ScrollArea>
           </div>
         </div>

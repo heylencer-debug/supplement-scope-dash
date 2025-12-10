@@ -57,8 +57,9 @@ export function HeroHeader({
     if (opportunityIndex >= 30) return "Tier C (Fair)";
     return "Tier D (Poor)";
   };
-  const normalizedScore = Math.min(100, Math.max(0, opportunityIndex));
-  const displayScore = (normalizedScore / 10).toFixed(1);
+  // opportunityIndex is on a 0-10 scale, convert to 0-100 for progress bar
+  const normalizedScore = Math.min(100, Math.max(0, opportunityIndex * 10));
+  const displayScore = opportunityIndex.toFixed(1);
   return <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-primary via-primary/90 to-primary p-4 sm:p-6 md:p-8 text-primary-foreground shadow-lg">
       {/* Subtle background pattern */}
       <div className="absolute inset-0 opacity-5">

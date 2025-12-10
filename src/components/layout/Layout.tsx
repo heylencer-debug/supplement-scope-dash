@@ -185,7 +185,6 @@ export function Layout({ children }: LayoutProps) {
       }
     }
   };
-  };
 
   return (
     <SidebarProvider>

@@ -590,19 +590,28 @@ Be specific about dosages, cite clinical ranges where relevant, and provide acti
 
     const claudeResponse = await response.json();
     console.log('Claude response received');
+    console.log('Claude stop_reason:', claudeResponse.stop_reason);
+    console.log('Claude usage:', JSON.stringify(claudeResponse.usage));
 
     // Extract the tool use result
     const toolUse = claudeResponse.content?.find((c: any) => c.type === 'tool_use');
     if (!toolUse || !toolUse.input) {
-      console.error('No tool use in response:', claudeResponse);
+      console.error('No tool use in response. Content types:', claudeResponse.content?.map((c: any) => c.type));
+      console.error('Full response:', JSON.stringify(claudeResponse).substring(0, 1000));
       return new Response(
-        JSON.stringify({ error: 'Invalid AI response format' }),
+        JSON.stringify({ error: 'Invalid AI response format', details: 'No tool use in response' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     const analysis: IngredientAnalysis = toolUse.input;
     console.log('Analysis complete:', analysis.summary.overall_assessment);
+    
+    // Log whether ingredient_comparison_table is present
+    console.log('Has ingredient_comparison_table:', !!analysis.ingredient_comparison_table);
+    if (analysis.ingredient_comparison_table) {
+      console.log('Comparison table rows count:', analysis.ingredient_comparison_table.rows?.length || 0);
+    }
 
     // Save analysis to database (upsert)
     const { error: upsertError } = await supabase

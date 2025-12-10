@@ -171,24 +171,39 @@ export function useIngredientAnalysis(categoryId?: string) {
     setError(null);
 
     try {
+      // First, delete any existing stale analysis to force a fresh one
+      console.log('Clearing existing analysis before refresh...');
+      await supabase
+        .from('ingredient_analyses')
+        .delete()
+        .eq('category_id', categoryId);
+      
+      setAnalysis(null);
+
+      console.log('Calling analyze-ingredients edge function...');
       const { data, error: fnError } = await supabase.functions.invoke('analyze-ingredients', {
         body: { categoryId }
       });
 
       if (fnError) {
+        console.error('Edge function error:', fnError);
         throw new Error(fnError.message);
       }
 
       if (data?.error) {
-        throw new Error(data.error);
+        console.error('Analysis error:', data.error, data.details);
+        throw new Error(data.error + (data.details ? `: ${data.details}` : ''));
       }
 
       if (data?.analysis) {
         setAnalysis(data.analysis);
+        
+        const hasComparisonTable = !!data.analysis.ingredient_comparison_table;
+        const tableRowCount = data.analysis.ingredient_comparison_table?.rows?.length || 0;
 
         toast({
           title: 'Analysis Complete',
-          description: `Comprehensive analysis with ${data.analysis.ingredients?.length || 0} ingredients, SWOT, clinical insights, and roadmap generated.`,
+          description: `Analysis complete with ${data.analysis.ingredients?.length || 0} ingredients${hasComparisonTable ? ` and ${tableRowCount}-row comparison table` : ''}.`,
         });
       }
     } catch (err) {

@@ -549,6 +549,45 @@ export type Database = {
           },
         ]
       }
+      packaging_analyses: {
+        Row: {
+          analysis: Json
+          category_id: string
+          created_at: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          analysis: Json
+          category_id: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          analysis?: Json
+          category_id?: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "packaging_analyses_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: true
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "packaging_analyses_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: true
+            referencedRelation: "v_category_dashboard"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           age_months: number | null

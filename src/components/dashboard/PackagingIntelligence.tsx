@@ -2,8 +2,11 @@ import { useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Package, CheckCircle2, Award, Tag, Shield, DollarSign, Palette, Hash, Eye, Zap } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Package, CheckCircle2, Award, Tag, Shield, DollarSign, Palette, Hash, Eye, Zap, Sparkles, Loader2, RefreshCw, Trash2 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
+import { usePackagingAnalysis } from "@/hooks/usePackagingAnalysis";
+import { AIPackagingResults } from "./AIPackagingResults";
 
 interface PackagingData {
   type?: string;
@@ -37,9 +40,20 @@ interface PackagingIntelligenceProps {
   productsClaims: (string | null | undefined)[];
   productsData?: ProductData[];
   isLoading?: boolean;
+  categoryId?: string;
 }
 
-export function PackagingIntelligence({ packagingData, productsClaims, productsData = [], isLoading }: PackagingIntelligenceProps) {
+export function PackagingIntelligence({ packagingData, productsClaims, productsData = [], isLoading, categoryId }: PackagingIntelligenceProps) {
+  const {
+    analysis: aiAnalysis,
+    isLoading: isAnalyzing,
+    isLoadingFromDb,
+    pollingStatus,
+    runAnalysis,
+    clearAnalysis,
+    hasAnalysis
+  } = usePackagingAnalysis(categoryId);
+
   const CHART_COLORS = [
     "hsl(var(--chart-1))",
     "hsl(var(--chart-2))",
@@ -346,9 +360,62 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
           <Package className="w-5 h-5 text-primary" />
           Winning Packaging Strategy
         </CardTitle>
-        <CardDescription>Market intelligence for optimal packaging format, pricing, and positioning</CardDescription>
+        <CardDescription className="flex items-center justify-between flex-wrap gap-2">
+          <span>Market intelligence for optimal packaging format, pricing, and positioning</span>
+          <div className="flex items-center gap-2">
+            {hasAnalysis && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearAnalysis}
+                className="text-xs h-7"
+              >
+                <Trash2 className="w-3 h-3 mr-1" />
+                Clear
+              </Button>
+            )}
+            <Button
+              variant={hasAnalysis ? "outline" : "default"}
+              size="sm"
+              onClick={runAnalysis}
+              disabled={isAnalyzing || isLoadingFromDb || !categoryId}
+              className="text-xs h-7"
+            >
+              {isAnalyzing ? (
+                <>
+                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                  {pollingStatus.isPolling 
+                    ? `Analyzing... (${pollingStatus.attempt}/${pollingStatus.maxAttempts})`
+                    : 'Starting...'}
+                </>
+              ) : hasAnalysis ? (
+                <>
+                  <RefreshCw className="w-3 h-3 mr-1" />
+                  Refresh AI Analysis
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-3 h-3 mr-1" />
+                  Analyze with AI
+                </>
+              )}
+            </Button>
+          </div>
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* AI Analysis Results */}
+        {isLoadingFromDb && (
+          <div className="p-4 bg-muted/30 rounded-lg border border-border/50">
+            <div className="flex items-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Loading saved analysis...</span>
+            </div>
+          </div>
+        )}
+
+        {aiAnalysis && <AIPackagingResults analysis={aiAnalysis} />}
+
         {/* Top Row: Format Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Recommended Format */}

@@ -66,7 +66,7 @@ serve(async (req) => {
       .select('brand, title, main_image_url, price, claims, claims_on_label, marketing_analysis, monthly_sales, servings_per_container, packaging_type')
       .eq('category_id', categoryId)
       .order('monthly_sales', { ascending: false })
-      .limit(10);
+      .limit(5);
 
     if (competitorsError) {
       console.error('Error fetching competitors:', competitorsError);
@@ -118,7 +118,7 @@ Competitor ${idx + 1}: ${c.brand || 'Unknown'} - ${c.title || 'Unknown Product'}
           },
           body: JSON.stringify({
             model: 'claude-sonnet-4-5',
-            max_tokens: 32768,
+            max_tokens: 4096,
             tools: [
               {
                 name: 'create_packaging_design',

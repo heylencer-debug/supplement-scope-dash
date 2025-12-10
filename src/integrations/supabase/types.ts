@@ -628,6 +628,7 @@ export type Database = {
           flavor_options: string[] | null
           has_a_plus_content: boolean | null
           has_proprietary_blends: boolean | null
+          historical_data: Json | null
           id: string
           image_url: string | null
           image_urls: string[] | null
@@ -725,6 +726,7 @@ export type Database = {
           flavor_options?: string[] | null
           has_a_plus_content?: boolean | null
           has_proprietary_blends?: boolean | null
+          historical_data?: Json | null
           id?: string
           image_url?: string | null
           image_urls?: string[] | null
@@ -822,6 +824,7 @@ export type Database = {
           flavor_options?: string[] | null
           has_a_plus_content?: boolean | null
           has_proprietary_blends?: boolean | null
+          historical_data?: Json | null
           id?: string
           image_url?: string | null
           image_urls?: string[] | null

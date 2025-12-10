@@ -13,7 +13,9 @@ import {
   Loader2,
   ImageIcon,
   Download,
-  RefreshCw
+  RefreshCw,
+  X,
+  ZoomIn
 } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -25,6 +27,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface AIPackagingResultsProps {
   analysis: PackagingDesignAnalysis;
@@ -212,6 +220,7 @@ export function AIPackagingResults({ analysis, mockupImageUrl, onSaveMockup, onR
   const [rationaleOpen, setRationaleOpen] = useState(false);
   const [generatedMockup, setGeneratedMockup] = useState<string | null>(mockupImageUrl || null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
 
   const copyStyles = [
     { id: 'premium', label: 'Premium & Luxurious', description: 'High-end, sophisticated copy for premium positioning' },
@@ -445,10 +454,21 @@ export function AIPackagingResults({ analysis, mockupImageUrl, onSaveMockup, onR
                   <img 
                     src={generatedMockup} 
                     alt="AI Generated Product Mockup"
-                    className="w-full max-w-xs mx-auto rounded-xl shadow-lg"
+                    className="w-full max-w-xs mx-auto rounded-xl shadow-lg cursor-pointer hover:opacity-90 transition-opacity"
+                    onClick={() => setIsImageModalOpen(true)}
                   />
+                  {/* Hover overlay with zoom hint */}
+                  <div 
+                    className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                    onClick={() => setIsImageModalOpen(true)}
+                  >
+                    <div className="bg-black/50 text-white px-3 py-1.5 rounded-full text-xs flex items-center gap-1.5">
+                      <ZoomIn className="w-3 h-3" />
+                      Click to enlarge
+                    </div>
+                  </div>
                   <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button size="sm" variant="secondary" onClick={downloadMockup} className="gap-1">
+                    <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); downloadMockup(); }} className="gap-1">
                       <Download className="w-3 h-3" />
                       Save
                     </Button>
@@ -464,6 +484,35 @@ export function AIPackagingResults({ analysis, mockupImageUrl, onSaveMockup, onR
             </div>
           </div>
         </CardContent>
+
+      {/* Full Image Modal */}
+      <Dialog open={isImageModalOpen} onOpenChange={setIsImageModalOpen}>
+        <DialogContent className="max-w-4xl w-full p-0 overflow-hidden">
+          <DialogHeader className="p-4 pb-2">
+            <DialogTitle className="flex items-center gap-2">
+              <ImageIcon className="w-5 h-5 text-primary" />
+              AI Product Mockup
+            </DialogTitle>
+          </DialogHeader>
+          <div className="p-4 pt-0">
+            {generatedMockup && (
+              <div className="relative">
+                <img 
+                  src={generatedMockup} 
+                  alt="AI Generated Product Mockup - Full Size"
+                  className="w-full h-auto rounded-lg shadow-lg"
+                />
+                <div className="absolute bottom-4 right-4 flex gap-2">
+                  <Button size="sm" variant="secondary" onClick={downloadMockup} className="gap-1.5 shadow-lg">
+                    <Download className="w-4 h-4" />
+                    Download
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
       </Card>
 
       {/* Section 1: Design Brief Card */}

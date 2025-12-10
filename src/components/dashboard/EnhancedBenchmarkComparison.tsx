@@ -155,48 +155,52 @@ const parseIngredientTablesFromMarkdown = (markdown: string): ParsedIngredient[]
   const ingredients: ParsedIngredient[] = [];
   if (!markdown) return ingredients;
   
-  // Split markdown into sections by headers
-  const sections = markdown.split(/^###\s+/m);
+  // Split markdown into sections by #### headers (4 hashes, not 3)
+  const sections = markdown.split(/^####\s+/m);
   
   sections.forEach(section => {
     // Determine category based on section header
-    let category: ParsedIngredient['category'] = 'primary';
+    let category: ParsedIngredient['category'] | null = null;
     const sectionLower = section.toLowerCase();
     
+    // Match section headers - they start with the category name after the split
     if (sectionLower.startsWith('primary active')) {
       category = 'primary';
     } else if (sectionLower.startsWith('secondary active')) {
       category = 'secondary';
-    } else if (sectionLower.startsWith('tertiary active') || sectionLower.includes('differentiation blend')) {
+    } else if (sectionLower.startsWith('tertiary') || sectionLower.includes('differentiation blend')) {
       category = 'tertiary';
     } else if (sectionLower.startsWith('functional excipient')) {
       category = 'excipient';
-    } else {
-      // Skip non-ingredient sections
+    }
+    
+    // Skip non-ingredient sections
+    if (!category) {
       return;
     }
     
-    // Find table rows - look for lines that start and end with |
-    const tableRowRegex = /^\|([^|]+)\|([^|]+)\|([^|]*)\|([^|]*)\|?([^|]*)?\|?\s*$/gm;
+    // Find table rows - look for lines that start with | and have multiple columns
+    // Handle tables with 4-6 columns (some have rationale columns)
+    const tableRowRegex = /^\|([^|]+)\|([^|]+)\|([^|]*)\|([^|]*)(?:\|([^|]*))?(?:\|([^|]*))?\|?\s*$/gm;
     let match;
     
     while ((match = tableRowRegex.exec(section)) !== null) {
-      const [_, col1, col2, col3, col4, col5] = match;
+      const [_, col1, col2, col3, col4, col5, col6] = match;
       
       // Skip header rows and separator rows
       const ingredientName = col1?.trim() || '';
       if (!ingredientName || 
           ingredientName.toLowerCase() === 'ingredient' ||
           ingredientName.startsWith('---') ||
-          ingredientName.startsWith('---') ||
-          ingredientName.match(/^-+$/)) {
+          ingredientName.match(/^-+$/) ||
+          ingredientName.match(/^:?-+:?$/)) {
         continue;
       }
       
       const dosage = col2?.trim() || '';
       const form = col3?.trim() || '';
       const functionOrRationale = col4?.trim() || '';
-      const additionalRationale = col5?.trim() || '';
+      const additionalRationale = col5?.trim() || col6?.trim() || '';
       
       // Skip if dosage looks like a header (e.g., "Amount per Serving")
       if (dosage.toLowerCase().includes('amount') || dosage.toLowerCase().includes('serving')) {

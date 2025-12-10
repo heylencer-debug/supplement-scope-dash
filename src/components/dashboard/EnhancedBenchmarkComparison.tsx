@@ -1518,6 +1518,35 @@ export function EnhancedBenchmarkComparison({
     return null;
   };
 
+  // Get competitor USPs from marketing analysis
+  const getCompetitorUSPs = (product: Product): string[] | null => {
+    const marketingAnalysis = product.marketing_analysis as Record<string, unknown> | null;
+    if (!marketingAnalysis) return null;
+    
+    // Try creative_brief.unique_selling_props first
+    const creativeBrief = marketingAnalysis.creative_brief as Record<string, unknown> | undefined;
+    const usps = creativeBrief?.unique_selling_props as string[] | undefined;
+    if (usps && usps.length > 0) {
+      return usps;
+    }
+    
+    // Fallback to competitive_analysis.unique_selling_points
+    const competitiveAnalysis = marketingAnalysis.competitive_analysis as Record<string, unknown> | undefined;
+    const uniqueSellingPoints = competitiveAnalysis?.unique_selling_points as string[] | undefined;
+    if (uniqueSellingPoints && uniqueSellingPoints.length > 0) {
+      return uniqueSellingPoints;
+    }
+    
+    // Fallback to lifestyle_positioning.values_communicated
+    const lifestylePos = marketingAnalysis.lifestyle_positioning as Record<string, unknown> | undefined;
+    const valuesCommunicated = lifestylePos?.values_communicated as string[] | undefined;
+    if (valuesCommunicated && valuesCommunicated.length > 0) {
+      return valuesCommunicated;
+    }
+    
+    return null;
+  };
+
   // Fixed: Multi-source Target Audience extraction using correct data paths
   const getCompetitorAudience = (product: Product): string | null => {
     const marketingAnalysis = product.marketing_analysis as Record<string, unknown> | null;
@@ -2549,16 +2578,41 @@ export function EnhancedBenchmarkComparison({
                         </div>
                       </div>
 
-                      {/* Positioning */}
+                      {/* Product Stats Grid */}
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <div className="bg-secondary/50 rounded p-1.5">
+                          <p className="text-[9px] text-muted-foreground">Listing Age</p>
+                          <p className="text-[10px] font-semibold">{product.age_months ? `${product.age_months} mo` : '—'}</p>
+                        </div>
+                        <div className="bg-secondary/50 rounded p-1.5">
+                          <p className="text-[9px] text-muted-foreground">BSR Rank</p>
+                          <p className="text-[10px] font-semibold">{product.bsr_current ? `#${product.bsr_current.toLocaleString()}` : (product.rank ? `#${product.rank.toLocaleString()}` : '—')}</p>
+                        </div>
+                      </div>
+
+                      {/* USPs */}
                       <div>
                         <p className="text-[10px] font-semibold mb-1 flex items-center gap-1">
-                          <MessageSquare className="w-3 h-3 text-primary" />
-                          Positioning
+                          <Award className="w-3 h-3 text-primary" />
+                          USPs
                         </p>
                         {hasMarketingAnalysis(product) ? (
-                          <p className="text-[10px] text-muted-foreground">
-                            {getCompetitorPositioning(product) || 'Not specified'}
-                          </p>
+                          (() => {
+                            const usps = getCompetitorUSPs(product);
+                            if (!usps || usps.length === 0) {
+                              return <p className="text-[10px] text-muted-foreground">Not specified</p>;
+                            }
+                            return (
+                              <div className="space-y-0.5 max-h-20 overflow-y-auto">
+                                {usps.slice(0, 4).map((usp, i) => (
+                                  <div key={i} className="flex items-start gap-1 text-[10px] text-muted-foreground">
+                                    <span className="w-1 h-1 rounded-full bg-primary mt-1.5 shrink-0" />
+                                    <span>{usp}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })()
                         ) : (
                           <span className="text-[10px] px-1.5 py-0.5 bg-muted rounded text-muted-foreground">Analysis Pending</span>
                         )}
@@ -2759,19 +2813,9 @@ export function EnhancedBenchmarkComparison({
                           Target Audience
                         </p>
                         {hasMarketingAnalysis(product) ? (
-                          <div className="space-y-1.5">
-                            <p className="text-[10px] text-muted-foreground max-h-20 overflow-y-auto">
-                              {getCompetitorAudience(product) || 'Not specified'}
-                            </p>
-                            {getCompetitorMotivation(product) && (
-                              <div className="bg-primary/10 dark:bg-primary/20 rounded p-1.5 border border-primary/20 dark:border-primary/30">
-                                <p className="text-[9px] font-medium text-primary mb-0.5">Primary Motivation</p>
-                                <p className="text-[10px] text-muted-foreground max-h-16 overflow-y-auto">
-                                  {getCompetitorMotivation(product)}
-                                </p>
-                              </div>
-                            )}
-                          </div>
+                          <p className="text-[10px] text-muted-foreground max-h-20 overflow-y-auto">
+                            {getCompetitorAudience(product) || 'Not specified'}
+                          </p>
                         ) : (
                           <span className="text-[10px] px-1.5 py-0.5 bg-muted rounded text-muted-foreground">Analysis Pending</span>
                         )}

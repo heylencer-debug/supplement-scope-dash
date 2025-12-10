@@ -238,7 +238,7 @@ serve(async (req) => {
             content: `You are an expert supplement formulator and competitive analyst. Analyze the following formulation data for "${categoryName}" and provide a comprehensive ingredient comparison.
 
 ## OUR FORMULATION BRIEF:
-${formulaBriefContent.substring(0, 8000)}
+${formulaBriefContent}
 
 ## TOP 3 COMPETITORS BY SALES:
 ${competitorSummary}

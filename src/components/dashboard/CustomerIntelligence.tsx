@@ -46,7 +46,7 @@ export default function CustomerIntelligence({
             <CardTitle>Customer Intelligence</CardTitle>
           </div>
         </CardHeader>
-        <CardContent className="space-y-8">
+        <CardContent className="p-4 sm:p-6 space-y-6 sm:space-y-8">
           {/* Target Buyer Profile Skeleton */}
           <div className="space-y-3">
             <Skeleton className="h-5 w-40" />
@@ -109,7 +109,7 @@ export default function CustomerIntelligence({
           <CardTitle>Customer Intelligence</CardTitle>
         </div>
       </CardHeader>
-      <CardContent className="space-y-8 animate-enter">
+      <CardContent className="p-4 sm:p-6 space-y-6 sm:space-y-8 animate-enter">
         {/* Target Buyer Profile */}
         {buyer_profile && (
           <div>

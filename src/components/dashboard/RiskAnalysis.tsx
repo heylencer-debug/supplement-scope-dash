@@ -20,8 +20,8 @@ export function RiskAnalysis({ risks, isLoading }: RiskAnalysisProps) {
           </CardTitle>
           <CardDescription>Category challenges, failure patterns, and risk factors to consider</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="grid md:grid-cols-2 gap-8">
+        <CardContent className="p-4 sm:p-6">
+          <div className="grid md:grid-cols-2 gap-6 sm:gap-8">
             <div className="space-y-4">
               <Skeleton className="h-4 w-40" />
               <Skeleton className="h-16 rounded-lg" />
@@ -58,7 +58,7 @@ export function RiskAnalysis({ risks, isLoading }: RiskAnalysisProps) {
         </CardTitle>
         <CardDescription>Category challenges, failure patterns, and risk factors to consider</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-4 sm:p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 animate-enter">
           {/* Category Challenges */}
           {category_challenges && category_challenges.length > 0 && (

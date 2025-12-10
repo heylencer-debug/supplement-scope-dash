@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Package, CheckCircle2, Award, Tag, Shield, DollarSign, Palette, Hash } from "lucide-react";
+import { Package, CheckCircle2, Award, Tag, Shield, DollarSign, Palette, Hash, Eye, Zap } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 
 interface PackagingData {
@@ -27,6 +27,7 @@ interface ProductData {
       trust_signals?: string;
       color_strategy?: string;
       visual_style?: string;
+      conversion_triggers?: string;
     };
   } | null;
 }
@@ -239,6 +240,67 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
       }));
   }, [productsData]);
 
+  // Aggregate visual styles
+  const visualStyles = useMemo(() => {
+    if (!productsData || productsData.length === 0) return [];
+
+    const styleFrequency = new Map<string, number>();
+
+    productsData.forEach(product => {
+      const visualStyle = product.marketing_analysis?.design_blueprint?.visual_style;
+      if (!visualStyle) return;
+
+      // Extract key style keywords
+      const styleKeywords = visualStyle.match(/\b(premium|clean|clinical|natural|modern|minimalist|bold|vibrant|organic|professional|playful|elegant|rustic|sleek|luxurious|friendly|medical|scientific|wellness|holistic)\b/gi);
+      
+      if (styleKeywords) {
+        styleKeywords.forEach(style => {
+          const normalized = style.toLowerCase();
+          styleFrequency.set(normalized, (styleFrequency.get(normalized) || 0) + 1);
+        });
+      }
+    });
+
+    return Array.from(styleFrequency.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([style, count]) => ({ style, count }));
+  }, [productsData]);
+
+  // Aggregate conversion triggers
+  const conversionTriggers = useMemo(() => {
+    if (!productsData || productsData.length === 0) return [];
+
+    const triggerFrequency = new Map<string, number>();
+
+    productsData.forEach(product => {
+      const triggers = product.marketing_analysis?.design_blueprint?.conversion_triggers;
+      if (!triggers) return;
+
+      // Parse comma-separated triggers
+      const triggerList = triggers.split(/[,;]/).map(t => t.trim()).filter(Boolean);
+      
+      triggerList.forEach(trigger => {
+        const normalized = trigger.toLowerCase().trim();
+        if (normalized.length > 2) {
+          const existingKey = Array.from(triggerFrequency.keys()).find(
+            k => k.toLowerCase() === normalized
+          );
+          if (existingKey) {
+            triggerFrequency.set(existingKey, (triggerFrequency.get(existingKey) || 0) + 1);
+          } else {
+            triggerFrequency.set(trigger.trim(), 1);
+          }
+        }
+      });
+    });
+
+    return Array.from(triggerFrequency.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([trigger, count]) => ({ trigger, count }));
+  }, [productsData]);
+
   if (isLoading) {
     return (
       <Card>
@@ -395,6 +457,50 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
           </div>
         )}
 
+        {/* Visual Styles */}
+        {visualStyles.length > 0 && (
+          <div>
+            <h4 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
+              <Eye className="w-4 h-4 text-chart-3" />
+              Dominant Visual Styles
+            </h4>
+            <div className="flex flex-wrap gap-2">
+              {visualStyles.map(({ style, count }, idx) => (
+                <Badge 
+                  key={idx} 
+                  variant="secondary" 
+                  className="text-xs py-1 px-2 bg-chart-3/10 text-chart-3 border-chart-3/20 capitalize"
+                >
+                  {style}
+                  <span className="ml-1.5 text-chart-3/70">({count})</span>
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Conversion Triggers */}
+        {conversionTriggers.length > 0 && (
+          <div>
+            <h4 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
+              <Zap className="w-4 h-4 text-chart-2" />
+              Top Conversion Triggers
+            </h4>
+            <div className="flex flex-wrap gap-2">
+              {conversionTriggers.map(({ trigger, count }, idx) => (
+                <Badge 
+                  key={idx} 
+                  variant="secondary" 
+                  className="text-xs py-1 px-2 bg-chart-2/10 text-chart-2 border-chart-2/20"
+                >
+                  {trigger}
+                  <span className="ml-1.5 text-chart-2/70">({count})</span>
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Color Strategies */}
         {colorStrategies.length > 0 && (
           <div>
@@ -530,6 +636,14 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
                     (product.claims?.split(/[,;]/).map(c => c.trim()).filter(Boolean).slice(0, 3)) || 
                     [];
 
+                  const visualStyle = product.marketing_analysis?.design_blueprint?.visual_style || "";
+                  const conversionTriggersRaw = product.marketing_analysis?.design_blueprint?.conversion_triggers || "";
+                  const conversionTriggersList = conversionTriggersRaw
+                    .split(/[,;]/)
+                    .map(t => t.trim())
+                    .filter(t => t.length > 2)
+                    .slice(0, 2);
+
                   return (
                     <div key={idx} className="p-3 rounded-lg border border-border bg-muted/20">
                       <div className="flex items-center gap-2 mb-2">
@@ -549,6 +663,30 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
                           )}
                         </div>
                       </div>
+                      
+                      {visualStyle && (
+                        <div className="mb-2">
+                          <p className="text-[10px] text-muted-foreground mb-1">Visual Style</p>
+                          <p className="text-xs text-foreground line-clamp-2">{visualStyle}</p>
+                        </div>
+                      )}
+
+                      {conversionTriggersList.length > 0 && (
+                        <div className="mb-2">
+                          <p className="text-[10px] text-muted-foreground mb-1">Conversion Focus</p>
+                          <div className="flex flex-wrap gap-1">
+                            {conversionTriggersList.map((trigger, tIdx) => (
+                              <Badge 
+                                key={tIdx} 
+                                variant="outline" 
+                                className="text-[10px] py-0.5 px-1.5 bg-chart-2/5 border-chart-2/20 text-chart-2"
+                              >
+                                {trigger.length > 20 ? trigger.substring(0, 20) + "..." : trigger}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                       
                       {trustSignalsList.length > 0 && (
                         <div className="mb-2">
@@ -594,8 +732,9 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
                   <thead>
                     <tr className="border-b border-border">
                       <th className="text-left py-2 px-2 font-medium text-muted-foreground">Brand</th>
-                      <th className="text-left py-2 px-2 font-medium text-muted-foreground">Trust Signals</th>
-                      <th className="text-left py-2 px-2 font-medium text-muted-foreground">Key Claims</th>
+                      <th className="text-left py-2 px-2 font-medium text-muted-foreground">Visual Style</th>
+                      <th className="text-left py-2 px-2 font-medium text-muted-foreground">Conversion Focus</th>
+                      <th className="text-left py-2 px-2 font-medium text-muted-foreground hidden lg:table-cell">Trust Signals</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -605,11 +744,15 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
                         .split(/[,;]/)
                         .map(s => s.trim())
                         .filter(s => s.length > 2)
-                        .slice(0, 3);
+                        .slice(0, 2);
                       
-                      const claimsList = product.claims_on_label?.slice(0, 3) || 
-                        (product.claims?.split(/[,;]/).map(c => c.trim()).filter(Boolean).slice(0, 3)) || 
-                        [];
+                      const visualStyle = product.marketing_analysis?.design_blueprint?.visual_style || "";
+                      const conversionTriggersRaw = product.marketing_analysis?.design_blueprint?.conversion_triggers || "";
+                      const conversionTriggersList = conversionTriggersRaw
+                        .split(/[,;]/)
+                        .map(t => t.trim())
+                        .filter(t => t.length > 2)
+                        .slice(0, 2);
 
                       return (
                         <tr key={idx} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
@@ -623,7 +766,7 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
                                 />
                               )}
                               <div className="min-w-0">
-                                <p className="font-medium text-foreground truncate max-w-[120px]">
+                                <p className="font-medium text-foreground truncate max-w-[100px]">
                                   {product.brand || "Unknown"}
                                 </p>
                                 {product.price && (
@@ -632,7 +775,29 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
                               </div>
                             </div>
                           </td>
+                          <td className="py-3 px-2 max-w-[180px]">
+                            {visualStyle ? (
+                              <p className="text-xs text-foreground line-clamp-2">{visualStyle}</p>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </td>
                           <td className="py-3 px-2">
+                            <div className="flex flex-wrap gap-1">
+                              {conversionTriggersList.length > 0 ? conversionTriggersList.map((trigger, tIdx) => (
+                                <Badge 
+                                  key={tIdx} 
+                                  variant="outline" 
+                                  className="text-[10px] py-0.5 px-1.5 bg-chart-2/5 border-chart-2/20 text-chart-2"
+                                >
+                                  {trigger.length > 18 ? trigger.substring(0, 18) + "..." : trigger}
+                                </Badge>
+                              )) : (
+                                <span className="text-xs text-muted-foreground">—</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-3 px-2 hidden lg:table-cell">
                             <div className="flex flex-wrap gap-1">
                               {trustSignalsList.length > 0 ? trustSignalsList.map((signal, sIdx) => (
                                 <Badge 
@@ -640,22 +805,7 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
                                   variant="outline" 
                                   className="text-[10px] py-0.5 px-1.5 bg-chart-1/5 border-chart-1/20 text-chart-1"
                                 >
-                                  {signal.length > 20 ? signal.substring(0, 20) + "..." : signal}
-                                </Badge>
-                              )) : (
-                                <span className="text-xs text-muted-foreground">—</span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="py-3 px-2">
-                            <div className="flex flex-wrap gap-1">
-                              {claimsList.length > 0 ? claimsList.map((claim, cIdx) => (
-                                <Badge 
-                                  key={cIdx} 
-                                  variant="secondary" 
-                                  className="text-[10px] py-0.5 px-1.5"
-                                >
-                                  {claim.length > 20 ? claim.substring(0, 20) + "..." : claim}
+                                  {signal.length > 18 ? signal.substring(0, 18) + "..." : signal}
                                 </Badge>
                               )) : (
                                 <span className="text-xs text-muted-foreground">—</span>

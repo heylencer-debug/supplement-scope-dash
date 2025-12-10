@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import React, { useState, useMemo, useCallback, useEffect, Fragment } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -1023,78 +1023,122 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {/* Active Nutrients Section */}
-                      {nutrientsOnly.length > 0 && (
-                        <TableRow className="bg-primary/5">
-                          <TableCell colSpan={competitors.length + 2} className="py-2">
-                            <div className="flex items-center gap-2 text-xs font-semibold text-primary">
-                              <Beaker className="w-3.5 h-3.5" />
-                              Active Nutrients ({nutrientsOnly.length})
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )}
-                      {nutrientsOnly.map((ing, idx) => (
-                        <TableRow key={`nutrient-${idx}`} className={idx % 2 === 0 ? 'bg-muted/30' : ''}>
-                          <TableCell className="font-medium text-xs sticky left-0 bg-inherit z-10">
-                            <div className="flex items-center gap-1">
-                              {ing.ourDosage ? (
-                                <Check className="w-3 h-3 text-chart-4 shrink-0" />
-                              ) : (
-                                <span className="w-3 h-3 flex items-center justify-center shrink-0">
-                                  <span className="w-1 h-1 rounded-full bg-primary" />
-                                </span>
-                              )}
-                              <span className="truncate" title={ing.name}>{ing.name}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {ing.ourDosage ? (
-                              <Badge variant="secondary" className="text-[10px] bg-primary/10 text-primary">{ing.ourDosage}</Badge>
-                            ) : (
-                              <span className="text-[10px] text-muted-foreground">—</span>
-                            )}
-                          </TableCell>
-                          {competitors.slice(0, 3).map((p) => {
-                            const compData = ing.competitors.find(c => c.brand === (p.brand || 'Unknown'));
-                            return (
-                              <TableCell key={p.id}>
-                                {compData?.amount ? (
-                                  <Badge variant="outline" className="text-[10px]">{compData.amount}</Badge>
-                                ) : compData ? (
-                                  <Check className="w-3 h-3 text-muted-foreground" />
-                                ) : (
-                                  <span className="text-[10px] text-muted-foreground">—</span>
-                                )}
+                      {/* Render ingredients by category */}
+                      {(['Primary Active', 'Secondary Active', 'Tertiary Active', 'Functional Excipient'] as const).map((categoryName) => {
+                        const categoryIngredients = groupedNutrients[categoryName];
+                        if (!categoryIngredients || categoryIngredients.length === 0) return null;
+                        
+                        // Category styling
+                        const categoryStyles: Record<string, { bg: string; text: string; icon: React.ReactNode; label: string }> = {
+                          'Primary Active': { 
+                            bg: 'bg-chart-4/10', 
+                            text: 'text-chart-4', 
+                            icon: <Beaker className="w-3.5 h-3.5" />,
+                            label: 'Primary Active Ingredients'
+                          },
+                          'Secondary Active': { 
+                            bg: 'bg-chart-2/10', 
+                            text: 'text-chart-2', 
+                            icon: <FlaskConical className="w-3.5 h-3.5" />,
+                            label: 'Secondary Active Ingredients'
+                          },
+                          'Tertiary Active': { 
+                            bg: 'bg-primary/10', 
+                            text: 'text-primary', 
+                            icon: <Sparkles className="w-3.5 h-3.5" />,
+                            label: 'Tertiary Actives (Differentiation)'
+                          },
+                          'Functional Excipient': { 
+                            bg: 'bg-muted/50', 
+                            text: 'text-muted-foreground', 
+                            icon: <Package className="w-3.5 h-3.5" />,
+                            label: 'Functional Excipients'
+                          },
+                        };
+                        
+                        const style = categoryStyles[categoryName];
+                        
+                        return (
+                          <Fragment key={categoryName}>
+                            {/* Category Header */}
+                            <TableRow className={style.bg}>
+                              <TableCell colSpan={competitors.length + 2} className="py-2">
+                                <div className={`flex items-center gap-2 text-xs font-semibold ${style.text}`}>
+                                  {style.icon}
+                                  {style.label} ({categoryIngredients.length})
+                                </div>
                               </TableCell>
-                            );
-                          })}
-                        </TableRow>
-                      ))}
+                            </TableRow>
+                            {/* Category Ingredients */}
+                            {categoryIngredients.map((ing, idx) => (
+                              <TableRow key={`${categoryName}-${idx}`} className={idx % 2 === 0 ? 'bg-muted/20' : ''}>
+                                <TableCell className="font-medium text-xs sticky left-0 bg-inherit z-10">
+                                  <div className="flex flex-col gap-0.5">
+                                    <div className="flex items-center gap-1">
+                                      {ing.ourDosage ? (
+                                        <Check className="w-3 h-3 text-chart-4 shrink-0" />
+                                      ) : (
+                                        <span className="w-3 h-3 flex items-center justify-center shrink-0">
+                                          <span className="w-1 h-1 rounded-full bg-primary" />
+                                        </span>
+                                      )}
+                                      <span title={ing.name}>{ing.name}</span>
+                                    </div>
+                                    {ing.ourForm && (
+                                      <span className="text-[9px] text-muted-foreground pl-4 italic">{ing.ourForm}</span>
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  {ing.ourDosage ? (
+                                    <Badge variant="secondary" className="text-[10px] bg-primary/10 text-primary">{ing.ourDosage}</Badge>
+                                  ) : (
+                                    <span className="text-[10px] text-muted-foreground">—</span>
+                                  )}
+                                </TableCell>
+                                {competitors.slice(0, 3).map((p) => {
+                                  const compData = ing.competitors.find(c => c.brand === (p.brand || 'Unknown'));
+                                  return (
+                                    <TableCell key={p.id}>
+                                      {compData?.amount ? (
+                                        <Badge variant="outline" className="text-[10px]">{compData.amount}</Badge>
+                                      ) : compData ? (
+                                        <Check className="w-3 h-3 text-muted-foreground" />
+                                      ) : (
+                                        <span className="text-[10px] text-muted-foreground">—</span>
+                                      )}
+                                    </TableCell>
+                                  );
+                                })}
+                              </TableRow>
+                            ))}
+                          </Fragment>
+                        );
+                      })}
 
-                      {/* Other Ingredients Section */}
-                      {otherIngredientsOnly.length > 0 && (
-                        <>
-                          <TableRow className="bg-muted/50">
+                      {/* Other/Uncategorized Ingredients */}
+                      {groupedNutrients['Other'] && groupedNutrients['Other'].length > 0 && (
+                        <Fragment>
+                          <TableRow className="bg-muted/30">
                             <TableCell colSpan={competitors.length + 2} className="py-2">
                               <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-                                <FlaskConical className="w-3.5 h-3.5" />
-                                Other Ingredients ({otherIngredientsOnly.length})
+                                <Pill className="w-3.5 h-3.5" />
+                                Other Ingredients ({groupedNutrients['Other'].length})
                               </div>
                             </TableCell>
                           </TableRow>
-                          {otherIngredientsOnly.map((ing, idx) => (
+                          {groupedNutrients['Other'].map((ing, idx) => (
                             <TableRow key={`other-${idx}`} className={idx % 2 === 0 ? 'bg-muted/20' : ''}>
                               <TableCell className="font-medium text-xs sticky left-0 bg-inherit z-10">
                                 <div className="flex items-center gap-1">
                                   {ing.ourDosage ? (
                                     <Check className="w-3 h-3 text-chart-4 shrink-0" />
-                                  ) : ing.competitors.length > 0 ? (
-                                    <Check className="w-3 h-3 text-muted-foreground shrink-0" />
                                   ) : (
-                                    <span className="w-3 shrink-0" />
+                                    <span className="w-3 h-3 flex items-center justify-center shrink-0">
+                                      <span className="w-1 h-1 rounded-full bg-muted-foreground" />
+                                    </span>
                                   )}
-                                  <span className="truncate" title={ing.name}>{ing.name}</span>
+                                  <span title={ing.name}>{ing.name}</span>
                                 </div>
                               </TableCell>
                               <TableCell>
@@ -1103,6 +1147,49 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                                 ) : (
                                   <span className="text-[10px] text-muted-foreground">—</span>
                                 )}
+                              </TableCell>
+                              {competitors.slice(0, 3).map((p) => {
+                                const compData = ing.competitors.find(c => c.brand === (p.brand || 'Unknown'));
+                                return (
+                                  <TableCell key={p.id}>
+                                    {compData?.amount ? (
+                                      <Badge variant="outline" className="text-[10px]">{compData.amount}</Badge>
+                                    ) : compData ? (
+                                      <Check className="w-3 h-3 text-muted-foreground" />
+                                    ) : (
+                                      <span className="text-[10px] text-muted-foreground">—</span>
+                                    )}
+                                  </TableCell>
+                                );
+                              })}
+                            </TableRow>
+                          ))}
+                        </Fragment>
+                      )}
+
+                      {/* Competitor-Only Ingredients (not in our concept) */}
+                      {otherIngredientsOnly.length > 0 && (
+                        <Fragment>
+                          <TableRow className="bg-destructive/5">
+                            <TableCell colSpan={competitors.length + 2} className="py-2">
+                              <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+                                <AlertTriangle className="w-3.5 h-3.5" />
+                                Competitor-Only Ingredients ({otherIngredientsOnly.length})
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                          {otherIngredientsOnly.map((ing, idx) => (
+                            <TableRow key={`comp-only-${idx}`} className={idx % 2 === 0 ? 'bg-muted/10' : ''}>
+                              <TableCell className="font-medium text-xs sticky left-0 bg-inherit z-10">
+                                <div className="flex items-center gap-1">
+                                  <span className="w-3 h-3 flex items-center justify-center shrink-0">
+                                    <span className="w-1 h-1 rounded-full bg-muted-foreground" />
+                                  </span>
+                                  <span title={ing.name}>{ing.name}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <span className="text-[10px] text-muted-foreground">—</span>
                               </TableCell>
                               {competitors.slice(0, 3).map((p) => {
                                 const compData = ing.competitors.find(c => c.brand === (p.brand || 'Unknown'));
@@ -1118,7 +1205,7 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                               })}
                             </TableRow>
                           ))}
-                        </>
+                        </Fragment>
                       )}
                     </TableBody>
                   </Table>

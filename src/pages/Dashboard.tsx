@@ -136,7 +136,9 @@ export default function Dashboard() {
   const dashboardData = useMemo(() => {
     const analysis1 = analysis?.analysis_1_category_scores as Record<string, unknown> | null;
     const analysis2 = analysis?.analysis_2_opportunity_calculation as Record<string, unknown> | null;
+    const analysis3 = analysis?.analysis_3_formula_brief as Record<string, unknown> | null;
     const keyInsights = analysis?.key_insights as Record<string, unknown> | null;
+    const formulaBriefContent = (analysis3?.formula_brief_content as string) || null;
     
     // Customer insights for pain points and intelligence
     const customerInsights = analysis1?.customer_insights as Record<string, unknown> | null;
@@ -254,6 +256,7 @@ export default function Dashboard() {
             buyer_profile?: string;
           };
         } | null,
+        formula_brief_content: formulaBriefContent,
       },
     };
   }, [analysis]);

@@ -80,6 +80,7 @@ interface EnhancedBenchmarkComparisonProps {
       servings_per_container?: number;
       ingredients?: Array<string | { ingredient?: string; name?: string; dosage?: string; amount?: string; rationale?: string }>;
     };
+    formula_brief_content?: string | null;
     opportunity_index?: number;
     recommended_price?: number;
   } | null;
@@ -88,9 +89,84 @@ interface EnhancedBenchmarkComparisonProps {
 
 const MAX_COMPETITORS = 3;
 
-// Unified Ingredient & Nutrient Comparison Component
+// Parse ingredient tables from formula_brief_content Markdown
+interface ParsedIngredient {
+  ingredient: string;
+  dosage?: string;
+  form?: string;
+  function?: string;
+  rationale?: string;
+  category: 'primary' | 'secondary' | 'tertiary' | 'excipient';
+}
+
+const parseIngredientTablesFromMarkdown = (markdown: string): ParsedIngredient[] => {
+  const ingredients: ParsedIngredient[] = [];
+  if (!markdown) return ingredients;
+  
+  // Split markdown into sections by headers
+  const sections = markdown.split(/^###\s+/m);
+  
+  sections.forEach(section => {
+    // Determine category based on section header
+    let category: ParsedIngredient['category'] = 'primary';
+    const sectionLower = section.toLowerCase();
+    
+    if (sectionLower.startsWith('primary active')) {
+      category = 'primary';
+    } else if (sectionLower.startsWith('secondary active')) {
+      category = 'secondary';
+    } else if (sectionLower.startsWith('tertiary active') || sectionLower.includes('differentiation blend')) {
+      category = 'tertiary';
+    } else if (sectionLower.startsWith('functional excipient')) {
+      category = 'excipient';
+    } else {
+      // Skip non-ingredient sections
+      return;
+    }
+    
+    // Find table rows - look for lines that start and end with |
+    const tableRowRegex = /^\|([^|]+)\|([^|]+)\|([^|]*)\|([^|]*)\|?([^|]*)?\|?\s*$/gm;
+    let match;
+    
+    while ((match = tableRowRegex.exec(section)) !== null) {
+      const [_, col1, col2, col3, col4, col5] = match;
+      
+      // Skip header rows and separator rows
+      const ingredientName = col1?.trim() || '';
+      if (!ingredientName || 
+          ingredientName.toLowerCase() === 'ingredient' ||
+          ingredientName.startsWith('---') ||
+          ingredientName.startsWith('---') ||
+          ingredientName.match(/^-+$/)) {
+        continue;
+      }
+      
+      const dosage = col2?.trim() || '';
+      const form = col3?.trim() || '';
+      const functionOrRationale = col4?.trim() || '';
+      const additionalRationale = col5?.trim() || '';
+      
+      // Skip if dosage looks like a header (e.g., "Amount per Serving")
+      if (dosage.toLowerCase().includes('amount') || dosage.toLowerCase().includes('serving')) {
+        continue;
+      }
+      
+      ingredients.push({
+        ingredient: ingredientName,
+        dosage: dosage || undefined,
+        form: form || undefined,
+        function: functionOrRationale || undefined,
+        rationale: additionalRationale || functionOrRationale || undefined,
+        category,
+      });
+    }
+  });
+  
+  return ingredients;
+};
+
 interface IngredientComparisonProps {
-  ourDosages: Array<{ ingredient: string; dosage?: string; rationale?: string }>;
+  ourDosages: Array<{ ingredient: string; dosage?: string; rationale?: string; form?: string; category?: string }>;
   competitors: Product[];
   getCompetitorNutrients: (product: Product) => Array<{ name: string; amount: number | null; unit: string; dailyValue?: string | number }>;
   getCompetitorIngredientsList: (product: Product) => string[];
@@ -400,6 +476,8 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
     const ingredientMap = new Map<string, {
       displayName: string;
       ourDosage: string | null;
+      ourForm: string | null;
+      ourCategory: string | null;
       isNutrient: boolean;
       competitors: Array<{ brand: string; amount: string | null; dailyValue?: string | number }>;
     }>();
@@ -410,12 +488,16 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
       displayName: string, 
       isNutrient: boolean, 
       dosage: string | null,
+      form: string | null,
+      category: string | null,
       competitor?: { brand: string; amount: string | null; dailyValue?: string | number }
     ) => {
       if (!ingredientMap.has(normalizedKey)) {
         ingredientMap.set(normalizedKey, {
           displayName,
           ourDosage: dosage,
+          ourForm: form,
+          ourCategory: category,
           isNutrient,
           competitors: competitor ? [competitor] : []
         });
@@ -423,6 +505,12 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
         const existing = ingredientMap.get(normalizedKey)!;
         if (dosage && !existing.ourDosage) {
           existing.ourDosage = dosage;
+        }
+        if (form && !existing.ourForm) {
+          existing.ourForm = form;
+        }
+        if (category && !existing.ourCategory) {
+          existing.ourCategory = category;
         }
         if (competitor) {
           const alreadyHas = existing.competitors.some(c => c.brand === competitor.brand);
@@ -433,10 +521,10 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
       }
     };
 
-    // 1. Add our recommended dosages (these are nutrients)
+    // 1. Add our recommended dosages (these are nutrients) - with form and category
     ourDosages.forEach(item => {
       const normalizedName = item.ingredient.toLowerCase().trim();
-      addToMap(normalizedName, item.ingredient, true, item.dosage || null);
+      addToMap(normalizedName, item.ingredient, true, item.dosage || null, item.form || null, item.category || null);
     });
 
     // 2. Add ALL competitor data
@@ -451,6 +539,8 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
           normalizedName,
           nutrient.name,
           true,
+          null,
+          null,
           null,
           {
             brand,
@@ -475,20 +565,30 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
           cleanedIng.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' '),
           false,
           null,
+          null,
+          null,
           { brand, amount: null }
         );
       });
     });
 
-    // Convert to array and sort: ours first, then nutrients, then other ingredients
+    // Convert to array and sort: by category (Primary > Secondary > Tertiary > Excipient), then ours first, then nutrients
+    const categoryOrder = ['Primary Active', 'Secondary Active', 'Tertiary Active', 'Functional Excipient'];
     return Array.from(ingredientMap.entries())
       .map(([key, data]) => ({
         name: data.displayName,
         ourDosage: data.ourDosage,
+        ourForm: data.ourForm,
+        ourCategory: data.ourCategory,
         isNutrient: data.isNutrient,
         competitors: data.competitors
       }))
       .sort((a, b) => {
+        // First sort by category order
+        const aCatIdx = a.ourCategory ? categoryOrder.indexOf(a.ourCategory) : 999;
+        const bCatIdx = b.ourCategory ? categoryOrder.indexOf(b.ourCategory) : 999;
+        if (aCatIdx !== bCatIdx) return aCatIdx - bCatIdx;
+        // Then ours first
         if (a.ourDosage && !b.ourDosage) return -1;
         if (!a.ourDosage && b.ourDosage) return 1;
         if (a.isNutrient && !b.isNutrient) return -1;
@@ -497,9 +597,9 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
       });
   }, [ourDosages, competitors, getCompetitorNutrients, getCompetitorIngredientsList]);
 
-  // Separate nutrients and other ingredients for display
+  // Separate nutrients and other ingredients for display - now including those with categories
   const nutrientsOnly = useMemo(() => 
-    comparisonData.filter(item => item.isNutrient && (item.ourDosage || item.competitors.some(c => c.amount))),
+    comparisonData.filter(item => item.isNutrient && (item.ourDosage || item.ourCategory || item.competitors.some(c => c.amount))),
     [comparisonData]
   );
 
@@ -507,6 +607,26 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
     comparisonData.filter(item => !item.isNutrient),
     [comparisonData]
   );
+
+  // Group nutrients by category for better display
+  const groupedNutrients = useMemo(() => {
+    const groups: Record<string, typeof nutrientsOnly> = {
+      'Primary Active': [],
+      'Secondary Active': [],
+      'Tertiary Active': [],
+      'Functional Excipient': [],
+      'Other': []
+    };
+    nutrientsOnly.forEach(item => {
+      const cat = item.ourCategory || 'Other';
+      if (groups[cat]) {
+        groups[cat].push(item);
+      } else {
+        groups['Other'].push(item);
+      }
+    });
+    return groups;
+  }, [nutrientsOnly]);
 
   // Build chart data
   const chartData = useMemo(() => {
@@ -1726,9 +1846,9 @@ export function EnhancedBenchmarkComparison({
   };
 
   // Get Our Concept recommended ingredients with dosages from analysis - NO LIMIT (show all)
-  // This function pulls from MULTIPLE sources to ensure complete ingredient data
-  const getOurRecommendedDosages = (): Array<{ ingredient: string; dosage?: string; rationale?: string }> => {
-    const results: Array<{ ingredient: string; dosage?: string; rationale?: string }> = [];
+  // This function pulls from MULTIPLE sources to ensure complete ingredient data including Markdown parsing
+  const getOurRecommendedDosages = (): Array<{ ingredient: string; dosage?: string; rationale?: string; form?: string; category?: string }> => {
+    const results: Array<{ ingredient: string; dosage?: string; rationale?: string; form?: string; category?: string }> = [];
     const seenIngredients = new Set<string>();
     
     // Helper to parse ingredient string and extract dosage
@@ -1760,7 +1880,7 @@ export function EnhancedBenchmarkComparison({
     };
     
     // Helper to add ingredients while avoiding duplicates
-    const addIngredients = (ingredientList: unknown[] | undefined) => {
+    const addIngredients = (ingredientList: unknown[] | undefined, categoryLabel?: string) => {
       if (!ingredientList || !Array.isArray(ingredientList)) return;
       ingredientList.forEach(ing => {
         const parsed = parseIngredient(ing as string | Record<string, unknown>);
@@ -1768,28 +1888,61 @@ export function EnhancedBenchmarkComparison({
           const normalizedName = parsed.ingredient.toLowerCase().trim();
           if (!seenIngredients.has(normalizedName)) {
             seenIngredients.add(normalizedName);
-            results.push(parsed);
+            results.push({ ...parsed, category: categoryLabel });
           }
         }
       });
     };
     
-    const formulation = analysisData?.analysis_1_category_scores?.product_development?.formulation;
+    // PRIMARY SOURCE: Parse formula_brief_content Markdown (most complete - 27+ ingredients)
+    const markdownContent = analysisData?.formula_brief_content;
+    if (markdownContent && typeof markdownContent === 'string') {
+      const parsedFromMarkdown = parseIngredientTablesFromMarkdown(markdownContent);
+      
+      if (parsedFromMarkdown.length > 0) {
+        // Add ingredients by category
+        const categoryMap: Record<string, string> = {
+          'primary': 'Primary Active',
+          'secondary': 'Secondary Active',
+          'tertiary': 'Tertiary Active',
+          'excipient': 'Functional Excipient'
+        };
+        
+        parsedFromMarkdown.forEach(ing => {
+          const normalizedName = ing.ingredient.toLowerCase().trim();
+          if (!seenIngredients.has(normalizedName)) {
+            seenIngredients.add(normalizedName);
+            results.push({
+              ingredient: ing.ingredient,
+              dosage: ing.dosage,
+              form: ing.form,
+              rationale: ing.rationale || ing.function,
+              category: categoryMap[ing.category] || ing.category
+            });
+          }
+        });
+      }
+    }
     
-    // Source 1: recommended_ingredients (PRIMARY - most complete)
-    addIngredients(formulation?.recommended_ingredients as unknown[]);
-    
-    // Source 2: key_ingredients (may have additional items)
-    addIngredients(formulation?.key_ingredients as unknown[]);
-    
-    // Source 3: active_ingredients (may have additional items)
-    addIngredients(formulation?.active_ingredients as unknown[]);
-    
-    // Source 4: other_ingredients (inactive/filler ingredients)
-    addIngredients(formulation?.other_ingredients as unknown[]);
-    
-    // Source 5: formula_brief.ingredients (backup source)
-    addIngredients(analysisData?.formula_brief?.ingredients as unknown[]);
+    // FALLBACK: If Markdown parsing yielded no results, use structured JSON sources
+    if (results.length === 0) {
+      const formulation = analysisData?.analysis_1_category_scores?.product_development?.formulation;
+      
+      // Source 1: recommended_ingredients (PRIMARY - most complete)
+      addIngredients(formulation?.recommended_ingredients as unknown[], 'Primary Active');
+      
+      // Source 2: key_ingredients (may have additional items)
+      addIngredients(formulation?.key_ingredients as unknown[], 'Primary Active');
+      
+      // Source 3: active_ingredients (may have additional items)
+      addIngredients(formulation?.active_ingredients as unknown[], 'Secondary Active');
+      
+      // Source 4: other_ingredients (inactive/filler ingredients)
+      addIngredients(formulation?.other_ingredients as unknown[], 'Functional Excipient');
+      
+      // Source 5: formula_brief.ingredients (backup source)
+      addIngredients(analysisData?.formula_brief?.ingredients as unknown[]);
+    }
     
     return results;
   };

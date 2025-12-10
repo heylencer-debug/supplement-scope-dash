@@ -89,7 +89,7 @@ interface EnhancedBenchmarkComparisonProps {
   isLoading?: boolean;
 }
 
-const MAX_COMPETITORS = 3;
+const MAX_COMPETITORS = 15;
 
 // Parse ingredient tables from formula_brief_content Markdown
 interface ParsedIngredient {
@@ -1429,10 +1429,38 @@ export function EnhancedBenchmarkComparison({
     const marketingAnalysis = product.marketing_analysis as Record<string, unknown> | null;
     if (!marketingAnalysis) return null;
     
-    // Try lifestyle_positioning.primary_lifestyle first
+    // Try creative_brief.target_persona first (most reliable source)
+    const creativeBrief = marketingAnalysis.creative_brief as Record<string, unknown> | undefined;
+    const targetPersona = creativeBrief?.target_persona as Record<string, unknown> | undefined;
+    if (targetPersona?.psychographic) {
+      return targetPersona.psychographic as string;
+    }
+    
+    // Try brand_identity.tone
+    const brandIdentity = creativeBrief?.brand_identity as Record<string, unknown> | undefined;
+    if (brandIdentity?.tone) {
+      return brandIdentity.tone as string;
+    }
+    
+    // Try details.customer_sentiment.gap_analysis (summary of positioning)
+    const details = marketingAnalysis.details as Record<string, unknown> | undefined;
+    const customerSentiment = details?.customer_sentiment as Record<string, unknown> | undefined;
+    if (customerSentiment?.gap_analysis) {
+      const gap = customerSentiment.gap_analysis as string;
+      // Return first 100 chars if it's too long
+      return gap.length > 100 ? gap.substring(0, 100) + '...' : gap;
+    }
+    
+    // Try lifestyle_positioning.primary_lifestyle
     const lifestylePos = marketingAnalysis.lifestyle_positioning as Record<string, unknown> | undefined;
     if (lifestylePos?.primary_lifestyle) {
       return lifestylePos.primary_lifestyle as string;
+    }
+    
+    // Fallback to visual_gallery.vibe
+    const visualGallery = marketingAnalysis.visual_gallery as Record<string, unknown> | undefined;
+    if (visualGallery?.vibe) {
+      return visualGallery.vibe as string;
     }
     
     // Fallback to target_demographics.primary_audience

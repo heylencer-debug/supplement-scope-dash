@@ -99,6 +99,58 @@ interface ParsedIngredient {
   category: 'primary' | 'secondary' | 'tertiary' | 'excipient';
 }
 
+// Parse Finished Product Specifications for label claims
+interface LabelClaim {
+  ingredient: string;
+  labelClaim: string;
+  releaseRange?: string;
+  shelfLifeRange?: string;
+}
+
+const parseFinishedProductSpecifications = (markdown: string): LabelClaim[] => {
+  const labelClaims: LabelClaim[] = [];
+  if (!markdown) return labelClaims;
+  
+  // Find the "FINISHED PRODUCT SPECIFICATIONS" section
+  const specsSectionMatch = markdown.match(/##\s*\d*\.?\s*FINISHED PRODUCT SPECIFICATIONS[\s\S]*?(?=##\s*\d*\.|$)/i);
+  if (!specsSectionMatch) return labelClaims;
+  
+  const specsSection = specsSectionMatch[0];
+  
+  // Find the Potency Targets table
+  const tableRowRegex = /^\|([^|]+)\|([^|]+)\|([^|]*)\|([^|]*)?\|?\s*$/gm;
+  let match;
+  
+  while ((match = tableRowRegex.exec(specsSection)) !== null) {
+    const [_, col1, col2, col3, col4] = match;
+    
+    const ingredientName = col1?.trim() || '';
+    const labelClaim = col2?.trim() || '';
+    
+    // Skip header rows and separator rows
+    if (!ingredientName || 
+        ingredientName.toLowerCase() === 'ingredient' ||
+        ingredientName.startsWith('---') ||
+        ingredientName.match(/^-+$/) ||
+        labelClaim.toLowerCase().includes('label claim') ||
+        labelClaim.toLowerCase().includes('acceptable range')) {
+      continue;
+    }
+    
+    // Clean up sub-ingredient markers (↳)
+    const cleanName = ingredientName.replace(/^↳\s*/, '').trim();
+    
+    labelClaims.push({
+      ingredient: cleanName,
+      labelClaim: labelClaim,
+      releaseRange: col3?.trim() || undefined,
+      shelfLifeRange: col4?.trim() || undefined,
+    });
+  }
+  
+  return labelClaims;
+};
+
 const parseIngredientTablesFromMarkdown = (markdown: string): ParsedIngredient[] => {
   const ingredients: ParsedIngredient[] = [];
   if (!markdown) return ingredients;
@@ -166,12 +218,13 @@ const parseIngredientTablesFromMarkdown = (markdown: string): ParsedIngredient[]
 };
 
 interface IngredientComparisonProps {
-  ourDosages: Array<{ ingredient: string; dosage?: string; rationale?: string; form?: string; category?: string }>;
+  ourDosages: Array<{ ingredient: string; dosage?: string; rationale?: string; form?: string; category?: string; labelClaim?: string }>;
   competitors: Product[];
   getCompetitorNutrients: (product: Product) => Array<{ name: string; amount: number | null; unit: string; dailyValue?: string | number }>;
   getCompetitorIngredientsList: (product: Product) => string[];
   ourPrice?: number;
   ourServings?: number;
+  labelClaims?: LabelClaim[];
 }
 
 // Packaging Comparison Component
@@ -465,10 +518,19 @@ function PackagingComparisonSection({ ourPackaging, competitors, getCompetitorPa
   );
 }
 
-function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNutrients, getCompetitorIngredientsList, ourPrice, ourServings }: IngredientComparisonProps) {
+function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNutrients, getCompetitorIngredientsList, ourPrice, ourServings, labelClaims = [] }: IngredientComparisonProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [viewMode, setViewMode] = useState<'chart' | 'table' | 'gaps'>('chart');
 
+  // Create a map of label claims for quick lookup
+  const labelClaimsMap = useMemo(() => {
+    const map = new Map<string, LabelClaim>();
+    labelClaims.forEach(claim => {
+      const normalizedName = claim.ingredient.toLowerCase().trim();
+      map.set(normalizedName, claim);
+    });
+    return map;
+  }, [labelClaims]);
 
   // Build unified data combining nutrients (with amounts) AND other ingredients
   const comparisonData = useMemo(() => {
@@ -478,6 +540,7 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
       ourDosage: string | null;
       ourForm: string | null;
       ourCategory: string | null;
+      ourLabelClaim: string | null;
       isNutrient: boolean;
       competitors: Array<{ brand: string; amount: string | null; dailyValue?: string | number }>;
     }>();
@@ -492,12 +555,17 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
       category: string | null,
       competitor?: { brand: string; amount: string | null; dailyValue?: string | number }
     ) => {
+      // Look up label claim for this ingredient
+      const labelClaimData = labelClaimsMap.get(normalizedKey);
+      const labelClaimValue = labelClaimData?.labelClaim || null;
+      
       if (!ingredientMap.has(normalizedKey)) {
         ingredientMap.set(normalizedKey, {
           displayName,
           ourDosage: dosage,
           ourForm: form,
           ourCategory: category,
+          ourLabelClaim: labelClaimValue,
           isNutrient,
           competitors: competitor ? [competitor] : []
         });
@@ -511,6 +579,9 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
         }
         if (category && !existing.ourCategory) {
           existing.ourCategory = category;
+        }
+        if (labelClaimValue && !existing.ourLabelClaim) {
+          existing.ourLabelClaim = labelClaimValue;
         }
         if (competitor) {
           const alreadyHas = existing.competitors.some(c => c.brand === competitor.brand);
@@ -580,6 +651,7 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
         ourDosage: data.ourDosage,
         ourForm: data.ourForm,
         ourCategory: data.ourCategory,
+        ourLabelClaim: data.ourLabelClaim,
         isNutrient: data.isNutrient,
         competitors: data.competitors
       }))
@@ -1195,6 +1267,11 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                         <TableHead className="min-w-[100px]">
                           <div className="flex items-center gap-1">
                             <Award className="w-3 h-3 text-primary" />Our Concept
+                          </div>
+                        </TableHead>
+                        <TableHead className="min-w-[80px]">
+                          <div className="flex items-center gap-1 text-chart-4">
+                            <FileText className="w-3 h-3" />Label Claim
                           </div>
                         </TableHead>
                         {competitors.slice(0, 3).map((p, i) => (
@@ -3279,6 +3356,7 @@ export function EnhancedBenchmarkComparison({
         getCompetitorIngredientsList={getCompetitorIngredientsList}
         ourPrice={analysisData?.formula_brief?.target_price as number | undefined}
         ourServings={getOurFormulationSpecs().servingsPerContainer || undefined}
+        labelClaims={analysisData?.formula_brief_content ? parseFinishedProductSpecifications(analysisData.formula_brief_content as string) : []}
       />
 
       {/* PACKAGING STRATEGY COMPARISON */}

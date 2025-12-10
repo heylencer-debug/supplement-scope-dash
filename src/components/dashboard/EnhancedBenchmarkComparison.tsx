@@ -8,13 +8,14 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Star, TrendingUp, Pill, Target, MessageSquare, Package, Users, Megaphone, AlertTriangle, CheckCircle, XCircle, Palette, Search, Filter, X, Trophy, ThumbsUp, ThumbsDown, Check, FlaskConical, Scale, Award, Beaker, ChevronDown, ChevronUp, BarChart3, DollarSign, Eye, Layers, Shield, Tag, Sparkles, FileText } from "lucide-react";
+import { Star, TrendingUp, Pill, Target, MessageSquare, Package, Users, Megaphone, AlertTriangle, CheckCircle, XCircle, Palette, Search, Filter, X, Trophy, ThumbsUp, ThumbsDown, Check, FlaskConical, Scale, Award, Beaker, ChevronDown, ChevronUp, BarChart3, DollarSign, Eye, Layers, Shield, Tag, Sparkles, FileText, Loader2, Zap, Brain, ArrowUp, ArrowDown, Minus, Plus, RefreshCw } from "lucide-react";
 import { useProducts, Product } from "@/hooks/useProducts";
 import ProductDetailModal from "@/components/ProductDetailModal";
 import { useToast } from "@/hooks/use-toast";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell, RadialBarChart, RadialBar } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { useIngredientAnalysis, IngredientAnalysis } from "@/hooks/useIngredientAnalysis";
 interface EnhancedBenchmarkComparisonProps {
   categoryId?: string;
   analysisData?: {
@@ -229,6 +230,284 @@ interface IngredientComparisonProps {
   ourPrice?: number;
   ourServings?: number;
   labelClaims?: LabelClaim[];
+  categoryId?: string;
+}
+
+// AI Analysis Results Display Component
+function AIAnalysisResults({ analysis, onRefresh, isLoading }: { 
+  analysis: IngredientAnalysis; 
+  onRefresh: () => void;
+  isLoading: boolean;
+}) {
+  const [activeTab, setActiveTab] = useState<'summary' | 'ingredients' | 'insights'>('summary');
+  
+  const getAssessmentColor = (assessment: string) => {
+    switch (assessment) {
+      case 'Strong': return 'bg-chart-4/20 text-chart-4 border-chart-4/30';
+      case 'Moderate': return 'bg-chart-2/20 text-chart-2 border-chart-2/30';
+      case 'Weak': return 'bg-destructive/20 text-destructive border-destructive/30';
+      default: return 'bg-muted text-muted-foreground';
+    }
+  };
+
+  const getGapStatusIcon = (status: string) => {
+    switch (status) {
+      case 'leading': return <ArrowUp className="w-3 h-3 text-chart-4" />;
+      case 'trailing': return <ArrowDown className="w-3 h-3 text-destructive" />;
+      case 'matching': return <Minus className="w-3 h-3 text-chart-2" />;
+      case 'unique': return <Sparkles className="w-3 h-3 text-primary" />;
+      case 'missing': return <XCircle className="w-3 h-3 text-muted-foreground" />;
+      default: return null;
+    }
+  };
+
+  const getGapStatusColor = (status: string) => {
+    switch (status) {
+      case 'leading': return 'bg-chart-4/10 text-chart-4 border-chart-4/30';
+      case 'trailing': return 'bg-destructive/10 text-destructive border-destructive/30';
+      case 'matching': return 'bg-chart-2/10 text-chart-2 border-chart-2/30';
+      case 'unique': return 'bg-primary/10 text-primary border-primary/30';
+      case 'missing': return 'bg-muted text-muted-foreground border-border';
+      default: return 'bg-muted';
+    }
+  };
+
+  const getInsightIcon = (type: string) => {
+    switch (type) {
+      case 'add': return <Plus className="w-3 h-3" />;
+      case 'increase': return <ArrowUp className="w-3 h-3" />;
+      case 'decrease': return <ArrowDown className="w-3 h-3" />;
+      case 'remove': return <XCircle className="w-3 h-3" />;
+      case 'keep': return <Check className="w-3 h-3" />;
+      default: return null;
+    }
+  };
+
+  const getInsightColor = (type: string) => {
+    switch (type) {
+      case 'add': return 'bg-chart-4/10 text-chart-4';
+      case 'increase': return 'bg-primary/10 text-primary';
+      case 'decrease': return 'bg-chart-2/10 text-chart-2';
+      case 'remove': return 'bg-destructive/10 text-destructive';
+      case 'keep': return 'bg-chart-3/10 text-chart-3';
+      default: return 'bg-muted';
+    }
+  };
+
+  const getImpactBadge = (impact: string) => {
+    switch (impact) {
+      case 'high': return <Badge variant="outline" className="text-[8px] border-destructive/50 text-destructive">High Impact</Badge>;
+      case 'medium': return <Badge variant="outline" className="text-[8px] border-chart-2/50 text-chart-2">Medium</Badge>;
+      case 'low': return <Badge variant="outline" className="text-[8px] border-muted-foreground/50 text-muted-foreground">Low</Badge>;
+      default: return null;
+    }
+  };
+
+  return (
+    <div className="bg-gradient-to-br from-primary/5 via-chart-5/5 to-chart-4/5 rounded-xl border border-primary/20 p-4 space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-xl bg-primary/10">
+            <Brain className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-foreground flex items-center gap-2">
+              AI Formulation Analysis
+              <Badge className={`${getAssessmentColor(analysis.summary.overall_assessment)} text-[10px]`}>
+                {analysis.summary.overall_assessment}
+              </Badge>
+            </h3>
+            <p className="text-xs text-muted-foreground">{analysis.ingredients.length} ingredients analyzed</p>
+          </div>
+        </div>
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={onRefresh} 
+          disabled={isLoading}
+          className="h-8"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 mr-1 ${isLoading ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+      </div>
+
+      {/* Score Gauges */}
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { label: 'Coverage', value: analysis.charts.coverage_score, color: 'chart-4' },
+          { label: 'Uniqueness', value: analysis.charts.uniqueness_score, color: 'primary' },
+          { label: 'Efficacy', value: analysis.charts.efficacy_score, color: 'chart-3' },
+        ].map((gauge) => (
+          <div key={gauge.label} className="bg-card rounded-xl p-3 border border-border/50 text-center">
+            <div className={`text-2xl font-bold text-${gauge.color}`}>{gauge.value}</div>
+            <div className="text-[10px] text-muted-foreground">{gauge.label} Score</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Tab Navigation */}
+      <div className="flex items-center bg-muted rounded-lg p-0.5">
+        {[
+          { id: 'summary', label: 'Summary' },
+          { id: 'ingredients', label: 'Ingredients' },
+          { id: 'insights', label: 'Actions' },
+        ].map((tab) => (
+          <Button 
+            key={tab.id}
+            variant={activeTab === tab.id ? 'secondary' : 'ghost'} 
+            size="sm" 
+            className="flex-1 h-7 text-xs"
+            onClick={() => setActiveTab(tab.id as any)}
+          >
+            {tab.label}
+          </Button>
+        ))}
+      </div>
+
+      {/* Summary Tab */}
+      {activeTab === 'summary' && (
+        <div className="space-y-3">
+          {/* Recommendation */}
+          <div className="bg-card rounded-lg p-3 border border-border/50">
+            <p className="text-xs font-medium text-foreground mb-1">Strategic Recommendation</p>
+            <p className="text-sm text-muted-foreground">{analysis.summary.recommendation}</p>
+          </div>
+
+          {/* Strengths & Gaps */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-chart-4/5 rounded-lg p-3 border border-chart-4/20">
+              <p className="text-xs font-medium text-chart-4 mb-2 flex items-center gap-1">
+                <CheckCircle className="w-3 h-3" /> Key Strengths
+              </p>
+              <ul className="space-y-1">
+                {analysis.summary.key_strengths.map((s, i) => (
+                  <li key={i} className="text-xs text-foreground flex items-start gap-1.5">
+                    <span className="text-chart-4 mt-0.5">•</span>
+                    {s}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="bg-chart-2/5 rounded-lg p-3 border border-chart-2/20">
+              <p className="text-xs font-medium text-chart-2 mb-2 flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3" /> Key Gaps
+              </p>
+              <ul className="space-y-1">
+                {analysis.summary.key_gaps.map((g, i) => (
+                  <li key={i} className="text-xs text-foreground flex items-start gap-1.5">
+                    <span className="text-chart-2 mt-0.5">•</span>
+                    {g}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          {/* Dosage Comparison Chart */}
+          {analysis.charts.dosage_comparison.length > 0 && (
+            <div className="bg-card rounded-lg p-3 border border-border/50">
+              <p className="text-xs font-medium text-foreground mb-3">Dosage Comparison (Our Concept vs Competitor Avg)</p>
+              <div className="h-[200px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart 
+                    data={analysis.charts.dosage_comparison.slice(0, 8)} 
+                    layout="vertical"
+                    margin={{ top: 5, right: 30, left: 80, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} className="stroke-muted" />
+                    <XAxis type="number" tick={{ fontSize: 10 }} className="text-muted-foreground" />
+                    <YAxis 
+                      dataKey="ingredient" 
+                      type="category" 
+                      width={75} 
+                      tick={{ fontSize: 9 }} 
+                      className="text-muted-foreground"
+                      tickFormatter={(v) => v.length > 12 ? v.substring(0, 10) + '...' : v}
+                    />
+                    <Tooltip 
+                      formatter={(value: number, name: string) => [`${value}`, name]}
+                      labelFormatter={(label) => `${label}`}
+                    />
+                    <Legend wrapperStyle={{ fontSize: '10px' }} />
+                    <Bar dataKey="our_amount" name="Our Concept" fill="hsl(var(--chart-2))" radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="competitor_avg" name="Competitor Avg" fill="hsl(var(--chart-1))" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Ingredients Tab */}
+      {activeTab === 'ingredients' && (
+        <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
+          {analysis.ingredients.map((ing, idx) => (
+            <div 
+              key={idx} 
+              className={`rounded-lg p-3 border ${getGapStatusColor(ing.gap_status)}`}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  {getGapStatusIcon(ing.gap_status)}
+                  <div>
+                    <p className="text-xs font-medium text-foreground">{ing.name}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      {ing.our_dosage && (
+                        <span className="text-[10px] text-primary font-medium">Ours: {ing.our_dosage}</span>
+                      )}
+                      {ing.avg_competitor_dosage && (
+                        <span className="text-[10px] text-muted-foreground">Avg: {ing.avg_competitor_dosage}</span>
+                      )}
+                      {ing.gap_percentage !== null && (
+                        <Badge variant="outline" className={`text-[8px] ${ing.gap_percentage > 0 ? 'text-chart-4' : ing.gap_percentage < 0 ? 'text-destructive' : ''}`}>
+                          {ing.gap_percentage > 0 ? '+' : ''}{ing.gap_percentage}%
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <Badge variant="outline" className={`text-[8px] ${ing.priority === 'high' ? 'border-destructive/50' : ing.priority === 'medium' ? 'border-chart-2/50' : 'border-muted'}`}>
+                  {ing.priority}
+                </Badge>
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-2">{ing.clinical_note}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Actions Tab */}
+      {activeTab === 'insights' && (
+        <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
+          {analysis.actionable_insights.map((insight, idx) => (
+            <div 
+              key={idx} 
+              className={`rounded-lg p-3 border border-border/50 ${getInsightColor(insight.type)}`}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-background/50">
+                    {getInsightIcon(insight.type)}
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-foreground flex items-center gap-2">
+                      <span className="uppercase text-[10px] opacity-70">{insight.type}</span>
+                      {insight.ingredient}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{insight.reason}</p>
+                  </div>
+                </div>
+                {getImpactBadge(insight.impact)}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // Packaging Comparison Component
@@ -522,9 +801,12 @@ function PackagingComparisonSection({ ourPackaging, competitors, getCompetitorPa
   );
 }
 
-function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNutrients, getCompetitorIngredientsList, ourPrice, ourServings, labelClaims = [] }: IngredientComparisonProps) {
+function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNutrients, getCompetitorIngredientsList, ourPrice, ourServings, labelClaims = [], categoryId }: IngredientComparisonProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [viewMode, setViewMode] = useState<'chart' | 'table' | 'gaps'>('chart');
+  
+  // AI Analysis hook
+  const { analysis: aiAnalysis, isLoading: aiLoading, runAnalysis, hasAnalysis } = useIngredientAnalysis(categoryId);
 
   // Create a map of label claims for quick lookup
   const labelClaimsMap = useMemo(() => {
@@ -887,6 +1169,21 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
               </div>
             </CollapsibleTrigger>
             <div className="flex items-center gap-2">
+              {/* AI Analysis Button */}
+              <Button 
+                variant={hasAnalysis ? "secondary" : "default"}
+                size="sm" 
+                className="h-7 sm:h-8 px-2 sm:px-3 text-[10px] sm:text-xs"
+                onClick={(e) => { e.stopPropagation(); runAnalysis(); }}
+                disabled={aiLoading || !categoryId}
+              >
+                {aiLoading ? (
+                  <Loader2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 mr-1 animate-spin" />
+                ) : (
+                  <Brain className="w-3 h-3 sm:w-3.5 sm:h-3.5 mr-1" />
+                )}
+                {hasAnalysis ? 'Re-analyze' : 'Analyze with AI'}
+              </Button>
               {/* View Toggle */}
               <div className="flex items-center bg-muted rounded-lg p-0.5">
                 <Button variant={viewMode === 'chart' ? 'secondary' : 'ghost'} size="sm" className="h-6 sm:h-7 px-1.5 sm:px-2 text-[10px] sm:text-xs"
@@ -912,6 +1209,13 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
         </CardHeader>
         <CollapsibleContent>
           <CardContent className="pt-0 p-3 sm:p-4 md:p-6">
+            {/* AI Analysis Results */}
+            {aiAnalysis && (
+              <div className="mb-4">
+                <AIAnalysisResults analysis={aiAnalysis} onRefresh={runAnalysis} isLoading={aiLoading} />
+              </div>
+            )}
+            
             {viewMode === 'chart' && (
               /* BAR CHART VIEW */
               <div className="space-y-4">

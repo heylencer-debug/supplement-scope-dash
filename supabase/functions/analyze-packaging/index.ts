@@ -122,174 +122,109 @@ Competitor ${idx + 1}: ${c.brand || 'Unknown'} - ${c.title || 'Unknown Product'}
             tools: [
               {
                 name: 'create_packaging_design',
-                description: 'Create a comprehensive packaging design strategy with visual specifications, copy content, and competitive positioning.',
+                description: 'Create a designer-ready packaging brief with concise copy and clear specifications.',
                 input_schema: {
                   type: 'object',
                   properties: {
-                    summary: {
+                    design_brief: {
                       type: 'object',
-                      properties: {
-                        design_strategy: { type: 'string', description: 'Overall design strategy in 2-3 sentences' },
-                        key_differentiators: { type: 'array', items: { type: 'string' }, description: '3-5 key visual/messaging differentiators' },
-                        target_shelf_positioning: { type: 'string', description: 'How product should stand out on shelf' }
-                      },
-                      required: ['design_strategy', 'key_differentiators', 'target_shelf_positioning']
-                    },
-                    visual_design: {
-                      type: 'object',
+                      description: 'Core design specifications for the designer',
                       properties: {
                         primary_color: {
                           type: 'object',
                           properties: {
-                            hex: { type: 'string', description: 'Hex color code' },
-                            name: { type: 'string', description: 'Color name' },
-                            psychology: { type: 'string', description: 'Why this color works' }
+                            hex: { type: 'string', description: 'Hex color code e.g. #2D5A3D' },
+                            name: { type: 'string', description: 'Color name e.g. Forest Green' }
                           },
-                          required: ['hex', 'name', 'psychology']
+                          required: ['hex', 'name']
                         },
                         secondary_color: {
                           type: 'object',
                           properties: {
                             hex: { type: 'string' },
-                            name: { type: 'string' },
-                            psychology: { type: 'string' }
+                            name: { type: 'string' }
                           },
-                          required: ['hex', 'name', 'psychology']
+                          required: ['hex', 'name']
                         },
                         accent_color: {
                           type: 'object',
                           properties: {
                             hex: { type: 'string' },
-                            name: { type: 'string' },
-                            psychology: { type: 'string' }
+                            name: { type: 'string' }
                           },
-                          required: ['hex', 'name', 'psychology']
+                          required: ['hex', 'name']
                         },
-                        color_rationale: { type: 'string', description: 'Overall color palette rationale' },
-                        typography: {
-                          type: 'object',
-                          properties: {
-                            headline_font: { type: 'string', description: 'Recommended headline font family' },
-                            body_font: { type: 'string', description: 'Recommended body font family' },
-                            font_rationale: { type: 'string', description: 'Why these fonts work' }
-                          },
-                          required: ['headline_font', 'body_font', 'font_rationale']
+                        headline_font: { type: 'string', description: 'Font family name for headlines e.g. Montserrat Bold' },
+                        body_font: { type: 'string', description: 'Font family name for body text e.g. Open Sans' },
+                        primary_claim: { type: 'string', description: 'Main headline claim - 3-8 words MAX. This is the hero text on front panel.' },
+                        key_differentiators: { 
+                          type: 'array', 
+                          items: { type: 'string' }, 
+                          description: '3-5 short badges/tags that make us stand out e.g. "Clinically Dosed", "3rd Party Tested"' 
                         },
-                        imagery_style: { type: 'string', description: 'Style of imagery/illustrations to use' },
-                        overall_aesthetic: { type: 'string', description: 'Overall visual aesthetic description' }
+                        certifications: { 
+                          type: 'array', 
+                          items: { type: 'string' }, 
+                          description: 'Required certification badges e.g. "GMP Certified", "Non-GMO", "Vegan"' 
+                        }
                       },
-                      required: ['primary_color', 'secondary_color', 'accent_color', 'color_rationale', 'typography', 'imagery_style', 'overall_aesthetic']
+                      required: ['primary_color', 'secondary_color', 'accent_color', 'headline_font', 'body_font', 'primary_claim', 'key_differentiators', 'certifications']
                     },
-                    front_panel: {
+                    elements_checklist: {
                       type: 'object',
+                      description: 'Checklist of elements to include on the package',
                       properties: {
-                        layout_structure: { type: 'string', description: 'How elements should be arranged' },
-                        visual_hierarchy: { type: 'array', items: { type: 'string' }, description: 'Elements in order of visual importance' },
-                        primary_claim: { type: 'string', description: 'The main claim/headline' },
-                        secondary_claims: { type: 'array', items: { type: 'string' }, description: 'Supporting claims' },
-                        brand_positioning_statement: { type: 'string', description: 'Brand positioning statement for package' },
-                        required_elements: { type: 'array', items: { type: 'string' }, description: 'Must-have elements on front panel' }
-                      },
-                      required: ['layout_structure', 'visual_hierarchy', 'primary_claim', 'secondary_claims', 'brand_positioning_statement', 'required_elements']
-                    },
-                    trust_signals: {
-                      type: 'object',
-                      properties: {
-                        recommended_certifications: {
-                          type: 'array',
-                          items: {
-                            type: 'object',
-                            properties: {
-                              badge: { type: 'string', description: 'Certification or badge name' },
-                              importance: { type: 'string', enum: ['critical', 'high', 'medium'] },
-                              rationale: { type: 'string', description: 'Why this certification matters' }
-                            },
-                            required: ['badge', 'importance', 'rationale']
-                          }
+                        front_panel_hierarchy: { 
+                          type: 'array', 
+                          items: { type: 'string' }, 
+                          description: 'Elements in order of visual importance for front panel e.g. ["Brand Logo", "Primary Claim", "Serving Count", "Certification Badges"]' 
                         },
-                        trust_building_elements: { type: 'array', items: { type: 'string' }, description: 'Additional trust elements' }
-                      },
-                      required: ['recommended_certifications', 'trust_building_elements']
-                    },
-                    copy_content: {
-                      type: 'object',
-                      properties: {
-                        headline: { type: 'string', description: 'Main headline text for front panel' },
-                        subheadline: { type: 'string', description: 'Supporting subheadline' },
-                        bullet_points: { type: 'array', items: { type: 'string' }, description: 'Key benefit bullet points' },
-                        call_to_action: { type: 'string', description: 'CTA text' },
-                        back_panel_copy: { type: 'string', description: 'Full back panel copy text' }
-                      },
-                      required: ['headline', 'subheadline', 'bullet_points', 'call_to_action', 'back_panel_copy']
-                    },
-                    conversion_triggers: {
-                      type: 'array',
-                      items: {
-                        type: 'object',
-                        properties: {
-                          trigger: { type: 'string', description: 'The conversion trigger text or element' },
-                          placement: { type: 'string', description: 'Where to place on package' },
-                          psychological_principle: { type: 'string', description: 'Psychology behind why it works' }
+                        bullet_points: { 
+                          type: 'array', 
+                          items: { type: 'string' }, 
+                          description: '3-5 benefit bullets - CONCISE, 5-10 words each. Ready to use on package.' 
                         },
-                        required: ['trigger', 'placement', 'psychological_principle']
+                        call_to_action: { type: 'string', description: 'CTA text - 2-5 words e.g. "Feel the Difference"' },
+                        trust_signals: { 
+                          type: 'array', 
+                          items: { type: 'string' }, 
+                          description: 'Trust elements to include e.g. "Made in USA", "Money-Back Guarantee", "Doctor Recommended"' 
+                        }
                       },
-                      description: 'Psychological conversion triggers to include'
-                    },
-                    competitive_positioning: {
-                      type: 'object',
-                      properties: {
-                        vs_leader: {
-                          type: 'object',
-                          properties: {
-                            competitor: { type: 'string', description: 'Name of market leader' },
-                            our_advantage: { type: 'string', description: 'How we beat them visually' }
-                          },
-                          required: ['competitor', 'our_advantage']
-                        },
-                        market_gap_filled: { type: 'string', description: 'Market gap we fill with this design' },
-                        differentiation_elements: { type: 'array', items: { type: 'string' }, description: 'Specific elements that differentiate us' }
-                      },
-                      required: ['vs_leader', 'market_gap_filled', 'differentiation_elements']
-                    },
-                    competitor_comparison: {
-                      type: 'array',
-                      items: {
-                        type: 'object',
-                        properties: {
-                          competitor: { type: 'string' },
-                          their_approach: { type: 'string', description: 'Their packaging strategy' },
-                          our_counter_strategy: { type: 'string', description: 'How we counter/beat them' },
-                          advantage_score: { type: 'string', enum: ['strong', 'moderate', 'weak'] }
-                        },
-                        required: ['competitor', 'their_approach', 'our_counter_strategy', 'advantage_score']
-                      },
-                      description: 'Comparison against top 5 competitors'
-                    },
-                    implementation_priorities: {
-                      type: 'array',
-                      items: {
-                        type: 'object',
-                        properties: {
-                          priority: { type: 'number', enum: [1, 2, 3], description: '1=must have, 2=important, 3=nice to have' },
-                          element: { type: 'string', description: 'Design element' },
-                          impact: { type: 'string', description: 'Expected impact' },
-                          complexity: { type: 'string', enum: ['easy', 'moderate', 'complex'] }
-                        },
-                        required: ['priority', 'element', 'impact', 'complexity']
-                      },
-                      description: 'Prioritized implementation list'
+                      required: ['front_panel_hierarchy', 'bullet_points', 'call_to_action', 'trust_signals']
                     },
                     mock_content: {
                       type: 'object',
+                      description: 'Ready-to-use text content exactly as it should appear on packaging',
                       properties: {
-                        front_panel_text: { type: 'string', description: 'Complete front panel text content as it should appear' },
-                        back_panel_text: { type: 'string', description: 'Complete back panel text content' },
-                        side_panel_suggestions: { type: 'array', items: { type: 'string' }, description: 'Side panel content suggestions' }
+                        front_panel_text: { 
+                          type: 'string', 
+                          description: 'Complete front panel text layout. Format as it appears on the actual package with line breaks. Keep text SHORT - this is packaging, not a brochure.' 
+                        },
+                        back_panel_text: { 
+                          type: 'string', 
+                          description: 'Complete back panel text including benefits section, directions, and any required copy. Format with sections and line breaks.' 
+                        },
+                        side_panel_suggestions: { 
+                          type: 'array', 
+                          items: { type: 'string' }, 
+                          description: 'Brief suggestions for side panel content e.g. "Storage instructions", "Contact info", "Website QR code"' 
+                        }
                       },
                       required: ['front_panel_text', 'back_panel_text', 'side_panel_suggestions']
+                    },
+                    client_rationale: {
+                      type: 'object',
+                      description: 'Brief explanations for client presentation - why these design choices win',
+                      properties: {
+                        color_explanation: { type: 'string', description: '1-2 sentences explaining why this color palette beats competitors' },
+                        positioning_explanation: { type: 'string', description: '2-3 sentences on how this design positions us to win shelf space' },
+                        differentiation_summary: { type: 'string', description: '2-3 sentences on what makes this design stand out from top competitors' }
+                      },
+                      required: ['color_explanation', 'positioning_explanation', 'differentiation_summary']
                     }
                   },
-                  required: ['summary', 'visual_design', 'front_panel', 'trust_signals', 'copy_content', 'conversion_triggers', 'competitive_positioning', 'competitor_comparison', 'implementation_priorities', 'mock_content']
+                  required: ['design_brief', 'elements_checklist', 'mock_content', 'client_rationale']
                 }
               }
             ],
@@ -297,38 +232,40 @@ Competitor ${idx + 1}: ${c.brand || 'Unknown'} - ${c.title || 'Unknown Product'}
             messages: [
               {
                 role: 'user',
-                content: `You are an expert packaging designer, brand strategist, and consumer psychologist. Create a WINNING PACKAGING DESIGN PLAN for "${categoryName}" that will stand out on shelves and convert browsers into buyers.
+                content: `You are an expert packaging designer creating a DESIGNER-READY BRIEF for "${categoryName}".
 
-## OUR PRODUCT POSITIONING & FORMULA:
+## CRITICAL REQUIREMENTS:
+- ALL COPY MUST BE SHORT - this is packaging, not marketing material
+- Headlines: 3-8 words MAX
+- Subheadlines: 5-12 words MAX  
+- Bullet points: 5-10 words each
+- Claims/badges: 2-5 words each
+- Think ACTUAL PACKAGE TEXT, not descriptions
+
+## OUR PRODUCT:
 ${formulaBriefContent}
 
-## RECOMMENDED PACKAGING FROM ANALYSIS:
+## RECOMMENDED PACKAGING:
 - Type: ${recommendedPackaging.type || 'Not specified'}
 - Design Elements: ${recommendedPackaging.design_elements?.join(', ') || 'Not specified'}
 
-## TOP 10 COMPETITORS' PACKAGING AUDITS:
+## TOP COMPETITORS:
 ${competitorPackagingSummary}
 
-## YOUR TASK:
-Create a comprehensive packaging design specification that:
+## YOUR DELIVERABLES:
 
-1. **VISUAL DESIGN SYSTEM**: Define a complete color palette with hex codes and psychology, typography choices, and imagery style that differentiates us from competitors while appealing to our target audience.
+1. **DESIGN BRIEF**: Color palette (3 hex codes), typography (2 fonts), primary claim (SHORT!), key differentiators (badges), certifications to include
 
-2. **FRONT PANEL LAYOUT**: Specify exact visual hierarchy, primary and secondary claims, required elements, and layout structure.
+2. **ELEMENTS CHECKLIST**: What goes on the package in priority order, short bullet points ready to print, CTA, trust signals
 
-3. **TRUST SIGNALS**: Recommend specific certifications, badges, and trust-building elements with importance levels and rationale.
+3. **MOCK CONTENT**: 
+   - Front panel text EXACTLY as it appears (with line breaks, formatted)
+   - Back panel text EXACTLY as it appears (with sections)
+   - Side panel suggestions
 
-4. **COPY CONTENT**: Write actual headline, subheadline, bullet points, CTA, and full back panel copy that we can use.
+4. **CLIENT RATIONALE**: Brief explanations for why these choices beat competitors (for presenting to stakeholders)
 
-5. **CONVERSION TRIGGERS**: Identify specific psychological triggers to incorporate with their placement and the principle behind each.
-
-6. **COMPETITIVE POSITIONING**: Analyze how to beat each competitor visually and fill market gaps.
-
-7. **IMPLEMENTATION PRIORITIES**: Rank design elements by priority, impact, and complexity.
-
-8. **MOCK CONTENT**: Provide complete front and back panel text exactly as it should appear on the package.
-
-Be specific with colors (exact hex codes), fonts (actual font names), and copy (actual words to use). This should be ready for a designer to execute.`
+Make the mock content READY TO SEND TO A DESIGNER - exact text, proper formatting, copy-paste ready.`
               }
             ]
           })

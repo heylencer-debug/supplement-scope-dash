@@ -47,11 +47,11 @@ export function LaunchPlanSection({
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Rocket className="h-5 w-5 text-primary" />
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <Rocket className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
             Launch Strategy & Action Plan
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-xs sm:text-sm">
             Go-to-market strategy and execution roadmap
           </CardDescription>
         </CardHeader>
@@ -168,11 +168,11 @@ export function LaunchPlanSection({
   return (
     <Card className="animate-enter [animation-duration:400ms]">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <Rocket className="h-5 w-5 text-primary" />
+        <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+          <Rocket className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
           Launch Strategy & Action Plan
         </CardTitle>
-        <CardDescription>
+        <CardDescription className="text-xs sm:text-sm">
           Go-to-market strategy and execution roadmap
         </CardDescription>
       </CardHeader>
@@ -185,11 +185,11 @@ export function LaunchPlanSection({
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <Quote className="h-4 w-4 text-primary" />
-                  <h4 className="text-sm font-semibold text-foreground">Winning Hook</h4>
+                  <h4 className="text-xs sm:text-sm font-semibold text-foreground">Winning Hook</h4>
                 </div>
-                <div className="relative p-4 rounded-lg bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20">
-                  <Quote className="absolute top-2 left-2 h-6 w-6 text-primary/20" />
-                  <p className="text-sm italic text-foreground leading-relaxed pl-4">
+                <div className="relative p-3 sm:p-4 rounded-lg bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20">
+                  <Quote className="absolute top-2 left-2 h-5 w-5 sm:h-6 sm:w-6 text-primary/20" />
+                  <p className="text-xs sm:text-sm italic text-foreground leading-relaxed pl-4">
                     "{goToMarket.positioning}"
                   </p>
                 </div>
@@ -201,12 +201,12 @@ export function LaunchPlanSection({
               <div className="space-y-2">
               <div className="flex items-center gap-2">
                   <Megaphone className="h-4 w-4 text-chart-2" />
-                  <h4 className="text-sm font-semibold text-foreground">Ad Angles</h4>
+                  <h4 className="text-xs sm:text-sm font-semibold text-foreground">Ad Angles</h4>
                 </div>
                 <ul className="space-y-2">
                   {goToMarket.messaging.map((msg, index) => (
-                    <li key={index} className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <Zap className="h-4 w-4 text-chart-2 mt-0.5 shrink-0" />
+                    <li key={index} className="flex items-start gap-2 text-xs sm:text-sm text-muted-foreground">
+                      <Zap className="h-3 w-3 sm:h-4 sm:w-4 text-chart-2 mt-0.5 shrink-0" />
                       <span>{msg}</span>
                     </li>
                   ))}
@@ -219,18 +219,18 @@ export function LaunchPlanSection({
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-chart-4" />
-                  <h4 className="text-sm font-semibold text-foreground">Launch Tactics</h4>
+                  <h4 className="text-xs sm:text-sm font-semibold text-foreground">Launch Tactics</h4>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
                   {launchTactics.map((tactic, index) => {
                     const Icon = tactic.icon;
                     return (
-                      <div key={index} className="p-3 rounded-lg bg-muted/30 border border-border/50">
+                      <div key={index} className="p-2 sm:p-3 rounded-lg bg-muted/30 border border-border/50">
                         <div className="flex items-center gap-2 mb-1">
-                          <Icon className="h-4 w-4 text-chart-4" />
-                          <span className="text-sm font-medium text-foreground">{tactic.label}</span>
+                          <Icon className="h-3 w-3 sm:h-4 sm:w-4 text-chart-4" />
+                          <span className="text-xs sm:text-sm font-medium text-foreground">{tactic.label}</span>
                         </div>
-                        <p className="text-xs text-muted-foreground leading-relaxed">
+                        <p className="text-[10px] sm:text-xs text-muted-foreground leading-relaxed">
                           {tactic.value}
                         </p>
                       </div>
@@ -245,7 +245,7 @@ export function LaunchPlanSection({
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <Target className="h-4 w-4 text-chart-3" />
-                  <h4 className="text-sm font-semibold text-foreground">Differentiation</h4>
+                  <h4 className="text-xs sm:text-sm font-semibold text-foreground">Differentiation</h4>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {goToMarket.differentiation.map((diff, index) => (
@@ -270,9 +270,9 @@ export function LaunchPlanSection({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-primary" />
-                <h4 className="text-sm font-semibold text-foreground">Action Plan Roadmap</h4>
+                <h4 className="text-xs sm:text-sm font-semibold text-foreground">Action Plan Roadmap</h4>
               </div>
-              <span className="text-xs text-muted-foreground">
+              <span className="text-[10px] sm:text-xs text-muted-foreground">
                 {timelineKeys.length} phases • {actionItems.length} actions
               </span>
             </div>

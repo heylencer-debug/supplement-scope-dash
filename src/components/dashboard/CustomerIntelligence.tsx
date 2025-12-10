@@ -125,8 +125,31 @@ export default function CustomerIntelligence({
               <AlertTriangle className="w-4 h-4 text-chart-2" />
               Primary Pain Points
             </h3>
-            <div className="rounded-md border">
-              <Table>
+            <div className="rounded-md border overflow-x-auto">
+              {/* Mobile: Card layout */}
+              <div className="md:hidden space-y-3 p-3">
+                {primary_pain_points.map((point, idx) => (
+                  <div key={idx} className="p-3 bg-muted/30 rounded-lg border border-border/50">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <p className="font-medium text-sm">
+                        {point.pain_point || point.issue || point.theme || "Unknown"}
+                      </p>
+                      <Badge variant="secondary" className="text-xs shrink-0">
+                        {point.frequency || "—"}
+                      </Badge>
+                    </div>
+                    {point.evidence && (
+                      <p className="text-xs text-muted-foreground mb-2">{point.evidence}</p>
+                    )}
+                    {point.solution && (
+                      <p className="text-xs text-foreground"><span className="text-muted-foreground">Solution:</span> {point.solution}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+              
+              {/* Desktop: Table layout */}
+              <Table className="hidden md:table">
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[180px]">Pain Point</TableHead>

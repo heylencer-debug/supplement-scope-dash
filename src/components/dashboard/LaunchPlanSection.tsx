@@ -221,7 +221,7 @@ export function LaunchPlanSection({
                   <CheckCircle2 className="h-4 w-4 text-chart-4" />
                   <h4 className="text-sm font-semibold text-foreground">Launch Tactics</h4>
                 </div>
-                <div className="grid md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
                   {launchTactics.map((tactic, index) => {
                     const Icon = tactic.icon;
                     return (
@@ -277,7 +277,7 @@ export function LaunchPlanSection({
               </span>
             </div>
             
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
               {timelineKeys.map((timeline, timelineIdx) => {
                 const items = groupedItems[timeline];
                 const completedCount = items.filter(

@@ -154,7 +154,7 @@ export function DeepDiveSection({
                 <Skeleton className="h-7 w-20 rounded-md" />
                 <Skeleton className="h-7 w-24 rounded-md" />
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                 {[...Array(8)].map((_, i) => (
                   <Skeleton key={i} className="h-24 rounded-lg" />
                 ))}
@@ -339,13 +339,13 @@ function CriteriaBreakdownPanel({
       </div>
 
       {isLoading ? (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
           {[...Array(6)].map((_, i) => (
             <Skeleton key={i} className="h-20 rounded-lg" />
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
           {filteredBreakdown.map((item, idx) => {
             const name = item.name || item.criterion || item.category || "Unknown";
             const score = item.raw_score || item.score || 0;

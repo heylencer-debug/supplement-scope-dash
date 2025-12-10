@@ -515,7 +515,81 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
                 <Award className="w-4 h-4 text-chart-5" />
                 Competitor Packaging Audit
               </h4>
-              <div className="overflow-x-auto">
+              
+              {/* Mobile: Card layout */}
+              <div className="md:hidden space-y-3">
+                {topCompetitors.map((product, idx) => {
+                  const trustSignalsRaw = product.marketing_analysis?.design_blueprint?.trust_signals || "";
+                  const trustSignalsList = trustSignalsRaw
+                    .split(/[,;]/)
+                    .map(s => s.trim())
+                    .filter(s => s.length > 2)
+                    .slice(0, 3);
+                  
+                  const claimsList = product.claims_on_label?.slice(0, 3) || 
+                    (product.claims?.split(/[,;]/).map(c => c.trim()).filter(Boolean).slice(0, 3)) || 
+                    [];
+
+                  return (
+                    <div key={idx} className="p-3 rounded-lg border border-border bg-muted/20">
+                      <div className="flex items-center gap-2 mb-2">
+                        {product.main_image_url && (
+                          <img 
+                            src={product.main_image_url} 
+                            alt={product.brand || ""} 
+                            className="w-10 h-10 rounded object-cover border border-border/50"
+                          />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-foreground text-sm truncate">
+                            {product.brand || "Unknown"}
+                          </p>
+                          {product.price && (
+                            <p className="text-xs text-muted-foreground">${product.price.toFixed(2)}</p>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {trustSignalsList.length > 0 && (
+                        <div className="mb-2">
+                          <p className="text-[10px] text-muted-foreground mb-1">Trust Signals</p>
+                          <div className="flex flex-wrap gap-1">
+                            {trustSignalsList.map((signal, sIdx) => (
+                              <Badge 
+                                key={sIdx} 
+                                variant="outline" 
+                                className="text-[10px] py-0.5 px-1.5 bg-chart-1/5 border-chart-1/20 text-chart-1"
+                              >
+                                {signal.length > 25 ? signal.substring(0, 25) + "..." : signal}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {claimsList.length > 0 && (
+                        <div>
+                          <p className="text-[10px] text-muted-foreground mb-1">Key Claims</p>
+                          <div className="flex flex-wrap gap-1">
+                            {claimsList.map((claim, cIdx) => (
+                              <Badge 
+                                key={cIdx} 
+                                variant="secondary" 
+                                className="text-[10px] py-0.5 px-1.5"
+                              >
+                                {claim.length > 25 ? claim.substring(0, 25) + "..." : claim}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Desktop: Table layout */}
+              <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border">
@@ -526,7 +600,6 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
                   </thead>
                   <tbody>
                     {topCompetitors.map((product, idx) => {
-                      // Parse trust signals
                       const trustSignalsRaw = product.marketing_analysis?.design_blueprint?.trust_signals || "";
                       const trustSignalsList = trustSignalsRaw
                         .split(/[,;]/)
@@ -534,7 +607,6 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
                         .filter(s => s.length > 2)
                         .slice(0, 3);
                       
-                      // Parse claims (from claims_on_label or claims field)
                       const claimsList = product.claims_on_label?.slice(0, 3) || 
                         (product.claims?.split(/[,;]/).map(c => c.trim()).filter(Boolean).slice(0, 3)) || 
                         [];

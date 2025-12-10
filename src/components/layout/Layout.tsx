@@ -153,21 +153,21 @@ export function Layout({ children }: LayoutProps) {
       <div className="min-h-screen flex w-full">
         <AppSidebar />
         <main className="flex-1 flex flex-col">
-          <header className="h-14 border-b border-border bg-card shadow-soft flex items-center px-4 gap-3 overflow-hidden">
+          <header className="h-14 border-b border-border bg-card shadow-soft flex items-center px-2 sm:px-4 gap-2 sm:gap-3 overflow-hidden">
             <SidebarTrigger className="flex-shrink-0" />
             
             {/* New Analysis Button */}
             <button 
               onClick={() => navigate("/")}
               className={cn(
-                "flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 whitespace-nowrap flex-shrink-0",
+                "flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 whitespace-nowrap flex-shrink-0",
                 isNewAnalysisActive 
                   ? "bg-primary text-primary-foreground shadow-sm" 
                   : "text-muted-foreground hover:bg-secondary hover:text-foreground hover:shadow-sm"
               )}
             >
               <Plus className="w-4 h-4" />
-              New
+              <span className="hidden sm:inline">New</span>
             </button>
 
             {allTabs.length > 0 && (
@@ -196,32 +196,32 @@ export function Layout({ children }: LayoutProps) {
                         const isActive = currentCategory === tab.category_name;
                         const isComplete = (tab.products_analyzed ?? 0) > 0;
                         
-                        return (
-                          <div
-                            key={tab.id}
-                            className={cn(
-                              "flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all duration-200 group flex-shrink-0",
-                              isActive 
-                                ? "bg-secondary text-foreground font-medium shadow-sm" 
-                                : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground hover:shadow-sm"
-                            )}
-                          >
-                            <button
-                              onClick={() => navigate(`/dashboard?category=${encodeURIComponent(tab.category_name)}`)}
-                              className="flex items-center gap-2 whitespace-nowrap"
-                            >
-                              {tab.isPending ? (
-                                <Loader2 className="w-3 h-3 text-chart-2 animate-spin flex-shrink-0" />
-                              ) : (
-                                <span 
-                                  className={cn(
-                                    "w-2 h-2 rounded-full flex-shrink-0 transition-all",
-                                    isComplete ? "bg-chart-4" : "bg-chart-2 animate-pulse"
-                                  )} 
-                                />
-                              )}
-                              <span className="max-w-[140px] truncate">{tab.category_name}</span>
-                            </button>
+                                        return (
+                                          <div
+                                            key={tab.id}
+                                            className={cn(
+                                              "flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm transition-all duration-200 group flex-shrink-0",
+                                              isActive 
+                                                ? "bg-secondary text-foreground font-medium shadow-sm" 
+                                                : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground hover:shadow-sm"
+                                            )}
+                                          >
+                                            <button
+                                              onClick={() => navigate(`/dashboard?category=${encodeURIComponent(tab.category_name)}`)}
+                                              className="flex items-center gap-1.5 sm:gap-2 whitespace-nowrap"
+                                            >
+                                              {tab.isPending ? (
+                                                <Loader2 className="w-3 h-3 text-chart-2 animate-spin flex-shrink-0" />
+                                              ) : (
+                                                <span 
+                                                  className={cn(
+                                                    "w-2 h-2 rounded-full flex-shrink-0 transition-all",
+                                                    isComplete ? "bg-chart-4" : "bg-chart-2 animate-pulse"
+                                                  )} 
+                                                />
+                                              )}
+                                              <span className="max-w-[100px] sm:max-w-[140px] truncate">{tab.category_name}</span>
+                                            </button>
                             <button
                               onClick={(e) => handleDismissTab(e, tab.category_name)}
                               className="opacity-0 group-hover:opacity-100 hover:bg-destructive/20 rounded p-0.5 transition-all duration-200 flex-shrink-0"
@@ -247,8 +247,8 @@ export function Layout({ children }: LayoutProps) {
             )}
           </header>
           <div className="flex-1 bg-background overflow-y-auto overflow-x-hidden flex flex-col items-center">
-            <div className="w-full max-w-[80vw] px-4 lg:px-0">
-              <div className="py-8">
+            <div className="w-full max-w-full md:max-w-[90vw] lg:max-w-[85vw] xl:max-w-[80vw] px-3 sm:px-4 md:px-6 lg:px-0">
+              <div className="py-4 sm:py-6 md:py-8">
                 {children}
               </div>
             </div>

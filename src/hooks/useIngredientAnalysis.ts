@@ -125,6 +125,12 @@ export function useIngredientAnalysis(categoryId?: string) {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingFromDb, setIsLoadingFromDb] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [pollingStatus, setPollingStatus] = useState<{
+    isPolling: boolean;
+    attempt: number;
+    maxAttempts: number;
+    startedAt: Date | null;
+  }>({ isPolling: false, attempt: 0, maxAttempts: 60, startedAt: null });
   const { toast } = useToast();
 
   // Load from database on mount
@@ -207,9 +213,12 @@ export function useIngredientAnalysis(categoryId?: string) {
         const maxAttempts = 60;
         let attempts = 0;
         
+        setPollingStatus({ isPolling: true, attempt: 0, maxAttempts, startedAt: new Date() });
+        
         const pollForResults = async (): Promise<IngredientAnalysis | null> => {
           while (attempts < maxAttempts) {
             attempts++;
+            setPollingStatus(prev => ({ ...prev, attempt: attempts }));
             console.log(`Polling for results... attempt ${attempts}/${maxAttempts}`);
             
             await new Promise(resolve => setTimeout(resolve, 10000)); // Wait 10 seconds
@@ -232,10 +241,12 @@ export function useIngredientAnalysis(categoryId?: string) {
               const diffMinutes = (now.getTime() - updatedAt.getTime()) / (1000 * 60);
               
               if (diffMinutes < 5) {
+                setPollingStatus(prev => ({ ...prev, isPolling: false }));
                 return dbData.analysis as unknown as IngredientAnalysis;
               }
             }
           }
+          setPollingStatus(prev => ({ ...prev, isPolling: false }));
           return null;
         };
 
@@ -296,6 +307,7 @@ export function useIngredientAnalysis(categoryId?: string) {
     isLoading,
     isLoadingFromDb,
     error,
+    pollingStatus,
     runAnalysis,
     clearAnalysis,
     hasAnalysis: !!analysis,

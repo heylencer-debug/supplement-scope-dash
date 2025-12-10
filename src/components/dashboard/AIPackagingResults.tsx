@@ -265,7 +265,10 @@ export function AIPackagingResults({ analysis }: AIPackagingResultsProps) {
             accentColor,
             primaryClaim,
             certifications,
-            productType: 'supplement gummy bottle'
+            bulletPoints,
+            callToAction,
+            headlineFont,
+            bodyFont
           }
         }
       });

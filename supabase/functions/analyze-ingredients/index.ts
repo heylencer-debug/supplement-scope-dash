@@ -93,7 +93,7 @@ serve(async (req) => {
     // Fetch top 3 competitors by monthly_sales
     const { data: competitors, error: competitorsError } = await supabase
       .from('products')
-      .select('brand, all_nutrients, ingredients, other_ingredients, price, servings_per_container')
+      .select('brand, all_nutrients, ingredients, other_ingredients, price, servings_per_container, review_analysis')
       .eq('category_id', categoryId)
       .order('monthly_sales', { ascending: false })
       .limit(3);
@@ -118,11 +118,20 @@ serve(async (req) => {
         ? nutrients.map((n: any) => `${n.name}: ${n.amount}${n.unit}`).join(', ')
         : 'No nutrient data';
       
+      // Extract review analysis insights
+      const reviewAnalysis = c.review_analysis as any;
+      const painPoints = reviewAnalysis?.pain_points?.slice(0, 5)?.map((p: any) => p.issue || p).join(', ') || 'N/A';
+      const positiveThemes = reviewAnalysis?.positive_themes?.slice(0, 5)?.map((t: any) => t.theme || t).join(', ') || 'N/A';
+      const keyInsights = reviewAnalysis?.key_insights?.slice(0, 3)?.join(', ') || 'N/A';
+      
       return `Competitor ${idx + 1} (${c.brand || 'Unknown'}):
 - Nutrients: ${nutrientList}
 - Ingredients: ${c.ingredients || 'N/A'}
 - Other Ingredients: ${c.other_ingredients || 'N/A'}
-- Price: $${c.price || 'N/A'}, Servings: ${c.servings_per_container || 'N/A'}`;
+- Price: $${c.price || 'N/A'}, Servings: ${c.servings_per_container || 'N/A'}
+- Customer Pain Points: ${painPoints}
+- Positive Themes: ${positiveThemes}
+- Key Insights: ${keyInsights}`;
     }).join('\n\n') || 'No competitor data available';
 
     console.log('Calling Claude API for ingredient analysis...');

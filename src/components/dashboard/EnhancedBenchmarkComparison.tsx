@@ -532,7 +532,7 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
   const [viewMode, setViewMode] = useState<'chart' | 'table' | 'gaps'>('chart');
   
   // AI Analysis hook
-  const { analysis: aiAnalysis, isLoading: aiLoading, runAnalysis, hasAnalysis } = useIngredientAnalysis(categoryId);
+  const { analysis: aiAnalysis, isLoading: aiLoading, runAnalysis, hasAnalysis, pollingStatus } = useIngredientAnalysis(categoryId);
 
   // Create a map of label claims for quick lookup
   const labelClaimsMap = useMemo(() => {
@@ -925,6 +925,43 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
             {/* Show AI Analysis Results when available */}
             {aiAnalysis ? (
               <AIAnalysisResults analysis={aiAnalysis} onRefresh={runAnalysis} isLoading={aiLoading} />
+            ) : pollingStatus.isPolling ? (
+              /* Polling Progress Indicator */
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="relative mb-6">
+                  <div className="p-4 rounded-full bg-primary/10 animate-pulse">
+                    <Brain className="w-8 h-8 text-primary" />
+                  </div>
+                  <div className="absolute -bottom-1 -right-1 bg-card rounded-full p-1 border border-border">
+                    <Loader2 className="w-4 h-4 text-primary animate-spin" />
+                  </div>
+                </div>
+                <h3 className="text-lg font-semibold text-foreground mb-2">AI Analysis in Progress</h3>
+                <p className="text-sm text-muted-foreground max-w-md mb-4">
+                  Claude is analyzing your formulation against competitors. This may take 1-2 minutes...
+                </p>
+                
+                {/* Progress Bar */}
+                <div className="w-full max-w-xs mb-4">
+                  <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                    <span>Polling for results...</span>
+                    <span>{pollingStatus.attempt} / {pollingStatus.maxAttempts}</span>
+                  </div>
+                  <div className="h-2 bg-muted rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-primary transition-all duration-500 ease-out rounded-full"
+                      style={{ width: `${(pollingStatus.attempt / pollingStatus.maxAttempts) * 100}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Time Elapsed */}
+                {pollingStatus.startedAt && (
+                  <p className="text-xs text-muted-foreground">
+                    Time elapsed: {Math.floor((Date.now() - pollingStatus.startedAt.getTime()) / 1000)}s
+                  </p>
+                )}
+              </div>
             ) : (
               /* Empty State - Prompt to run analysis */
               <div className="flex flex-col items-center justify-center py-12 text-center">

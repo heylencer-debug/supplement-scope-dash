@@ -39,7 +39,6 @@ interface IngredientAnalysis {
     reason: string;
     impact: 'high' | 'medium' | 'low';
   }>;
-  // NEW: Customer-Formulation Connection
   customer_insights: {
     pain_point_solutions: Array<{
       pain_point: string;
@@ -53,7 +52,6 @@ interface IngredientAnalysis {
       ingredient_recommendation: string;
     }>;
   };
-  // NEW: Competitive Advantage Matrix
   competitive_matrix: {
     advantages: Array<{
       category: string;
@@ -67,7 +65,6 @@ interface IngredientAnalysis {
       mitigation: string;
     }>;
   };
-  // NEW: Clinical Efficacy Breakdown
   clinical_analysis: {
     dosage_adequacy: Array<{
       ingredient: string;
@@ -82,14 +79,12 @@ interface IngredientAnalysis {
       present_in_formula: boolean;
     }>;
   };
-  // NEW: SWOT Summary
   swot: {
     strengths: string[];
     weaknesses: string[];
     opportunities: string[];
     threats: string[];
   };
-  // NEW: Priority Roadmap
   priority_roadmap: Array<{
     phase: 1 | 2 | 3;
     action: string;
@@ -98,6 +93,35 @@ interface IngredientAnalysis {
     complexity: 'easy' | 'moderate' | 'complex';
     timeline: string;
   }>;
+  // NEW: AI-Generated Ingredient Comparison Table
+  ingredient_comparison_table: {
+    our_concept_name: string;
+    competitors: Array<{
+      brand: string;
+      product_name: string;
+    }>;
+    rows: Array<{
+      ingredient: string;
+      category: 'primary_active' | 'secondary_active' | 'tertiary_active' | 'excipient' | 'other';
+      our_concept: {
+        amount: string | null;
+        form: string | null;
+      };
+      competitor_1: { amount: string | null; present: boolean };
+      competitor_2: { amount: string | null; present: boolean };
+      competitor_3: { amount: string | null; present: boolean };
+      status: 'in_all' | 'unique_to_us' | 'missing_from_us' | 'partial';
+      comparison_note: string;
+    }>;
+    summary: {
+      total_our_ingredients: number;
+      total_competitor_avg: number;
+      overlap_count: number;
+      unique_to_us_count: number;
+      missing_from_us_count: number;
+      overall_assessment: string;
+    };
+  };
 }
 
 serve(async (req) => {
@@ -402,7 +426,7 @@ serve(async (req) => {
                   },
                   required: ['strengths', 'weaknesses', 'opportunities', 'threats']
                 },
-                // NEW: Priority Roadmap
+                // Priority Roadmap
                 priority_roadmap: {
                   type: 'array',
                   items: {
@@ -418,9 +442,95 @@ serve(async (req) => {
                     required: ['phase', 'action', 'ingredient', 'expected_impact', 'complexity', 'timeline']
                   },
                   description: 'Phased improvement roadmap'
+                },
+                // NEW: Comprehensive Ingredient Comparison Table
+                ingredient_comparison_table: {
+                  type: 'object',
+                  description: 'Complete ingredient-by-ingredient comparison table of Our Concept vs all competitors',
+                  properties: {
+                    our_concept_name: { type: 'string', description: 'Name of our product concept' },
+                    competitors: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          brand: { type: 'string' },
+                          product_name: { type: 'string' }
+                        },
+                        required: ['brand', 'product_name']
+                      }
+                    },
+                    rows: {
+                      type: 'array',
+                      description: 'ALL ingredients from both Our Concept and competitors - include EVERY ingredient',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          ingredient: { type: 'string', description: 'Full ingredient name (e.g., Cranberry Extract, Pectin, Sodium Citrate)' },
+                          category: { 
+                            type: 'string', 
+                            enum: ['primary_active', 'secondary_active', 'tertiary_active', 'excipient', 'other'],
+                            description: 'Ingredient category'
+                          },
+                          our_concept: {
+                            type: 'object',
+                            properties: {
+                              amount: { type: 'string', nullable: true, description: 'Dosage amount (e.g., 500mg, 100IU) or null if not present' },
+                              form: { type: 'string', nullable: true, description: 'Form/standardization (e.g., KSM-66, 36:1 extract) or null' }
+                            },
+                            required: ['amount', 'form']
+                          },
+                          competitor_1: {
+                            type: 'object',
+                            properties: {
+                              amount: { type: 'string', nullable: true, description: 'Dosage or null' },
+                              present: { type: 'boolean', description: 'Whether ingredient is present' }
+                            },
+                            required: ['amount', 'present']
+                          },
+                          competitor_2: {
+                            type: 'object',
+                            properties: {
+                              amount: { type: 'string', nullable: true },
+                              present: { type: 'boolean' }
+                            },
+                            required: ['amount', 'present']
+                          },
+                          competitor_3: {
+                            type: 'object',
+                            properties: {
+                              amount: { type: 'string', nullable: true },
+                              present: { type: 'boolean' }
+                            },
+                            required: ['amount', 'present']
+                          },
+                          status: { 
+                            type: 'string', 
+                            enum: ['in_all', 'unique_to_us', 'missing_from_us', 'partial'],
+                            description: 'in_all=all have it, unique_to_us=only we have it, missing_from_us=competitors have but we dont, partial=some have it'
+                          },
+                          comparison_note: { type: 'string', description: 'AI-generated insight about this ingredient comparison (e.g., Our dosage leads by 25%, Standard excipient, Differentiator)' }
+                        },
+                        required: ['ingredient', 'category', 'our_concept', 'competitor_1', 'competitor_2', 'competitor_3', 'status', 'comparison_note']
+                      }
+                    },
+                    summary: {
+                      type: 'object',
+                      properties: {
+                        total_our_ingredients: { type: 'number', description: 'Total ingredients in Our Concept' },
+                        total_competitor_avg: { type: 'number', description: 'Average ingredient count across competitors' },
+                        overlap_count: { type: 'number', description: 'Number of ingredients shared by all' },
+                        unique_to_us_count: { type: 'number', description: 'Ingredients only we have' },
+                        missing_from_us_count: { type: 'number', description: 'Ingredients competitors have that we lack' },
+                        overall_assessment: { type: 'string', description: 'Brief overall comparison summary' }
+                      },
+                      required: ['total_our_ingredients', 'total_competitor_avg', 'overlap_count', 'unique_to_us_count', 'missing_from_us_count', 'overall_assessment']
+                    }
+                  },
+                  required: ['our_concept_name', 'competitors', 'rows', 'summary']
                 }
               },
-              required: ['summary', 'ingredients', 'charts', 'actionable_insights', 'customer_insights', 'competitive_matrix', 'clinical_analysis', 'swot', 'priority_roadmap']
+              required: ['summary', 'ingredients', 'charts', 'actionable_insights', 'customer_insights', 'competitive_matrix', 'clinical_analysis', 'swot', 'priority_roadmap', 'ingredient_comparison_table']
             }
           }
         ],
@@ -451,6 +561,17 @@ Please provide a thorough analysis including:
 6. **SWOT ANALYSIS**: Provide strengths, weaknesses, opportunities, and threats for our formulation.
 
 7. **PRIORITY ROADMAP**: Create a phased action plan (Phase 1: Immediate, Phase 2: Next Batch, Phase 3: Future) with specific ingredient adjustments.
+
+8. **COMPREHENSIVE INGREDIENT COMPARISON TABLE**: Create a COMPLETE ingredient-by-ingredient comparison table including:
+   - ALL active ingredients from Our Concept (primary, secondary, tertiary actives)
+   - ALL excipients and other ingredients from Our Concept
+   - ALL nutrients from competitor products (from all_nutrients data)
+   - ALL other ingredients from competitors (from other_ingredients field)
+   - For each ingredient: dosage/amount if available, whether present in each entity
+   - Status: in_all (everyone has it), unique_to_us (only we have), missing_from_us (competitors have, we don't), partial (some have)
+   - A comparison note for each ingredient explaining the strategic significance
+
+Include EVERY single ingredient - do not skip any. Include excipients like pectin, citric acid, natural flavors, etc.
 
 Be specific about dosages, cite clinical ranges where relevant, and provide actionable insights.`
           }

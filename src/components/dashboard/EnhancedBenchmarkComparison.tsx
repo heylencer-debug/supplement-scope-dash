@@ -1010,6 +1010,107 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                   </div>
                 )}
 
+                {/* Ingredient Synergy Visualization */}
+                {groupedNutrients && Object.keys(groupedNutrients).length > 0 && (() => {
+                  // Define known synergy pairs with scientific rationale
+                  const synergyPairs = [
+                    { a: 'Magnesium', b: 'GABA', rationale: 'Magnesium enhances GABA receptor activity, amplifying calming effects', category: 'Relaxation' },
+                    { a: 'Magnesium', b: 'Vitamin B6', rationale: 'B6 is required for magnesium absorption and utilization in cells', category: 'Absorption' },
+                    { a: '5-HTP', b: 'Vitamin B6', rationale: 'B6 is a cofactor in converting 5-HTP to serotonin', category: 'Mood Support' },
+                    { a: 'L-Theanine', b: 'GABA', rationale: 'L-Theanine increases GABA production for enhanced relaxation', category: 'Relaxation' },
+                    { a: 'L-Theanine', b: 'Magnesium', rationale: 'Both promote alpha brain waves for calm focus', category: 'Focus' },
+                    { a: 'Ashwagandha', b: 'Magnesium', rationale: 'Combined stress adaptation through HPA axis and nervous system support', category: 'Stress Relief' },
+                    { a: 'Melatonin', b: 'Magnesium', rationale: 'Magnesium supports melatonin production and circadian rhythm', category: 'Sleep' },
+                    { a: 'Valerian', b: 'GABA', rationale: 'Valerian inhibits GABA breakdown, prolonging calming effects', category: 'Sleep' },
+                    { a: 'Zinc', b: 'Vitamin B6', rationale: 'Zinc and B6 work together to support neurotransmitter synthesis', category: 'Cognitive' },
+                    { a: 'Vitamin D', b: 'Magnesium', rationale: 'Magnesium is required to convert Vitamin D to its active form', category: 'Absorption' },
+                    { a: 'Calcium', b: 'Vitamin D', rationale: 'Vitamin D enhances calcium absorption in the intestines', category: 'Absorption' },
+                    { a: 'Iron', b: 'Vitamin C', rationale: 'Vitamin C significantly increases non-heme iron absorption', category: 'Absorption' },
+                  ];
+
+                  // Get all our ingredient names (lowercase for matching)
+                  const ourIngredients = Object.values(groupedNutrients)
+                    .flat()
+                    .map(i => i.name.toLowerCase());
+
+                  // Find synergies present in our formula
+                  const activeSynergies = synergyPairs.filter(pair => {
+                    const hasA = ourIngredients.some(ing => ing.includes(pair.a.toLowerCase()));
+                    const hasB = ourIngredients.some(ing => ing.includes(pair.b.toLowerCase()));
+                    return hasA && hasB;
+                  });
+
+                  if (activeSynergies.length === 0) return null;
+
+                  // Group by category
+                  const groupedSynergies = activeSynergies.reduce((acc, syn) => {
+                    if (!acc[syn.category]) acc[syn.category] = [];
+                    acc[syn.category].push(syn);
+                    return acc;
+                  }, {} as Record<string, typeof activeSynergies>);
+
+                  const categoryColors: Record<string, string> = {
+                    'Relaxation': 'chart-3',
+                    'Absorption': 'chart-4',
+                    'Mood Support': 'chart-5',
+                    'Focus': 'primary',
+                    'Stress Relief': 'chart-2',
+                    'Sleep': 'chart-1',
+                    'Cognitive': 'primary',
+                  };
+
+                  return (
+                    <div className="bg-gradient-to-br from-chart-5/5 to-primary/5 rounded-xl border border-chart-5/20 p-4">
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="p-2 rounded-xl bg-chart-5/10">
+                          <Sparkles className="h-5 w-5 text-chart-5" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-foreground">Ingredient Synergies</h3>
+                          <p className="text-xs text-muted-foreground">{activeSynergies.length} synergistic combinations detected</p>
+                        </div>
+                      </div>
+                      <div className="grid gap-3">
+                        {Object.entries(groupedSynergies).map(([category, synergies]) => (
+                          <div key={category} className="space-y-2">
+                            <Badge variant="secondary" className={`bg-${categoryColors[category] || 'primary'}/10 text-${categoryColors[category] || 'primary'}`}>
+                              {category}
+                            </Badge>
+                            <div className="grid gap-2">
+                              {synergies.map((syn, idx) => (
+                                <div 
+                                  key={idx} 
+                                  className="flex items-center gap-3 bg-card rounded-lg p-3 border border-border/50"
+                                >
+                                  {/* Ingredient A */}
+                                  <div className="bg-primary/10 rounded-lg px-3 py-1.5 text-sm font-medium text-primary whitespace-nowrap">
+                                    {syn.a}
+                                  </div>
+                                  {/* Connection line with + */}
+                                  <div className="flex items-center gap-1 text-muted-foreground">
+                                    <div className="h-px w-4 bg-border" />
+                                    <div className="w-5 h-5 rounded-full bg-chart-5/20 flex items-center justify-center text-xs font-bold text-chart-5">+</div>
+                                    <div className="h-px w-4 bg-border" />
+                                  </div>
+                                  {/* Ingredient B */}
+                                  <div className="bg-chart-5/10 rounded-lg px-3 py-1.5 text-sm font-medium text-chart-5 whitespace-nowrap">
+                                    {syn.b}
+                                  </div>
+                                  {/* Arrow and rationale */}
+                                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                                    <div className="text-muted-foreground">→</div>
+                                    <p className="text-xs text-muted-foreground">{syn.rationale}</p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {/* Stats Row 1: Ingredient counts */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <div className="bg-primary/10 rounded-lg p-1.5 sm:p-2 text-center">

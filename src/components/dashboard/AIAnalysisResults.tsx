@@ -6,10 +6,11 @@ import {
   Brain, RefreshCw, CheckCircle, AlertTriangle, XCircle, Sparkles,
   ArrowUp, ArrowDown, Minus, Plus, Check, Target, Shield, TrendingUp,
   Clock, Zap, Users, FlaskConical, Link2, AlertCircle, Lightbulb,
-  ChevronRight
+  ChevronRight, Beaker, Table2
 } from "lucide-react";
 import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, Radar, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell } from "recharts";
 import { IngredientAnalysis } from "@/hooks/useIngredientAnalysis";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface AIAnalysisResultsProps {
   analysis: IngredientAnalysis;
@@ -18,7 +19,7 @@ interface AIAnalysisResultsProps {
 }
 
 export function AIAnalysisResults({ analysis, onRefresh, isLoading }: AIAnalysisResultsProps) {
-  const [activeTab, setActiveTab] = useState<'summary' | 'clinical' | 'customer' | 'competitive' | 'roadmap'>('summary');
+  const [activeTab, setActiveTab] = useState<'ingredients' | 'summary' | 'clinical' | 'customer' | 'competitive' | 'roadmap'>('ingredients');
 
   const getAssessmentColor = (assessment: string) => {
     switch (assessment) {
@@ -143,6 +144,7 @@ export function AIAnalysisResults({ analysis, onRefresh, isLoading }: AIAnalysis
       {/* Tab Navigation */}
       <div className="flex items-center bg-muted rounded-lg p-0.5 overflow-x-auto">
         {[
+          { id: 'ingredients', label: 'Ingredients', icon: Table2 },
           { id: 'summary', label: 'Summary', icon: Target },
           { id: 'clinical', label: 'Clinical', icon: FlaskConical },
           { id: 'customer', label: 'Customer', icon: Users },
@@ -161,6 +163,161 @@ export function AIAnalysisResults({ analysis, onRefresh, isLoading }: AIAnalysis
           </Button>
         ))}
       </div>
+
+      {/* Ingredients Tab - NEW */}
+      {activeTab === 'ingredients' && analysis.ingredient_comparison_table && (
+        <div className="space-y-4">
+          {/* Summary Stats */}
+          <div className="grid grid-cols-5 gap-2">
+            <div className="bg-card rounded-lg p-3 border border-border/50 text-center">
+              <div className="text-xl font-bold text-primary">{analysis.ingredient_comparison_table.summary.total_our_ingredients}</div>
+              <div className="text-[9px] text-muted-foreground">Our Ingredients</div>
+            </div>
+            <div className="bg-card rounded-lg p-3 border border-border/50 text-center">
+              <div className="text-xl font-bold text-muted-foreground">{analysis.ingredient_comparison_table.summary.total_competitor_avg}</div>
+              <div className="text-[9px] text-muted-foreground">Comp. Avg</div>
+            </div>
+            <div className="bg-chart-4/10 rounded-lg p-3 border border-chart-4/30 text-center">
+              <div className="text-xl font-bold text-chart-4">{analysis.ingredient_comparison_table.summary.overlap_count}</div>
+              <div className="text-[9px] text-chart-4">In All</div>
+            </div>
+            <div className="bg-primary/10 rounded-lg p-3 border border-primary/30 text-center">
+              <div className="text-xl font-bold text-primary">{analysis.ingredient_comparison_table.summary.unique_to_us_count}</div>
+              <div className="text-[9px] text-primary">Unique to Us</div>
+            </div>
+            <div className="bg-destructive/10 rounded-lg p-3 border border-destructive/30 text-center">
+              <div className="text-xl font-bold text-destructive">{analysis.ingredient_comparison_table.summary.missing_from_us_count}</div>
+              <div className="text-[9px] text-destructive">Missing</div>
+            </div>
+          </div>
+
+          {/* Assessment */}
+          <div className="bg-card rounded-lg p-3 border border-border/50">
+            <p className="text-xs text-muted-foreground">{analysis.ingredient_comparison_table.summary.overall_assessment}</p>
+          </div>
+
+          {/* Comparison Table */}
+          <div className="bg-card rounded-lg border border-border/50 overflow-hidden">
+            <ScrollArea className="max-h-[500px]">
+              <table className="w-full text-xs">
+                <thead className="bg-muted sticky top-0 z-10">
+                  <tr>
+                    <th className="text-left p-2 font-medium text-foreground">Ingredient</th>
+                    <th className="text-left p-2 font-medium text-foreground">Category</th>
+                    <th className="text-center p-2 font-medium text-primary">Our Concept</th>
+                    {analysis.ingredient_comparison_table.competitors.map((c, idx) => (
+                      <th key={idx} className="text-center p-2 font-medium text-muted-foreground">
+                        {c.brand || `Comp ${idx + 1}`}
+                      </th>
+                    ))}
+                    <th className="text-center p-2 font-medium text-foreground">Status</th>
+                    <th className="text-left p-2 font-medium text-foreground">Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {/* Group by category */}
+                  {['primary_active', 'secondary_active', 'tertiary_active', 'excipient', 'other'].map(category => {
+                    const categoryRows = analysis.ingredient_comparison_table?.rows.filter(r => r.category === category) || [];
+                    if (categoryRows.length === 0) return null;
+                    
+                    const categoryLabels: Record<string, { label: string; color: string; icon: string }> = {
+                      'primary_active': { label: 'Primary Actives', color: 'bg-chart-4/10 text-chart-4', icon: '💊' },
+                      'secondary_active': { label: 'Secondary Actives', color: 'bg-chart-3/10 text-chart-3', icon: '🧪' },
+                      'tertiary_active': { label: 'Tertiary Actives', color: 'bg-chart-5/10 text-chart-5', icon: '🔬' },
+                      'excipient': { label: 'Excipients', color: 'bg-muted text-muted-foreground', icon: '⚗️' },
+                      'other': { label: 'Other Ingredients', color: 'bg-muted text-muted-foreground', icon: '📦' },
+                    };
+                    
+                    const catInfo = categoryLabels[category];
+                    
+                    return (
+                      <React.Fragment key={category}>
+                        {/* Category Header */}
+                        <tr className={`${catInfo.color} border-t border-border`}>
+                          <td colSpan={7} className="p-2 font-medium">
+                            <span className="mr-1">{catInfo.icon}</span>
+                            {catInfo.label} ({categoryRows.length})
+                          </td>
+                        </tr>
+                        {/* Category Rows */}
+                        {categoryRows.map((row, idx) => {
+                          const statusStyles: Record<string, string> = {
+                            'in_all': 'bg-chart-4/20 text-chart-4 border-chart-4/30',
+                            'unique_to_us': 'bg-primary/20 text-primary border-primary/30',
+                            'missing_from_us': 'bg-destructive/20 text-destructive border-destructive/30',
+                            'partial': 'bg-chart-2/20 text-chart-2 border-chart-2/30',
+                          };
+                          const statusLabels: Record<string, string> = {
+                            'in_all': '✅ All',
+                            'unique_to_us': '🟡 Unique',
+                            'missing_from_us': '🔴 Missing',
+                            'partial': '⚪ Partial',
+                          };
+                          
+                          return (
+                            <tr key={idx} className="border-t border-border/30 hover:bg-muted/30">
+                              <td className="p-2 font-medium text-foreground">{row.ingredient}</td>
+                              <td className="p-2 text-muted-foreground capitalize">{row.category.replace('_', ' ')}</td>
+                              <td className="p-2 text-center">
+                                {row.our_concept.amount ? (
+                                  <div>
+                                    <span className="font-medium text-primary">{row.our_concept.amount}</span>
+                                    {row.our_concept.form && (
+                                      <span className="text-[9px] text-muted-foreground block">{row.our_concept.form}</span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-muted-foreground">—</span>
+                                )}
+                              </td>
+                              <td className="p-2 text-center">
+                                {row.competitor_1.present ? (
+                                  <span className="text-foreground">{row.competitor_1.amount || '✓'}</span>
+                                ) : (
+                                  <span className="text-muted-foreground">—</span>
+                                )}
+                              </td>
+                              <td className="p-2 text-center">
+                                {row.competitor_2.present ? (
+                                  <span className="text-foreground">{row.competitor_2.amount || '✓'}</span>
+                                ) : (
+                                  <span className="text-muted-foreground">—</span>
+                                )}
+                              </td>
+                              <td className="p-2 text-center">
+                                {row.competitor_3.present ? (
+                                  <span className="text-foreground">{row.competitor_3.amount || '✓'}</span>
+                                ) : (
+                                  <span className="text-muted-foreground">—</span>
+                                )}
+                              </td>
+                              <td className="p-2 text-center">
+                                <Badge variant="outline" className={`text-[8px] ${statusStyles[row.status]}`}>
+                                  {statusLabels[row.status]}
+                                </Badge>
+                              </td>
+                              <td className="p-2 text-[10px] text-muted-foreground max-w-[150px]">{row.comparison_note}</td>
+                            </tr>
+                          );
+                        })}
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </ScrollArea>
+          </div>
+        </div>
+      )}
+
+      {/* Ingredients Tab - Empty State */}
+      {activeTab === 'ingredients' && !analysis.ingredient_comparison_table && (
+        <div className="text-center py-8 text-muted-foreground">
+          <Table2 className="w-8 h-8 mx-auto mb-2 opacity-50" />
+          <p className="text-sm">No ingredient comparison data available</p>
+          <p className="text-xs">Try refreshing the analysis</p>
+        </div>
+      )}
 
       {/* Summary Tab */}
       {activeTab === 'summary' && (

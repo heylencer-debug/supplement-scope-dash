@@ -35,7 +35,6 @@ export interface IngredientAnalysis {
     reason: string;
     impact: 'high' | 'medium' | 'low';
   }>;
-  // NEW: Customer-Formulation Connection
   customer_insights?: {
     pain_point_solutions: Array<{
       pain_point: string;
@@ -49,7 +48,6 @@ export interface IngredientAnalysis {
       ingredient_recommendation: string;
     }>;
   };
-  // NEW: Competitive Advantage Matrix
   competitive_matrix?: {
     advantages: Array<{
       category: string;
@@ -63,7 +61,6 @@ export interface IngredientAnalysis {
       mitigation: string;
     }>;
   };
-  // NEW: Clinical Efficacy Breakdown
   clinical_analysis?: {
     dosage_adequacy: Array<{
       ingredient: string;
@@ -78,14 +75,12 @@ export interface IngredientAnalysis {
       present_in_formula: boolean;
     }>;
   };
-  // NEW: SWOT Summary
   swot?: {
     strengths: string[];
     weaknesses: string[];
     opportunities: string[];
     threats: string[];
   };
-  // NEW: Priority Roadmap
   priority_roadmap?: Array<{
     phase: 1 | 2 | 3;
     action: string;
@@ -94,6 +89,35 @@ export interface IngredientAnalysis {
     complexity: 'easy' | 'moderate' | 'complex';
     timeline: string;
   }>;
+  // NEW: AI-Generated Ingredient Comparison Table
+  ingredient_comparison_table?: {
+    our_concept_name: string;
+    competitors: Array<{
+      brand: string;
+      product_name: string;
+    }>;
+    rows: Array<{
+      ingredient: string;
+      category: 'primary_active' | 'secondary_active' | 'tertiary_active' | 'excipient' | 'other';
+      our_concept: {
+        amount: string | null;
+        form: string | null;
+      };
+      competitor_1: { amount: string | null; present: boolean };
+      competitor_2: { amount: string | null; present: boolean };
+      competitor_3: { amount: string | null; present: boolean };
+      status: 'in_all' | 'unique_to_us' | 'missing_from_us' | 'partial';
+      comparison_note: string;
+    }>;
+    summary: {
+      total_our_ingredients: number;
+      total_competitor_avg: number;
+      overlap_count: number;
+      unique_to_us_count: number;
+      missing_from_us_count: number;
+      overall_assessment: string;
+    };
+  };
 }
 
 export function useIngredientAnalysis(categoryId?: string) {

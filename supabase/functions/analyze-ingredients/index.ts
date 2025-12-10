@@ -39,6 +39,65 @@ interface IngredientAnalysis {
     reason: string;
     impact: 'high' | 'medium' | 'low';
   }>;
+  // NEW: Customer-Formulation Connection
+  customer_insights: {
+    pain_point_solutions: Array<{
+      pain_point: string;
+      solving_ingredient: string;
+      confidence: 'high' | 'medium' | 'low';
+      evidence: string;
+    }>;
+    unaddressed_complaints: Array<{
+      complaint: string;
+      suggested_solution: string;
+      ingredient_recommendation: string;
+    }>;
+  };
+  // NEW: Competitive Advantage Matrix
+  competitive_matrix: {
+    advantages: Array<{
+      category: string;
+      our_position: string;
+      vs_competitors: string;
+      impact: 'high' | 'medium' | 'low';
+    }>;
+    vulnerabilities: Array<{
+      category: string;
+      risk_description: string;
+      mitigation: string;
+    }>;
+  };
+  // NEW: Clinical Efficacy Breakdown
+  clinical_analysis: {
+    dosage_adequacy: Array<{
+      ingredient: string;
+      our_dosage: string;
+      clinical_range: string;
+      adequacy: 'optimal' | 'adequate' | 'suboptimal' | 'insufficient';
+      research_note: string;
+    }>;
+    synergy_pairs: Array<{
+      ingredients: string[];
+      synergy_type: string;
+      present_in_formula: boolean;
+    }>;
+  };
+  // NEW: SWOT Summary
+  swot: {
+    strengths: string[];
+    weaknesses: string[];
+    opportunities: string[];
+    threats: string[];
+  };
+  // NEW: Priority Roadmap
+  priority_roadmap: Array<{
+    phase: 1 | 2 | 3;
+    action: string;
+    ingredient: string;
+    expected_impact: string;
+    complexity: 'easy' | 'moderate' | 'complex';
+    timeline: string;
+  }>;
 }
 
 serve(async (req) => {
@@ -146,11 +205,11 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 4096,
+        max_tokens: 8192,
         tools: [
           {
             name: 'analyze_ingredients',
-            description: 'Analyze and compare ingredient formulations between our concept and competitors. Return structured analysis with dosage comparisons, gap analysis, and actionable insights.',
+            description: 'Comprehensive ingredient formulation analysis with clinical insights, competitive matrix, customer pain point solutions, SWOT analysis, and priority roadmap.',
             input_schema: {
               type: 'object',
               properties: {
@@ -165,12 +224,12 @@ serve(async (req) => {
                     key_strengths: { 
                       type: 'array', 
                       items: { type: 'string' },
-                      description: 'Top 3 formulation advantages'
+                      description: 'Top 3-5 formulation advantages'
                     },
                     key_gaps: { 
                       type: 'array', 
                       items: { type: 'string' },
-                      description: 'Top 3 missing opportunities or weaknesses'
+                      description: 'Top 3-5 missing opportunities or weaknesses'
                     },
                     recommendation: { 
                       type: 'string',
@@ -234,9 +293,134 @@ serve(async (req) => {
                     required: ['type', 'ingredient', 'reason', 'impact']
                   },
                   description: 'Specific actionable recommendations'
+                },
+                // NEW: Customer-Formulation Connection
+                customer_insights: {
+                  type: 'object',
+                  properties: {
+                    pain_point_solutions: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          pain_point: { type: 'string', description: 'Customer complaint from reviews' },
+                          solving_ingredient: { type: 'string', description: 'Ingredient or feature that addresses this' },
+                          confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
+                          evidence: { type: 'string', description: 'Clinical or market rationale' }
+                        },
+                        required: ['pain_point', 'solving_ingredient', 'confidence', 'evidence']
+                      }
+                    },
+                    unaddressed_complaints: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          complaint: { type: 'string' },
+                          suggested_solution: { type: 'string' },
+                          ingredient_recommendation: { type: 'string' }
+                        },
+                        required: ['complaint', 'suggested_solution', 'ingredient_recommendation']
+                      }
+                    }
+                  },
+                  required: ['pain_point_solutions', 'unaddressed_complaints']
+                },
+                // NEW: Competitive Advantage Matrix
+                competitive_matrix: {
+                  type: 'object',
+                  properties: {
+                    advantages: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          category: { type: 'string', description: 'Dosage, Form, Quality, Value, Ingredients' },
+                          our_position: { type: 'string' },
+                          vs_competitors: { type: 'string' },
+                          impact: { type: 'string', enum: ['high', 'medium', 'low'] }
+                        },
+                        required: ['category', 'our_position', 'vs_competitors', 'impact']
+                      }
+                    },
+                    vulnerabilities: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          category: { type: 'string' },
+                          risk_description: { type: 'string' },
+                          mitigation: { type: 'string' }
+                        },
+                        required: ['category', 'risk_description', 'mitigation']
+                      }
+                    }
+                  },
+                  required: ['advantages', 'vulnerabilities']
+                },
+                // NEW: Clinical Efficacy Breakdown
+                clinical_analysis: {
+                  type: 'object',
+                  properties: {
+                    dosage_adequacy: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          ingredient: { type: 'string' },
+                          our_dosage: { type: 'string' },
+                          clinical_range: { type: 'string', description: 'Research-backed dosage range' },
+                          adequacy: { type: 'string', enum: ['optimal', 'adequate', 'suboptimal', 'insufficient'] },
+                          research_note: { type: 'string' }
+                        },
+                        required: ['ingredient', 'our_dosage', 'clinical_range', 'adequacy', 'research_note']
+                      }
+                    },
+                    synergy_pairs: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          ingredients: { type: 'array', items: { type: 'string' }, description: 'Two ingredients that work together' },
+                          synergy_type: { type: 'string', description: 'Enhanced absorption, Bioavailability, etc.' },
+                          present_in_formula: { type: 'boolean' }
+                        },
+                        required: ['ingredients', 'synergy_type', 'present_in_formula']
+                      }
+                    }
+                  },
+                  required: ['dosage_adequacy', 'synergy_pairs']
+                },
+                // NEW: SWOT Summary
+                swot: {
+                  type: 'object',
+                  properties: {
+                    strengths: { type: 'array', items: { type: 'string' }, description: 'Internal advantages of our formulation' },
+                    weaknesses: { type: 'array', items: { type: 'string' }, description: 'Internal disadvantages' },
+                    opportunities: { type: 'array', items: { type: 'string' }, description: 'External opportunities to exploit' },
+                    threats: { type: 'array', items: { type: 'string' }, description: 'External risks and challenges' }
+                  },
+                  required: ['strengths', 'weaknesses', 'opportunities', 'threats']
+                },
+                // NEW: Priority Roadmap
+                priority_roadmap: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      phase: { type: 'number', enum: [1, 2, 3], description: '1=immediate, 2=next batch, 3=future' },
+                      action: { type: 'string' },
+                      ingredient: { type: 'string' },
+                      expected_impact: { type: 'string' },
+                      complexity: { type: 'string', enum: ['easy', 'moderate', 'complex'] },
+                      timeline: { type: 'string', description: 'Immediate, Next formulation, Future' }
+                    },
+                    required: ['phase', 'action', 'ingredient', 'expected_impact', 'complexity', 'timeline']
+                  },
+                  description: 'Phased improvement roadmap'
                 }
               },
-              required: ['summary', 'ingredients', 'charts', 'actionable_insights']
+              required: ['summary', 'ingredients', 'charts', 'actionable_insights', 'customer_insights', 'competitive_matrix', 'clinical_analysis', 'swot', 'priority_roadmap']
             }
           }
         ],
@@ -244,7 +428,7 @@ serve(async (req) => {
         messages: [
           {
             role: 'user',
-            content: `You are an expert supplement formulator and competitive analyst. Analyze the following formulation data for "${categoryName}" and provide a comprehensive ingredient comparison.
+            content: `You are an expert supplement formulator, clinical nutritionist, and competitive analyst. Analyze the following formulation data for "${categoryName}" and provide a COMPREHENSIVE ingredient analysis.
 
 ## OUR FORMULATION BRIEF:
 ${formulaBriefContent}
@@ -252,14 +436,23 @@ ${formulaBriefContent}
 ## TOP 3 COMPETITORS BY SALES:
 ${competitorSummary}
 
-Please analyze:
-1. Compare our ingredient dosages vs competitor averages
-2. Identify where we're leading, matching, trailing, or missing key ingredients
-3. Evaluate clinical efficacy of our dosages based on research-backed amounts
-4. Provide specific, actionable recommendations to strengthen our formulation
-5. Calculate coverage score (how well we match competitor ingredients), uniqueness score (unique ingredients we have), and efficacy score (clinical adequacy)
+Please provide a thorough analysis including:
 
-Focus on the most important active ingredients first. Be specific about dosages and cite clinical ranges where relevant.`
+1. **INGREDIENT COMPARISON**: Compare our ingredient dosages vs competitor averages. Identify where we're leading, matching, trailing, or missing key ingredients.
+
+2. **CLINICAL EFFICACY**: Evaluate our dosages against research-backed clinical ranges. Note which ingredients are at optimal, adequate, suboptimal, or insufficient levels.
+
+3. **SYNERGY PAIRS**: Identify ingredient combinations that work synergistically (e.g., Vitamin D + K2, Iron + Vitamin C) and whether we have them.
+
+4. **CUSTOMER PAIN POINT SOLUTIONS**: Based on competitor review pain points and positive themes, identify which customer complaints our formulation solves and which remain unaddressed.
+
+5. **COMPETITIVE MATRIX**: Create an advantages/vulnerabilities matrix across categories like Dosage, Form, Quality, Value, Ingredients.
+
+6. **SWOT ANALYSIS**: Provide strengths, weaknesses, opportunities, and threats for our formulation.
+
+7. **PRIORITY ROADMAP**: Create a phased action plan (Phase 1: Immediate, Phase 2: Next Batch, Phase 3: Future) with specific ingredient adjustments.
+
+Be specific about dosages, cite clinical ranges where relevant, and provide actionable insights.`
           }
         ]
       })

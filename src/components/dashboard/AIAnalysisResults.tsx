@@ -1,0 +1,497 @@
+import React, { useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { 
+  Brain, RefreshCw, CheckCircle, AlertTriangle, XCircle, Sparkles,
+  ArrowUp, ArrowDown, Minus, Plus, Check, Target, Shield, TrendingUp,
+  Clock, Zap, Users, FlaskConical, Link2, AlertCircle, Lightbulb,
+  ChevronRight
+} from "lucide-react";
+import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, Radar, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell } from "recharts";
+import { IngredientAnalysis } from "@/hooks/useIngredientAnalysis";
+
+interface AIAnalysisResultsProps {
+  analysis: IngredientAnalysis;
+  onRefresh: () => void;
+  isLoading: boolean;
+}
+
+export function AIAnalysisResults({ analysis, onRefresh, isLoading }: AIAnalysisResultsProps) {
+  const [activeTab, setActiveTab] = useState<'summary' | 'clinical' | 'customer' | 'competitive' | 'roadmap'>('summary');
+
+  const getAssessmentColor = (assessment: string) => {
+    switch (assessment) {
+      case 'Strong': return 'bg-chart-4/20 text-chart-4 border-chart-4/30';
+      case 'Moderate': return 'bg-chart-2/20 text-chart-2 border-chart-2/30';
+      case 'Weak': return 'bg-destructive/20 text-destructive border-destructive/30';
+      default: return 'bg-muted text-muted-foreground';
+    }
+  };
+
+  const getGapStatusIcon = (status: string) => {
+    switch (status) {
+      case 'leading': return <ArrowUp className="w-3 h-3 text-chart-4" />;
+      case 'trailing': return <ArrowDown className="w-3 h-3 text-destructive" />;
+      case 'matching': return <Minus className="w-3 h-3 text-chart-2" />;
+      case 'unique': return <Sparkles className="w-3 h-3 text-primary" />;
+      case 'missing': return <XCircle className="w-3 h-3 text-muted-foreground" />;
+      default: return null;
+    }
+  };
+
+  const getAdequacyColor = (adequacy: string) => {
+    switch (adequacy) {
+      case 'optimal': return 'bg-chart-4/10 text-chart-4 border-chart-4/30';
+      case 'adequate': return 'bg-chart-3/10 text-chart-3 border-chart-3/30';
+      case 'suboptimal': return 'bg-chart-2/10 text-chart-2 border-chart-2/30';
+      case 'insufficient': return 'bg-destructive/10 text-destructive border-destructive/30';
+      default: return 'bg-muted';
+    }
+  };
+
+  const getConfidenceColor = (confidence: string) => {
+    switch (confidence) {
+      case 'high': return 'text-chart-4';
+      case 'medium': return 'text-chart-2';
+      case 'low': return 'text-muted-foreground';
+      default: return '';
+    }
+  };
+
+  const getComplexityColor = (complexity: string) => {
+    switch (complexity) {
+      case 'easy': return 'bg-chart-4/10 text-chart-4';
+      case 'moderate': return 'bg-chart-2/10 text-chart-2';
+      case 'complex': return 'bg-destructive/10 text-destructive';
+      default: return 'bg-muted';
+    }
+  };
+
+  const getPhaseColor = (phase: number) => {
+    switch (phase) {
+      case 1: return 'bg-chart-4 text-white';
+      case 2: return 'bg-chart-2 text-white';
+      case 3: return 'bg-primary text-white';
+      default: return 'bg-muted';
+    }
+  };
+
+  const getImpactColor = (impact: string) => {
+    switch (impact) {
+      case 'high': return 'border-chart-4/50 text-chart-4';
+      case 'medium': return 'border-chart-2/50 text-chart-2';
+      case 'low': return 'border-muted-foreground/50 text-muted-foreground';
+      default: return '';
+    }
+  };
+
+  // Prepare SWOT data for radar chart
+  const swotRadarData = analysis.swot ? [
+    { subject: 'Strengths', value: analysis.swot.strengths.length, fullMark: 5 },
+    { subject: 'Weaknesses', value: analysis.swot.weaknesses.length, fullMark: 5 },
+    { subject: 'Opportunities', value: analysis.swot.opportunities.length, fullMark: 5 },
+    { subject: 'Threats', value: analysis.swot.threats.length, fullMark: 5 },
+  ] : [];
+
+  return (
+    <div className="bg-gradient-to-br from-primary/5 via-chart-5/5 to-chart-4/5 rounded-xl border border-primary/20 p-4 space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-xl bg-primary/10">
+            <Brain className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-foreground flex items-center gap-2">
+              AI Formulation Intelligence
+              <Badge className={`${getAssessmentColor(analysis.summary.overall_assessment)} text-[10px]`}>
+                {analysis.summary.overall_assessment}
+              </Badge>
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              {analysis.ingredients.length} ingredients • {analysis.clinical_analysis?.synergy_pairs?.length || 0} synergies • {analysis.priority_roadmap?.length || 0} actions
+            </p>
+          </div>
+        </div>
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={onRefresh} 
+          disabled={isLoading}
+          className="h-8"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 mr-1 ${isLoading ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+      </div>
+
+      {/* Score Gauges */}
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { label: 'Coverage', value: analysis.charts.coverage_score, color: 'chart-4' },
+          { label: 'Uniqueness', value: analysis.charts.uniqueness_score, color: 'primary' },
+          { label: 'Efficacy', value: analysis.charts.efficacy_score, color: 'chart-3' },
+        ].map((gauge) => (
+          <div key={gauge.label} className="bg-card rounded-xl p-3 border border-border/50 text-center">
+            <div className={`text-2xl font-bold text-${gauge.color}`}>{gauge.value}</div>
+            <div className="text-[10px] text-muted-foreground">{gauge.label} Score</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Tab Navigation */}
+      <div className="flex items-center bg-muted rounded-lg p-0.5 overflow-x-auto">
+        {[
+          { id: 'summary', label: 'Summary', icon: Target },
+          { id: 'clinical', label: 'Clinical', icon: FlaskConical },
+          { id: 'customer', label: 'Customer', icon: Users },
+          { id: 'competitive', label: 'Competitive', icon: Shield },
+          { id: 'roadmap', label: 'Roadmap', icon: Clock },
+        ].map((tab) => (
+          <Button 
+            key={tab.id}
+            variant={activeTab === tab.id ? 'secondary' : 'ghost'} 
+            size="sm" 
+            className="flex-1 h-7 text-xs gap-1 min-w-fit"
+            onClick={() => setActiveTab(tab.id as any)}
+          >
+            <tab.icon className="w-3 h-3" />
+            {tab.label}
+          </Button>
+        ))}
+      </div>
+
+      {/* Summary Tab */}
+      {activeTab === 'summary' && (
+        <div className="space-y-4">
+          {/* Recommendation */}
+          <div className="bg-card rounded-lg p-3 border border-border/50">
+            <p className="text-xs font-medium text-foreground mb-1">Strategic Recommendation</p>
+            <p className="text-sm text-muted-foreground">{analysis.summary.recommendation}</p>
+          </div>
+
+          {/* SWOT Summary */}
+          {analysis.swot && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-chart-4/5 rounded-lg p-3 border border-chart-4/20">
+                <p className="text-xs font-medium text-chart-4 mb-2 flex items-center gap-1">
+                  <CheckCircle className="w-3 h-3" /> Strengths ({analysis.swot.strengths.length})
+                </p>
+                <ul className="space-y-1">
+                  {analysis.swot.strengths.slice(0, 3).map((s, i) => (
+                    <li key={i} className="text-xs text-foreground flex items-start gap-1.5">
+                      <span className="text-chart-4 mt-0.5">•</span>
+                      {s}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="bg-destructive/5 rounded-lg p-3 border border-destructive/20">
+                <p className="text-xs font-medium text-destructive mb-2 flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" /> Weaknesses ({analysis.swot.weaknesses.length})
+                </p>
+                <ul className="space-y-1">
+                  {analysis.swot.weaknesses.slice(0, 3).map((w, i) => (
+                    <li key={i} className="text-xs text-foreground flex items-start gap-1.5">
+                      <span className="text-destructive mt-0.5">•</span>
+                      {w}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="bg-chart-3/5 rounded-lg p-3 border border-chart-3/20">
+                <p className="text-xs font-medium text-chart-3 mb-2 flex items-center gap-1">
+                  <Lightbulb className="w-3 h-3" /> Opportunities ({analysis.swot.opportunities.length})
+                </p>
+                <ul className="space-y-1">
+                  {analysis.swot.opportunities.slice(0, 3).map((o, i) => (
+                    <li key={i} className="text-xs text-foreground flex items-start gap-1.5">
+                      <span className="text-chart-3 mt-0.5">•</span>
+                      {o}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="bg-chart-2/5 rounded-lg p-3 border border-chart-2/20">
+                <p className="text-xs font-medium text-chart-2 mb-2 flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" /> Threats ({analysis.swot.threats.length})
+                </p>
+                <ul className="space-y-1">
+                  {analysis.swot.threats.slice(0, 3).map((t, i) => (
+                    <li key={i} className="text-xs text-foreground flex items-start gap-1.5">
+                      <span className="text-chart-2 mt-0.5">•</span>
+                      {t}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
+
+          {/* Dosage Comparison Chart */}
+          {analysis.charts.dosage_comparison.length > 0 && (
+            <div className="bg-card rounded-lg p-3 border border-border/50">
+              <p className="text-xs font-medium text-foreground mb-3">Dosage Comparison (Our Concept vs Competitor Avg)</p>
+              <div className="h-[200px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart 
+                    data={analysis.charts.dosage_comparison.slice(0, 8)} 
+                    layout="vertical"
+                    margin={{ top: 5, right: 30, left: 80, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} className="stroke-muted" />
+                    <XAxis type="number" tick={{ fontSize: 10 }} className="text-muted-foreground" />
+                    <YAxis 
+                      dataKey="ingredient" 
+                      type="category" 
+                      width={75} 
+                      tick={{ fontSize: 9 }} 
+                      className="text-muted-foreground"
+                      tickFormatter={(v) => v.length > 12 ? v.substring(0, 10) + '...' : v}
+                    />
+                    <Tooltip 
+                      formatter={(value: number, name: string) => [`${value}`, name]}
+                      labelFormatter={(label) => `${label}`}
+                    />
+                    <Legend wrapperStyle={{ fontSize: '10px' }} />
+                    <Bar dataKey="our_amount" name="Our Concept" fill="hsl(var(--chart-2))" radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="competitor_avg" name="Competitor Avg" fill="hsl(var(--chart-1))" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Clinical Tab */}
+      {activeTab === 'clinical' && (
+        <div className="space-y-4">
+          {/* Dosage Adequacy */}
+          {analysis.clinical_analysis?.dosage_adequacy && analysis.clinical_analysis.dosage_adequacy.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-foreground flex items-center gap-1">
+                <FlaskConical className="w-3 h-3" /> Clinical Dosage Adequacy
+              </p>
+              <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                {analysis.clinical_analysis.dosage_adequacy.map((item, idx) => (
+                  <div 
+                    key={idx} 
+                    className={`rounded-lg p-3 border ${getAdequacyColor(item.adequacy)}`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-xs font-medium text-foreground">{item.ingredient}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-[10px] text-primary font-medium">Our: {item.our_dosage}</span>
+                          <span className="text-[10px] text-muted-foreground">Clinical: {item.clinical_range}</span>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className={`text-[8px] capitalize ${getAdequacyColor(item.adequacy)}`}>
+                        {item.adequacy}
+                      </Badge>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-2">{item.research_note}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Synergy Pairs */}
+          {analysis.clinical_analysis?.synergy_pairs && analysis.clinical_analysis.synergy_pairs.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-foreground flex items-center gap-1">
+                <Link2 className="w-3 h-3" /> Ingredient Synergies
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {analysis.clinical_analysis.synergy_pairs.map((pair, idx) => (
+                  <div 
+                    key={idx} 
+                    className={`rounded-lg p-3 border ${pair.present_in_formula ? 'bg-chart-4/5 border-chart-4/20' : 'bg-muted/50 border-border'}`}
+                  >
+                    <div className="flex items-center gap-1 mb-1">
+                      {pair.present_in_formula ? (
+                        <CheckCircle className="w-3 h-3 text-chart-4" />
+                      ) : (
+                        <XCircle className="w-3 h-3 text-muted-foreground" />
+                      )}
+                      <span className="text-[10px] font-medium text-foreground">
+                        {pair.ingredients.join(' + ')}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">{pair.synergy_type}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Customer Tab */}
+      {activeTab === 'customer' && (
+        <div className="space-y-4">
+          {/* Pain Point Solutions */}
+          {analysis.customer_insights?.pain_point_solutions && analysis.customer_insights.pain_point_solutions.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-foreground flex items-center gap-1">
+                <CheckCircle className="w-3 h-3 text-chart-4" /> Pain Points We Solve
+              </p>
+              <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
+                {analysis.customer_insights.pain_point_solutions.map((item, idx) => (
+                  <div key={idx} className="rounded-lg p-3 border bg-chart-4/5 border-chart-4/20">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-xs font-medium text-foreground">"{item.pain_point}"</p>
+                        <p className="text-[10px] text-chart-4 mt-1 flex items-center gap-1">
+                          <ChevronRight className="w-3 h-3" />
+                          Solved by: <span className="font-medium">{item.solving_ingredient}</span>
+                        </p>
+                      </div>
+                      <Badge variant="outline" className={`text-[8px] ${getConfidenceColor(item.confidence)}`}>
+                        {item.confidence} confidence
+                      </Badge>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-2">{item.evidence}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Unaddressed Complaints */}
+          {analysis.customer_insights?.unaddressed_complaints && analysis.customer_insights.unaddressed_complaints.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-foreground flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3 text-chart-2" /> Unaddressed Complaints
+              </p>
+              <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
+                {analysis.customer_insights.unaddressed_complaints.map((item, idx) => (
+                  <div key={idx} className="rounded-lg p-3 border bg-chart-2/5 border-chart-2/20">
+                    <p className="text-xs font-medium text-foreground">"{item.complaint}"</p>
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      <span className="text-chart-2">Suggestion:</span> {item.suggested_solution}
+                    </p>
+                    <p className="text-[10px] text-primary mt-1">
+                      <span className="font-medium">Consider adding:</span> {item.ingredient_recommendation}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Competitive Tab */}
+      {activeTab === 'competitive' && (
+        <div className="space-y-4">
+          {/* Advantages */}
+          {analysis.competitive_matrix?.advantages && analysis.competitive_matrix.advantages.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-foreground flex items-center gap-1">
+                <TrendingUp className="w-3 h-3 text-chart-4" /> Competitive Advantages
+              </p>
+              <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1">
+                {analysis.competitive_matrix.advantages.map((item, idx) => (
+                  <div key={idx} className="rounded-lg p-3 border bg-chart-4/5 border-chart-4/20">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <Badge variant="outline" className="text-[8px] mb-1">{item.category}</Badge>
+                        <p className="text-xs font-medium text-foreground">{item.our_position}</p>
+                        <p className="text-[10px] text-muted-foreground mt-1">vs Competitors: {item.vs_competitors}</p>
+                      </div>
+                      <Badge variant="outline" className={`text-[8px] ${getImpactColor(item.impact)}`}>
+                        {item.impact} impact
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Vulnerabilities */}
+          {analysis.competitive_matrix?.vulnerabilities && analysis.competitive_matrix.vulnerabilities.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-foreground flex items-center gap-1">
+                <Shield className="w-3 h-3 text-chart-2" /> Vulnerabilities
+              </p>
+              <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1">
+                {analysis.competitive_matrix.vulnerabilities.map((item, idx) => (
+                  <div key={idx} className="rounded-lg p-3 border bg-chart-2/5 border-chart-2/20">
+                    <Badge variant="outline" className="text-[8px] mb-1">{item.category}</Badge>
+                    <p className="text-xs font-medium text-foreground">{item.risk_description}</p>
+                    <p className="text-[10px] text-chart-4 mt-1">
+                      <span className="font-medium">Mitigation:</span> {item.mitigation}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Roadmap Tab */}
+      {activeTab === 'roadmap' && (
+        <div className="space-y-4">
+          {analysis.priority_roadmap && analysis.priority_roadmap.length > 0 ? (
+            [1, 2, 3].map(phase => {
+              const phaseItems = analysis.priority_roadmap?.filter(item => item.phase === phase) || [];
+              if (phaseItems.length === 0) return null;
+              
+              return (
+                <div key={phase} className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${getPhaseColor(phase)}`}>
+                      {phase}
+                    </div>
+                    <p className="text-xs font-medium text-foreground">
+                      Phase {phase}: {phase === 1 ? 'Immediate' : phase === 2 ? 'Next Batch' : 'Future'}
+                    </p>
+                  </div>
+                  <div className="space-y-2 pl-8">
+                    {phaseItems.map((item, idx) => (
+                      <div key={idx} className="rounded-lg p-3 border bg-card border-border/50">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="text-xs font-medium text-foreground flex items-center gap-1">
+                              <Zap className="w-3 h-3 text-primary" />
+                              {item.action}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground mt-1">
+                              Ingredient: <span className="text-foreground">{item.ingredient}</span>
+                            </p>
+                            <p className="text-[10px] text-muted-foreground">
+                              Impact: <span className="text-chart-4">{item.expected_impact}</span>
+                            </p>
+                          </div>
+                          <div className="flex flex-col items-end gap-1">
+                            <Badge variant="outline" className={`text-[8px] ${getComplexityColor(item.complexity)}`}>
+                              {item.complexity}
+                            </Badge>
+                            <span className="text-[9px] text-muted-foreground">{item.timeline}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <Clock className="w-8 h-8 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">No roadmap items available</p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default AIAnalysisResults;

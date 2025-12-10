@@ -35,6 +35,65 @@ export interface IngredientAnalysis {
     reason: string;
     impact: 'high' | 'medium' | 'low';
   }>;
+  // NEW: Customer-Formulation Connection
+  customer_insights?: {
+    pain_point_solutions: Array<{
+      pain_point: string;
+      solving_ingredient: string;
+      confidence: 'high' | 'medium' | 'low';
+      evidence: string;
+    }>;
+    unaddressed_complaints: Array<{
+      complaint: string;
+      suggested_solution: string;
+      ingredient_recommendation: string;
+    }>;
+  };
+  // NEW: Competitive Advantage Matrix
+  competitive_matrix?: {
+    advantages: Array<{
+      category: string;
+      our_position: string;
+      vs_competitors: string;
+      impact: 'high' | 'medium' | 'low';
+    }>;
+    vulnerabilities: Array<{
+      category: string;
+      risk_description: string;
+      mitigation: string;
+    }>;
+  };
+  // NEW: Clinical Efficacy Breakdown
+  clinical_analysis?: {
+    dosage_adequacy: Array<{
+      ingredient: string;
+      our_dosage: string;
+      clinical_range: string;
+      adequacy: 'optimal' | 'adequate' | 'suboptimal' | 'insufficient';
+      research_note: string;
+    }>;
+    synergy_pairs: Array<{
+      ingredients: string[];
+      synergy_type: string;
+      present_in_formula: boolean;
+    }>;
+  };
+  // NEW: SWOT Summary
+  swot?: {
+    strengths: string[];
+    weaknesses: string[];
+    opportunities: string[];
+    threats: string[];
+  };
+  // NEW: Priority Roadmap
+  priority_roadmap?: Array<{
+    phase: 1 | 2 | 3;
+    action: string;
+    ingredient: string;
+    expected_impact: string;
+    complexity: 'easy' | 'moderate' | 'complex';
+    timeline: string;
+  }>;
 }
 
 export function useIngredientAnalysis(categoryId?: string) {
@@ -105,7 +164,7 @@ export function useIngredientAnalysis(categoryId?: string) {
 
         toast({
           title: 'Analysis Complete',
-          description: `Found ${data.analysis.ingredients?.length || 0} ingredients analyzed with ${data.analysis.actionable_insights?.length || 0} actionable insights.`,
+          description: `Comprehensive analysis with ${data.analysis.ingredients?.length || 0} ingredients, SWOT, clinical insights, and roadmap generated.`,
         });
       }
     } catch (err) {

@@ -170,55 +170,55 @@ function PackagingComparisonSection({ ourPackaging, competitors, getCompetitorPa
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <Card className="mt-4">
-        <CardHeader className="pb-2">
+        <CardHeader className="pb-2 p-3 sm:p-4 md:p-6">
           <div className="flex items-center justify-between">
             <CollapsibleTrigger asChild>
               <div className="cursor-pointer hover:opacity-80 transition-opacity">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Package className="w-4 h-4 text-primary" />
+                <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+                  <Package className="w-3 h-3 sm:w-4 sm:h-4 text-primary" />
                   Packaging Strategy Comparison
                 </CardTitle>
-                <CardDescription className="text-xs">
+                <CardDescription className="text-[10px] sm:text-xs">
                   Visual styles, trust signals, and claims across competitors
                 </CardDescription>
               </div>
             </CollapsibleTrigger>
             <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              <Button variant="ghost" size="sm" className="h-7 w-7 sm:h-8 sm:w-8 p-0">
+                {isOpen ? <ChevronUp className="h-3 w-3 sm:h-4 sm:w-4" /> : <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4" />}
               </Button>
             </CollapsibleTrigger>
           </div>
         </CardHeader>
         <CollapsibleContent>
-          <CardContent className="pt-0">
+          <CardContent className="pt-0 p-3 sm:p-4 md:p-6">
             {/* Comparison Grid */}
             <div className="space-y-4">
               {/* Our Concept Packaging */}
               {ourPackaging && (ourPackaging.type || ourPackaging.design_elements?.length) && (
-                <div className="p-3 bg-primary/5 rounded-lg border border-primary/20">
+                <div className="p-2 sm:p-3 bg-primary/5 rounded-lg border border-primary/20">
                   <div className="flex items-center gap-2 mb-2">
-                    <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
-                      <Sparkles className="w-3 h-3 text-primary-foreground" />
+                    <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-primary flex items-center justify-center">
+                      <Sparkles className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-primary-foreground" />
                     </div>
-                    <span className="text-sm font-semibold text-foreground">Our Concept</span>
+                    <span className="text-xs sm:text-sm font-semibold text-foreground">Our Concept</span>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
                     {ourPackaging.type && (
-                      <div className="bg-background/60 rounded p-2">
-                        <p className="text-[10px] text-muted-foreground mb-0.5">Recommended Format</p>
-                        <p className="text-sm font-medium text-primary">{ourPackaging.type}</p>
+                      <div className="bg-background/60 rounded p-1.5 sm:p-2">
+                        <p className="text-[9px] sm:text-[10px] text-muted-foreground mb-0.5">Recommended Format</p>
+                        <p className="text-xs sm:text-sm font-medium text-primary">{ourPackaging.type}</p>
                         {ourPackaging.quantity && (
-                          <p className="text-[10px] text-muted-foreground">({ourPackaging.quantity} count)</p>
+                          <p className="text-[9px] sm:text-[10px] text-muted-foreground">({ourPackaging.quantity} count)</p>
                         )}
                       </div>
                     )}
                     {ourPackaging.design_elements && ourPackaging.design_elements.length > 0 && (
-                      <div className="bg-background/60 rounded p-2 md:col-span-2">
-                        <p className="text-[10px] text-muted-foreground mb-1">Design Elements</p>
+                      <div className="bg-background/60 rounded p-1.5 sm:p-2 sm:col-span-2">
+                        <p className="text-[9px] sm:text-[10px] text-muted-foreground mb-1">Design Elements</p>
                         <div className="flex flex-wrap gap-1">
                           {ourPackaging.design_elements.map((el, i) => (
-                            <Badge key={i} variant="secondary" className="text-[9px]">{el}</Badge>
+                            <Badge key={i} variant="secondary" className="text-[8px] sm:text-[9px]">{el}</Badge>
                           ))}
                         </div>
                       </div>
@@ -298,14 +298,14 @@ function PackagingComparisonSection({ ourPackaging, competitors, getCompetitorPa
               </div>
 
               {/* Average Score Banner */}
-              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border">
+              <div className="flex items-center justify-between p-2 sm:p-3 bg-muted/30 rounded-lg border">
                 <div className="flex items-center gap-2">
-                  <Award className="w-4 h-4 text-primary" />
-                  <span className="text-xs font-medium text-foreground">Category Average Packaging Score</span>
+                  <Award className="w-3 h-3 sm:w-4 sm:h-4 text-primary" />
+                  <span className="text-[10px] sm:text-xs font-medium text-foreground">Category Average Packaging Score</span>
                 </div>
-                <div className={`flex items-center gap-2 ${getScoreColor(aggregatedData.avgScore)}`}>
-                  <span className="text-lg font-bold">{aggregatedData.avgScore}</span>
-                  <span className="text-[10px] text-muted-foreground">/100</span>
+                <div className={`flex items-center gap-1 sm:gap-2 ${getScoreColor(aggregatedData.avgScore)}`}>
+                  <span className="text-base sm:text-lg font-bold">{aggregatedData.avgScore}</span>
+                  <span className="text-[9px] sm:text-[10px] text-muted-foreground">/100</span>
                 </div>
               </div>
 
@@ -313,14 +313,14 @@ function PackagingComparisonSection({ ourPackaging, competitors, getCompetitorPa
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Top Claims */}
                 {aggregatedData.topClaims.length > 0 && (
-                  <div className="bg-chart-4/5 rounded-lg p-3 border border-chart-4/20">
-                    <p className="text-[10px] font-semibold mb-2 flex items-center gap-1 text-chart-4">
-                      <Tag className="w-3 h-3" />
+                  <div className="bg-chart-4/5 rounded-lg p-2 sm:p-3 border border-chart-4/20">
+                    <p className="text-[9px] sm:text-[10px] font-semibold mb-2 flex items-center gap-1 text-chart-4">
+                      <Tag className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                       Most Common Claims
                     </p>
                     <div className="flex flex-wrap gap-1">
                       {aggregatedData.topClaims.map(([claim, count], i) => (
-                        <Badge key={i} variant="secondary" className="text-[9px]">
+                        <Badge key={i} variant="secondary" className="text-[8px] sm:text-[9px]">
                           {claim}
                           <span className="ml-1 text-muted-foreground">({count})</span>
                         </Badge>
@@ -331,14 +331,14 @@ function PackagingComparisonSection({ ourPackaging, competitors, getCompetitorPa
 
                 {/* Top Trust Signals */}
                 {aggregatedData.topTrustSignals.length > 0 && (
-                  <div className="bg-primary/5 rounded-lg p-3 border border-primary/20">
-                    <p className="text-[10px] font-semibold mb-2 flex items-center gap-1 text-primary">
-                      <Shield className="w-3 h-3" />
+                  <div className="bg-primary/5 rounded-lg p-2 sm:p-3 border border-primary/20">
+                    <p className="text-[9px] sm:text-[10px] font-semibold mb-2 flex items-center gap-1 text-primary">
+                      <Shield className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                       Common Trust Signals
                     </p>
                     <div className="flex flex-wrap gap-1">
                       {aggregatedData.topTrustSignals.map(([signal, count], i) => (
-                        <Badge key={i} variant="outline" className="text-[9px] border-primary/30">
+                        <Badge key={i} variant="outline" className="text-[8px] sm:text-[9px] border-primary/30">
                           {signal}
                           <span className="ml-1 text-muted-foreground">({count})</span>
                         </Badge>
@@ -640,18 +640,18 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <Card className="mt-4">
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
+        <CardHeader className="pb-2 p-3 sm:p-4 md:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <CollapsibleTrigger asChild>
               <div className="cursor-pointer hover:opacity-80 transition-opacity">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <FlaskConical className="w-4 h-4 text-primary" />
+                <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+                  <FlaskConical className="w-3 h-3 sm:w-4 sm:h-4 text-primary" />
                   Ingredient & Dosage Comparison
-                  <Badge variant="secondary" className="ml-2 text-[10px]">
+                  <Badge variant="secondary" className="ml-2 text-[9px] sm:text-[10px]">
                     {stats.total} total
                   </Badge>
                 </CardTitle>
-                <CardDescription className="text-xs">
+                <CardDescription className="text-[10px] sm:text-xs">
                   {stats.nutrients} active nutrients • {stats.otherIngredients} other ingredients
                 </CardDescription>
               </div>
@@ -659,29 +659,29 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
             <div className="flex items-center gap-2">
               {/* View Toggle */}
               <div className="flex items-center bg-muted rounded-lg p-0.5">
-                <Button variant={viewMode === 'chart' ? 'secondary' : 'ghost'} size="sm" className="h-7 px-2 text-xs"
+                <Button variant={viewMode === 'chart' ? 'secondary' : 'ghost'} size="sm" className="h-6 sm:h-7 px-1.5 sm:px-2 text-[10px] sm:text-xs"
                   onClick={(e) => { e.stopPropagation(); setViewMode('chart'); }}>
-                  <BarChart3 className="w-3 h-3 mr-1" />Chart
+                  <BarChart3 className="w-2.5 h-2.5 sm:w-3 sm:h-3 mr-0.5 sm:mr-1" />Chart
                 </Button>
-                <Button variant={viewMode === 'gaps' ? 'secondary' : 'ghost'} size="sm" className="h-7 px-2 text-xs"
+                <Button variant={viewMode === 'gaps' ? 'secondary' : 'ghost'} size="sm" className="h-6 sm:h-7 px-1.5 sm:px-2 text-[10px] sm:text-xs"
                   onClick={(e) => { e.stopPropagation(); setViewMode('gaps'); }}>
-                  <Scale className="w-3 h-3 mr-1" />Gaps
+                  <Scale className="w-2.5 h-2.5 sm:w-3 sm:h-3 mr-0.5 sm:mr-1" />Gaps
                 </Button>
-                <Button variant={viewMode === 'table' ? 'secondary' : 'ghost'} size="sm" className="h-7 px-2 text-xs"
+                <Button variant={viewMode === 'table' ? 'secondary' : 'ghost'} size="sm" className="h-6 sm:h-7 px-1.5 sm:px-2 text-[10px] sm:text-xs"
                   onClick={(e) => { e.stopPropagation(); setViewMode('table'); }}>
-                  <Pill className="w-3 h-3 mr-1" />All
+                  <Pill className="w-2.5 h-2.5 sm:w-3 sm:h-3 mr-0.5 sm:mr-1" />All
                 </Button>
               </div>
               <CollapsibleTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                  {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                <Button variant="ghost" size="sm" className="h-7 w-7 sm:h-8 sm:w-8 p-0">
+                  {isOpen ? <ChevronUp className="h-3 w-3 sm:h-4 sm:w-4" /> : <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4" />}
                 </Button>
               </CollapsibleTrigger>
             </div>
           </div>
         </CardHeader>
         <CollapsibleContent>
-          <CardContent className="pt-0">
+          <CardContent className="pt-0 p-3 sm:p-4 md:p-6">
             {viewMode === 'chart' && (
               /* BAR CHART VIEW */
               <div className="space-y-4">
@@ -775,31 +775,31 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
               <div className="space-y-4">
                 {/* Stats Row 1: Ingredient counts */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  <div className="bg-primary/10 rounded-lg p-2 text-center">
-                    <p className="text-lg font-bold text-primary">{stats.inOurFormula}</p>
-                    <p className="text-[10px] text-muted-foreground">In Our Formula</p>
+                  <div className="bg-primary/10 rounded-lg p-1.5 sm:p-2 text-center">
+                    <p className="text-base sm:text-lg font-bold text-primary">{stats.inOurFormula}</p>
+                    <p className="text-[9px] sm:text-[10px] text-muted-foreground">In Our Formula</p>
                   </div>
-                  <div className="bg-chart-4/10 rounded-lg p-2 text-center">
-                    <p className="text-lg font-bold text-chart-4">{stats.nutrients}</p>
-                    <p className="text-[10px] text-muted-foreground">Active Nutrients</p>
+                  <div className="bg-chart-4/10 rounded-lg p-1.5 sm:p-2 text-center">
+                    <p className="text-base sm:text-lg font-bold text-chart-4">{stats.nutrients}</p>
+                    <p className="text-[9px] sm:text-[10px] text-muted-foreground">Active Nutrients</p>
                   </div>
-                  <div className="bg-muted rounded-lg p-2 text-center">
-                    <p className="text-lg font-bold">{stats.otherIngredients}</p>
-                    <p className="text-[10px] text-muted-foreground">Other Ingredients</p>
+                  <div className="bg-muted rounded-lg p-1.5 sm:p-2 text-center">
+                    <p className="text-base sm:text-lg font-bold">{stats.otherIngredients}</p>
+                    <p className="text-[9px] sm:text-[10px] text-muted-foreground">Other Ingredients</p>
                   </div>
-                  <div className={`rounded-lg p-2 text-center ${stats.coverageScore >= 80 ? 'bg-chart-4/10' : stats.coverageScore >= 50 ? 'bg-chart-2/10' : 'bg-destructive/10'}`}>
-                    <p className={`text-lg font-bold ${stats.coverageScore >= 80 ? 'text-chart-4' : stats.coverageScore >= 50 ? 'text-chart-2' : 'text-destructive'}`}>
+                  <div className={`rounded-lg p-1.5 sm:p-2 text-center ${stats.coverageScore >= 80 ? 'bg-chart-4/10' : stats.coverageScore >= 50 ? 'bg-chart-2/10' : 'bg-destructive/10'}`}>
+                    <p className={`text-base sm:text-lg font-bold ${stats.coverageScore >= 80 ? 'text-chart-4' : stats.coverageScore >= 50 ? 'text-chart-2' : 'text-destructive'}`}>
                       {stats.coverageScore}%
                     </p>
-                    <p className="text-[10px] text-muted-foreground">Coverage Score</p>
+                    <p className="text-[9px] sm:text-[10px] text-muted-foreground">Coverage Score</p>
                   </div>
                 </div>
 
                 {/* Stats Row 2: Price-per-Serving Comparison */}
                 {pricePerServing.data.length > 0 && (
-                  <div className="bg-muted/30 rounded-lg p-3">
-                    <p className="text-xs font-semibold mb-2 flex items-center gap-1">
-                      <DollarSign className="w-3.5 h-3.5 text-primary" />
+                  <div className="bg-muted/30 rounded-lg p-2 sm:p-3">
+                    <p className="text-[10px] sm:text-xs font-semibold mb-2 flex items-center gap-1">
+                      <DollarSign className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-primary" />
                       Price-per-Serving Comparison
                     </p>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -820,13 +820,13 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                                   : 'bg-background border-border'
                             }`}
                           >
-                            <p className="text-[10px] text-muted-foreground truncate" title={item.name}>
+                            <p className="text-[9px] sm:text-[10px] text-muted-foreground truncate" title={item.name}>
                               {isOurs ? '🎯 ' : ''}{item.name}
                             </p>
-                            <p className={`text-sm font-bold ${isOurs ? 'text-chart-2' : isLowest ? 'text-chart-4' : ''}`}>
+                            <p className={`text-xs sm:text-sm font-bold ${isOurs ? 'text-chart-2' : isLowest ? 'text-chart-4' : ''}`}>
                               {item.pps ? `$${item.pps.toFixed(2)}` : '—'}
                             </p>
-                            <p className="text-[9px] text-muted-foreground">
+                            <p className="text-[8px] sm:text-[9px] text-muted-foreground">
                               ${item.price?.toFixed(0)} / {item.servings} srv
                             </p>
                             {!isOurs && item.pps && pricePerServing.avgCompetitorPps && (
@@ -839,10 +839,10 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                             )}
                           </div>
                         );
-                      })}
+                    })}
                     </div>
                     {pricePerServing.avgCompetitorPps && (
-                      <p className="text-[10px] text-muted-foreground text-center mt-2">
+                      <p className="text-[9px] sm:text-[10px] text-muted-foreground text-center mt-2">
                         Competitor Average: ${pricePerServing.avgCompetitorPps.toFixed(2)}/serving
                       </p>
                     )}
@@ -1645,14 +1645,14 @@ export function EnhancedBenchmarkComparison({
   return (
     <>
       <Card>
-        <CardHeader className="pb-2">
+        <CardHeader className="pb-2 p-3 sm:p-4 md:p-6">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <CardTitle className="flex items-center gap-2 text-base md:text-lg">
-                <Package className="w-4 h-4 md:w-5 md:h-5 text-primary" />
+              <CardTitle className="flex items-center gap-2 text-sm sm:text-base md:text-lg">
+                <Package className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5 text-primary" />
                 Benchmark Comparison
               </CardTitle>
-              <CardDescription className="text-xs md:text-sm">
+              <CardDescription className="text-[10px] sm:text-xs md:text-sm">
                 Compare your concept against competitors • Click any product for details
               </CardDescription>
             </div>
@@ -1749,43 +1749,43 @@ export function EnhancedBenchmarkComparison({
           <div className="flex flex-col lg:flex-row gap-3 lg:gap-2 md:gap-3 overflow-x-hidden">
             {/* Our Concept Column - Full width on mobile, fixed on desktop */}
             <div className="w-full lg:w-[280px] xl:w-[320px] lg:shrink-0 rounded-lg border-2 border-chart-2/50 bg-gradient-to-b from-chart-2/10 to-background dark:from-chart-2/20 overflow-hidden">
-              <div className="bg-gradient-to-r from-chart-2 to-chart-2/80 px-3 py-2">
+              <div className="bg-gradient-to-r from-chart-2 to-chart-2/80 px-2 sm:px-3 py-1.5 sm:py-2">
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 md:w-7 md:h-7 rounded-full bg-white/20 flex items-center justify-center">
-                    <Target className="w-3 h-3 md:w-4 md:h-4 text-white" />
+                  <div className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 rounded-full bg-white/20 flex items-center justify-center">
+                    <Target className="w-2.5 h-2.5 sm:w-3 sm:h-3 md:w-4 md:h-4 text-white" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-white font-semibold text-xs md:text-sm truncate">OUR CONCEPT</p>
-                    <p className="text-white/80 text-[10px] md:text-xs truncate">Strategy</p>
+                    <p className="text-white font-semibold text-[10px] sm:text-xs md:text-sm truncate">OUR CONCEPT</p>
+                    <p className="text-white/80 text-[9px] sm:text-[10px] md:text-xs truncate">Strategy</p>
                   </div>
                 </div>
               </div>
               
-              <div className="p-2 md:p-3 space-y-3">
+              <div className="p-2 md:p-3 space-y-2 sm:space-y-3">
                 <div className="w-full aspect-square rounded-lg bg-gradient-to-br from-chart-2/20 to-chart-2/10 dark:from-chart-2/30 dark:to-chart-2/20 flex items-center justify-center">
                   <div className="text-center">
-                    <Target className="w-10 h-10 md:w-12 md:h-12 text-chart-2/50 mx-auto" />
-                    <p className="text-[10px] text-chart-2/70 mt-1">Your Product</p>
+                    <Target className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 text-chart-2/50 mx-auto" />
+                    <p className="text-[9px] sm:text-[10px] text-chart-2/70 mt-1">Your Product</p>
                   </div>
                 </div>
 
                 {/* Positioning */}
                 <div>
-                  <p className="text-[10px] font-semibold mb-1 flex items-center gap-1">
-                    <MessageSquare className="w-3 h-3 text-primary" />
+                  <p className="text-[9px] sm:text-[10px] font-semibold mb-1 flex items-center gap-1">
+                    <MessageSquare className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-primary" />
                     Positioning
                   </p>
-                  <p className="text-[10px] text-muted-foreground">
+                  <p className="text-[9px] sm:text-[10px] text-muted-foreground">
                     {getOurPositioning()}
                   </p>
                 </div>
 
                 {/* Ingredients */}
                 <div>
-                  <p className="text-[10px] font-semibold mb-1 flex items-center gap-1">
-                    <Pill className="w-3 h-3 text-chart-4" />
+                  <p className="text-[9px] sm:text-[10px] font-semibold mb-1 flex items-center gap-1">
+                    <Pill className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-chart-4" />
                     Key Ingredients
-                    <Badge variant="secondary" className="text-[9px] h-4 ml-auto">
+                    <Badge variant="secondary" className="text-[8px] sm:text-[9px] h-3.5 sm:h-4 ml-auto">
                       {getOurIngredients().length}
                     </Badge>
                   </p>
@@ -1793,9 +1793,9 @@ export function EnhancedBenchmarkComparison({
                     {getOurIngredients().map((ing, i) => {
                       const hasMatch = isOurIngredientInCompetitors(ing);
                       return (
-                        <div key={i} className={`flex items-start gap-1 text-[10px] ${hasMatch ? 'text-chart-4 font-medium' : 'text-muted-foreground'}`}>
+                        <div key={i} className={`flex items-start gap-1 text-[9px] sm:text-[10px] ${hasMatch ? 'text-chart-4 font-medium' : 'text-muted-foreground'}`}>
                           {hasMatch ? (
-                            <Check className="w-3 h-3 text-chart-4 mt-0.5 shrink-0" />
+                            <Check className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-chart-4 mt-0.5 shrink-0" />
                           ) : (
                             <span className="w-1 h-1 rounded-full bg-chart-4 mt-1.5 shrink-0 ml-1" />
                           )}
@@ -1807,9 +1807,9 @@ export function EnhancedBenchmarkComparison({
                 </div>
 
                 {/* FORMULATION DETAILS SECTION */}
-                <div className="bg-primary/5 dark:bg-primary/10 rounded-lg p-2 border border-primary/20 space-y-2">
-                  <p className="text-[10px] font-semibold flex items-center gap-1 text-primary">
-                    <FlaskConical className="w-3 h-3" />
+                <div className="bg-primary/5 dark:bg-primary/10 rounded-lg p-1.5 sm:p-2 border border-primary/20 space-y-1.5 sm:space-y-2">
+                  <p className="text-[9px] sm:text-[10px] font-semibold flex items-center gap-1 text-primary">
+                    <FlaskConical className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                     Formulation Details
                   </p>
                   
@@ -1819,17 +1819,17 @@ export function EnhancedBenchmarkComparison({
                       const specs = getOurFormulationSpecs();
                       return (
                         <>
-                          <div className="bg-background/60 rounded p-1.5">
-                            <p className="text-[9px] text-muted-foreground">Servings</p>
-                            <p className="text-[10px] font-medium">{specs.servingsPerContainer || '—'}</p>
+                          <div className="bg-background/60 rounded p-1 sm:p-1.5">
+                            <p className="text-[8px] sm:text-[9px] text-muted-foreground">Servings</p>
+                            <p className="text-[9px] sm:text-[10px] font-medium">{specs.servingsPerContainer || '—'}</p>
                           </div>
-                          <div className="bg-background/60 rounded p-1.5">
-                            <p className="text-[9px] text-muted-foreground">Serving Size</p>
-                            <p className="text-[10px] font-medium">{specs.servingSize || '—'}</p>
+                          <div className="bg-background/60 rounded p-1 sm:p-1.5">
+                            <p className="text-[8px] sm:text-[9px] text-muted-foreground">Serving Size</p>
+                            <p className="text-[9px] sm:text-[10px] font-medium">{specs.servingSize || '—'}</p>
                           </div>
-                          <div className="bg-background/60 rounded p-1.5 col-span-2">
-                            <p className="text-[9px] text-muted-foreground">Form</p>
-                            <p className="text-[10px] font-medium">{specs.packagingType || getOurFormFactor()}</p>
+                          <div className="bg-background/60 rounded p-1 sm:p-1.5 col-span-2">
+                            <p className="text-[8px] sm:text-[9px] text-muted-foreground">Form</p>
+                            <p className="text-[9px] sm:text-[10px] font-medium">{specs.packagingType || getOurFormFactor()}</p>
                           </div>
                         </>
                       );
@@ -1839,13 +1839,13 @@ export function EnhancedBenchmarkComparison({
                   {/* Recommended Dosages */}
                   {getOurRecommendedDosages().length > 0 && (
                     <div>
-                      <p className="text-[9px] font-medium text-muted-foreground mb-1 flex items-center gap-1">
-                        <Beaker className="w-2.5 h-2.5" />
+                      <p className="text-[8px] sm:text-[9px] font-medium text-muted-foreground mb-1 flex items-center gap-1">
+                        <Beaker className="w-2 h-2 sm:w-2.5 sm:h-2.5" />
                         Recommended Dosages
                       </p>
                       <div className="space-y-0.5 max-h-20 overflow-y-auto">
                         {getOurRecommendedDosages().map((item, i) => (
-                          <div key={i} className="flex items-center justify-between text-[10px] gap-1">
+                          <div key={i} className="flex items-center justify-between text-[9px] sm:text-[10px] gap-1">
                             <span className="text-muted-foreground truncate flex-1">{item.ingredient}</span>
                             {item.dosage && (
                               <Badge variant="secondary" className="text-[9px] h-4 shrink-0">{item.dosage}</Badge>

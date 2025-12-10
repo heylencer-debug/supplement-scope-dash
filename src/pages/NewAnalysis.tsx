@@ -44,6 +44,10 @@ const productFormOptions = [
   { id: "soft-chew", label: "Soft Chew" },
   { id: "treat", label: "Treat" },
   { id: "chewable", label: "Chewable" },
+  { id: "oil", label: "Oil" },
+  { id: "spray", label: "Spray" },
+  { id: "drops", label: "Drops" },
+  { id: "bites", label: "Bites" },
 ];
 
 

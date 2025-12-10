@@ -1240,6 +1240,59 @@ export function EnhancedBenchmarkComparison({
     return analysisData?.analysis_1_category_scores?.customer_insights?.decision_drivers || [];
   };
 
+  // NEW: Get Top 3 Reasons to Proceed (Competitive Advantages)
+  const getCompetitiveAdvantages = (): string[] => {
+    const advantages: string[] = [];
+    
+    // Source 1: Key differentiators from go_to_market
+    const differentiators = analysisData?.key_insights?.go_to_market?.key_differentiators;
+    if (differentiators?.length) {
+      differentiators.slice(0, 2).forEach(d => advantages.push(d));
+    }
+    
+    // Source 2: Key differentiators from formula_brief
+    if (advantages.length < 3) {
+      const formulaDiff = analysisData?.formula_brief?.key_differentiators;
+      if (formulaDiff?.length) {
+        formulaDiff.slice(0, 3 - advantages.length).forEach(d => {
+          if (!advantages.includes(d)) advantages.push(d);
+        });
+      }
+    }
+    
+    // Source 3: Market gaps from competitive landscape
+    if (advantages.length < 3) {
+      const gaps = analysisData?.analysis_1_category_scores?.competitive_landscape?.market_gaps;
+      if (gaps?.length) {
+        gaps.slice(0, 3 - advantages.length).forEach(g => {
+          if (!advantages.includes(g)) advantages.push(g);
+        });
+      }
+    }
+    
+    // Source 4: Top strengths
+    if (advantages.length < 3) {
+      const topStrengths = analysisData?.top_strengths;
+      if (topStrengths?.length) {
+        topStrengths.slice(0, 3 - advantages.length).forEach(s => {
+          if (s.strength && !advantages.includes(s.strength)) advantages.push(s.strength);
+        });
+      }
+    }
+    
+    // Source 5: Key features from formulation
+    if (advantages.length < 3) {
+      const keyFeatures = analysisData?.analysis_1_category_scores?.product_development?.formulation?.key_features;
+      if (keyFeatures?.length) {
+        keyFeatures.slice(0, 3 - advantages.length).forEach(f => {
+          if (!advantages.includes(f)) advantages.push(f);
+        });
+      }
+    }
+    
+    return advantages.slice(0, 3);
+  };
+
   // NEW: Get primary motivation for Our Concept from customer_insights
   const getOurMotivation = (): string | null => {
     const customerInsights = analysisData?.analysis_1_category_scores?.customer_insights as Record<string, unknown> | undefined;
@@ -1895,6 +1948,33 @@ export function EnhancedBenchmarkComparison({
               </div>
               
               <div className="p-2 md:p-3 space-y-2 sm:space-y-3 max-h-[800px] overflow-y-auto">
+                {/* COMPETITIVE ADVANTAGE SUMMARY BADGE */}
+                {(() => {
+                  const advantages = getCompetitiveAdvantages();
+                  if (advantages.length === 0) return null;
+                  return (
+                    <div className="bg-gradient-to-r from-chart-4 to-chart-4/80 rounded-lg p-2 sm:p-2.5 text-white">
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <Trophy className="w-3 h-3 sm:w-4 sm:h-4" />
+                        <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wide">Why Proceed</p>
+                        <Badge className="ml-auto text-[7px] sm:text-[8px] h-4 bg-white/20 text-white border-0">
+                          Top {advantages.length}
+                        </Badge>
+                      </div>
+                      <div className="space-y-1">
+                        {advantages.map((adv, i) => (
+                          <div key={i} className="flex items-start gap-1.5 text-[8px] sm:text-[9px]">
+                            <div className="w-4 h-4 rounded-full bg-white/20 flex items-center justify-center shrink-0 mt-0.5">
+                              <span className="text-[7px] font-bold">{i + 1}</span>
+                            </div>
+                            <span className="text-white/95 leading-tight">{adv}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {/* PRICING & OPPORTUNITY SCORE - Hero Section */}
                 {(() => {
                   const pricing = getOurPricing();

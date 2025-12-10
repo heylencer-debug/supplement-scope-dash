@@ -100,12 +100,12 @@ export function FinancialProjections({ financials, isLoading }: FinancialProject
           {(investmentData.length > 0 || startup_investment?.total) && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h4 className="font-medium text-sm flex items-center gap-2">
+                <h4 className="font-medium text-xs sm:text-sm flex items-center gap-2">
                   <PiggyBank className="w-4 h-4 text-primary" />
                   Startup Investment
                 </h4>
                 {startup_investment?.total && (
-                  <Badge variant="outline" className="text-chart-4">
+                  <Badge variant="outline" className="text-chart-4 text-[10px] sm:text-xs">
                     ${startup_investment.total.toLocaleString()} total
                   </Badge>
                 )}
@@ -138,7 +138,7 @@ export function FinancialProjections({ financials, isLoading }: FinancialProject
               {investmentData.length > 0 && (
                 <div className="grid grid-cols-2 gap-2">
                   {investmentData.map((item, idx) => (
-                    <div key={idx} className="flex items-center gap-2 text-xs">
+                    <div key={idx} className="flex items-center gap-2 text-[10px] sm:text-xs">
                       <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.fill }} />
                       <span className="text-muted-foreground truncate">{item.name}</span>
                     </div>
@@ -151,7 +151,7 @@ export function FinancialProjections({ financials, isLoading }: FinancialProject
           {/* Revenue Targets Timeline */}
           {revenueData.length > 0 && (
             <div className="space-y-4">
-              <h4 className="font-medium text-sm flex items-center gap-2">
+              <h4 className="font-medium text-xs sm:text-sm flex items-center gap-2">
                 <TrendingUp className="w-4 h-4 text-primary" />
                 Revenue Projection
               </h4>
@@ -186,15 +186,15 @@ export function FinancialProjections({ financials, isLoading }: FinancialProject
           {costs && (
             <>
               {costs.cogs_per_unit !== undefined && costs.cogs_per_unit !== null && (
-                <div className="p-4 bg-secondary rounded-lg text-center">
-                  <p className="text-2xl font-bold text-foreground">${Number(costs.cogs_per_unit).toFixed(2)}</p>
-                  <p className="text-xs text-muted-foreground">COGS per Unit</p>
+                <div className="p-3 sm:p-4 bg-secondary rounded-lg text-center">
+                  <p className="text-lg sm:text-2xl font-bold text-foreground">${Number(costs.cogs_per_unit).toFixed(2)}</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground">COGS per Unit</p>
                 </div>
               )}
               {costs.amazon_fees_percent !== undefined && costs.amazon_fees_percent !== null && (
-                <div className="p-4 bg-secondary rounded-lg text-center">
-                  <p className="text-2xl font-bold text-foreground">{Number(costs.amazon_fees_percent)}%</p>
-                  <p className="text-xs text-muted-foreground">Amazon Fees</p>
+                <div className="p-3 sm:p-4 bg-secondary rounded-lg text-center">
+                  <p className="text-lg sm:text-2xl font-bold text-foreground">{Number(costs.amazon_fees_percent)}%</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground">Amazon Fees</p>
                 </div>
               )}
             </>
@@ -204,18 +204,18 @@ export function FinancialProjections({ financials, isLoading }: FinancialProject
           {breakeven && (
             <>
               {breakeven.months_to_breakeven !== undefined && (
-                <div className="p-4 bg-chart-4/10 border border-chart-4/20 rounded-lg text-center">
-                  <p className="text-2xl font-bold text-chart-4">{breakeven.months_to_breakeven}</p>
-                  <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+                <div className="p-3 sm:p-4 bg-chart-4/10 border border-chart-4/20 rounded-lg text-center">
+                  <p className="text-lg sm:text-2xl font-bold text-chart-4">{breakeven.months_to_breakeven}</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground flex items-center justify-center gap-1">
                     <Calendar className="w-3 h-3" />
                     Months to Breakeven
                   </p>
                 </div>
               )}
               {breakeven.units_to_breakeven !== undefined && (
-                <div className="p-4 bg-secondary rounded-lg text-center">
-                  <p className="text-2xl font-bold text-foreground">{breakeven.units_to_breakeven.toLocaleString()}</p>
-                  <p className="text-xs text-muted-foreground">Units to Breakeven</p>
+                <div className="p-3 sm:p-4 bg-secondary rounded-lg text-center">
+                  <p className="text-lg sm:text-2xl font-bold text-foreground">{breakeven.units_to_breakeven.toLocaleString()}</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground">Units to Breakeven</p>
                 </div>
               )}
             </>
@@ -224,17 +224,17 @@ export function FinancialProjections({ financials, isLoading }: FinancialProject
 
         {/* Margin Projections */}
         {margins && (margins.year_1 !== undefined || margins.year_2 !== undefined) && (
-          <div className="mt-8 space-y-4">
-            <h4 className="font-medium text-sm flex items-center gap-2">
+          <div className="mt-6 sm:mt-8 space-y-4">
+            <h4 className="font-medium text-xs sm:text-sm flex items-center gap-2">
               <Target className="w-4 h-4 text-primary" />
               Margin Projections
             </h4>
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid md:grid-cols-2 gap-4 sm:gap-6">
               {margins.year_1 !== undefined && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Year 1 Margin</span>
-                    <span className="text-sm font-bold">{margins.year_1}%</span>
+                    <span className="text-xs sm:text-sm text-muted-foreground">Year 1 Margin</span>
+                    <span className="text-xs sm:text-sm font-bold">{margins.year_1}%</span>
                   </div>
                   <Progress value={margins.year_1} className="h-2" />
                 </div>
@@ -242,8 +242,8 @@ export function FinancialProjections({ financials, isLoading }: FinancialProject
               {margins.year_2 !== undefined && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Year 2 Margin</span>
-                    <span className="text-sm font-bold">{margins.year_2}%</span>
+                    <span className="text-xs sm:text-sm text-muted-foreground">Year 2 Margin</span>
+                    <span className="text-xs sm:text-sm font-bold">{margins.year_2}%</span>
                   </div>
                   <Progress value={margins.year_2} className="h-2" />
                 </div>

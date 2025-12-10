@@ -78,7 +78,7 @@ export function KPIMetricsGrid({
           className="border-border/50 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-default opacity-0 animate-fade-in"
           style={{ animationDelay: `${idx * 100}ms`, animationFillMode: 'forwards' }}
         >
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             {isLoading ? (
               <div className="space-y-3">
                 <Skeleton className="h-4 w-24" />
@@ -88,20 +88,20 @@ export function KPIMetricsGrid({
             ) : (
               <div className="animate-enter flex items-start justify-between">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">
+                  <p className="text-xs sm:text-sm font-medium text-muted-foreground mb-1">
                     {kpi.label}
                   </p>
-                  <p className="text-2xl font-bold text-foreground">
+                  <p className="text-xl sm:text-2xl font-bold text-foreground">
                     {kpi.value !== null ? kpi.value : <LoadingPulse />}
                   </p>
                   {kpi.subtext && (
-                    <p className={`text-xs mt-1 ${kpi.subtextColor || "text-muted-foreground"}`}>
+                    <p className={`text-[10px] sm:text-xs mt-1 ${kpi.subtextColor || "text-muted-foreground"}`}>
                       {kpi.subtext}
                     </p>
                   )}
                 </div>
-                <div className={`p-3 rounded-full ${kpi.iconBg}`}>
-                  <kpi.icon className={`w-5 h-5 ${kpi.iconColor}`} />
+                <div className={`p-2 sm:p-3 rounded-full ${kpi.iconBg}`}>
+                  <kpi.icon className={`w-4 h-4 sm:w-5 sm:h-5 ${kpi.iconColor}`} />
                 </div>
               </div>
             )}

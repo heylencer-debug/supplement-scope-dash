@@ -7,7 +7,8 @@ import {
   CheckCircle2,
   Copy,
   FileText,
-  ChevronDown
+  ChevronDown,
+  Package
 } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -15,6 +16,179 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 
 interface AIPackagingResultsProps {
   analysis: PackagingDesignAnalysis;
+}
+
+// Visual mockup component for front panel
+function FrontPanelMockup({ 
+  primaryColor, 
+  secondaryColor, 
+  accentColor, 
+  headlineFont, 
+  bodyFont, 
+  primaryClaim, 
+  certifications, 
+  callToAction,
+  bulletPoints
+}: {
+  primaryColor?: { hex: string; name: string };
+  secondaryColor?: { hex: string; name: string };
+  accentColor?: { hex: string; name: string };
+  headlineFont?: string;
+  bodyFont?: string;
+  primaryClaim?: string;
+  certifications?: string[];
+  callToAction?: string;
+  bulletPoints?: string[];
+}) {
+  // Get font family for styling (use generic fallback)
+  const getHeadlineStyle = () => {
+    if (!headlineFont) return {};
+    const fontName = headlineFont.replace(/\s*(Bold|Light|Regular|Medium|Semibold|Black|Italic)/gi, '').trim();
+    return { fontFamily: `"${fontName}", sans-serif` };
+  };
+
+  const getBodyStyle = () => {
+    if (!bodyFont) return {};
+    const fontName = bodyFont.replace(/\s*(Bold|Light|Regular|Medium|Semibold|Black|Italic)/gi, '').trim();
+    return { fontFamily: `"${fontName}", sans-serif` };
+  };
+
+  return (
+    <div className="relative w-full max-w-xs mx-auto">
+      {/* Package container - bottle/jar shape */}
+      <div 
+        className="relative rounded-2xl overflow-hidden shadow-xl"
+        style={{ 
+          backgroundColor: primaryColor?.hex || '#1a365d',
+          minHeight: '400px'
+        }}
+      >
+        {/* Top accent bar */}
+        <div 
+          className="h-3 w-full"
+          style={{ backgroundColor: accentColor?.hex || '#f6ad55' }}
+        />
+        
+        {/* Content area */}
+        <div className="p-6 flex flex-col items-center text-center space-y-4">
+          {/* Brand placeholder */}
+          <div 
+            className="text-xs font-bold tracking-[0.3em] uppercase opacity-80"
+            style={{ 
+              color: secondaryColor?.hex || '#ffffff',
+              ...getBodyStyle()
+            }}
+          >
+            BRAND NAME
+          </div>
+          
+          {/* Decorative line */}
+          <div 
+            className="w-16 h-0.5"
+            style={{ backgroundColor: accentColor?.hex || '#f6ad55' }}
+          />
+          
+          {/* Primary Claim / Headline */}
+          <h2 
+            className="text-2xl font-bold leading-tight"
+            style={{ 
+              color: '#ffffff',
+              ...getHeadlineStyle()
+            }}
+          >
+            {primaryClaim || 'Premium Formula'}
+          </h2>
+          
+          {/* Subheadline / Benefits */}
+          {bulletPoints && bulletPoints.length > 0 && (
+            <div 
+              className="text-sm opacity-90 space-y-1"
+              style={{ 
+                color: '#ffffff',
+                ...getBodyStyle()
+              }}
+            >
+              {bulletPoints.slice(0, 3).map((point, idx) => (
+                <p key={idx} className="text-xs">• {point}</p>
+              ))}
+            </div>
+          )}
+          
+          {/* Serving info placeholder */}
+          <div 
+            className="mt-4 px-4 py-2 rounded-full text-sm font-medium"
+            style={{ 
+              backgroundColor: 'rgba(255,255,255,0.15)',
+              color: '#ffffff',
+              ...getBodyStyle()
+            }}
+          >
+            60 Servings
+          </div>
+          
+          {/* Certification badges */}
+          {certifications && certifications.length > 0 && (
+            <div className="flex flex-wrap justify-center gap-2 mt-4">
+              {certifications.slice(0, 4).map((cert, idx) => (
+                <div 
+                  key={idx}
+                  className="px-2 py-1 rounded text-[10px] font-medium uppercase tracking-wide"
+                  style={{ 
+                    backgroundColor: 'rgba(255,255,255,0.2)',
+                    color: '#ffffff',
+                    border: `1px solid ${accentColor?.hex || 'rgba(255,255,255,0.3)'}`
+                  }}
+                >
+                  {cert}
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {/* CTA */}
+          {callToAction && (
+            <div 
+              className="mt-auto pt-6 text-xs font-medium italic opacity-80"
+              style={{ 
+                color: accentColor?.hex || '#f6ad55',
+                ...getBodyStyle()
+              }}
+            >
+              {callToAction}
+            </div>
+          )}
+        </div>
+        
+        {/* Bottom accent bar */}
+        <div 
+          className="absolute bottom-0 left-0 right-0 h-3"
+          style={{ backgroundColor: secondaryColor?.hex || '#2d3748' }}
+        />
+      </div>
+      
+      {/* Color swatches legend */}
+      <div className="flex justify-center gap-3 mt-4">
+        {primaryColor && (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <div className="w-3 h-3 rounded-full border border-border" style={{ backgroundColor: primaryColor.hex }} />
+            <span>Primary</span>
+          </div>
+        )}
+        {secondaryColor && (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <div className="w-3 h-3 rounded-full border border-border" style={{ backgroundColor: secondaryColor.hex }} />
+            <span>Secondary</span>
+          </div>
+        )}
+        {accentColor && (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <div className="w-3 h-3 rounded-full border border-border" style={{ backgroundColor: accentColor.hex }} />
+            <span>Accent</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export function AIPackagingResults({ analysis }: AIPackagingResultsProps) {
@@ -75,6 +249,32 @@ export function AIPackagingResults({ analysis }: AIPackagingResultsProps) {
 
   return (
     <div className="space-y-6 mt-6">
+      {/* Section 0: Visual Mockup Preview */}
+      <Card className="border-chart-2/20 bg-gradient-to-br from-muted/30 to-muted/10">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Package className="w-5 h-5 text-chart-2" />
+            Front Panel Preview
+          </CardTitle>
+          <p className="text-xs text-muted-foreground mt-1">
+            Visual mockup showing colors, typography, and layout. Not final design.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <FrontPanelMockup
+            primaryColor={primaryColor}
+            secondaryColor={secondaryColor}
+            accentColor={accentColor}
+            headlineFont={headlineFont}
+            bodyFont={bodyFont}
+            primaryClaim={primaryClaim}
+            certifications={certifications}
+            callToAction={callToAction}
+            bulletPoints={bulletPoints}
+          />
+        </CardContent>
+      </Card>
+
       {/* Section 1: Design Brief Card */}
       <Card className="border-primary/20">
         <CardHeader className="pb-4">

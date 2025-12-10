@@ -244,11 +244,16 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
     const signalFrequency = new Map<string, number>();
 
     productsData.forEach(product => {
-      const signals = product.marketing_analysis?.design_blueprint?.trust_signals;
+      const signals = product.marketing_analysis?.design_blueprint?.trust_signals as unknown;
       if (!signals) return;
 
-      // Parse comma-separated signals
-      const signalList = signals.split(/[,;]/).map(s => s.trim()).filter(Boolean);
+      // Handle both string and array formats
+      let signalList: string[] = [];
+      if (typeof signals === 'string') {
+        signalList = signals.split(/[,;]/).map(s => s.trim()).filter(Boolean);
+      } else if (Array.isArray(signals)) {
+        signalList = (signals as unknown[]).filter((s): s is string => typeof s === 'string').map(s => s.trim()).filter(Boolean);
+      }
       
       signalList.forEach(signal => {
         const normalized = signal.toLowerCase().trim();

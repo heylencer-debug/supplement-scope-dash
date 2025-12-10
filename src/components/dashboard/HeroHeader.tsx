@@ -59,7 +59,7 @@ export function HeroHeader({
   };
   const normalizedScore = Math.min(100, Math.max(0, opportunityIndex));
   const displayScore = (normalizedScore / 10).toFixed(1);
-  return <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-primary via-primary/90 to-primary p-6 md:p-8 text-primary-foreground shadow-lg">
+  return <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-primary via-primary/90 to-primary p-4 sm:p-6 md:p-8 text-primary-foreground shadow-lg">
       {/* Subtle background pattern */}
       <div className="absolute inset-0 opacity-5">
         <div className="absolute top-0 right-0 w-96 h-96 bg-white rounded-full blur-3xl -translate-y-1/2 translate-x-1/3" />

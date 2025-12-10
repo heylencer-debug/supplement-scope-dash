@@ -1744,9 +1744,9 @@ export function EnhancedBenchmarkComparison({
             </div>
           </div>
         </CardHeader>
-        <CardContent className="px-2 md:px-6">
+        <CardContent className="px-3 sm:px-4 md:px-6 overflow-hidden">
           {/* Mobile: Vertical stack, Desktop: Horizontal scroll */}
-          <div className="flex flex-col lg:flex-row gap-3 lg:gap-2 md:gap-3">
+          <div className="flex flex-col lg:flex-row gap-3 lg:gap-2 md:gap-3 overflow-x-hidden">
             {/* Our Concept Column - Full width on mobile, fixed on desktop */}
             <div className="w-full lg:w-[280px] xl:w-[320px] lg:shrink-0 rounded-lg border-2 border-chart-2/50 bg-gradient-to-b from-chart-2/10 to-background dark:from-chart-2/20 overflow-hidden">
               <div className="bg-gradient-to-r from-chart-2 to-chart-2/80 px-3 py-2">
@@ -1935,12 +1935,12 @@ export function EnhancedBenchmarkComparison({
             </div>
 
             {/* Competitor Columns - Stack on mobile, Scrollable on desktop */}
-            <ScrollArea className="w-full lg:flex-1">
-              <div className="flex flex-col lg:flex-row gap-3 lg:gap-2 md:gap-3 pb-4">
+            <ScrollArea className="w-full lg:flex-1 overflow-x-hidden">
+              <div className="flex flex-col lg:flex-row gap-3 lg:gap-2 md:gap-3 pb-4 w-full">
                 {displayedProducts.map((product, idx) => (
                   <div 
                     key={product.id} 
-                    className="w-full lg:w-[280px] xl:w-[320px] lg:shrink-0 rounded-lg border border-border bg-card overflow-hidden cursor-pointer transition-all hover:border-primary hover:shadow-md"
+                    className="w-full lg:w-[280px] xl:w-[300px] lg:shrink-0 rounded-lg border border-border bg-card overflow-hidden cursor-pointer transition-all hover:border-primary hover:shadow-md"
                     onClick={() => handleProductClick(product)}
                   >
                     <div className="bg-gradient-to-r from-muted to-muted/80 px-3 py-2">

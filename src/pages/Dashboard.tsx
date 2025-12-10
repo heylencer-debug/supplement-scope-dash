@@ -328,7 +328,7 @@ export default function Dashboard() {
   const isDataLoading = analysisLoading || productsLoading;
 
   return (
-    <div className="space-y-6 md:space-y-10 pb-12 md:pb-16">
+    <div className="space-y-6 md:space-y-10 pb-12 md:pb-16 overflow-x-hidden">
       {/* SECTION 1: Hero Header with Executive Summary */}
       <div className="animate-fade-in">
         <HeroHeader
@@ -350,7 +350,7 @@ export default function Dashboard() {
       {/* Progress Banner */}
       {!progress.isComplete && (
         <Card className="border-primary/30 bg-primary/5 animate-pulse [animation-duration:3s]">
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">

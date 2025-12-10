@@ -46,6 +46,8 @@ interface PackagingIntelligenceProps {
 export function PackagingIntelligence({ packagingData, productsClaims, productsData = [], isLoading, categoryId }: PackagingIntelligenceProps) {
   const {
     analysis: aiAnalysis,
+    mockupImageUrl,
+    saveMockupImage,
     isLoading: isAnalyzing,
     isLoadingFromDb,
     pollingStatus,
@@ -387,7 +389,7 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
           </div>
         )}
 
-        {aiAnalysis && <AIPackagingResults analysis={aiAnalysis} />}
+        {aiAnalysis && <AIPackagingResults analysis={aiAnalysis} mockupImageUrl={mockupImageUrl} onSaveMockup={saveMockupImage} />}
 
         {/* Top Row: Format Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

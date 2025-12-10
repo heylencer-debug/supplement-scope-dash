@@ -21,6 +21,8 @@ import { supabase } from "@/integrations/supabase/client";
 
 interface AIPackagingResultsProps {
   analysis: PackagingDesignAnalysis;
+  mockupImageUrl?: string | null;
+  onSaveMockup?: (imageUrl: string) => Promise<void>;
 }
 
 // Visual mockup component for front panel
@@ -196,10 +198,10 @@ function FrontPanelMockup({
   );
 }
 
-export function AIPackagingResults({ analysis }: AIPackagingResultsProps) {
+export function AIPackagingResults({ analysis, mockupImageUrl, onSaveMockup }: AIPackagingResultsProps) {
   const { toast } = useToast();
   const [rationaleOpen, setRationaleOpen] = useState(false);
-  const [generatedMockup, setGeneratedMockup] = useState<string | null>(null);
+  const [generatedMockup, setGeneratedMockup] = useState<string | null>(mockupImageUrl || null);
   const [isGenerating, setIsGenerating] = useState(false);
 
   if (!analysis) {
@@ -278,9 +280,13 @@ export function AIPackagingResults({ analysis }: AIPackagingResultsProps) {
 
       if (data?.imageUrl) {
         setGeneratedMockup(data.imageUrl);
+        // Save to database for persistence
+        if (onSaveMockup) {
+          await onSaveMockup(data.imageUrl);
+        }
         toast({
           title: 'Mockup Generated!',
-          description: 'AI product image created successfully.',
+          description: 'AI product image saved successfully.',
         });
       }
     } catch (err) {

@@ -555,6 +555,7 @@ export type Database = {
           category_id: string
           created_at: string
           id: string
+          mockup_image_url: string | null
           updated_at: string
         }
         Insert: {
@@ -562,6 +563,7 @@ export type Database = {
           category_id: string
           created_at?: string
           id?: string
+          mockup_image_url?: string | null
           updated_at?: string
         }
         Update: {
@@ -569,6 +571,7 @@ export type Database = {
           category_id?: string
           created_at?: string
           id?: string
+          mockup_image_url?: string | null
           updated_at?: string
         }
         Relationships: [

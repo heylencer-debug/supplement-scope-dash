@@ -75,6 +75,7 @@ export interface PackagingDesignAnalysis {
 
 export function usePackagingAnalysis(categoryId?: string) {
   const [analysis, setAnalysis] = useState<PackagingDesignAnalysis | null>(null);
+  const [mockupImageUrl, setMockupImageUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingFromDb, setIsLoadingFromDb] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -89,6 +90,7 @@ export function usePackagingAnalysis(categoryId?: string) {
   // Reset state when categoryId changes
   useEffect(() => {
     setAnalysis(null);
+    setMockupImageUrl(null);
     setIsLoadingFromDb(true);
     setError(null);
   }, [categoryId]);
@@ -104,14 +106,19 @@ export function usePackagingAnalysis(categoryId?: string) {
       try {
         const { data, error: dbError } = await supabase
           .from('packaging_analyses')
-          .select('analysis')
+          .select('analysis, mockup_image_url')
           .eq('category_id', categoryId)
           .maybeSingle();
 
         if (dbError) {
           console.error('Error loading packaging analysis from DB:', dbError);
-        } else if (data?.analysis) {
-          setAnalysis(data.analysis as unknown as PackagingDesignAnalysis);
+        } else if (data) {
+          if (data.analysis) {
+            setAnalysis(data.analysis as unknown as PackagingDesignAnalysis);
+          }
+          if (data.mockup_image_url) {
+            setMockupImageUrl(data.mockup_image_url);
+          }
         }
       } catch (e) {
         console.error('Error loading packaging analysis from DB:', e);
@@ -121,6 +128,26 @@ export function usePackagingAnalysis(categoryId?: string) {
     }
 
     loadFromDb();
+  }, [categoryId]);
+
+  // Save mockup image to database
+  const saveMockupImage = useCallback(async (imageUrl: string) => {
+    if (!categoryId) return;
+
+    try {
+      const { error: updateError } = await supabase
+        .from('packaging_analyses')
+        .update({ mockup_image_url: imageUrl })
+        .eq('category_id', categoryId);
+
+      if (updateError) {
+        console.error('Error saving mockup to DB:', updateError);
+      } else {
+        setMockupImageUrl(imageUrl);
+      }
+    } catch (e) {
+      console.error('Error saving mockup to DB:', e);
+    }
   }, [categoryId]);
 
   const runAnalysis = useCallback(async () => {
@@ -244,6 +271,7 @@ export function usePackagingAnalysis(categoryId?: string) {
 
   const clearAnalysis = useCallback(async () => {
     setAnalysis(null);
+    setMockupImageUrl(null);
     setError(null);
     
     // Delete from database
@@ -261,6 +289,8 @@ export function usePackagingAnalysis(categoryId?: string) {
 
   return {
     analysis,
+    mockupImageUrl,
+    saveMockupImage,
     isLoading,
     isLoadingFromDb,
     error,

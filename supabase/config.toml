@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.analyze-packaging]
 verify_jwt = false
+
+[functions.generate-product-mockup]
+verify_jwt = false

@@ -8,11 +8,16 @@ import {
   Copy,
   FileText,
   ChevronDown,
-  Package
+  Package,
+  Sparkles,
+  Loader2,
+  ImageIcon,
+  Download
 } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { supabase } from "@/integrations/supabase/client";
 
 interface AIPackagingResultsProps {
   analysis: PackagingDesignAnalysis;
@@ -194,6 +199,8 @@ function FrontPanelMockup({
 export function AIPackagingResults({ analysis }: AIPackagingResultsProps) {
   const { toast } = useToast();
   const [rationaleOpen, setRationaleOpen] = useState(false);
+  const [generatedMockup, setGeneratedMockup] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   if (!analysis) {
     return null;
@@ -247,31 +254,133 @@ export function AIPackagingResults({ analysis }: AIPackagingResultsProps) {
     }
   };
 
+  const generateAIMockup = async () => {
+    setIsGenerating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-product-mockup', {
+        body: {
+          designBrief: {
+            primaryColor,
+            secondaryColor,
+            accentColor,
+            primaryClaim,
+            certifications,
+            productType: 'supplement gummy bottle'
+          }
+        }
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      if (data?.imageUrl) {
+        setGeneratedMockup(data.imageUrl);
+        toast({
+          title: 'Mockup Generated!',
+          description: 'AI product image created successfully.',
+        });
+      }
+    } catch (err) {
+      console.error('Mockup generation error:', err);
+      toast({
+        title: 'Generation Failed',
+        description: err instanceof Error ? err.message : 'Failed to generate mockup',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const downloadMockup = () => {
+    if (!generatedMockup) return;
+    const link = document.createElement('a');
+    link.href = generatedMockup;
+    link.download = 'product-mockup.png';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="space-y-6 mt-6">
       {/* Section 0: Visual Mockup Preview */}
       <Card className="border-chart-2/20 bg-gradient-to-br from-muted/30 to-muted/10">
         <CardHeader className="pb-4">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Package className="w-5 h-5 text-chart-2" />
-            Front Panel Preview
-          </CardTitle>
-          <p className="text-xs text-muted-foreground mt-1">
-            Visual mockup showing colors, typography, and layout. Not final design.
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Package className="w-5 h-5 text-chart-2" />
+                Front Panel Preview
+              </CardTitle>
+              <p className="text-xs text-muted-foreground mt-1">
+                Visual mockup showing colors, typography, and layout.
+              </p>
+            </div>
+            <Button 
+              onClick={generateAIMockup}
+              disabled={isGenerating}
+              size="sm"
+              className="gap-2"
+            >
+              {isGenerating ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4" />
+                  Generate AI Image
+                </>
+              )}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
-          <FrontPanelMockup
-            primaryColor={primaryColor}
-            secondaryColor={secondaryColor}
-            accentColor={accentColor}
-            headlineFont={headlineFont}
-            bodyFont={bodyFont}
-            primaryClaim={primaryClaim}
-            certifications={certifications}
-            callToAction={callToAction}
-            bulletPoints={bulletPoints}
-          />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* CSS Mockup */}
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-3 text-center">Layout Preview</p>
+              <FrontPanelMockup
+                primaryColor={primaryColor}
+                secondaryColor={secondaryColor}
+                accentColor={accentColor}
+                headlineFont={headlineFont}
+                bodyFont={bodyFont}
+                primaryClaim={primaryClaim}
+                certifications={certifications}
+                callToAction={callToAction}
+                bulletPoints={bulletPoints}
+              />
+            </div>
+
+            {/* AI Generated Mockup */}
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-3 text-center">AI Product Render</p>
+              {generatedMockup ? (
+                <div className="relative group">
+                  <img 
+                    src={generatedMockup} 
+                    alt="AI Generated Product Mockup"
+                    className="w-full max-w-xs mx-auto rounded-xl shadow-lg"
+                  />
+                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button size="sm" variant="secondary" onClick={downloadMockup} className="gap-1">
+                      <Download className="w-3 h-3" />
+                      Save
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="w-full max-w-xs mx-auto h-[400px] rounded-xl border-2 border-dashed border-border/50 flex flex-col items-center justify-center text-muted-foreground bg-muted/20">
+                  <ImageIcon className="w-12 h-12 mb-3 opacity-30" />
+                  <p className="text-sm font-medium">No AI mockup yet</p>
+                  <p className="text-xs mt-1">Click "Generate AI Image" above</p>
+                </div>
+              )}
+            </div>
+          </div>
         </CardContent>
       </Card>
 

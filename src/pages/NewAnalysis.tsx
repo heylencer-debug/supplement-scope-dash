@@ -18,10 +18,30 @@ const PENDING_ANALYSES_KEY = "pending_analyses";
 const WEBHOOK_URL = "https://n8n.srv1075172.hstgr.cloud/webhook/bd007464-71c5-452a-8e4c-a8fc716d4316";
 
 const amazonCategoryOptions = [
-  { id: "health-household", label: "Health & Household" },
-  { id: "sports-outdoors", label: "Sports & Outdoors" },
-  { id: "beauty-personal-care", label: "Beauty & Personal Care" },
-  { id: "pet-supplies", label: "Pet Supplies" },
+  "Appliances",
+  "Arts, Crafts & Sewing",
+  "Automotive",
+  "Baby",
+  "Beauty & Personal Care",
+  "Camera & Photo",
+  "Cell Phones & Accessories",
+  "Clothing, Shoes & Jewelry",
+  "Computers & Accessories",
+  "Electronics",
+  "Grocery & Gourmet Food",
+  "Health & Household",
+  "Home & Kitchen",
+  "Industrial & Scientific",
+  "Kitchen & Dining",
+  "Musical Instruments",
+  "Office Products",
+  "Patio, Lawn & Garden",
+  "Pet Supplies",
+  "Software",
+  "Sports & Outdoors",
+  "Tools & Home Improvement",
+  "Toys & Games",
+  "Video Games",
 ];
 
 const demographicsOptions = [
@@ -280,25 +300,25 @@ export default function NewAnalysis() {
 
           {/* Amazon Categories Multi-select */}
           <div className="space-y-4">
-            <Label>Amazon Categories</Label>
-            <div className="grid grid-cols-2 gap-4">
+            <Label>Amazon Category</Label>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {amazonCategoryOptions.map((option) => (
                 <div
-                  key={option.id}
+                  key={option}
                   className="flex items-center space-x-3 p-3 rounded-lg border bg-secondary/30 hover:bg-secondary/50 transition-colors"
                 >
                   <Checkbox
-                    id={option.id}
-                    checked={amazonCategories.includes(option.label)}
+                    id={`amazon-${option}`}
+                    checked={amazonCategories.includes(option)}
                     onCheckedChange={(checked) =>
-                      handleCategoryToggle(option.label, checked as boolean)
+                      handleCategoryToggle(option, checked as boolean)
                     }
                   />
                   <Label
-                    htmlFor={option.id}
+                    htmlFor={`amazon-${option}`}
                     className="text-sm font-medium cursor-pointer flex-1"
                   >
-                    {option.label}
+                    {option}
                   </Label>
                 </div>
               ))}

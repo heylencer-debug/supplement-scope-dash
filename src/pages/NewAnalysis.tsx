@@ -64,7 +64,6 @@ export default function NewAnalysis() {
   const [category, setCategory] = useState("");
   const [demographics, setDemographics] = useState<string[]>([]);
   const [productForm, setProductForm] = useState("");
-  const [asin, setAsin] = useState("");
   const [amazonCategories, setAmazonCategories] = useState<string[]>([]);
 
   const { data: recentCategories, isLoading: categoriesLoading } = useRecentCategories();
@@ -103,14 +102,6 @@ export default function NewAnalysis() {
       return;
     }
 
-    if (demographics.length === 0) {
-      toast({
-        title: "Error",
-        description: "Please select at least one demographic.",
-        variant: "destructive",
-      });
-      return;
-    }
 
     if (!productForm) {
       toast({
@@ -123,15 +114,17 @@ export default function NewAnalysis() {
 
     setIsLoading(true);
 
-    // Build combined category name: "Magnesium Glycinate Gummy for Women"
+    // Build combined category name: "Magnesium Glycinate Gummy for Women" or "Magnesium Glycinate Gummy"
     let fullCategoryName = category.trim();
     fullCategoryName = `${fullCategoryName} ${productForm}`;
-    const demoString = demographics.join(' & ');
-    fullCategoryName = `${fullCategoryName} for ${demoString}`;
+    if (demographics.length > 0) {
+      const demoString = demographics.join(' & ');
+      fullCategoryName = `${fullCategoryName} for ${demoString}`;
+    }
 
     const payload = {
       category: fullCategoryName,
-      ASIN: asin.trim() || null,
+      product_form: productForm,
       amazon_categories: amazonCategories.length > 0 ? amazonCategories : null,
     };
 
@@ -232,7 +225,7 @@ export default function NewAnalysis() {
           {/* Demographics Field */}
           <div className="space-y-4">
             <Label>
-              Target Demographics <span className="text-destructive">*</span>
+              Target Demographics
             </Label>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {demographicsOptions.map((option) => (
@@ -280,18 +273,6 @@ export default function NewAnalysis() {
             </div>
           </div>
 
-          {/* Target ASINs Field */}
-          <div className="space-y-2">
-            <Label htmlFor="ASIN">Specific Competitor ASINs</Label>
-            <Input
-              id="ASIN"
-              placeholder="Enter ASINs separated by commas"
-              value={asin}
-              onChange={(e) => setAsin(e.target.value)}
-              className="h-12"
-            />
-            <p className="text-xs text-muted-foreground">Optional - Leave blank to analyze all products in the category</p>
-          </div>
 
           {/* Amazon Categories Multi-select */}
           <div className="space-y-4">
@@ -321,11 +302,11 @@ export default function NewAnalysis() {
           </div>
 
           {/* Category Name Preview */}
-          {category.trim() && productForm && demographics.length > 0 && (
+          {category.trim() && productForm && (
             <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
               <p className="text-xs text-muted-foreground mb-1">Analysis will be created as:</p>
               <p className="font-semibold text-foreground">
-                {category.trim()} {productForm} for {demographics.join(' & ')}
+                {category.trim()} {productForm}{demographics.length > 0 ? ` for ${demographics.join(' & ')}` : ''}
               </p>
             </div>
           )}
@@ -333,7 +314,7 @@ export default function NewAnalysis() {
           <Button
             onClick={handleAnalysis}
             className="w-full h-12 text-base"
-            disabled={isLoading || !category.trim() || demographics.length === 0 || !productForm}
+            disabled={isLoading || !category.trim() || !productForm}
           >
             {isLoading ? (
               <>

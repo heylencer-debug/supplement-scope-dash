@@ -3,7 +3,7 @@ import { AppSidebar } from "./AppSidebar";
 import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { Plus, X, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, TouchEvent } from "react";
 import { useCategoryAnalyses } from "@/hooks/useCategoryAnalyses";
 
 const DISMISSED_TABS_KEY = "dismissed_analysis_tabs";
@@ -30,6 +30,8 @@ export function Layout({ children }: LayoutProps) {
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const tabsScrollRef = useRef<HTMLDivElement>(null);
+  const touchStartX = useRef<number>(0);
+  const touchEndX = useRef<number>(0);
   
   const { data: analyses } = useCategoryAnalyses();
 
@@ -148,6 +150,43 @@ export function Layout({ children }: LayoutProps) {
     }
   };
 
+  // Swipe gesture handlers for mobile tab navigation
+  const handleTouchStart = (e: TouchEvent<HTMLDivElement>) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchMove = (e: TouchEvent<HTMLDivElement>) => {
+    touchEndX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = () => {
+    const swipeThreshold = 50;
+    const diff = touchStartX.current - touchEndX.current;
+    
+    if (Math.abs(diff) < swipeThreshold) return;
+    
+    // Find current tab index
+    const currentIndex = allTabs.findIndex(tab => tab.category_name === currentCategory);
+    
+    if (diff > 0) {
+      // Swiped left - go to next tab
+      if (currentIndex < allTabs.length - 1) {
+        const nextTab = allTabs[currentIndex + 1];
+        navigate(`/dashboard?category=${encodeURIComponent(nextTab.category_name)}`);
+      }
+    } else {
+      // Swiped right - go to previous tab
+      if (currentIndex > 0) {
+        const prevTab = allTabs[currentIndex - 1];
+        navigate(`/dashboard?category=${encodeURIComponent(prevTab.category_name)}`);
+      } else if (currentIndex === 0) {
+        // Swipe right on first tab goes to New Analysis
+        navigate("/");
+      }
+    }
+  };
+  };
+
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
@@ -189,7 +228,10 @@ export function Layout({ children }: LayoutProps) {
                   <div 
                     ref={tabsScrollRef}
                     onScroll={handleTabsScroll}
-                    className="overflow-x-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent"
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                    className="overflow-x-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent touch-pan-x"
                   >
                     <div className="flex items-center gap-2 min-w-max px-1">
                       {allTabs.map((tab) => {

@@ -209,6 +209,19 @@ export default {
           "0%": { width: "100%" },
           "100%": { width: "0%" },
         },
+        "icon-bounce": {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-3px)" },
+        },
+        "icon-wiggle": {
+          "0%, 100%": { transform: "rotate(0deg)" },
+          "25%": { transform: "rotate(-5deg)" },
+          "75%": { transform: "rotate(5deg)" },
+        },
+        "slide-indicator": {
+          "0%": { transform: "scaleX(0)", opacity: "0" },
+          "100%": { transform: "scaleX(1)", opacity: "1" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -242,6 +255,9 @@ export default {
         "circle-scale": "circle-scale 0.3s ease-out forwards",
         "x-draw": "x-draw 0.3s ease-out 0.2s forwards",
         "countdown": "countdown linear forwards",
+        "icon-bounce": "icon-bounce 0.4s ease-out",
+        "icon-wiggle": "icon-wiggle 0.4s ease-in-out",
+        "slide-indicator": "slide-indicator 0.3s ease-out forwards",
       },
     },
   },

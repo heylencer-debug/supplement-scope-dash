@@ -272,8 +272,8 @@ serve(async (req) => {
             },
             signal: controller.signal,
             body: JSON.stringify({
-              model: 'claude-sonnet-4-5',
-              max_tokens: 32768,
+              model: 'claude-3-5-haiku-20241022', // Faster model for quicker responses
+              max_tokens: 16000, // Reduced from 32768 to speed up response
             tools: [
               {
                 name: 'analyze_ingredients',

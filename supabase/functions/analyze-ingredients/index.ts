@@ -160,7 +160,7 @@ ${competitorData.map(c => `
 
 Analyze Our Concept against these competitors and call the save_ingredient_analysis function with your findings.`;
 
-        console.log('[analyze-ingredients] Calling OpenRouter API with Claude Sonnet 4...');
+        console.log('[analyze-ingredients] Calling OpenRouter API with Gemini 3 Pro Preview...');
 
         const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
           method: 'POST',
@@ -171,7 +171,7 @@ Analyze Our Concept against these competitors and call the save_ingredient_analy
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            model: 'anthropic/claude-sonnet-4-20250514',
+            model: 'google/gemini-3-pro-preview',
             messages: [
               { role: 'system', content: systemPrompt },
               { role: 'user', content: userPrompt }

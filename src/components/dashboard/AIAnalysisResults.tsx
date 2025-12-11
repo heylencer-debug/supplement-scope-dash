@@ -102,7 +102,7 @@ export function AIAnalysisResults({ analysis, onRefresh, isLoading }: AIAnalysis
   };
 
   // Prepare SWOT data for radar chart
-  const swotRadarData = analysis.swot ? [
+  const swotRadarData = analysis.swot && analysis.swot.strengths && analysis.swot.weaknesses && analysis.swot.opportunities && analysis.swot.threats ? [
     { subject: 'Strengths', value: analysis.swot.strengths.length, fullMark: 5 },
     { subject: 'Weaknesses', value: analysis.swot.weaknesses.length, fullMark: 5 },
     { subject: 'Opportunities', value: analysis.swot.opportunities.length, fullMark: 5 },

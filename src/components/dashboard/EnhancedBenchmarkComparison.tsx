@@ -527,164 +527,6 @@ function PackagingComparisonSection({ ourPackaging, competitors, getCompetitorPa
   );
 }
 
-// BSR Trend Chart Component
-interface BSRTrendChartProps {
-  competitors: Product[];
-}
-
-const CHART_COLORS = [
-  'hsl(var(--chart-1))',
-  'hsl(var(--chart-2))',
-  'hsl(var(--chart-3))',
-  'hsl(var(--chart-4))',
-  'hsl(var(--chart-5))',
-  'hsl(var(--primary))',
-  'hsl(var(--destructive))',
-];
-
-function BSRTrendChartSection({ competitors }: BSRTrendChartProps) {
-  const [isOpen, setIsOpen] = useState(true);
-
-  // Transform historical_data.bsr_monthly into chart data
-  const bsrTrendData = useMemo(() => {
-    const months = ['6 mo ago', '5 mo ago', '4 mo ago', '3 mo ago', '2 mo ago', 'Last month'];
-    
-    // Check if any competitor has BSR historical data
-    const hasAnyData = competitors.some(product => {
-      const historical = product.historical_data as { bsr_monthly?: Record<string, number> } | null;
-      return historical?.bsr_monthly && Object.keys(historical.bsr_monthly).length > 0;
-    });
-
-    if (!hasAnyData) return null;
-
-    return months.map((label, monthIdx) => {
-      const monthKey = `month_${6 - monthIdx}`; // month_6 = 6 mo ago, month_1 = last month
-      const dataPoint: Record<string, string | number | null> = { month: label };
-      
-      competitors.slice(0, 7).forEach((product) => {
-        const historical = product.historical_data as { bsr_monthly?: Record<string, number> } | null;
-        const bsrValue = historical?.bsr_monthly?.[monthKey] ?? null;
-        const brandKey = product.brand || product.asin || `Product`;
-        dataPoint[brandKey] = bsrValue;
-      });
-      
-      return dataPoint;
-    });
-  }, [competitors]);
-
-  // Get unique brand names for the legend
-  const brandNames = useMemo(() => {
-    return competitors.slice(0, 7).map(p => p.brand || p.asin || 'Product');
-  }, [competitors]);
-
-  if (!bsrTrendData || competitors.length === 0) {
-    return null;
-  }
-
-  // Calculate min/max for Y axis (inverted since lower BSR is better)
-  const allBsrValues = bsrTrendData.flatMap(d => 
-    Object.entries(d)
-      .filter(([key]) => key !== 'month')
-      .map(([, val]) => val as number | null)
-      .filter((v): v is number => v !== null && v > 0)
-  );
-
-  if (allBsrValues.length === 0) {
-    return null;
-  }
-
-  const minBsr = Math.min(...allBsrValues);
-  const maxBsr = Math.max(...allBsrValues);
-  const padding = Math.round((maxBsr - minBsr) * 0.1) || 100;
-
-  return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <Card className="mt-4">
-        <CardHeader className="pb-2 p-3 sm:p-4 md:p-6">
-          <div className="flex items-center justify-between">
-            <CollapsibleTrigger asChild>
-              <div className="cursor-pointer hover:opacity-80 transition-opacity">
-                <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
-                  <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 text-primary" />
-                  BSR Trend (Past 6 Months)
-                </CardTitle>
-                <CardDescription className="text-[10px] sm:text-xs">
-                  Lower BSR = Better Amazon ranking. Track competitor performance over time.
-                </CardDescription>
-              </div>
-            </CollapsibleTrigger>
-            <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-7 w-7 sm:h-8 sm:w-8 p-0">
-                {isOpen ? <ChevronUp className="h-3 w-3 sm:h-4 sm:w-4" /> : <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4" />}
-              </Button>
-            </CollapsibleTrigger>
-          </div>
-        </CardHeader>
-        <CollapsibleContent>
-          <CardContent className="pt-0 p-3 sm:p-4 md:p-6">
-            <div className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={bsrTrendData} margin={{ top: 10, right: 30, left: 10, bottom: 10 }}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis 
-                    dataKey="month" 
-                    tick={{ fontSize: 11 }}
-                    className="text-muted-foreground"
-                  />
-                  <YAxis 
-                    reversed 
-                    domain={[Math.max(1, minBsr - padding), maxBsr + padding]}
-                    tick={{ fontSize: 11 }}
-                    className="text-muted-foreground"
-                    tickFormatter={(value) => value.toLocaleString()}
-                    label={{ 
-                      value: 'BSR Rank', 
-                      angle: -90, 
-                      position: 'insideLeft',
-                      style: { textAnchor: 'middle', fontSize: 11 }
-                    }}
-                  />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--card))', 
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px',
-                      fontSize: '12px'
-                    }}
-                    formatter={(value: number, name: string) => [
-                      value ? `#${value.toLocaleString()}` : 'N/A',
-                      name
-                    ]}
-                    labelFormatter={(label) => `${label}`}
-                  />
-                  <Legend 
-                    wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }}
-                  />
-                  {brandNames.map((brand, idx) => (
-                    <Line
-                      key={brand}
-                      type="monotone"
-                      dataKey={brand}
-                      stroke={CHART_COLORS[idx % CHART_COLORS.length]}
-                      strokeWidth={2}
-                      dot={{ r: 3 }}
-                      activeDot={{ r: 5 }}
-                      connectNulls
-                    />
-                  ))}
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-            <p className="text-[10px] text-muted-foreground text-center mt-2">
-              ↓ Lower position on chart = Better ranking
-            </p>
-          </CardContent>
-        </CollapsibleContent>
-      </Card>
-    </Collapsible>
-  );
-}
-
 function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNutrients, getCompetitorIngredientsList, ourPrice, ourServings, labelClaims = [], categoryId }: IngredientComparisonProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [viewMode, setViewMode] = useState<'chart' | 'table' | 'gaps'>('chart');
@@ -2741,6 +2583,68 @@ export function EnhancedBenchmarkComparison({
                         </div>
                       </div>
 
+                      {/* Mini BSR Trend Chart */}
+                      {(() => {
+                        const historical = product.historical_data as { bsr_monthly?: Record<string, number> } | null;
+                        const bsrMonthly = historical?.bsr_monthly;
+                        if (!bsrMonthly || Object.keys(bsrMonthly).length === 0) return null;
+                        
+                        const chartData = ['month_6', 'month_5', 'month_4', 'month_3', 'month_2', 'month_1'].map((key, idx) => ({
+                          month: ['6m', '5m', '4m', '3m', '2m', '1m'][idx],
+                          bsr: bsrMonthly[key] ?? null
+                        })).filter(d => d.bsr !== null);
+                        
+                        if (chartData.length < 2) return null;
+                        
+                        const values = chartData.map(d => d.bsr as number);
+                        const min = Math.min(...values);
+                        const max = Math.max(...values);
+                        const first = values[0];
+                        const last = values[values.length - 1];
+                        const improved = last < first; // Lower BSR = better
+                        
+                        return (
+                          <div className="bg-secondary/50 rounded p-1.5">
+                            <div className="flex items-center justify-between mb-1">
+                              <p className="text-[9px] font-semibold flex items-center gap-1">
+                                <BarChart3 className="w-3 h-3 text-primary" />
+                                BSR Trend (6mo)
+                              </p>
+                              <Badge variant="secondary" className={`text-[8px] h-4 ${improved ? 'bg-chart-4/20 text-chart-4' : 'bg-destructive/20 text-destructive'}`}>
+                                {improved ? '↑' : '↓'} {Math.abs(first - last).toLocaleString()}
+                              </Badge>
+                            </div>
+                            <div className="h-[60px] w-full">
+                              <ResponsiveContainer width="100%" height="100%">
+                                <LineChart data={chartData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                                  <YAxis hide reversed domain={[min * 0.9, max * 1.1]} />
+                                  <XAxis dataKey="month" tick={{ fontSize: 8 }} axisLine={false} tickLine={false} />
+                                  <Tooltip 
+                                    contentStyle={{ 
+                                      backgroundColor: 'hsl(var(--card))', 
+                                      border: '1px solid hsl(var(--border))',
+                                      borderRadius: '6px',
+                                      fontSize: '10px',
+                                      padding: '4px 8px'
+                                    }}
+                                    formatter={(value: number) => [`#${value.toLocaleString()}`, 'BSR']}
+                                  />
+                                  <Line 
+                                    type="monotone" 
+                                    dataKey="bsr" 
+                                    stroke={improved ? 'hsl(var(--chart-4))' : 'hsl(var(--destructive))'} 
+                                    strokeWidth={2} 
+                                    dot={{ r: 2 }} 
+                                    activeDot={{ r: 4 }}
+                                  />
+                                </LineChart>
+                              </ResponsiveContainer>
+                            </div>
+                            <p className="text-[8px] text-muted-foreground text-center">Lower = Better</p>
+                          </div>
+                        );
+                      })()}
+
                       {/* USPs */}
                       <div>
                         {(() => {
@@ -3105,9 +3009,6 @@ export function EnhancedBenchmarkComparison({
         labelClaims={analysisData?.formula_brief_content ? parseFinishedProductSpecifications(analysisData.formula_brief_content as string) : []}
         categoryId={categoryId}
       />
-
-      {/* BSR TREND CHART */}
-      <BSRTrendChartSection competitors={displayedProducts} />
 
       {/* Product Detail Modal */}
       <ProductDetailModal 

@@ -21,6 +21,20 @@ interface AIAnalysisResultsProps {
 export function AIAnalysisResults({ analysis, onRefresh, isLoading }: AIAnalysisResultsProps) {
   const [activeTab, setActiveTab] = useState<'ingredients' | 'summary' | 'clinical' | 'customer' | 'competitive' | 'roadmap'>('ingredients');
 
+  // Guard against incomplete/error analysis data
+  if (!analysis?.summary || !analysis?.charts || !analysis?.ingredients) {
+    return (
+      <div className="bg-gradient-to-br from-primary/5 via-chart-5/5 to-chart-4/5 rounded-xl border border-primary/20 p-6 text-center">
+        <Brain className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-50" />
+        <p className="text-sm text-muted-foreground">Analysis data is incomplete or still processing</p>
+        <Button variant="ghost" size="sm" onClick={onRefresh} disabled={isLoading} className="mt-3">
+          <RefreshCw className={`w-3.5 h-3.5 mr-1 ${isLoading ? 'animate-spin' : ''}`} />
+          Retry Analysis
+        </Button>
+      </div>
+    );
+  }
+
   const getAssessmentColor = (assessment: string) => {
     switch (assessment) {
       case 'Strong': return 'bg-chart-4/20 text-chart-4 border-chart-4/30';

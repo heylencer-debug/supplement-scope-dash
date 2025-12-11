@@ -126,6 +126,15 @@
   h1, h2, h3, h4, h5, h6 {
     @apply font-semibold text-foreground;
   }
+  
+  /* Improve label and secondary text hierarchy */
+  label, .text-muted-foreground {
+    @apply font-medium;
+  }
+  
+  small, .text-xs, .text-sm {
+    @apply font-medium;
+  }
 }
 
 @layer utilities {

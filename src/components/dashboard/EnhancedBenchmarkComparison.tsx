@@ -3076,16 +3076,67 @@ export function EnhancedBenchmarkComparison({
           </CardHeader>
           <CardContent>
             {competitivePolling && !competitiveAnalysis ? (
-              <div className="flex flex-col items-center justify-center py-12 gap-4">
-                <div className="relative">
-                  <Loader2 className="w-12 h-12 animate-spin text-primary" />
-                  <Brain className="w-6 h-6 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-primary" />
+              <div className="space-y-6">
+                {/* Progress Animation */}
+                <div className="flex flex-col items-center justify-center py-8 gap-4">
+                  <div className="relative">
+                    <Loader2 className="w-12 h-12 animate-spin text-primary" />
+                    <Brain className="w-6 h-6 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-primary" />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-medium">Analyzing {displayedProducts.length} competitors...</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      This takes about 30-60 seconds
+                    </p>
+                  </div>
                 </div>
-                <div className="text-center">
-                  <p className="text-sm font-medium">Analyzing competitive landscape...</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Comparing formulation, pricing, positioning, and reviews
+
+                {/* Data Being Analyzed Preview */}
+                <div className="border rounded-lg p-4 bg-muted/30">
+                  <p className="text-xs font-medium mb-3 flex items-center gap-2">
+                    <FileText className="w-3.5 h-3.5 text-primary" />
+                    Data being analyzed:
                   </p>
+                  <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {displayedProducts.slice(0, 6).map((product, idx) => {
+                      const hasReviews = !!product.review_analysis;
+                      const hasMarketing = !!product.marketing_analysis;
+                      const hasIngredients = !!product.ingredients;
+                      return (
+                        <div key={product.id} className="flex items-start gap-2 p-2 bg-background rounded border">
+                          <div className="w-8 h-8 rounded bg-muted overflow-hidden shrink-0">
+                            {product.main_image_url ? (
+                              <img src={product.main_image_url} alt="" className="w-full h-full object-contain" />
+                            ) : (
+                              <Package className="w-4 h-4 m-2 text-muted-foreground" />
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[10px] font-medium truncate">{product.brand || 'Unknown'}</p>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              <Badge variant="outline" className={`text-[8px] h-4 ${hasIngredients ? 'bg-chart-4/10 text-chart-4' : 'bg-muted text-muted-foreground'}`}>
+                                {hasIngredients ? <Check className="w-2 h-2 mr-0.5" /> : <X className="w-2 h-2 mr-0.5" />}
+                                Ingredients
+                              </Badge>
+                              <Badge variant="outline" className={`text-[8px] h-4 ${hasReviews ? 'bg-chart-4/10 text-chart-4' : 'bg-muted text-muted-foreground'}`}>
+                                {hasReviews ? <Check className="w-2 h-2 mr-0.5" /> : <X className="w-2 h-2 mr-0.5" />}
+                                Reviews
+                              </Badge>
+                              <Badge variant="outline" className={`text-[8px] h-4 ${hasMarketing ? 'bg-chart-4/10 text-chart-4' : 'bg-muted text-muted-foreground'}`}>
+                                {hasMarketing ? <Check className="w-2 h-2 mr-0.5" /> : <X className="w-2 h-2 mr-0.5" />}
+                                Marketing
+                              </Badge>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {displayedProducts.length > 6 && (
+                    <p className="text-[10px] text-muted-foreground mt-2 text-center">
+                      + {displayedProducts.length - 6} more competitors
+                    </p>
+                  )}
                 </div>
               </div>
             ) : competitiveAnalysis ? (

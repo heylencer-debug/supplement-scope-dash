@@ -184,6 +184,31 @@ export default {
           "0%": { opacity: "1", transform: "translateY(0) scale(1)" },
           "100%": { opacity: "0", transform: "translateY(10px) scale(0.95)" },
         },
+        "toast-slide-in": {
+          "0%": { opacity: "0", transform: "translateX(100%)" },
+          "100%": { opacity: "1", transform: "translateX(0)" },
+        },
+        "toast-slide-out": {
+          "0%": { opacity: "1", transform: "translateX(0)" },
+          "100%": { opacity: "0", transform: "translateX(100%)" },
+        },
+        "checkmark-draw": {
+          "0%": { strokeDashoffset: "100" },
+          "100%": { strokeDashoffset: "0" },
+        },
+        "circle-scale": {
+          "0%": { transform: "scale(0)", opacity: "0" },
+          "50%": { transform: "scale(1.1)" },
+          "100%": { transform: "scale(1)", opacity: "1" },
+        },
+        "x-draw": {
+          "0%": { strokeDashoffset: "100" },
+          "100%": { strokeDashoffset: "0" },
+        },
+        "countdown": {
+          "0%": { width: "100%" },
+          "100%": { width: "0%" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -211,6 +236,12 @@ export default {
         "dot-bounce": "dot-bounce 1.4s ease-in-out infinite both",
         "fade-in-up": "fade-in-up 0.3s ease-out forwards",
         "fade-out-down": "fade-out-down 0.3s ease-out forwards",
+        "toast-slide-in": "toast-slide-in 0.4s cubic-bezier(0.21, 1.02, 0.73, 1) forwards",
+        "toast-slide-out": "toast-slide-out 0.3s ease-in forwards",
+        "checkmark-draw": "checkmark-draw 0.4s ease-out 0.2s forwards",
+        "circle-scale": "circle-scale 0.3s ease-out forwards",
+        "x-draw": "x-draw 0.3s ease-out 0.2s forwards",
+        "countdown": "countdown linear forwards",
       },
     },
   },

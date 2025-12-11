@@ -17,7 +17,14 @@ import {
   X,
   ZoomIn
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
@@ -263,10 +270,34 @@ export function AIPackagingResults({ analysis, mockupImageUrl, onSaveMockup, onR
   const trustSignals = elementsChecklist.trust_signals || analysis.trust_signals?.trust_building_elements || [];
 
   // Get recommended packaging format from analysis
-  const packagingFormat = designBrief.packaging_format || 
+  const recommendedPackagingFormat = designBrief.packaging_format || 
     (analysis as any).packaging_format || 
     (analysis as any).recommended_format?.type ||
     "soft chew resealable pouch";
+
+  // Packaging format options for dropdown
+  const packagingFormatOptions = [
+    { value: "soft chew resealable pouch", label: "Resealable Pouch (Soft Chews)" },
+    { value: "resealable stand-up pouch", label: "Stand-Up Pouch" },
+    { value: "wide-mouth plastic jar", label: "Wide-Mouth Jar (Plastic)" },
+    { value: "glass jar with screw cap", label: "Glass Jar" },
+    { value: "supplement bottle with flip cap", label: "Bottle (Flip Cap)" },
+    { value: "dropper bottle", label: "Dropper Bottle" },
+    { value: "squeeze bottle", label: "Squeeze Bottle" },
+    { value: "pump bottle", label: "Pump Bottle" },
+    { value: "tube packaging", label: "Tube" },
+    { value: "sachet packet", label: "Sachet/Packet" },
+    { value: "blister pack", label: "Blister Pack" },
+    { value: "tin container", label: "Tin Container" },
+  ];
+
+  // State for selected packaging format (defaults to recommended)
+  const [selectedPackagingFormat, setSelectedPackagingFormat] = useState(recommendedPackagingFormat);
+  
+  // Update if recommended format changes
+  useEffect(() => {
+    setSelectedPackagingFormat(recommendedPackagingFormat);
+  }, [recommendedPackagingFormat]);
 
   // Mock content
   const frontPanelText = mockContent?.front_panel_text || '';
@@ -309,8 +340,8 @@ export function AIPackagingResults({ analysis, mockupImageUrl, onSaveMockup, onR
             backPanelText,
             keyDifferentiators,
             trustSignals,
-            // Include the recommended packaging format
-            packagingFormat
+            // Include the selected packaging format (user override or recommended)
+            packagingFormat: selectedPackagingFormat
           }
         }
       });
@@ -406,34 +437,67 @@ export function AIPackagingResults({ analysis, mockupImageUrl, onSaveMockup, onR
       {/* Section 0: Visual Mockup Preview */}
       <Card className="border-chart-2/20 bg-gradient-to-br from-muted/30 to-muted/10">
         <CardHeader className="pb-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Package className="w-5 h-5 text-chart-2" />
-                Front Panel Preview
-              </CardTitle>
-              <p className="text-xs text-muted-foreground mt-1">
-                Visual mockup showing colors, typography, and layout.
-              </p>
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Package className="w-5 h-5 text-chart-2" />
+                  Front Panel Preview
+                </CardTitle>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Visual mockup showing colors, typography, and layout.
+                </p>
+              </div>
+              <Button 
+                onClick={generateAIMockup}
+                disabled={isGenerating}
+                size="sm"
+                className="gap-2"
+              >
+                {isGenerating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    Generate AI Image
+                  </>
+                )}
+              </Button>
             </div>
-            <Button 
-              onClick={generateAIMockup}
-              disabled={isGenerating}
-              size="sm"
-              className="gap-2"
-            >
-              {isGenerating ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4" />
-                  Generate AI Image
-                </>
+            
+            {/* Packaging Format Selector */}
+            <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border border-border/50">
+              <div className="flex-1">
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                  Packaging Format
+                </label>
+                <Select value={selectedPackagingFormat} onValueChange={setSelectedPackagingFormat}>
+                  <SelectTrigger className="w-full bg-background">
+                    <SelectValue placeholder="Select packaging format" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {packagingFormatOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {selectedPackagingFormat !== recommendedPackagingFormat && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedPackagingFormat(recommendedPackagingFormat)}
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                >
+                  Reset to recommended
+                </Button>
               )}
-            </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>

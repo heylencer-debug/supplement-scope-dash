@@ -222,21 +222,38 @@ serve(async (req) => {
 - Key Insights: ${keyInsights}`;
     }).join('\n\n') || 'No competitor data available';
 
-    // Background task to call Claude and save results
+    // Background task to call Claude and save results with retry logic
     async function runAnalysisInBackground() {
       console.log('Starting background Claude API call...');
       
-      try {
-        const response = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': ANTHROPIC_API_KEY!,
-            'anthropic-version': '2023-06-01',
-          },
-          body: JSON.stringify({
-            model: 'claude-sonnet-4-5',
-            max_tokens: 32768,
+      const maxRetries = 2;
+      let lastError: Error | null = null;
+      
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+          if (attempt > 0) {
+            console.log(`Retry attempt ${attempt}/${maxRetries}...`);
+            await new Promise(r => setTimeout(r, 3000)); // Wait 3 seconds before retry
+          }
+          
+          // Create AbortController for timeout (3 minutes)
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => {
+            console.log('Aborting fetch due to timeout (3 minutes)');
+            controller.abort();
+          }, 180000); // 3 minute timeout
+          
+          const response = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': ANTHROPIC_API_KEY!,
+              'anthropic-version': '2023-06-01',
+            },
+            signal: controller.signal,
+            body: JSON.stringify({
+              model: 'claude-sonnet-4-5',
+              max_tokens: 16384, // Reduced from 32768 for faster response
             tools: [
               {
                 name: 'analyze_ingredients',
@@ -580,50 +597,78 @@ Be specific about dosages, cite clinical ranges where relevant, and provide acti
           })
         });
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('Claude API error:', response.status, errorText);
-          return;
-        }
+          clearTimeout(timeoutId);
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Claude API error:', response.status, errorText);
+            throw new Error(`Claude API error: ${response.status}`);
+          }
 
-        const claudeResponse = await response.json();
-        console.log('Claude response received');
+          const claudeResponse = await response.json();
+          console.log('Claude response received');
         console.log('Claude stop_reason:', claudeResponse.stop_reason);
         console.log('Claude usage:', JSON.stringify(claudeResponse.usage));
 
-        // Extract the tool use result
-        const toolUse = claudeResponse.content?.find((c: any) => c.type === 'tool_use');
-        if (!toolUse || !toolUse.input) {
-          console.error('No tool use in response. Content types:', claudeResponse.content?.map((c: any) => c.type));
-          console.error('Full response:', JSON.stringify(claudeResponse).substring(0, 1000));
+          // Extract the tool use result
+          const toolUse = claudeResponse.content?.find((c: any) => c.type === 'tool_use');
+          if (!toolUse || !toolUse.input) {
+            console.error('No tool use in response. Content types:', claudeResponse.content?.map((c: any) => c.type));
+            console.error('Full response:', JSON.stringify(claudeResponse).substring(0, 1000));
+            throw new Error('No tool use in Claude response');
+          }
+
+          const analysis: IngredientAnalysis = toolUse.input;
+          console.log('Analysis complete:', analysis.summary.overall_assessment);
+          
+          // Log whether ingredient_comparison_table is present
+          console.log('Has ingredient_comparison_table:', !!analysis.ingredient_comparison_table);
+          if (analysis.ingredient_comparison_table) {
+            console.log('Comparison table rows count:', analysis.ingredient_comparison_table.rows?.length || 0);
+          }
+
+          // Save analysis to database (upsert)
+          const { error: upsertError } = await supabase
+            .from('ingredient_analyses')
+            .upsert({
+              category_id: categoryId,
+              analysis: analysis,
+              updated_at: new Date().toISOString()
+            }, { onConflict: 'category_id' });
+
+          if (upsertError) {
+            console.error('Error saving analysis to database:', upsertError);
+          } else {
+            console.log('Analysis saved to database successfully');
+          }
+          
+          // Success - exit retry loop
           return;
+          
+        } catch (error) {
+          lastError = error instanceof Error ? error : new Error(String(error));
+          console.error(`Attempt ${attempt + 1} failed:`, lastError.message);
+          
+          // If this was the last attempt, save error state to database
+          if (attempt === maxRetries) {
+            console.error('All retry attempts exhausted. Saving error state.');
+            try {
+              await supabase
+                .from('ingredient_analyses')
+                .upsert({
+                  category_id: categoryId,
+                  analysis: { 
+                    error: true, 
+                    message: `Analysis failed after ${maxRetries + 1} attempts: ${lastError.message}`,
+                    timestamp: new Date().toISOString()
+                  },
+                  updated_at: new Date().toISOString()
+                }, { onConflict: 'category_id' });
+            } catch (dbError) {
+              console.error('Failed to save error state:', dbError);
+            }
+          }
         }
-
-        const analysis: IngredientAnalysis = toolUse.input;
-        console.log('Analysis complete:', analysis.summary.overall_assessment);
-        
-        // Log whether ingredient_comparison_table is present
-        console.log('Has ingredient_comparison_table:', !!analysis.ingredient_comparison_table);
-        if (analysis.ingredient_comparison_table) {
-          console.log('Comparison table rows count:', analysis.ingredient_comparison_table.rows?.length || 0);
-        }
-
-        // Save analysis to database (upsert)
-        const { error: upsertError } = await supabase
-          .from('ingredient_analyses')
-          .upsert({
-            category_id: categoryId,
-            analysis: analysis,
-            updated_at: new Date().toISOString()
-          }, { onConflict: 'category_id' });
-
-        if (upsertError) {
-          console.error('Error saving analysis to database:', upsertError);
-        } else {
-          console.log('Analysis saved to database successfully');
-        }
-      } catch (error) {
-        console.error('Background analysis error:', error);
       }
     }
 

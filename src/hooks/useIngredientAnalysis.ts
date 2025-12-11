@@ -130,7 +130,7 @@ export function useIngredientAnalysis(categoryId?: string) {
     attempt: number;
     maxAttempts: number;
     startedAt: Date | null;
-  }>({ isPolling: false, attempt: 0, maxAttempts: 60, startedAt: null });
+  }>({ isPolling: false, attempt: 0, maxAttempts: 90, startedAt: null }); // 90 attempts * 10s = 15 min
   const { toast } = useToast();
 
   // Load from database on mount
@@ -206,11 +206,11 @@ export function useIngredientAnalysis(categoryId?: string) {
       if (data?.status === 'processing') {
         toast({
           title: 'Analysis Started',
-          description: 'AI analysis is running in background. This may take 1-2 minutes...',
+          description: 'AI analysis is running in background. This may take 2-4 minutes...',
         });
 
-        // Poll for results every 10 seconds, up to 10 minutes
-        const maxAttempts = 60;
+        // Poll for results every 10 seconds, up to 15 minutes
+        const maxAttempts = 90;
         let attempts = 0;
         
         setPollingStatus({ isPolling: true, attempt: 0, maxAttempts, startedAt: new Date() });
@@ -235,12 +235,20 @@ export function useIngredientAnalysis(categoryId?: string) {
             }
 
             if (dbData?.analysis) {
-              // Check if this is a fresh analysis (updated within last 5 minutes)
+              // Check if this is a fresh analysis (updated within last 20 minutes)
               const updatedAt = new Date(dbData.updated_at);
               const now = new Date();
               const diffMinutes = (now.getTime() - updatedAt.getTime()) / (1000 * 60);
               
-              if (diffMinutes < 5) {
+              // Check if analysis contains an error
+              const analysisData = dbData.analysis as any;
+              if (analysisData?.error) {
+                console.error('Analysis failed with error:', analysisData.message);
+                setPollingStatus(prev => ({ ...prev, isPolling: false }));
+                throw new Error(analysisData.message || 'Analysis failed on server');
+              }
+              
+              if (diffMinutes < 20) {
                 setPollingStatus(prev => ({ ...prev, isPolling: false }));
                 return dbData.analysis as unknown as IngredientAnalysis;
               }

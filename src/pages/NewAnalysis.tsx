@@ -77,7 +77,7 @@ export default function NewAnalysis() {
   const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
   const [category, setCategory] = useState("");
-  const [productForm, setProductForm] = useState("");
+  const [productForms, setProductForms] = useState<string[]>([]);
   const [amazonCategories, setAmazonCategories] = useState<string[]>([]);
 
   const { data: recentCategories, isLoading: categoriesLoading } = useRecentCategories();
@@ -110,10 +110,10 @@ export default function NewAnalysis() {
     }
 
 
-    if (!productForm) {
+    if (productForms.length === 0) {
       toast({
         title: "Error",
-        description: "Please select a product form.",
+        description: "Please select at least one product form.",
         variant: "destructive",
       });
       return;
@@ -123,12 +123,12 @@ export default function NewAnalysis() {
 
     const payload = {
       category: category.trim(),
-      product_form: productForm,
+      product_form: productForms,
       amazon_categories: amazonCategories.length > 0 ? amazonCategories : null,
     };
 
     // For display/navigation purposes
-    const displayCategoryName = `${category.trim()} ${productForm}`;
+    const displayCategoryName = `${category.trim()} ${productForms.join(" & ")}`;
 
     try {
       const response = await fetch(WEBHOOK_URL, {
@@ -225,25 +225,35 @@ export default function NewAnalysis() {
           </div>
 
 
-          {/* Product Form Field */}
+          {/* Product Form Field - Multi-select */}
           <div className="space-y-4">
             <Label>
               Product Form <span className="text-destructive">*</span>
+              <span className="text-muted-foreground text-xs ml-2">(select one or more)</span>
             </Label>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {productFormOptions.map((option) => (
-                <div
-                  key={option.id}
-                  onClick={() => setProductForm(option.label)}
-                  className={`flex items-center justify-center p-3 rounded-lg border cursor-pointer transition-all ${
-                    productForm === option.label
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-secondary/30 hover:bg-secondary/50 border-border"
-                  }`}
-                >
-                  <span className="text-sm font-medium">{option.label}</span>
-                </div>
-              ))}
+              {productFormOptions.map((option) => {
+                const isSelected = productForms.includes(option.label);
+                return (
+                  <div
+                    key={option.id}
+                    onClick={() => {
+                      if (isSelected) {
+                        setProductForms((prev) => prev.filter((f) => f !== option.label));
+                      } else {
+                        setProductForms((prev) => [...prev, option.label]);
+                      }
+                    }}
+                    className={`flex items-center justify-center p-3 rounded-lg border cursor-pointer transition-all ${
+                      isSelected
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-secondary/30 hover:bg-secondary/50 border-border"
+                    }`}
+                  >
+                    <span className="text-sm font-medium">{option.label}</span>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -276,11 +286,11 @@ export default function NewAnalysis() {
           </div>
 
           {/* Category Name Preview */}
-          {category.trim() && productForm && (
+          {category.trim() && productForms.length > 0 && (
             <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
               <p className="text-xs text-muted-foreground mb-1">Analysis will be created as:</p>
               <p className="font-semibold text-foreground">
-                {category.trim()} {productForm}
+                {category.trim()} {productForms.join(" & ")}
               </p>
             </div>
           )}
@@ -288,7 +298,7 @@ export default function NewAnalysis() {
           <Button
             onClick={handleAnalysis}
             className="w-full h-12 text-base"
-            disabled={isLoading || !category.trim() || !productForm}
+            disabled={isLoading || !category.trim() || productForms.length === 0}
           >
             {isLoading ? (
               <>

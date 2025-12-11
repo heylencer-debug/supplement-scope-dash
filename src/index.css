@@ -28,7 +28,7 @@
     
     /* Cool Grey muted tones */
     --muted: 224 30% 95%;
-    --muted-foreground: 224 30% 66%;
+    --muted-foreground: 224 30% 46%;
     
     /* Deep Indigo accent */
     --accent: 251 100% 55%;
@@ -87,7 +87,7 @@
     
     /* Dark muted */
     --muted: 228 47% 16%;
-    --muted-foreground: 224 30% 55%;
+    --muted-foreground: 224 30% 65%;
     
     /* Deep Indigo accent */
     --accent: 251 100% 60%;

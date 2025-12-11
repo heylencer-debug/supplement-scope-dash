@@ -145,9 +145,9 @@ serve(async (req) => {
       );
     }
 
-    const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
-    if (!ANTHROPIC_API_KEY) {
-      console.error('ANTHROPIC_API_KEY is not configured');
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    if (!LOVABLE_API_KEY) {
+      console.error('LOVABLE_API_KEY is not configured');
       return new Response(
         JSON.stringify({ error: 'AI service not configured' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -263,24 +263,24 @@ serve(async (req) => {
             controller.abort();
           }, 480000); // 8 minute timeout for complex analysis
           
-          const response = await fetch('https://api.anthropic.com/v1/messages', {
+          const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'x-api-key': ANTHROPIC_API_KEY!,
-              'anthropic-version': '2023-06-01',
+              'Authorization': `Bearer ${LOVABLE_API_KEY}`,
             },
             signal: controller.signal,
             body: JSON.stringify({
-              model: 'claude-sonnet-4-5',
-              max_tokens: 8192, // Reduced to speed up response and avoid timeouts
+              model: 'google/gemini-3-pro-preview',
             tools: [
               {
-                name: 'analyze_ingredients',
-                description: 'Comprehensive ingredient formulation analysis with clinical insights, competitive matrix, customer pain point solutions, SWOT analysis, and priority roadmap.',
-                input_schema: {
-                  type: 'object',
-                  properties: {
+                type: 'function',
+                function: {
+                  name: 'analyze_ingredients',
+                  description: 'Comprehensive ingredient formulation analysis with clinical insights, competitive matrix, customer pain point solutions, SWOT analysis, and priority roadmap.',
+                  parameters: {
+                    type: 'object',
+                    properties: {
                     summary: {
                       type: 'object',
                       properties: {
@@ -568,11 +568,12 @@ serve(async (req) => {
                       required: ['our_concept_name', 'competitors', 'rows', 'summary']
                     }
                   },
+                  },
                   required: ['summary', 'ingredients', 'charts', 'actionable_insights', 'customer_insights', 'competitive_matrix', 'clinical_analysis', 'swot', 'priority_roadmap', 'ingredient_comparison_table']
                 }
               }
             ],
-            tool_choice: { type: 'tool', name: 'analyze_ingredients' },
+            tool_choice: { type: 'function', function: { name: 'analyze_ingredients' } },
             messages: [
               {
                 role: 'user',
@@ -621,24 +622,23 @@ Be specific about dosages, cite clinical ranges where relevant, and provide acti
           
           if (!response.ok) {
             const errorText = await response.text();
-            console.error('Claude API error:', response.status, errorText);
-            throw new Error(`Claude API error: ${response.status}`);
+            console.error('Gemini API error:', response.status, errorText);
+            throw new Error(`Gemini API error: ${response.status}`);
           }
 
-          const claudeResponse = await response.json();
-          console.log('Claude response received');
-        console.log('Claude stop_reason:', claudeResponse.stop_reason);
-        console.log('Claude usage:', JSON.stringify(claudeResponse.usage));
+          const geminiResponse = await response.json();
+          console.log('Gemini response received');
+          console.log('Gemini finish_reason:', geminiResponse.choices?.[0]?.finish_reason);
+          console.log('Gemini usage:', JSON.stringify(geminiResponse.usage));
 
-          // Extract the tool use result
-          const toolUse = claudeResponse.content?.find((c: any) => c.type === 'tool_use');
-          if (!toolUse || !toolUse.input) {
-            console.error('No tool use in response. Content types:', claudeResponse.content?.map((c: any) => c.type));
-            console.error('Full response:', JSON.stringify(claudeResponse).substring(0, 1000));
-            throw new Error('No tool use in Claude response');
+          // Extract the tool call result (OpenAI format)
+          const toolCall = geminiResponse.choices?.[0]?.message?.tool_calls?.[0];
+          if (!toolCall || !toolCall.function?.arguments) {
+            console.error('No tool call in response. Message:', JSON.stringify(geminiResponse.choices?.[0]?.message).substring(0, 1000));
+            throw new Error('No tool call in Gemini response');
           }
 
-          const analysis: IngredientAnalysis = toolUse.input;
+          const analysis: IngredientAnalysis = JSON.parse(toolCall.function.arguments);
           console.log('Analysis complete:', analysis.summary.overall_assessment);
           
           // Log whether ingredient_comparison_table is present

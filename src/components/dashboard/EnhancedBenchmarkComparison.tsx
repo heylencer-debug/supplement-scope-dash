@@ -8,7 +8,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Star, TrendingUp, Pill, Target, MessageSquare, Package, Users, Megaphone, AlertTriangle, CheckCircle, XCircle, Palette, Search, Filter, X, Trophy, ThumbsUp, ThumbsDown, Check, FlaskConical, Scale, Award, Beaker, ChevronDown, ChevronUp, BarChart3, DollarSign, Eye, Layers, Shield, Tag, Sparkles, FileText, Loader2, Zap, Brain, ArrowUp, ArrowDown, Minus, Plus, RefreshCw } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Progress } from "@/components/ui/progress";
+import { Star, TrendingUp, TrendingDown, Pill, Target, MessageSquare, Package, Users, Megaphone, AlertTriangle, CheckCircle, XCircle, Palette, Search, Filter, X, Trophy, ThumbsUp, ThumbsDown, Check, FlaskConical, Scale, Award, Beaker, ChevronDown, ChevronUp, BarChart3, DollarSign, Eye, Layers, Shield, Tag, Sparkles, FileText, Loader2, Zap, Brain, ArrowUp, ArrowDown, Minus, Plus, RefreshCw, ArrowRight } from "lucide-react";
 import { useProducts, Product } from "@/hooks/useProducts";
 import ProductDetailModal from "@/components/ProductDetailModal";
 import { useToast } from "@/hooks/use-toast";
@@ -1007,6 +1009,8 @@ export function EnhancedBenchmarkComparison({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
+  const [competitorAnalysisOpen, setCompetitorAnalysisOpen] = useState(false);
+  const [selectedCompetitorBrand, setSelectedCompetitorBrand] = useState<string | null>(null);
   const { toast } = useToast();
   
   // Competitive Analysis Hook
@@ -2563,28 +2567,6 @@ export function EnhancedBenchmarkComparison({
                     className="group relative w-full lg:w-[280px] xl:w-[300px] lg:shrink-0 lg:max-h-[600px] rounded-lg border border-border bg-card overflow-hidden cursor-pointer transition-all hover:border-primary hover:shadow-md flex flex-col"
                     onClick={() => handleProductClick(product)}
                   >
-                    {/* Data Availability Overlay - visible on hover */}
-                    <div className="absolute inset-0 z-20 bg-background/95 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center gap-3 p-4 pointer-events-none">
-                      <p className="text-xs font-medium text-foreground">Data Available</p>
-                      <div className="space-y-2 w-full max-w-[180px]">
-                        <div className={`flex items-center gap-2 text-sm ${hasIngredients ? 'text-chart-4' : 'text-muted-foreground'}`}>
-                          {hasIngredients ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
-                          <span>Ingredients</span>
-                        </div>
-                        <div className={`flex items-center gap-2 text-sm ${hasReviews ? 'text-chart-4' : 'text-muted-foreground'}`}>
-                          {hasReviews ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
-                          <span>Reviews</span>
-                        </div>
-                        <div className={`flex items-center gap-2 text-sm ${hasMarketing ? 'text-chart-4' : 'text-muted-foreground'}`}>
-                          {hasMarketing ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
-                          <span>Marketing</span>
-                        </div>
-                        <div className={`flex items-center gap-2 text-sm ${hasBsrHistory ? 'text-chart-4' : 'text-muted-foreground'}`}>
-                          {hasBsrHistory ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
-                          <span>BSR History</span>
-                        </div>
-                      </div>
-                    </div>
                     
                     <div className="bg-gradient-to-r from-muted to-muted/80 px-3 py-2">
                       <div className="flex items-center gap-2">
@@ -3049,6 +3031,29 @@ export function EnhancedBenchmarkComparison({
                           <span className="text-[10px] px-1.5 py-0.5 bg-muted rounded text-muted-foreground">Analysis Pending</span>
                         )}
                       </div>
+
+                      {/* View Competitive Analysis Button */}
+                      {competitiveAnalysis && (() => {
+                        const compAnalysis = competitiveAnalysis.competitor_comparisons.find(
+                          c => c.competitor_brand?.toLowerCase() === product.brand?.toLowerCase()
+                        );
+                        if (!compAnalysis) return null;
+                        return (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full h-8 text-xs gap-1.5 mt-2 border-primary/30 text-primary hover:bg-primary/10"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedCompetitorBrand(product.brand || null);
+                              setCompetitorAnalysisOpen(true);
+                            }}
+                          >
+                            <Brain className="w-3 h-3" />
+                            View AI Analysis
+                          </Button>
+                        );
+                      })()}
                     </div>
                   </div>
                   );
@@ -3134,6 +3139,116 @@ export function EnhancedBenchmarkComparison({
         open={modalOpen}
         onOpenChange={setModalOpen}
       />
+
+      {/* Competitor Analysis Dialog */}
+      <Dialog open={competitorAnalysisOpen} onOpenChange={setCompetitorAnalysisOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          {(() => {
+            if (!competitiveAnalysis || !selectedCompetitorBrand) return null;
+            const compAnalysis = competitiveAnalysis.competitor_comparisons.find(
+              c => c.competitor_brand?.toLowerCase() === selectedCompetitorBrand.toLowerCase()
+            );
+            if (!compAnalysis) return (
+              <div className="py-8 text-center text-muted-foreground">
+                <p>No analysis found for this competitor.</p>
+              </div>
+            );
+            
+            const getImpactColor = (impact: string) => {
+              switch (impact) {
+                case "high": return "bg-chart-4/10 text-chart-4 border-chart-4/20";
+                case "medium": return "bg-chart-2/10 text-chart-2 border-chart-2/20";
+                default: return "bg-muted text-muted-foreground border-muted";
+              }
+            };
+            
+            const getDifficultyColor = (difficulty: string) => {
+              switch (difficulty) {
+                case "easy": return "bg-chart-4/10 text-chart-4 border-chart-4/20";
+                case "moderate": return "bg-chart-2/10 text-chart-2 border-chart-2/20";
+                default: return "bg-destructive/10 text-destructive border-destructive/20";
+              }
+            };
+            
+            return (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Brain className="w-5 h-5 text-primary" />
+                    vs. {compAnalysis.competitor_brand}
+                  </DialogTitle>
+                  <DialogDescription className="line-clamp-2">
+                    {compAnalysis.competitor_product}
+                  </DialogDescription>
+                </DialogHeader>
+                
+                <div className="space-y-6 pt-4">
+                  {/* Displacement Potential */}
+                  <div className="p-4 rounded-lg bg-muted/30 border">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm font-medium">Displacement Potential</p>
+                      <span className="text-2xl font-bold">{compAnalysis.displacement_potential}/10</span>
+                    </div>
+                    <Progress value={compAnalysis.displacement_potential * 10} className="h-2" />
+                  </div>
+                  
+                  {/* Where We Win */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-chart-4">
+                      <TrendingUp className="w-4 h-4" />
+                      Where We Win
+                    </div>
+                    <div className="space-y-2">
+                      {compAnalysis.where_we_win.map((win, i) => (
+                        <div key={i} className="p-3 rounded-lg bg-chart-4/5 border border-chart-4/10">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-medium text-sm">{win.area}</span>
+                            <Badge variant="outline" className={getImpactColor(win.impact)}>
+                              {win.impact} impact
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground">{win.our_advantage}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  {/* Where They Win */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-chart-2">
+                      <TrendingDown className="w-4 h-4" />
+                      Where They Win
+                    </div>
+                    <div className="space-y-2">
+                      {compAnalysis.where_they_win.map((loss, i) => (
+                        <div key={i} className="p-3 rounded-lg bg-chart-2/5 border border-chart-2/10">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-medium text-sm">{loss.area}</span>
+                            <Badge variant="outline" className={getDifficultyColor(loss.difficulty)}>
+                              {loss.difficulty} to match
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground mb-2">{loss.their_advantage}</p>
+                          <p className="text-sm flex items-center gap-1.5">
+                            <ArrowRight className="w-3.5 h-3.5 text-primary" />
+                            <span className="text-primary">{loss.how_to_match}</span>
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  {/* Verdict */}
+                  <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
+                    <p className="text-sm font-medium mb-1">Overall Verdict</p>
+                    <p className="text-sm text-foreground">{compAnalysis.overall_verdict}</p>
+                  </div>
+                </div>
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

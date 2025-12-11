@@ -162,4 +162,39 @@
   .pulse {
     animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
+  
+  /* Micro-interaction utilities */
+  .micro-press {
+    @apply active:scale-[0.97] transition-transform duration-150;
+  }
+  
+  .micro-hover {
+    @apply hover:-translate-y-0.5 hover:shadow-soft transition-all duration-200;
+  }
+  
+  .focus-glow {
+    @apply focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-0 focus-visible:shadow-[0_0_0_4px_hsl(var(--primary)/0.1)];
+  }
+  
+  .input-shake {
+    @apply animate-shake;
+  }
+  
+  /* Reduced motion support */
+  @media (prefers-reduced-motion: reduce) {
+    .micro-press,
+    .micro-hover,
+    .hover-scale,
+    .hover-lift {
+      @apply transform-none transition-none;
+    }
+    
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
 }

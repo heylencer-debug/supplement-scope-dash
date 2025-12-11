@@ -244,12 +244,17 @@ export default function NewAnalysis() {
                         setProductForms((prev) => [...prev, option.label]);
                       }
                     }}
-                    className={`flex items-center justify-center p-3 rounded-lg border cursor-pointer transition-all ${
+                    className={`flex items-center justify-center gap-2 p-3 rounded-lg border cursor-pointer transition-all duration-200 active:scale-95 hover:-translate-y-0.5 ${
                       isSelected
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-secondary/30 hover:bg-secondary/50 border-border"
+                        ? "bg-primary text-primary-foreground border-primary shadow-[0_4px_12px_rgba(67,24,255,0.3)] scale-[1.02]"
+                        : "bg-secondary/30 hover:bg-secondary/50 border-border hover:shadow-soft"
                     }`}
                   >
+                    {isSelected && (
+                      <svg className="w-4 h-4 animate-check-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
                     <span className="text-sm font-medium">{option.label}</span>
                   </div>
                 );

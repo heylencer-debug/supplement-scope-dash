@@ -3044,10 +3044,13 @@ export function EnhancedBenchmarkComparison({
                         )}
                       </div>
 
-                      {/* View Competitive Analysis Button */}
-                      {competitiveAnalysis && (
+                    </div>
+                    
+                    {/* View Competitive Analysis Button - Outside card content at bottom */}
+                    {competitiveAnalysis && (
+                      <div className="px-2 pb-2 md:px-3 md:pb-3 border-t border-border bg-muted/30">
                         <Button
-                          variant="default"
+                          variant="secondary"
                           size="sm"
                           className="w-full h-8 text-xs gap-1.5 mt-2"
                           onClick={(e) => {
@@ -3059,8 +3062,8 @@ export function EnhancedBenchmarkComparison({
                           <Brain className="w-3 h-3" />
                           View AI Analysis
                         </Button>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
                   );
                 })}

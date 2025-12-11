@@ -2563,30 +2563,28 @@ export function EnhancedBenchmarkComparison({
                     className="group relative w-full lg:w-[280px] xl:w-[300px] lg:shrink-0 lg:max-h-[600px] rounded-lg border border-border bg-card overflow-hidden cursor-pointer transition-all hover:border-primary hover:shadow-md flex flex-col"
                     onClick={() => handleProductClick(product)}
                   >
-                    {/* Data Availability Overlay - visible on hover when analyzing */}
-                    {competitivePolling && !competitiveAnalysis && (
-                      <div className="absolute inset-0 z-10 bg-background/90 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center gap-3 p-4">
-                        <p className="text-xs font-medium text-foreground">Data Available for Analysis</p>
-                        <div className="space-y-2 w-full max-w-[180px]">
-                          <div className={`flex items-center gap-2 text-sm ${hasIngredients ? 'text-chart-4' : 'text-muted-foreground'}`}>
-                            {hasIngredients ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
-                            <span>Ingredients</span>
-                          </div>
-                          <div className={`flex items-center gap-2 text-sm ${hasReviews ? 'text-chart-4' : 'text-muted-foreground'}`}>
-                            {hasReviews ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
-                            <span>Reviews</span>
-                          </div>
-                          <div className={`flex items-center gap-2 text-sm ${hasMarketing ? 'text-chart-4' : 'text-muted-foreground'}`}>
-                            {hasMarketing ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
-                            <span>Marketing</span>
-                          </div>
-                          <div className={`flex items-center gap-2 text-sm ${hasBsrHistory ? 'text-chart-4' : 'text-muted-foreground'}`}>
-                            {hasBsrHistory ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
-                            <span>BSR History</span>
-                          </div>
+                    {/* Data Availability Overlay - visible on hover */}
+                    <div className="absolute inset-0 z-20 bg-background/95 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center gap-3 p-4 pointer-events-none">
+                      <p className="text-xs font-medium text-foreground">Data Available</p>
+                      <div className="space-y-2 w-full max-w-[180px]">
+                        <div className={`flex items-center gap-2 text-sm ${hasIngredients ? 'text-chart-4' : 'text-muted-foreground'}`}>
+                          {hasIngredients ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
+                          <span>Ingredients</span>
+                        </div>
+                        <div className={`flex items-center gap-2 text-sm ${hasReviews ? 'text-chart-4' : 'text-muted-foreground'}`}>
+                          {hasReviews ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
+                          <span>Reviews</span>
+                        </div>
+                        <div className={`flex items-center gap-2 text-sm ${hasMarketing ? 'text-chart-4' : 'text-muted-foreground'}`}>
+                          {hasMarketing ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
+                          <span>Marketing</span>
+                        </div>
+                        <div className={`flex items-center gap-2 text-sm ${hasBsrHistory ? 'text-chart-4' : 'text-muted-foreground'}`}>
+                          {hasBsrHistory ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
+                          <span>BSR History</span>
                         </div>
                       </div>
-                    )}
+                    </div>
                     
                     <div className="bg-gradient-to-r from-muted to-muted/80 px-3 py-2">
                       <div className="flex items-center gap-2">

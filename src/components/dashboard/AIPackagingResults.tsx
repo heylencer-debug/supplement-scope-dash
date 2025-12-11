@@ -262,6 +262,12 @@ export function AIPackagingResults({ analysis, mockupImageUrl, onSaveMockup, onR
   const callToAction = elementsChecklist.call_to_action || analysis.copy_content?.call_to_action;
   const trustSignals = elementsChecklist.trust_signals || analysis.trust_signals?.trust_building_elements || [];
 
+  // Get recommended packaging format from analysis
+  const packagingFormat = designBrief.packaging_format || 
+    (analysis as any).packaging_format || 
+    (analysis as any).recommended_format?.type ||
+    "soft chew resealable pouch";
+
   // Mock content
   const frontPanelText = mockContent?.front_panel_text || '';
   const backPanelText = mockContent?.back_panel_text || '';
@@ -302,7 +308,9 @@ export function AIPackagingResults({ analysis, mockupImageUrl, onSaveMockup, onR
             frontPanelText,
             backPanelText,
             keyDifferentiators,
-            trustSignals
+            trustSignals,
+            // Include the recommended packaging format
+            packagingFormat
           }
         }
       });

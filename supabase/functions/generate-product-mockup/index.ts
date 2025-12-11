@@ -41,6 +41,9 @@ serve(async (req) => {
     const frontPanelText = designBrief.frontPanelText;
     const keyDifferentiators = designBrief.keyDifferentiators;
     const trustSignals = designBrief.trustSignals;
+    
+    // Get recommended packaging format (e.g., "Resealable Stand-Up Pouch", "Wide-Mouth Jar", "Bottle")
+    const packagingFormat = designBrief.packagingFormat || "supplement bottle";
 
     // Build certification string
     const certBadges = certifications?.length > 0 
@@ -64,9 +67,9 @@ serve(async (req) => {
 
     // Build a detailed, data-driven prompt using MOCK CONTENT
     const promptParts = [
-      "Professional product photography of a premium supplement gummy bottle on a clean white studio background.",
+      `Professional product photography of a premium ${packagingFormat} on a clean white studio background.`,
       "",
-      "EXACT LABEL TEXT TO DISPLAY (use this exact text on the bottle label):"
+      `EXACT LABEL TEXT TO DISPLAY (use this exact text on the ${packagingFormat} label):`
     ];
 
     // Use the front panel mock content if available - this is the PRIMARY source
@@ -126,8 +129,9 @@ serve(async (req) => {
     promptParts.push("- Photorealistic, commercial product photography");
     promptParts.push("- Clean white or light gradient studio background");
     promptParts.push("- Professional studio lighting with soft shadows");
-    promptParts.push("- Premium supplement bottle with modern, clean label design");
+    promptParts.push(`- Premium ${packagingFormat} with modern, clean label design`);
     promptParts.push("- IMPORTANT: The label text must be legible and match the exact text provided above");
+    promptParts.push(`- IMPORTANT: Use a ${packagingFormat} format, NOT a glass bottle or dropper bottle`);
     promptParts.push("- High-end pharmaceutical aesthetic");
     promptParts.push("- 4K detail, sharp focus on product");
     promptParts.push("- Slight surface reflection for premium feel");

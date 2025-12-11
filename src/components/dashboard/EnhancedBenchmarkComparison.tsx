@@ -2560,6 +2560,9 @@ export function EnhancedBenchmarkComparison({
                   const hasReviews = !!product.review_analysis;
                   const hasMarketing = !!product.marketing_analysis;
                   const hasBsrHistory = !!(product.historical_data as { bsr_monthly?: Record<string, number> } | null)?.bsr_monthly;
+                  const hasCompetitorAnalysis = competitiveAnalysis?.competitor_comparisons.some(
+                    c => c.competitor_brand?.toLowerCase() === product.brand?.toLowerCase()
+                  );
                   
                   return (
                   <div 
@@ -2567,6 +2570,15 @@ export function EnhancedBenchmarkComparison({
                     className="group relative w-full lg:w-[280px] xl:w-[300px] lg:shrink-0 lg:max-h-[600px] rounded-lg border border-border bg-card overflow-hidden cursor-pointer transition-all hover:border-primary hover:shadow-md flex flex-col"
                     onClick={() => handleProductClick(product)}
                   >
+                    {/* AI Analysis Available Badge */}
+                    {hasCompetitorAnalysis && (
+                      <div className="absolute top-2 right-2 z-10">
+                        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-primary text-primary-foreground text-[9px] font-medium shadow-sm">
+                          <Brain className="w-2.5 h-2.5" />
+                          <span>AI</span>
+                        </div>
+                      </div>
+                    )}
                     
                     <div className="bg-gradient-to-r from-muted to-muted/80 px-3 py-2">
                       <div className="flex items-center gap-2">

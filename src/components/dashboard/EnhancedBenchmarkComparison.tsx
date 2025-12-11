@@ -17,6 +17,8 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { useIngredientAnalysis, IngredientAnalysis } from "@/hooks/useIngredientAnalysis";
 import AIAnalysisResults from "@/components/dashboard/AIAnalysisResults";
+import { useCompetitiveAnalysis } from "@/hooks/useCompetitiveAnalysis";
+import { CompetitiveAnalysisResults } from "@/components/dashboard/CompetitiveAnalysisResults";
 interface EnhancedBenchmarkComparisonProps {
   categoryId?: string;
   analysisData?: {
@@ -1007,6 +1009,16 @@ export function EnhancedBenchmarkComparison({
   const [filterOpen, setFilterOpen] = useState(false);
   const { toast } = useToast();
   
+  // Competitive Analysis Hook
+  const {
+    analysis: competitiveAnalysis,
+    isLoading: competitiveLoading,
+    isPolling: competitivePolling,
+    pollingAttempt,
+    runAnalysis: runCompetitiveAnalysis,
+    clearAnalysis: clearCompetitiveAnalysis,
+  } = useCompetitiveAnalysis(categoryId);
+  
   // All products sorted by monthly sales for selection pool
   const allProductsSorted = useMemo(() => 
     [...(products || [])].sort((a, b) => (b.monthly_sales || 0) - (a.monthly_sales || 0)),
@@ -1938,12 +1950,44 @@ export function EnhancedBenchmarkComparison({
               </CardDescription>
             </div>
             
-            {/* Filter/Select Competitors Button */}
-            <div className="flex items-center gap-2">
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Analyze Competitors Button */}
+              <Button 
+                variant={competitiveAnalysis ? "outline" : "default"}
+                size="sm" 
+                onClick={runCompetitiveAnalysis}
+                disabled={competitiveLoading || competitivePolling}
+                className="h-8 gap-1.5"
+              >
+                {(competitiveLoading || competitivePolling) ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span className="hidden sm:inline">
+                      {competitivePolling ? `Analyzing (${pollingAttempt})...` : "Starting..."}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <Brain className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">
+                      {competitiveAnalysis ? "Re-Analyze" : "Analyze Competitors"}
+                    </span>
+                  </>
+                )}
+              </Button>
+              
+              {competitiveAnalysis && (
+                <Button variant="ghost" size="sm" onClick={clearCompetitiveAnalysis} className="h-8 px-2 text-xs">
+                  <X className="w-3 h-3 mr-1" />
+                  Clear Analysis
+                </Button>
+              )}
+
               {selectedIds.length > 0 && (
                 <Button variant="ghost" size="sm" onClick={clearSelection} className="h-8 px-2 text-xs">
                   <X className="w-3 h-3 mr-1" />
-                  Clear
+                  Clear Selection
                 </Button>
               )}
               <Popover open={filterOpen} onOpenChange={setFilterOpen}>
@@ -3009,6 +3053,47 @@ export function EnhancedBenchmarkComparison({
         labelClaims={analysisData?.formula_brief_content ? parseFinishedProductSpecifications(analysisData.formula_brief_content as string) : []}
         categoryId={categoryId}
       />
+
+      {/* AI COMPETITIVE ANALYSIS RESULTS */}
+      {(competitiveAnalysis || competitivePolling) && (
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-sm sm:text-base md:text-lg">
+                <Brain className="w-4 h-4 md:w-5 md:h-5 text-primary" />
+                AI Competitive Analysis
+              </CardTitle>
+              {competitivePolling && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Analyzing competitors... ({pollingAttempt}/30)</span>
+                </div>
+              )}
+            </div>
+            <CardDescription className="text-xs">
+              Strategic comparison of your concept against top competitors
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {competitivePolling && !competitiveAnalysis ? (
+              <div className="flex flex-col items-center justify-center py-12 gap-4">
+                <div className="relative">
+                  <Loader2 className="w-12 h-12 animate-spin text-primary" />
+                  <Brain className="w-6 h-6 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-primary" />
+                </div>
+                <div className="text-center">
+                  <p className="text-sm font-medium">Analyzing competitive landscape...</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Comparing formulation, pricing, positioning, and reviews
+                  </p>
+                </div>
+              </div>
+            ) : competitiveAnalysis ? (
+              <CompetitiveAnalysisResults analysis={competitiveAnalysis} />
+            ) : null}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Product Detail Modal */}
       <ProductDetailModal 

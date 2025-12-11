@@ -293,6 +293,45 @@ export type Database = {
           },
         ]
       }
+      competitive_analyses: {
+        Row: {
+          analysis: Json
+          category_id: string
+          created_at: string | null
+          id: string
+          updated_at: string | null
+        }
+        Insert: {
+          analysis: Json
+          category_id: string
+          created_at?: string | null
+          id?: string
+          updated_at?: string | null
+        }
+        Update: {
+          analysis?: Json
+          category_id?: string
+          created_at?: string | null
+          id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "competitive_analyses_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: true
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "competitive_analyses_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: true
+            referencedRelation: "v_category_dashboard"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       competitors: {
         Row: {
           created_at: string | null

@@ -3098,50 +3098,6 @@ export function EnhancedBenchmarkComparison({
         categoryId={categoryId}
       />
 
-      {/* AI COMPETITIVE ANALYSIS RESULTS */}
-      {(competitiveAnalysis || competitivePolling) && (
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-sm sm:text-base md:text-lg">
-                <Brain className="w-4 h-4 md:w-5 md:h-5 text-primary" />
-                AI Competitive Analysis
-              </CardTitle>
-              {competitivePolling && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Analyzing competitors... ({pollingAttempt}/30)</span>
-                </div>
-              )}
-            </div>
-            <CardDescription className="text-xs">
-              Strategic comparison of your concept against top competitors
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {competitivePolling && !competitiveAnalysis ? (
-              <div className="flex flex-col items-center justify-center py-12 gap-4">
-                <div className="relative">
-                  <Loader2 className="w-12 h-12 animate-spin text-primary" />
-                  <Brain className="w-6 h-6 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-primary" />
-                </div>
-                <div className="text-center">
-                  <p className="text-sm font-medium">Analyzing {displayedProducts.length} competitors...</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Hover over product cards above to see data availability
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    This takes about 30-60 seconds
-                  </p>
-                </div>
-              </div>
-            ) : competitiveAnalysis ? (
-              <CompetitiveAnalysisResults analysis={competitiveAnalysis} />
-            ) : null}
-          </CardContent>
-        </Card>
-      )}
-
       {/* Product Detail Modal */}
       <ProductDetailModal 
         product={selectedProduct}

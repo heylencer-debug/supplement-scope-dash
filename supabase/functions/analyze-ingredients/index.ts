@@ -471,14 +471,13 @@ serve(async (req) => {
                       items: {
                         type: 'object',
                         properties: {
-                          phase: { type: 'number', enum: [1, 2, 3], description: '1=immediate, 2=next batch, 3=future' },
-                          action: { type: 'string' },
-                          ingredient: { type: 'string' },
-                          expected_impact: { type: 'string' },
-                          complexity: { type: 'string', enum: ['easy', 'moderate', 'complex'] },
+                          phase: { type: 'integer', description: '1=immediate, 2=next batch, 3=future' },
+                          action: { type: 'string', description: 'Action to take' },
+                          ingredient: { type: 'string', description: 'Target ingredient' },
+                          expected_impact: { type: 'string', description: 'Expected impact' },
+                          complexity: { type: 'string', description: 'easy, moderate, or complex' },
                           timeline: { type: 'string', description: 'Immediate, Next formulation, Future' }
-                        },
-                        required: ['phase', 'action', 'ingredient', 'expected_impact', 'complexity', 'timeline']
+                        }
                       },
                       description: 'Phased improvement roadmap'
                     },

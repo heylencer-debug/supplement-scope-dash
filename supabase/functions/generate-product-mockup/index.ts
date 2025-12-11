@@ -65,76 +65,56 @@ serve(async (req) => {
       ? trustSignals.slice(0, 3).join(", ")
       : null;
 
-    // Build a detailed, data-driven prompt using MOCK CONTENT
+    // Build a PREMIUM, MINIMALIST design prompt
     const promptParts = [
-      `Professional product photography of a premium ${packagingFormat} on a clean white studio background.`,
+      `Ultra-premium luxury ${packagingFormat} product photography. Award-winning minimalist packaging design.`,
       "",
-      `EXACT LABEL TEXT TO DISPLAY (use this exact text on the ${packagingFormat} label):`
+      "DESIGN PHILOSOPHY: High-end, luxury, minimalist. Think Apple meets Aesop. Less is more.",
+      ""
     ];
 
-    // Use the front panel mock content if available - this is the PRIMARY source
-    if (frontPanelText) {
-      promptParts.push("");
-      promptParts.push("--- FRONT LABEL TEXT (copy exactly) ---");
-      promptParts.push(frontPanelText);
-      promptParts.push("--- END FRONT LABEL ---");
-    } else {
-      // Fallback to individual fields if no mock content
-      if (primaryClaim) {
-        promptParts.push(`- Main headline: "${primaryClaim}"`);
-      }
-      if (benefitsList) {
-        promptParts.push(`- Benefit bullets: ${benefitsList}`);
-      }
-      if (callToAction) {
-        promptParts.push(`- Call to action: "${callToAction}"`);
-      }
+    // Colors - use as the primary design language
+    promptParts.push("COLOR PALETTE:");
+    if (primaryColorHex) {
+      promptParts.push(`- Dominant color: ${primaryColorHex} - use as main label/packaging color`);
+    }
+    if (secondaryColorHex) {
+      promptParts.push(`- Contrast color: ${secondaryColorHex} - for minimal text elements`);
+    }
+    if (accentColorHex) {
+      promptParts.push(`- Accent: ${accentColorHex} - subtle highlight only`);
     }
 
     promptParts.push("");
-    promptParts.push("DESIGN SPECIFICATIONS:");
-
-    // Colors
-    if (primaryColorName && primaryColorHex) {
-      promptParts.push(`- Primary bottle/label color: ${primaryColorName} (${primaryColorHex})`);
+    promptParts.push("LABEL CONTENT (use sparingly, large clean typography):");
+    
+    // Only use primary claim as hero text - no bullet points or excessive text
+    if (primaryClaim) {
+      promptParts.push(`- Hero headline ONLY: "${primaryClaim.split(' ').slice(0, 5).join(' ')}"`);
     }
-    if (secondaryColorName && secondaryColorHex) {
-      promptParts.push(`- Secondary color for text/accents: ${secondaryColorName} (${secondaryColorHex})`);
-    }
-    if (accentColorName && accentColorHex) {
-      promptParts.push(`- Accent color for highlights: ${accentColorName} (${accentColorHex})`);
-    }
-
-    // Typography
-    if (headlineFont) {
-      promptParts.push(`- Headline typography: ${headlineFont}`);
-    }
-    if (bodyFont) {
-      promptParts.push(`- Body text: ${bodyFont}`);
-    }
-
-    // Badges and certifications
-    if (certBadges) {
-      promptParts.push(`- Certification badges: ${certBadges}`);
-    }
-    if (differentiatorsList) {
-      promptParts.push(`- Key differentiator badges: ${differentiatorsList}`);
-    }
-    if (trustSignalsList) {
-      promptParts.push(`- Trust signals: ${trustSignalsList}`);
+    
+    // Just 1-2 certification badges, not a list
+    if (certifications?.length > 0) {
+      promptParts.push(`- Single certification badge: ${certifications[0]}`);
     }
 
     promptParts.push("");
-    promptParts.push("PHOTOGRAPHY REQUIREMENTS:");
-    promptParts.push("- Photorealistic, commercial product photography");
-    promptParts.push("- Clean white or light gradient studio background");
-    promptParts.push("- Professional studio lighting with soft shadows");
-    promptParts.push(`- Premium ${packagingFormat} with modern, clean label design`);
-    promptParts.push("- IMPORTANT: The label text must be legible and match the exact text provided above");
-    promptParts.push(`- IMPORTANT: Use a ${packagingFormat} format, NOT a glass bottle or dropper bottle`);
-    promptParts.push("- High-end pharmaceutical aesthetic");
-    promptParts.push("- 4K detail, sharp focus on product");
-    promptParts.push("- Slight surface reflection for premium feel");
+    promptParts.push("PREMIUM PACKAGING REQUIREMENTS:");
+    promptParts.push(`- Modern, sleek ${packagingFormat} with matte or soft-touch finish`);
+    promptParts.push("- EXTREMELY MINIMAL text on label - maximum 2-3 text elements total");
+    promptParts.push("- Large negative space, breathing room, zen-like simplicity");
+    promptParts.push("- Premium metallic or embossed logo treatment");
+    promptParts.push("- No cluttered bullet points or long text blocks");
+    promptParts.push("- Think luxury skincare (Aesop, Sunday Riley) or premium supplements (Ritual, AG1)");
+    promptParts.push("- Clean geometric shapes, subtle gradients, sophisticated typography");
+    promptParts.push("");
+    promptParts.push("PHOTOGRAPHY STYLE:");
+    promptParts.push("- Editorial product photography, magazine cover quality");
+    promptParts.push("- Soft diffused lighting, gentle shadows");
+    promptParts.push("- Clean white or soft gradient background");
+    promptParts.push("- Slight reflection on surface for luxury feel");
+    promptParts.push("- 4K, sharp focus, depth of field blur on background");
+    promptParts.push("- Premium, aspirational, would look great on Instagram");
 
     const prompt = promptParts.join("\n");
 

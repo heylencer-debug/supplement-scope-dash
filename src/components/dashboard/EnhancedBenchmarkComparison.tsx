@@ -2077,7 +2077,7 @@ export function EnhancedBenchmarkComparison({
           {/* Mobile: Vertical stack, Desktop: Horizontal scroll */}
           <div className="flex flex-col lg:flex-row lg:items-stretch gap-3 lg:gap-2 md:gap-3 overflow-x-hidden">
             {/* Our Concept Column - Full width on mobile, fixed on desktop */}
-            <div className="w-full lg:w-[280px] xl:w-[320px] lg:shrink-0 lg:max-h-[600px] rounded-lg border-2 border-chart-2/50 bg-gradient-to-b from-chart-2/10 to-background dark:from-chart-2/20 overflow-hidden flex flex-col">
+            <div className="w-full lg:w-[280px] xl:w-[320px] lg:shrink-0 lg:max-h-[750px] rounded-lg border-2 border-chart-2/50 bg-gradient-to-b from-chart-2/10 to-background dark:from-chart-2/20 overflow-hidden flex flex-col">
               <div className="bg-gradient-to-r from-chart-2 to-chart-2/80 px-2 sm:px-3 py-1.5 sm:py-2 shrink-0">
                 <div className="flex items-center gap-2">
                   <div className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 rounded-full bg-white/20 flex items-center justify-center">

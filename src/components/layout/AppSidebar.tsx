@@ -55,10 +55,6 @@ function NavItem({ item, isActive, href }: NavItemProps) {
             isActive && "hidden"
           )} />
           
-          {/* Active indicator bar */}
-          {isActive && (
-            <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-sidebar-primary-foreground rounded-r-full animate-slide-indicator" />
-          )}
           
           {/* Icon with bounce animation */}
           <span className={cn(

@@ -226,22 +226,42 @@ serve(async (req) => {
     async function runAnalysisInBackground() {
       console.log('Starting background Claude API call...');
       
-      const maxRetries = 2;
+      // Save "in progress" state to database before starting
+      try {
+        await supabase
+          .from('ingredient_analyses')
+          .upsert({
+            category_id: categoryId,
+            analysis: { 
+              status: 'in_progress', 
+              started_at: new Date().toISOString(),
+              message: 'AI analysis in progress. This typically takes 4-6 minutes for complex formulations.'
+            },
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'category_id' });
+        console.log('In-progress state saved to database');
+      } catch (dbError) {
+        console.error('Failed to save in-progress state:', dbError);
+      }
+      
+      const maxRetries = 1; // Reduced from 2 to avoid excessive wait times
       let lastError: Error | null = null;
       
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
           if (attempt > 0) {
             console.log(`Retry attempt ${attempt}/${maxRetries}...`);
-            await new Promise(r => setTimeout(r, 3000)); // Wait 3 seconds before retry
+            await new Promise(r => setTimeout(r, 5000)); // Wait 5 seconds before retry
           }
           
-          // Create AbortController for timeout (3 minutes)
+          console.log('Calling Claude API for ingredient analysis - this may take 4-6 minutes for complex analysis...');
+          
+          // Create AbortController for timeout (8 minutes for complex analysis)
           const controller = new AbortController();
           const timeoutId = setTimeout(() => {
-            console.log('Aborting fetch due to timeout (3 minutes)');
+            console.log('Aborting fetch due to timeout (8 minutes)');
             controller.abort();
-          }, 180000); // 3 minute timeout
+          }, 480000); // 8 minute timeout for complex analysis
           
           const response = await fetch('https://api.anthropic.com/v1/messages', {
             method: 'POST',
@@ -647,7 +667,8 @@ Be specific about dosages, cite clinical ranges where relevant, and provide acti
           
         } catch (error) {
           lastError = error instanceof Error ? error : new Error(String(error));
-          console.error(`Attempt ${attempt + 1} failed:`, lastError.message);
+          const isTimeout = lastError.name === 'AbortError';
+          console.error(`Attempt ${attempt + 1} failed (${isTimeout ? 'timeout' : 'error'}):`, lastError.message);
           
           // If this was the last attempt, save error state to database
           if (attempt === maxRetries) {
@@ -659,7 +680,10 @@ Be specific about dosages, cite clinical ranges where relevant, and provide acti
                   category_id: categoryId,
                   analysis: { 
                     error: true, 
-                    message: `Analysis failed after ${maxRetries + 1} attempts: ${lastError.message}`,
+                    error_type: isTimeout ? 'timeout' : 'api_error',
+                    message: isTimeout 
+                      ? 'Analysis took longer than expected. This can happen with complex formulas. Please try again.' 
+                      : `Analysis failed after ${maxRetries + 1} attempts: ${lastError.message}`,
                     timestamp: new Date().toISOString()
                   },
                   updated_at: new Date().toISOString()

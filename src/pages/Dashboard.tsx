@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { ScrollAnimate } from "@/components/ui/scroll-animate";
+import { ScrollAnimate, ScrollSection, ScrollCounter } from "@/components/ui/scroll-animate";
 import { 
   Loader2, RefreshCw, CheckCircle2, Circle, Clock,
   Building2, Package, Eye, MessageSquare, BarChart3, Sparkles
@@ -436,7 +436,7 @@ export default function Dashboard() {
       )}
 
       {/* SECTION 2: KPI Metrics Grid (Scoreboards) */}
-      <div className="animate-fade-in" style={{ animationDelay: '0.1s' }}>
+      <ScrollAnimate delay={100} variant="fade-up" duration={500}>
         <KPIMetricsGrid
         marketSize={totalRevenue}
         profitMargin={dashboardData.margins?.year_1 || null}
@@ -445,10 +445,10 @@ export default function Dashboard() {
         riskScore={dashboardData.riskScore}
         isLoading={isDataLoading && !hasAnalysis}
         />
-      </div>
+      </ScrollAnimate>
 
       {/* SECTION 3: Benchmark Comparison - Top 5 Competitors */}
-      <ScrollAnimate delay={50}>
+      <ScrollAnimate delay={50} variant="scale-up" duration={600}>
         <EnhancedBenchmarkComparison
         categoryId={category?.id}
         analysisData={dashboardData.benchmarkData}
@@ -458,7 +458,7 @@ export default function Dashboard() {
 
       {/* SECTION 4: Brand Market Share */}
       {brandMarketShare.length > 0 ? (
-        <ScrollAnimate delay={100}>
+        <ScrollAnimate delay={100} variant="fade-left" duration={600}>
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
@@ -521,7 +521,7 @@ export default function Dashboard() {
           </Card>
         </ScrollAnimate>
       ) : productsLoading ? (
-        <ScrollAnimate delay={100}>
+        <ScrollAnimate delay={100} variant="fade-up">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
@@ -537,7 +537,7 @@ export default function Dashboard() {
       ) : null}
 
       {/* SECTION 5: Packaging Intelligence */}
-      <ScrollAnimate delay={150}>
+      <ScrollAnimate delay={100} variant="fade-right" duration={600}>
         <PackagingIntelligence
           packagingData={(() => {
             const analysis1 = analysis?.analysis_1_category_scores as Record<string, unknown> | null;
@@ -570,7 +570,7 @@ export default function Dashboard() {
       </ScrollAnimate>
 
       {/* SECTION 6: 18-Point Analysis */}
-      <ScrollAnimate delay={175}>
+      <ScrollAnimate delay={100} variant="flip-up" duration={700}>
         <DeepDiveSection
         criteriaScores={dashboardData.criteriaScores}
         criteriaBreakdown={dashboardData.criteriaBreakdown}
@@ -582,7 +582,7 @@ export default function Dashboard() {
       </ScrollAnimate>
 
       {/* SECTION 7: Customer Intelligence */}
-      <ScrollAnimate delay={225}>
+      <ScrollAnimate delay={100} variant="blur-in" duration={600}>
         <CustomerIntelligence
         customerInsights={dashboardData.customerIntelligence}
         isLoading={analysisLoading && !hasAnalysis}
@@ -590,7 +590,7 @@ export default function Dashboard() {
       </ScrollAnimate>
 
       {/* SECTION 8: Financial Projections */}
-      <ScrollAnimate delay={275}>
+      <ScrollAnimate delay={100} variant="scale-up" duration={600}>
         <FinancialProjections 
           financials={dashboardData.financials as Record<string, unknown> | null} 
           isLoading={analysisLoading && !hasAnalysis}
@@ -598,7 +598,7 @@ export default function Dashboard() {
       </ScrollAnimate>
 
       {/* SECTION 9: Launch Strategy + Action Plan */}
-      <ScrollAnimate delay={325}>
+      <ScrollAnimate delay={100} variant="fade-left" duration={600}>
         <LaunchPlanSection
         goToMarket={dashboardData.goToMarket as {
           positioning?: string;
@@ -616,7 +616,7 @@ export default function Dashboard() {
       </ScrollAnimate>
 
       {/* SECTION 10: Risk Analysis */}
-      <ScrollAnimate delay={375}>
+      <ScrollAnimate delay={100} variant="fade-right" duration={600}>
         <RiskAnalysis 
           risks={dashboardData.risks as Record<string, unknown> | null} 
           isLoading={analysisLoading && !hasAnalysis}

@@ -8,7 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Progress } from "@/components/ui/progress";
 import { Star, TrendingUp, TrendingDown, Pill, Target, MessageSquare, Package, Users, Megaphone, AlertTriangle, CheckCircle, XCircle, Palette, Search, Filter, X, Trophy, ThumbsUp, ThumbsDown, Check, FlaskConical, Scale, Award, Beaker, ChevronDown, ChevronUp, BarChart3, DollarSign, Eye, Layers, Shield, Tag, Sparkles, FileText, Loader2, Zap, Brain, ArrowUp, ArrowDown, Minus, Plus, RefreshCw, ArrowRight } from "lucide-react";
 import { useProducts, Product } from "@/hooks/useProducts";
@@ -3045,27 +3045,21 @@ export function EnhancedBenchmarkComparison({
                       </div>
 
                       {/* View Competitive Analysis Button */}
-                      {competitiveAnalysis && (() => {
-                        const compAnalysis = competitiveAnalysis.competitor_comparisons.find(
-                          c => c.competitor_brand?.toLowerCase() === product.brand?.toLowerCase()
-                        );
-                        if (!compAnalysis) return null;
-                        return (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full h-8 text-xs gap-1.5 mt-2 border-primary/30 text-primary hover:bg-primary/10"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedCompetitorBrand(product.brand || null);
-                              setCompetitorAnalysisOpen(true);
-                            }}
-                          >
-                            <Brain className="w-3 h-3" />
-                            View AI Analysis
-                          </Button>
-                        );
-                      })()}
+                      {competitiveAnalysis && (
+                        <Button
+                          variant="default"
+                          size="sm"
+                          className="w-full h-8 text-xs gap-1.5 mt-2"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedCompetitorBrand(product.brand || null);
+                            setCompetitorAnalysisOpen(true);
+                          }}
+                        >
+                          <Brain className="w-3 h-3" />
+                          View AI Analysis
+                        </Button>
+                      )}
                     </div>
                   </div>
                   );
@@ -3152,9 +3146,9 @@ export function EnhancedBenchmarkComparison({
         onOpenChange={setModalOpen}
       />
 
-      {/* Competitor Analysis Dialog */}
-      <Dialog open={competitorAnalysisOpen} onOpenChange={setCompetitorAnalysisOpen}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+      {/* Competitor Analysis Side Panel */}
+      <Sheet open={competitorAnalysisOpen} onOpenChange={setCompetitorAnalysisOpen}>
+        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
           {(() => {
             if (!competitiveAnalysis || !selectedCompetitorBrand) return null;
             const compAnalysis = competitiveAnalysis.competitor_comparisons.find(
@@ -3162,7 +3156,11 @@ export function EnhancedBenchmarkComparison({
             );
             if (!compAnalysis) return (
               <div className="py-8 text-center text-muted-foreground">
-                <p>No analysis found for this competitor.</p>
+                <SheetHeader>
+                  <SheetTitle>vs. {selectedCompetitorBrand}</SheetTitle>
+                </SheetHeader>
+                <p className="mt-4">No detailed analysis found for this competitor.</p>
+                <p className="text-sm mt-2">The AI analysis may not have matched this brand name exactly.</p>
               </div>
             );
             
@@ -3184,17 +3182,17 @@ export function EnhancedBenchmarkComparison({
             
             return (
               <>
-                <DialogHeader>
-                  <DialogTitle className="flex items-center gap-2">
+                <SheetHeader>
+                  <SheetTitle className="flex items-center gap-2">
                     <Brain className="w-5 h-5 text-primary" />
                     vs. {compAnalysis.competitor_brand}
-                  </DialogTitle>
-                  <DialogDescription className="line-clamp-2">
+                  </SheetTitle>
+                  <SheetDescription className="line-clamp-2">
                     {compAnalysis.competitor_product}
-                  </DialogDescription>
-                </DialogHeader>
+                  </SheetDescription>
+                </SheetHeader>
                 
-                <div className="space-y-6 pt-4">
+                <div className="space-y-6 pt-6">
                   {/* Displacement Potential */}
                   <div className="p-4 rounded-lg bg-muted/30 border">
                     <div className="flex items-center justify-between mb-2">
@@ -3259,8 +3257,8 @@ export function EnhancedBenchmarkComparison({
               </>
             );
           })()}
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
     </>
   );
 }

@@ -2567,7 +2567,7 @@ export function EnhancedBenchmarkComparison({
                   return (
                   <div 
                     key={product.id} 
-                    className="group relative w-full lg:w-[280px] xl:w-[300px] lg:shrink-0 lg:max-h-[600px] rounded-lg border border-border bg-card overflow-hidden cursor-pointer transition-all hover:border-primary hover:shadow-md flex flex-col"
+                    className="group relative w-full lg:w-[280px] xl:w-[300px] lg:shrink-0 lg:max-h-[750px] rounded-lg border border-border bg-card overflow-hidden cursor-pointer transition-all hover:border-primary hover:shadow-md flex flex-col"
                     onClick={() => handleProductClick(product)}
                   >
                     {/* AI Analysis Available Badge */}

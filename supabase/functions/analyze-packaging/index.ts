@@ -141,6 +141,19 @@ THEIR VISUAL STRATEGY:
     // Helper function to get copy style instructions
     function getCopyStyleInstructions(style: string | undefined): string {
       switch (style) {
+        case 'match_leaders':
+          return `STYLE: MATCH MARKET LEADERS
+- Your goal is to LOOK AND FEEL like you belong alongside the #1 best-seller
+- STUDY the competitor images and copy VERY CLOSELY - MATCH their tone, style, length, and visual language
+- If top sellers use clinical/pharmaceutical style → use clinical style
+- If top sellers use friendly/approachable style → use friendly style
+- If top sellers use bold colors → use bold colors; if muted → use muted
+- MIRROR their bullet point length (count the words, match it)
+- MIRROR their headline style (direct vs. soft, short vs. medium)
+- MIRROR their trust signal placement
+- DO NOT try to be different - try to FIT IN while being slightly better on quality cues
+- This is about SHELF COMPETITION - customers should think you belong next to the leaders
+- Only differentiate where competitors are FAILING based on customer complaints`;
         case 'premium':
           return `STYLE: PREMIUM & LUXURIOUS
 - Use sophisticated, elegant language that signals high-end quality
@@ -179,17 +192,18 @@ THEIR VISUAL STRATEGY:
         case 'bold':
           return `STYLE: BOLD & DISRUPTIVE
 - Challenge the status quo with edgy, bold language
-- Words like: Revolutionary, Game-Changer, Disrupting, Next-Level
 - Break conventions, challenge competitors directly
 - Color palette should be unexpected and bold (neon accents, black, unconventional combos)
 - Think startup energy, category disruptor, rule-breaker`;
         default:
-          return `STYLE: BALANCED & CONVERSION-FOCUSED
-- Use proven conversion copy principles
-- Balance trust-building with benefit-driven messaging
-- Use power words: Premium, Clinical-Strength, Doctor-Formulated, Bioavailable
-- Focus on addressing customer pain points and clear value proposition
-- Think best practices from top Amazon supplement sellers`;
+          return `STYLE: MATCH MARKET LEADERS (DEFAULT)
+- Your goal is to LOOK AND FEEL like you belong alongside the #1 best-seller
+- STUDY the competitor images and copy VERY CLOSELY - MATCH their tone, style, length, and visual language
+- If top sellers use clinical/pharmaceutical style → use clinical style
+- If top sellers use friendly/approachable style → use friendly style
+- MIRROR their bullet point length and headline style
+- DO NOT invent a new aggressive style - MATCH what's already working
+- Only differentiate where competitors are FAILING based on customer complaints`;
       }
     }
 
@@ -326,27 +340,35 @@ THEIR VISUAL STRATEGY:
                   ...competitorImages,
                   {
                     type: 'text',
-                    text: `You are an EXPERT PACKAGING COPYWRITER & DESIGNER analyzing the BEST-SELLING competitor products in "${categoryName}" to create IRRESISTIBLE packaging that OUTSELLS them.
+                    text: `You are an EXPERT PACKAGING COPYWRITER & DESIGNER analyzing the BEST-SELLING competitor products in "${categoryName}" to create packaging that MATCHES THEIR PROVEN APPROACH while addressing their weaknesses.
 
 ## YOUR MISSION:
-Study the competitor product images I've included above. Look at their:
-- Color schemes and visual hierarchy
-- How they display claims and benefits  
-- Typography choices
-- Trust signals and certifications placement
-- What makes shoppers pick them off the shelf
+Study the competitor product images I've included above VERY CAREFULLY. Look at:
+- Their EXACT color schemes and visual hierarchy
+- Their EXACT bullet point length (count the words!)
+- Their EXACT headline style (how many words? what tone?)
+- Their typography choices and font styles
+- Their trust signals and certifications placement
+- What makes shoppers pick them - and MATCH that approach
 
-Now create packaging that is EVEN BETTER - more premium, more trustworthy, more compelling.
+Your goal is to create packaging that LOOKS LIKE IT BELONGS next to the #1 best-seller. NOT to be radically different - but to FIT IN while being slightly better.
 
 ## COPY STYLE DIRECTION:
 ${getCopyStyleInstructions(copyStyle)}
 
-## COPY RULES (NON-NEGOTIABLE):
-- Primary claim: 3-8 words that STOP the scroll
-- Bullet points: 5-10 words each, BENEFIT-FOCUSED not feature-focused
-- Every word must SELL - no fluff, no filler
-- Address the #1 customer pain point directly
-- Include specific numbers when possible (300mg, 90-day supply, 3X absorption)
+## CRITICAL COPY RULES:
+- MATCH the competitor's bullet point length (if theirs are 5-7 words, yours should be too)
+- MATCH their headline style (if direct, be direct; if soft, be soft)
+- MATCH their tone (if clinical/pharmaceutical, be clinical; if friendly, be friendly)
+- DO NOT use aggressive urgency tactics unless competitors are also using them
+- DO NOT write infomercial-style copy unless that's what competitors do
+- Address the #1 customer pain point - but in the SAME STYLE as competitors
+
+## STUDY THESE COMPETITOR BULLETS AND CREATE SIMILAR ONES:
+${competitors?.slice(0, 3).map((c, i) => {
+  const bullets = c.feature_bullets || [];
+  return `Competitor ${i + 1} (${c.brand}): ${bullets.slice(0, 3).map((b: string) => `"${b.substring(0, 60)}..."`).join(' | ')}`;
+}).join('\n') || 'N/A'}
 
 ## OUR PRODUCT FORMULATION:
 ${formulaBriefContent}
@@ -355,15 +377,15 @@ ${formulaBriefContent}
 - Type: ${recommendedPackaging.type || 'Premium Bottle'}
 - Key Design Elements: ${recommendedPackaging.design_elements?.join(', ') || 'Modern, clean, premium aesthetic'}
 
-## COMPETITOR INTELLIGENCE (LEARN FROM THE BEST, THEN BEAT THEM):
+## COMPETITOR INTELLIGENCE (STUDY THEM, MATCH THEIR APPROACH):
 ${competitorPackagingSummary}
 
-## WHAT WILL MAKE CUSTOMERS CHOOSE US:
-1. Address the pain points competitors are failing on
-2. Match or exceed the trust signals of best sellers  
-3. Cleaner, more premium visual design
-4. Clearer benefit communication
-5. Better value proposition
+## HOW TO WIN (WITHOUT BEING RADICALLY DIFFERENT):
+1. MATCH the visual style of the #1 seller (colors, fonts, layout)
+2. MATCH their bullet point length and tone exactly
+3. Only differentiate on the pain points where competitors are FAILING
+4. Use the same trust signal approach but add 1 extra credibility cue
+5. Look like you belong on the same shelf - customers should feel familiar
 
 ## YOUR DELIVERABLES:
 

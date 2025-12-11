@@ -230,6 +230,7 @@ export function AIPackagingResults({ analysis, mockupImageUrl, onSaveMockup, onR
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
 
   const copyStyles = [
+    { id: 'match_leaders', label: 'Match Market Leaders', description: 'Copy style that matches top-selling competitors' },
     { id: 'premium', label: 'Premium & Luxurious', description: 'High-end, sophisticated copy for premium positioning' },
     { id: 'clinical', label: 'Clinical & Scientific', description: 'Research-backed, clinical-sounding copy' },
     { id: 'friendly', label: 'Friendly & Approachable', description: 'Warm, conversational, everyday language' },

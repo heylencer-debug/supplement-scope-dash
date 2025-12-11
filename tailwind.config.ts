@@ -222,6 +222,10 @@ export default {
           "0%": { transform: "scaleX(0)", opacity: "0" },
           "100%": { transform: "scaleX(1)", opacity: "1" },
         },
+        "ripple": {
+          "0%": { transform: "scale(0)", opacity: "0.35" },
+          "100%": { transform: "scale(1)", opacity: "0" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -258,6 +262,7 @@ export default {
         "icon-bounce": "icon-bounce 0.4s ease-out",
         "icon-wiggle": "icon-wiggle 0.4s ease-in-out",
         "slide-indicator": "slide-indicator 0.3s ease-out forwards",
+        "ripple": "ripple 0.6s ease-out forwards",
       },
     },
   },

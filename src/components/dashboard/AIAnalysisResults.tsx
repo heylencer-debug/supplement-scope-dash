@@ -343,7 +343,7 @@ export function AIAnalysisResults({ analysis, onRefresh, isLoading }: AIAnalysis
           </div>
 
           {/* SWOT Summary */}
-          {analysis.swot && (
+          {analysis.swot && analysis.swot.strengths && analysis.swot.weaknesses && analysis.swot.opportunities && analysis.swot.threats && (
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-chart-4/5 rounded-lg p-3 border border-chart-4/20">
                 <p className="text-xs font-medium text-chart-4 mb-2 flex items-center gap-1">
@@ -401,7 +401,7 @@ export function AIAnalysisResults({ analysis, onRefresh, isLoading }: AIAnalysis
           )}
 
           {/* Dosage Comparison Chart */}
-          {analysis.charts.dosage_comparison.length > 0 && (
+          {analysis.charts.dosage_comparison && analysis.charts.dosage_comparison.length > 0 && (
             <div className="bg-card rounded-lg p-3 border border-border/50">
               <p className="text-xs font-medium text-foreground mb-3">Dosage Comparison (Our Concept vs Competitor Avg)</p>
               <div className="h-[200px]">

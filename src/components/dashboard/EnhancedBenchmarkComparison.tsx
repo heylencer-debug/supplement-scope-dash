@@ -2551,12 +2551,43 @@ export function EnhancedBenchmarkComparison({
             {/* Competitor Columns - Stack on mobile, Scrollable on desktop */}
             <ScrollArea className="w-full lg:flex-1 overflow-x-hidden h-full">
               <div className="flex flex-col lg:flex-row lg:items-stretch gap-3 lg:gap-2 md:gap-3 pb-4 w-full h-full">
-                {displayedProducts.map((product, idx) => (
+                {displayedProducts.map((product, idx) => {
+                  const hasIngredients = !!product.ingredients;
+                  const hasReviews = !!product.review_analysis;
+                  const hasMarketing = !!product.marketing_analysis;
+                  const hasBsrHistory = !!(product.historical_data as { bsr_monthly?: Record<string, number> } | null)?.bsr_monthly;
+                  
+                  return (
                   <div 
                     key={product.id} 
-                    className="w-full lg:w-[280px] xl:w-[300px] lg:shrink-0 lg:max-h-[600px] rounded-lg border border-border bg-card overflow-hidden cursor-pointer transition-all hover:border-primary hover:shadow-md flex flex-col"
+                    className="group relative w-full lg:w-[280px] xl:w-[300px] lg:shrink-0 lg:max-h-[600px] rounded-lg border border-border bg-card overflow-hidden cursor-pointer transition-all hover:border-primary hover:shadow-md flex flex-col"
                     onClick={() => handleProductClick(product)}
                   >
+                    {/* Data Availability Overlay - visible on hover when analyzing */}
+                    {competitivePolling && !competitiveAnalysis && (
+                      <div className="absolute inset-0 z-10 bg-background/90 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center gap-3 p-4">
+                        <p className="text-xs font-medium text-foreground">Data Available for Analysis</p>
+                        <div className="space-y-2 w-full max-w-[180px]">
+                          <div className={`flex items-center gap-2 text-sm ${hasIngredients ? 'text-chart-4' : 'text-muted-foreground'}`}>
+                            {hasIngredients ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
+                            <span>Ingredients</span>
+                          </div>
+                          <div className={`flex items-center gap-2 text-sm ${hasReviews ? 'text-chart-4' : 'text-muted-foreground'}`}>
+                            {hasReviews ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
+                            <span>Reviews</span>
+                          </div>
+                          <div className={`flex items-center gap-2 text-sm ${hasMarketing ? 'text-chart-4' : 'text-muted-foreground'}`}>
+                            {hasMarketing ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
+                            <span>Marketing</span>
+                          </div>
+                          <div className={`flex items-center gap-2 text-sm ${hasBsrHistory ? 'text-chart-4' : 'text-muted-foreground'}`}>
+                            {hasBsrHistory ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
+                            <span>BSR History</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
                     <div className="bg-gradient-to-r from-muted to-muted/80 px-3 py-2">
                       <div className="flex items-center gap-2">
                         <div className="w-6 h-6 md:w-7 md:h-7 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
@@ -3022,7 +3053,8 @@ export function EnhancedBenchmarkComparison({
                       </div>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
 
                 {/* Empty slots to show capacity */}
                 {Array.from({ length: Math.max(0, MAX_COMPETITORS - displayedProducts.length) }).map((_, idx) => (
@@ -3076,67 +3108,19 @@ export function EnhancedBenchmarkComparison({
           </CardHeader>
           <CardContent>
             {competitivePolling && !competitiveAnalysis ? (
-              <div className="space-y-6">
-                {/* Progress Animation */}
-                <div className="flex flex-col items-center justify-center py-8 gap-4">
-                  <div className="relative">
-                    <Loader2 className="w-12 h-12 animate-spin text-primary" />
-                    <Brain className="w-6 h-6 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-primary" />
-                  </div>
-                  <div className="text-center">
-                    <p className="text-sm font-medium">Analyzing {displayedProducts.length} competitors...</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      This takes about 30-60 seconds
-                    </p>
-                  </div>
+              <div className="flex flex-col items-center justify-center py-12 gap-4">
+                <div className="relative">
+                  <Loader2 className="w-12 h-12 animate-spin text-primary" />
+                  <Brain className="w-6 h-6 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-primary" />
                 </div>
-
-                {/* Data Being Analyzed Preview */}
-                <div className="border rounded-lg p-4 bg-muted/30">
-                  <p className="text-xs font-medium mb-3 flex items-center gap-2">
-                    <FileText className="w-3.5 h-3.5 text-primary" />
-                    Data being analyzed:
+                <div className="text-center">
+                  <p className="text-sm font-medium">Analyzing {displayedProducts.length} competitors...</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Hover over product cards above to see data availability
                   </p>
-                  <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {displayedProducts.slice(0, 6).map((product, idx) => {
-                      const hasReviews = !!product.review_analysis;
-                      const hasMarketing = !!product.marketing_analysis;
-                      const hasIngredients = !!product.ingredients;
-                      return (
-                        <div key={product.id} className="flex items-start gap-2 p-2 bg-background rounded border">
-                          <div className="w-8 h-8 rounded bg-muted overflow-hidden shrink-0">
-                            {product.main_image_url ? (
-                              <img src={product.main_image_url} alt="" className="w-full h-full object-contain" />
-                            ) : (
-                              <Package className="w-4 h-4 m-2 text-muted-foreground" />
-                            )}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-[10px] font-medium truncate">{product.brand || 'Unknown'}</p>
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              <Badge variant="outline" className={`text-[8px] h-4 ${hasIngredients ? 'bg-chart-4/10 text-chart-4' : 'bg-muted text-muted-foreground'}`}>
-                                {hasIngredients ? <Check className="w-2 h-2 mr-0.5" /> : <X className="w-2 h-2 mr-0.5" />}
-                                Ingredients
-                              </Badge>
-                              <Badge variant="outline" className={`text-[8px] h-4 ${hasReviews ? 'bg-chart-4/10 text-chart-4' : 'bg-muted text-muted-foreground'}`}>
-                                {hasReviews ? <Check className="w-2 h-2 mr-0.5" /> : <X className="w-2 h-2 mr-0.5" />}
-                                Reviews
-                              </Badge>
-                              <Badge variant="outline" className={`text-[8px] h-4 ${hasMarketing ? 'bg-chart-4/10 text-chart-4' : 'bg-muted text-muted-foreground'}`}>
-                                {hasMarketing ? <Check className="w-2 h-2 mr-0.5" /> : <X className="w-2 h-2 mr-0.5" />}
-                                Marketing
-                              </Badge>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {displayedProducts.length > 6 && (
-                    <p className="text-[10px] text-muted-foreground mt-2 text-center">
-                      + {displayedProducts.length - 6} more competitors
-                    </p>
-                  )}
+                  <p className="text-xs text-muted-foreground">
+                    This takes about 30-60 seconds
+                  </p>
                 </div>
               </div>
             ) : competitiveAnalysis ? (

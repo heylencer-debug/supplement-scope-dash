@@ -65,56 +65,95 @@ serve(async (req) => {
       ? trustSignals.slice(0, 3).join(", ")
       : null;
 
-    // Build a PREMIUM, MINIMALIST design prompt
+    // Detect target market from the data for imagery
+    const isDogProduct = primaryClaim?.toLowerCase().includes('dog') || 
+                         frontPanelText?.toLowerCase().includes('dog') ||
+                         packagingFormat?.toLowerCase().includes('dog');
+    const isCatProduct = primaryClaim?.toLowerCase().includes('cat') || 
+                         frontPanelText?.toLowerCase().includes('cat');
+    const isPetProduct = isDogProduct || isCatProduct;
+    
+    // Build a PREMIUM design prompt with essential content
     const promptParts = [
-      `Ultra-premium luxury ${packagingFormat} product photography. Award-winning minimalist packaging design.`,
+      `Premium ${packagingFormat} product photography. Modern, professional packaging design that balances elegance with clear product information.`,
       "",
-      "DESIGN PHILOSOPHY: High-end, luxury, minimalist. Think Apple meets Aesop. Less is more.",
+      "DESIGN PHILOSOPHY: Premium and professional, but informative. Think Ritual, AG1, or high-end pet brands like Open Farm or Ollie.",
       ""
     ];
 
-    // Colors - use as the primary design language
+    // Colors
     promptParts.push("COLOR PALETTE:");
     if (primaryColorHex) {
-      promptParts.push(`- Dominant color: ${primaryColorHex} - use as main label/packaging color`);
+      promptParts.push(`- Primary brand color: ${primaryColorHex}`);
     }
     if (secondaryColorHex) {
-      promptParts.push(`- Contrast color: ${secondaryColorHex} - for minimal text elements`);
+      promptParts.push(`- Secondary color: ${secondaryColorHex}`);
     }
     if (accentColorHex) {
-      promptParts.push(`- Accent: ${accentColorHex} - subtle highlight only`);
+      promptParts.push(`- Accent color: ${accentColorHex}`);
     }
 
     promptParts.push("");
-    promptParts.push("LABEL CONTENT (use sparingly, large clean typography):");
+    promptParts.push("LABEL CONTENT (include all of this, but with clean modern typography):");
     
-    // Only use primary claim as hero text - no bullet points or excessive text
-    if (primaryClaim) {
-      promptParts.push(`- Hero headline ONLY: "${primaryClaim.split(' ').slice(0, 5).join(' ')}"`);
+    // Use the front panel mock content
+    if (frontPanelText) {
+      // Extract key elements from front panel
+      const lines = frontPanelText.split('\n').filter((l: string) => l.trim());
+      const headline = lines[0] || primaryClaim;
+      const subheadline = lines.find((l: string) => l.includes('Support') || l.includes('For ')) || '';
+      const quantity = lines.find((l: string) => l.includes('CHEW') || l.includes('CAPSULE') || l.includes('SERVING')) || '';
+      const flavor = lines.find((l: string) => l.toLowerCase().includes('flavor')) || '';
+      
+      promptParts.push(`- Main headline: "${headline}"`);
+      if (subheadline) promptParts.push(`- Subheadline: "${subheadline}"`);
+      if (quantity) promptParts.push(`- Quantity: "${quantity}"`);
+      if (flavor) promptParts.push(`- Flavor callout: "${flavor}"`);
+    } else if (primaryClaim) {
+      promptParts.push(`- Main headline: "${primaryClaim}"`);
     }
     
-    // Just 1-2 certification badges, not a list
+    // Key differentiators as small badges/icons
+    if (keyDifferentiators?.length > 0) {
+      promptParts.push(`- Feature badges (small, icon-style): ${keyDifferentiators.slice(0, 3).join(', ')}`);
+    }
+    
+    // Certification badges
     if (certifications?.length > 0) {
-      promptParts.push(`- Single certification badge: ${certifications[0]}`);
+      promptParts.push(`- Certification seals: ${certifications.slice(0, 3).join(', ')}`);
+    }
+
+    // TARGET MARKET IMAGERY
+    promptParts.push("");
+    promptParts.push("IMAGERY ON PACKAGING (important!):");
+    if (isDogProduct) {
+      promptParts.push("- Include a beautiful, happy, healthy dog image/illustration on the label");
+      promptParts.push("- Dog should look vibrant, active, and healthy (golden retriever, lab, or friendly breed)");
+      promptParts.push("- Can be a photo or elegant line illustration style");
+    } else if (isCatProduct) {
+      promptParts.push("- Include an elegant cat image/illustration on the label");
+      promptParts.push("- Cat should look healthy and content");
+    } else {
+      promptParts.push("- Include lifestyle imagery suggesting health, vitality, and wellness");
+      promptParts.push("- Could be abstract shapes, nature elements, or subtle human silhouettes");
     }
 
     promptParts.push("");
     promptParts.push("PREMIUM PACKAGING REQUIREMENTS:");
-    promptParts.push(`- Modern, sleek ${packagingFormat} with matte or soft-touch finish`);
-    promptParts.push("- EXTREMELY MINIMAL text on label - maximum 2-3 text elements total");
-    promptParts.push("- Large negative space, breathing room, zen-like simplicity");
-    promptParts.push("- Premium metallic or embossed logo treatment");
-    promptParts.push("- No cluttered bullet points or long text blocks");
-    promptParts.push("- Think luxury skincare (Aesop, Sunday Riley) or premium supplements (Ritual, AG1)");
-    promptParts.push("- Clean geometric shapes, subtle gradients, sophisticated typography");
+    promptParts.push(`- Modern, sleek ${packagingFormat} with matte or soft-touch finish appearance`);
+    promptParts.push("- Clean visual hierarchy - headline largest, details smaller but readable");
+    promptParts.push("- Good use of whitespace, not cluttered");
+    promptParts.push("- Premium feel with subtle textures, gradients, or metallic accents on logo/badges");
+    promptParts.push("- Professional supplement brand aesthetic (not cheap or generic looking)");
+    promptParts.push("- Typography: Modern sans-serif, clean and professional");
     promptParts.push("");
     promptParts.push("PHOTOGRAPHY STYLE:");
-    promptParts.push("- Editorial product photography, magazine cover quality");
-    promptParts.push("- Soft diffused lighting, gentle shadows");
-    promptParts.push("- Clean white or soft gradient background");
-    promptParts.push("- Slight reflection on surface for luxury feel");
-    promptParts.push("- 4K, sharp focus, depth of field blur on background");
-    promptParts.push("- Premium, aspirational, would look great on Instagram");
+    promptParts.push("- Professional product photography, e-commerce quality");
+    promptParts.push("- Clean white or very light gradient background");
+    promptParts.push("- Soft studio lighting with gentle shadows");
+    promptParts.push("- Product at slight angle to show dimension");
+    promptParts.push("- Sharp focus, high resolution, photorealistic");
+    promptParts.push("- Would look great on Amazon or brand website");
 
     const prompt = promptParts.join("\n");
 

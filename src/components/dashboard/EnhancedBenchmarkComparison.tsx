@@ -3068,17 +3068,6 @@ export function EnhancedBenchmarkComparison({
                   );
                 })}
 
-                {/* Empty slots to show capacity */}
-                {Array.from({ length: Math.max(0, MAX_COMPETITORS - displayedProducts.length) }).map((_, idx) => (
-                  <div key={`empty-${idx}`} className="w-[280px] md:w-[320px] shrink-0 rounded-lg border border-dashed border-border bg-muted/20 flex flex-col items-center justify-center min-h-[480px] gap-2">
-                    <span className="inline-flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-primary/40 animate-pulse" />
-                      <span className="w-2 h-2 rounded-full bg-primary/40 animate-pulse [animation-delay:150ms]" />
-                      <span className="w-2 h-2 rounded-full bg-primary/40 animate-pulse [animation-delay:300ms]" />
-                    </span>
-                    <p className="text-xs text-muted-foreground">Loading...</p>
-                  </div>
-                ))}
               </div>
               <ScrollBar orientation="horizontal" />
             </ScrollArea>

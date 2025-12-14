@@ -257,6 +257,21 @@ export default function Dashboard() {
           };
         } | null,
         formula_brief_content: formulaBriefContent,
+        products_snapshot: analysis?.products_snapshot as {
+          formula_references?: Array<{
+            asin: string;
+            age_months?: number;
+            monthly_revenue?: number;
+            monthly_sales?: number;
+            brand?: string;
+            title?: string;
+          }>;
+          top_performers?: Array<{
+            asin: string;
+            monthly_revenue?: number;
+            monthly_sales?: number;
+          }>;
+        } | null,
       },
     };
   }, [analysis]);

@@ -517,6 +517,7 @@ export type Database = {
           category_id: string
           created_at: string
           id: string
+          type: string
           updated_at: string
         }
         Insert: {
@@ -524,6 +525,7 @@ export type Database = {
           category_id: string
           created_at?: string
           id?: string
+          type?: string
           updated_at?: string
         }
         Update: {
@@ -531,20 +533,21 @@ export type Database = {
           category_id?: string
           created_at?: string
           id?: string
+          type?: string
           updated_at?: string
         }
         Relationships: [
           {
             foreignKeyName: "ingredient_analyses_category_id_fkey"
             columns: ["category_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "categories"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "ingredient_analyses_category_id_fkey"
             columns: ["category_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "v_category_dashboard"
             referencedColumns: ["id"]
           },

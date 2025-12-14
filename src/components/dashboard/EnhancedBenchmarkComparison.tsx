@@ -552,9 +552,14 @@ function PackagingComparisonSection({ ourPackaging, competitors, getCompetitorPa
 function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNutrients, getCompetitorIngredientsList, ourPrice, ourServings, labelClaims = [], categoryId }: IngredientComparisonProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [viewMode, setViewMode] = useState<'chart' | 'table' | 'gaps'>('chart');
+  const [activeTab, setActiveTab] = useState<'new_winners' | 'top_performers'>('new_winners');
   
-  // AI Analysis hook
-  const { analysis: aiAnalysis, isLoading: aiLoading, runAnalysis, hasAnalysis, pollingStatus } = useIngredientAnalysis(categoryId);
+  // AI Analysis hooks - one for each type
+  const newWinnersAnalysis = useIngredientAnalysis(categoryId, 'new_winners');
+  const topPerformersAnalysis = useIngredientAnalysis(categoryId, 'top_performers');
+  
+  // Get the active analysis based on selected tab
+  const activeAnalysisData = activeTab === 'new_winners' ? newWinnersAnalysis : topPerformersAnalysis;
 
   // Create a map of label claims for quick lookup
   const labelClaimsMap = useMemo(() => {
@@ -917,23 +922,6 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
               </div>
             </CollapsibleTrigger>
             <div className="flex items-center gap-2">
-              {/* AI Analysis Button - only show if no analysis yet */}
-              {!hasAnalysis && (
-                <Button 
-                  variant="default"
-                  size="sm" 
-                  className="h-7 sm:h-8 px-2 sm:px-3 text-[10px] sm:text-xs"
-                  onClick={(e) => { e.stopPropagation(); runAnalysis(); }}
-                  disabled={aiLoading || !categoryId}
-                >
-                  {aiLoading ? (
-                    <Loader2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 mr-1 animate-spin" />
-                  ) : (
-                    <Brain className="w-3 h-3 sm:w-3.5 sm:h-3.5 mr-1" />
-                  )}
-                  Analyze with AI
-                </Button>
-              )}
               <CollapsibleTrigger asChild>
                 <Button variant="ghost" size="sm" className="h-7 w-7 sm:h-8 sm:w-8 p-0">
                   {isOpen ? <ChevronUp className="h-3 w-3 sm:h-4 sm:w-4" /> : <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4" />}
@@ -944,10 +932,83 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
         </CardHeader>
         <CollapsibleContent>
           <CardContent className="pt-0 p-3 sm:p-4 md:p-6">
+            {/* Tabbed Navigation for New Winners vs Top Performers */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+              <div className="flex items-center bg-muted rounded-lg p-0.5">
+                <Button 
+                  variant={activeTab === 'new_winners' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="h-8 px-3 text-xs gap-1.5 rounded-md"
+                  onClick={() => setActiveTab('new_winners')}
+                >
+                  <Zap className="w-3 h-3" />
+                  New Winners
+                  {newWinnersAnalysis.hasAnalysis && (
+                    <CheckCircle className="w-3 h-3 text-green-500" />
+                  )}
+                  {newWinnersAnalysis.pollingStatus.isPolling && (
+                    <Loader2 className="w-3 h-3 animate-spin text-primary" />
+                  )}
+                </Button>
+                <Button 
+                  variant={activeTab === 'top_performers' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="h-8 px-3 text-xs gap-1.5 rounded-md"
+                  onClick={() => setActiveTab('top_performers')}
+                >
+                  <Trophy className="w-3 h-3" />
+                  Top Performers
+                  {topPerformersAnalysis.hasAnalysis && (
+                    <CheckCircle className="w-3 h-3 text-green-500" />
+                  )}
+                  {topPerformersAnalysis.pollingStatus.isPolling && (
+                    <Loader2 className="w-3 h-3 animate-spin text-primary" />
+                  )}
+                </Button>
+              </div>
+              
+              {/* AI Analysis Button for active tab */}
+              {!activeAnalysisData.hasAnalysis && !activeAnalysisData.pollingStatus.isPolling && (
+                <Button 
+                  variant="default"
+                  size="sm" 
+                  className="h-8 px-3 text-xs"
+                  onClick={(e) => { e.stopPropagation(); activeAnalysisData.runAnalysis(); }}
+                  disabled={activeAnalysisData.isLoading || !categoryId}
+                >
+                  {activeAnalysisData.isLoading ? (
+                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                  ) : (
+                    <Brain className="w-3.5 h-3.5 mr-1.5" />
+                  )}
+                  Analyze {activeTab === 'new_winners' ? 'New Winners' : 'Top Performers'}
+                </Button>
+              )}
+            </div>
+
+            {/* Tab Description */}
+            <div className="mb-4 p-3 rounded-lg bg-muted/50 border border-border/50">
+              {activeTab === 'new_winners' ? (
+                <p className="text-xs text-muted-foreground">
+                  <Zap className="w-3 h-3 inline mr-1 text-amber-500" />
+                  <strong>New Winners:</strong> Compare against young, high-growth products (Formula References) that are disrupting the market with innovative formulations.
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  <Trophy className="w-3 h-3 inline mr-1 text-primary" />
+                  <strong>Top Performers:</strong> Compare against established best-sellers with proven track records and market-leading formulations.
+                </p>
+              )}
+            </div>
+
             {/* Show AI Analysis Results when available */}
-            {aiAnalysis ? (
-              <AIAnalysisResults analysis={aiAnalysis} onRefresh={runAnalysis} isLoading={aiLoading} />
-            ) : pollingStatus.isPolling ? (
+            {activeAnalysisData.analysis ? (
+              <AIAnalysisResults 
+                analysis={activeAnalysisData.analysis} 
+                onRefresh={activeAnalysisData.runAnalysis} 
+                isLoading={activeAnalysisData.isLoading} 
+              />
+            ) : activeAnalysisData.pollingStatus.isPolling ? (
               /* Polling Progress Indicator */
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <div className="relative mb-6">
@@ -958,29 +1019,31 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                     <Loader2 className="w-4 h-4 text-primary animate-spin" />
                   </div>
                 </div>
-                <h3 className="text-lg font-semibold text-foreground mb-2">AI Analysis in Progress</h3>
+                <h3 className="text-lg font-semibold text-foreground mb-2">
+                  Analyzing {activeTab === 'new_winners' ? 'New Winners' : 'Top Performers'}
+                </h3>
                 <p className="text-sm text-muted-foreground max-w-md mb-4">
-                  Claude is analyzing your formulation against competitors. This may take 1-2 minutes...
+                  AI is analyzing your formulation against {activeTab === 'new_winners' ? 'emerging high-growth products' : 'market-leading competitors'}. This may take 1-2 minutes...
                 </p>
                 
                 {/* Progress Bar */}
                 <div className="w-full max-w-xs mb-4">
                   <div className="flex justify-between text-xs text-muted-foreground mb-1">
                     <span>Polling for results...</span>
-                    <span>{pollingStatus.attempt} / {pollingStatus.maxAttempts}</span>
+                    <span>{activeAnalysisData.pollingStatus.attempt} / {activeAnalysisData.pollingStatus.maxAttempts}</span>
                   </div>
                   <div className="h-2 bg-muted rounded-full overflow-hidden">
                     <div 
                       className="h-full bg-primary transition-all duration-500 ease-out rounded-full"
-                      style={{ width: `${(pollingStatus.attempt / pollingStatus.maxAttempts) * 100}%` }}
+                      style={{ width: `${(activeAnalysisData.pollingStatus.attempt / activeAnalysisData.pollingStatus.maxAttempts) * 100}%` }}
                     />
                   </div>
                 </div>
 
                 {/* Time Elapsed */}
-                {pollingStatus.startedAt && (
+                {activeAnalysisData.pollingStatus.startedAt && (
                   <p className="text-xs text-muted-foreground">
-                    Time elapsed: {Math.floor((Date.now() - pollingStatus.startedAt.getTime()) / 1000)}s
+                    Time elapsed: {Math.floor((Date.now() - activeAnalysisData.pollingStatus.startedAt.getTime()) / 1000)}s
                   </p>
                 )}
               </div>
@@ -988,24 +1051,32 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
               /* Empty State - Prompt to run analysis */
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <div className="p-4 rounded-full bg-primary/10 mb-4">
-                  <Brain className="w-8 h-8 text-primary" />
+                  {activeTab === 'new_winners' ? (
+                    <Zap className="w-8 h-8 text-amber-500" />
+                  ) : (
+                    <Trophy className="w-8 h-8 text-primary" />
+                  )}
                 </div>
-                <h3 className="text-lg font-semibold text-foreground mb-2">AI Ingredient Analysis</h3>
+                <h3 className="text-lg font-semibold text-foreground mb-2">
+                  {activeTab === 'new_winners' ? 'New Winners Analysis' : 'Top Performers Analysis'}
+                </h3>
                 <p className="text-sm text-muted-foreground max-w-md mb-6">
-                  Click the button above to analyze your formulation against top competitors using Claude AI. 
-                  Get dosage comparisons, gap analysis, and actionable recommendations.
+                  {activeTab === 'new_winners' 
+                    ? 'Analyze your formulation against young, high-growth products to identify emerging trends and innovative formulation strategies.'
+                    : 'Analyze your formulation against established market leaders to understand proven formulation strategies and competitive positioning.'
+                  }
                 </p>
                 <Button 
-                  onClick={runAnalysis}
-                  disabled={aiLoading || !categoryId}
+                  onClick={activeAnalysisData.runAnalysis}
+                  disabled={activeAnalysisData.isLoading || !categoryId}
                   className="gap-2"
                 >
-                  {aiLoading ? (
+                  {activeAnalysisData.isLoading ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
-                    <Zap className="w-4 h-4" />
+                    <Brain className="w-4 h-4" />
                   )}
-                  {aiLoading ? 'Analyzing...' : 'Start Analysis'}
+                  {activeAnalysisData.isLoading ? 'Analyzing...' : `Analyze ${activeTab === 'new_winners' ? 'New Winners' : 'Top Performers'}`}
                 </Button>
               </div>
             )}

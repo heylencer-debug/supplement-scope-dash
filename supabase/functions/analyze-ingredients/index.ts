@@ -16,7 +16,7 @@ serve(async (req) => {
   }
 
   try {
-    const { categoryId } = await req.json();
+    const { categoryId, type = 'top_performers' } = await req.json();
     
     if (!categoryId) {
       return new Response(
@@ -25,7 +25,7 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[analyze-ingredients] Starting analysis for category: ${categoryId}`);
+    console.log(`[analyze-ingredients] Starting analysis for category: ${categoryId}, type: ${type}`);
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -48,31 +48,78 @@ serve(async (req) => {
       );
     }
 
-    // Fetch top 3 competitor products
-    const { data: competitors, error: competitorsError } = await supabase
-      .from('products')
-      .select('title, brand, ingredients, other_ingredients, all_nutrients, supplement_facts_complete, price, monthly_sales, review_analysis')
-      .eq('category_id', categoryId)
-      .order('monthly_sales', { ascending: false })
-      .limit(3);
-
-    if (competitorsError) {
-      console.error('[analyze-ingredients] Error fetching competitors:', competitorsError);
+    // Fetch competitors based on type
+    let competitors;
+    let competitorLabel = '';
+    
+    if (type === 'new_winners') {
+      // Get formula reference ASINs from category_analyses.products_snapshot.formula_references
+      const formulaRefs = (categoryAnalysis.products_snapshot as any)?.formula_references || [];
+      const asins = formulaRefs.map((r: any) => r.asin).filter(Boolean);
+      
+      console.log(`[analyze-ingredients] New Winners mode - found ${asins.length} formula reference ASINs:`, asins);
+      
+      if (asins.length > 0) {
+        const { data: refProducts, error: refError } = await supabase
+          .from('products')
+          .select('title, brand, ingredients, other_ingredients, all_nutrients, supplement_facts_complete, price, monthly_sales, review_analysis, age_months')
+          .eq('category_id', categoryId)
+          .in('asin', asins)
+          .limit(5);
+          
+        if (refError) {
+          console.error('[analyze-ingredients] Error fetching formula reference products:', refError);
+        }
+        competitors = refProducts || [];
+        competitorLabel = 'New Winners (Formula References)';
+      } else {
+        // Fallback to young, high-growth products if no formula references
+        const { data: youngProducts, error: youngError } = await supabase
+          .from('products')
+          .select('title, brand, ingredients, other_ingredients, all_nutrients, supplement_facts_complete, price, monthly_sales, review_analysis, age_months')
+          .eq('category_id', categoryId)
+          .lte('age_months', 24)
+          .order('monthly_sales', { ascending: false })
+          .limit(5);
+          
+        if (youngError) {
+          console.error('[analyze-ingredients] Error fetching young products:', youngError);
+        }
+        competitors = youngProducts || [];
+        competitorLabel = 'New Winners (Young High-Growth Products)';
+      }
+    } else {
+      // Top Performers - original behavior: top products by monthly sales
+      const { data: topProducts, error: topError } = await supabase
+        .from('products')
+        .select('title, brand, ingredients, other_ingredients, all_nutrients, supplement_facts_complete, price, monthly_sales, review_analysis, age_months')
+        .eq('category_id', categoryId)
+        .order('monthly_sales', { ascending: false })
+        .limit(5);
+        
+      if (topError) {
+        console.error('[analyze-ingredients] Error fetching top products:', topError);
+      }
+      competitors = topProducts || [];
+      competitorLabel = 'Top Performers (Best Sellers)';
     }
 
-    // Mark as in progress
+    console.log(`[analyze-ingredients] Found ${competitors?.length || 0} ${competitorLabel} competitors`);
+
+    // Mark as in progress with type
     await supabase
       .from('ingredient_analyses')
       .upsert({
         category_id: categoryId,
+        type: type,
         analysis: { status: 'in_progress', started_at: new Date().toISOString() },
         updated_at: new Date().toISOString()
-      }, { onConflict: 'category_id' });
+      }, { onConflict: 'category_id,type' });
 
-    console.log('[analyze-ingredients] Marked as in_progress');
+    console.log(`[analyze-ingredients] Marked as in_progress for type: ${type}`);
 
     // Format competitor data
-    const competitorData = (competitors || []).map((c, i) => ({
+    const competitorData = (competitors || []).map((c: any, i: number) => ({
       rank: i + 1,
       brand: c.brand || 'Unknown',
       title: c.title || 'Unknown Product',
@@ -80,6 +127,7 @@ serve(async (req) => {
       nutrients: c.all_nutrients || c.supplement_facts_complete || null,
       price: c.price,
       monthly_sales: c.monthly_sales,
+      age_months: c.age_months,
       pain_points: c.review_analysis?.pain_points || []
     }));
 
@@ -93,9 +141,10 @@ serve(async (req) => {
           .from('ingredient_analyses')
           .upsert({
             category_id: categoryId,
+            type: type,
             analysis: { status: 'error', error: 'OpenRouter API key not configured' },
             updated_at: new Date().toISOString()
-          }, { onConflict: 'category_id' });
+          }, { onConflict: 'category_id,type' });
         return;
       }
 
@@ -103,9 +152,16 @@ serve(async (req) => {
         const formulaBriefContent = categoryAnalysis.analysis_3_formula_brief?.formula_brief_content || '';
         const categoryName = categoryAnalysis.category_name || 'Unknown Category';
 
+        // Customize prompt based on analysis type
+        const typeContext = type === 'new_winners' 
+          ? `Focus on EMERGING TRENDS and GROWTH STRATEGIES. These are NEW WINNERS - young, high-growth products that are disrupting the market. Analyze what innovative formulation strategies they're using that are driving their rapid growth.`
+          : `Focus on PROVEN FORMULATIONS and MARKET SHARE. These are TOP PERFORMERS - established best-sellers with proven track records. Analyze what formulation strategies have made them market leaders.`;
+
         const systemPrompt = `You are an expert supplement formulation analyst. Analyze ingredient formulations and provide comprehensive strategic recommendations.
 
-Your task is to compare "Our Concept" formulation against competitor products and provide detailed analysis including:
+${typeContext}
+
+Your task is to compare "Our Concept" formulation against ${competitorLabel} and provide detailed analysis including:
 - SWOT analysis
 - Clinical dosage analysis with research notes
 - Customer pain point solutions
@@ -117,14 +173,20 @@ IMPORTANT: You must call the "save_ingredient_analysis" function with your compl
 
         const userPrompt = `Analyze the ingredient formulation for: ${categoryName}
 
+## Analysis Type: ${competitorLabel}
+${type === 'new_winners' 
+  ? 'These are emerging high-growth products. Focus on innovative formulation trends and growth drivers.' 
+  : 'These are established market leaders. Focus on proven formulation strategies and competitive positioning.'}
+
 ## Our Concept Formula Brief:
 ${formulaBriefContent || 'No formula brief available'}
 
-## Top Competitor Products:
-${competitorData.map(c => `
-### Competitor ${c.rank}: ${c.brand} - ${c.title}
+## ${competitorLabel}:
+${competitorData.map((c: any) => `
+### ${type === 'new_winners' ? 'New Winner' : 'Top Performer'} ${c.rank}: ${c.brand} - ${c.title}
 - Price: $${c.price || 'N/A'}
 - Monthly Sales: ${c.monthly_sales || 'N/A'}
+${c.age_months ? `- Product Age: ${c.age_months} months` : ''}
 - Ingredients: ${typeof c.ingredients === 'string' ? c.ingredients.substring(0, 800) : JSON.stringify(c.ingredients).substring(0, 800)}
 - Nutrients: ${c.nutrients ? JSON.stringify(c.nutrients).substring(0, 800) : 'Not available'}
 - Customer Pain Points: ${JSON.stringify(c.pain_points).substring(0, 300)}
@@ -132,7 +194,7 @@ ${competitorData.map(c => `
 
 Provide a comprehensive analysis including SWOT, clinical dosage adequacy, customer insights, competitive matrix, priority roadmap, and a complete ingredient comparison table. Call the save_ingredient_analysis function with all fields populated.`;
 
-        console.log('[analyze-ingredients] Calling OpenRouter API with Gemini 3 Pro Preview...');
+        console.log(`[analyze-ingredients] Calling OpenRouter API for ${type} analysis...`);
 
         const toolSchema = {
           type: 'function',
@@ -422,7 +484,7 @@ Provide a comprehensive analysis including SWOT, clinical dosage adequacy, custo
         }
 
         const data = await response.json();
-        console.log('[analyze-ingredients] OpenRouter response received');
+        console.log(`[analyze-ingredients] OpenRouter response received for ${type}`);
 
         // Extract tool call
         const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
@@ -440,23 +502,24 @@ Provide a comprehensive analysis including SWOT, clinical dosage adequacy, custo
           throw new Error('Failed to parse analysis result');
         }
 
-        console.log('[analyze-ingredients] Analysis result parsed successfully with keys:', Object.keys(analysisResult).join(', '));
+        console.log(`[analyze-ingredients] Analysis result parsed successfully for ${type} with keys:`, Object.keys(analysisResult).join(', '));
 
-        // Save to database
+        // Save to database with type
         const { error: saveError } = await supabase
           .from('ingredient_analyses')
           .upsert({
             category_id: categoryId,
+            type: type,
             analysis: analysisResult,
             updated_at: new Date().toISOString()
-          }, { onConflict: 'category_id' });
+          }, { onConflict: 'category_id,type' });
 
         if (saveError) {
           console.error('[analyze-ingredients] Error saving analysis:', saveError);
           throw saveError;
         }
 
-        console.log('[analyze-ingredients] Analysis saved successfully for category:', categoryId);
+        console.log(`[analyze-ingredients] Analysis saved successfully for category: ${categoryId}, type: ${type}`);
 
       } catch (error) {
         console.error('[analyze-ingredients] Background analysis error:', error);
@@ -464,13 +527,14 @@ Provide a comprehensive analysis including SWOT, clinical dosage adequacy, custo
           .from('ingredient_analyses')
           .upsert({
             category_id: categoryId,
+            type: type,
             analysis: { 
               status: 'error', 
               error: error instanceof Error ? error.message : 'Unknown error',
               timestamp: new Date().toISOString()
             },
             updated_at: new Date().toISOString()
-          }, { onConflict: 'category_id' });
+          }, { onConflict: 'category_id,type' });
       }
     }
 
@@ -480,8 +544,9 @@ Provide a comprehensive analysis including SWOT, clinical dosage adequacy, custo
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: 'Ingredient analysis started',
-        categoryId 
+        message: `Ingredient analysis started for ${competitorLabel}`,
+        categoryId,
+        type
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

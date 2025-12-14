@@ -2,6 +2,8 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
+export type IngredientAnalysisType = 'new_winners' | 'top_performers';
+
 export interface IngredientAnalysis {
   summary: {
     overall_assessment: 'Strong' | 'Moderate' | 'Weak';
@@ -123,7 +125,7 @@ export interface IngredientAnalysis {
   message?: string;
 }
 
-export function useIngredientAnalysis(categoryId?: string) {
+export function useIngredientAnalysis(categoryId?: string, type: IngredientAnalysisType = 'top_performers') {
   const [analysis, setAnalysis] = useState<IngredientAnalysis | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingFromDb, setIsLoadingFromDb] = useState(true);
@@ -159,25 +161,26 @@ export function useIngredientAnalysis(categoryId?: string) {
           .from('ingredient_analyses')
           .select('analysis')
           .eq('category_id', categoryId)
+          .eq('type', type)
           .maybeSingle();
 
         if (dbError) {
-          console.error('[useIngredientAnalysis] DB load error:', dbError);
+          console.error(`[useIngredientAnalysis:${type}] DB load error:`, dbError);
         } else if (data?.analysis && isValidAnalysis(data.analysis)) {
-          console.log('[useIngredientAnalysis] Loaded valid analysis from DB');
+          console.log(`[useIngredientAnalysis:${type}] Loaded valid analysis from DB`);
           setAnalysis(data.analysis as unknown as IngredientAnalysis);
         } else if (data?.analysis) {
-          console.log('[useIngredientAnalysis] Found analysis but invalid/in-progress:', data.analysis);
+          console.log(`[useIngredientAnalysis:${type}] Found analysis but invalid/in-progress:`, data.analysis);
         }
       } catch (e) {
-        console.error('[useIngredientAnalysis] DB load error:', e);
+        console.error(`[useIngredientAnalysis:${type}] DB load error:`, e);
       } finally {
         setIsLoadingFromDb(false);
       }
     }
 
     loadFromDb();
-  }, [categoryId]);
+  }, [categoryId, type]);
 
   const runAnalysis = useCallback(async () => {
     if (!categoryId) {
@@ -190,7 +193,7 @@ export function useIngredientAnalysis(categoryId?: string) {
     }
 
     if (pollingRef.current) {
-      console.log('[useIngredientAnalysis] Already polling, skipping');
+      console.log(`[useIngredientAnalysis:${type}] Already polling, skipping`);
       return;
     }
 
@@ -199,23 +202,24 @@ export function useIngredientAnalysis(categoryId?: string) {
     pollingRef.current = true;
 
     try {
-      // Clear existing analysis
-      console.log('[useIngredientAnalysis] Clearing existing analysis...');
+      // Clear existing analysis for this type
+      console.log(`[useIngredientAnalysis:${type}] Clearing existing analysis...`);
       await supabase
         .from('ingredient_analyses')
         .delete()
-        .eq('category_id', categoryId);
+        .eq('category_id', categoryId)
+        .eq('type', type);
       
       setAnalysis(null);
 
-      // Call edge function
-      console.log('[useIngredientAnalysis] Invoking edge function...');
+      // Call edge function with type parameter
+      console.log(`[useIngredientAnalysis:${type}] Invoking edge function...`);
       const { data, error: fnError } = await supabase.functions.invoke('analyze-ingredients', {
-        body: { categoryId }
+        body: { categoryId, type }
       });
 
       if (fnError) {
-        console.error('[useIngredientAnalysis] Edge function error:', fnError);
+        console.error(`[useIngredientAnalysis:${type}] Edge function error:`, fnError);
         throw new Error(fnError.message);
       }
 
@@ -223,9 +227,10 @@ export function useIngredientAnalysis(categoryId?: string) {
         throw new Error(data.error);
       }
 
+      const typeLabel = type === 'new_winners' ? 'New Winners' : 'Top Performers';
       toast({
         title: 'Analysis Started',
-        description: 'AI analysis running in background. This takes 2-4 minutes...',
+        description: `AI analysis for ${typeLabel} running in background. This takes 2-4 minutes...`,
       });
 
       // Poll for results
@@ -238,7 +243,7 @@ export function useIngredientAnalysis(categoryId?: string) {
         attempts++;
         setPollingStatus(prev => ({ ...prev, attempt: attempts }));
         
-        console.log(`[useIngredientAnalysis] Polling attempt ${attempts}/${maxAttempts}`);
+        console.log(`[useIngredientAnalysis:${type}] Polling attempt ${attempts}/${maxAttempts}`);
         
         await new Promise(resolve => setTimeout(resolve, 5000)); // 5 second intervals
         
@@ -246,10 +251,11 @@ export function useIngredientAnalysis(categoryId?: string) {
           .from('ingredient_analyses')
           .select('analysis, updated_at')
           .eq('category_id', categoryId)
+          .eq('type', type)
           .maybeSingle();
 
         if (dbError) {
-          console.error('[useIngredientAnalysis] Polling error:', dbError);
+          console.error(`[useIngredientAnalysis:${type}] Polling error:`, dbError);
           continue;
         }
 
@@ -258,7 +264,7 @@ export function useIngredientAnalysis(categoryId?: string) {
           
           // Check for error state
           if (analysisData.error === true) {
-            console.error('[useIngredientAnalysis] Analysis failed:', analysisData.message);
+            console.error(`[useIngredientAnalysis:${type}] Analysis failed:`, analysisData.message);
             setPollingStatus(prev => ({ ...prev, isPolling: false }));
             pollingRef.current = false;
             throw new Error(analysisData.message || 'Analysis failed');
@@ -266,20 +272,20 @@ export function useIngredientAnalysis(categoryId?: string) {
           
           // Check for in-progress state
           if (analysisData.status === 'in_progress') {
-            console.log('[useIngredientAnalysis] Analysis still in progress...');
+            console.log(`[useIngredientAnalysis:${type}] Analysis still in progress...`);
             continue;
           }
           
           // Check for valid analysis
           if (isValidAnalysis(analysisData)) {
-            console.log('[useIngredientAnalysis] Valid analysis received!');
+            console.log(`[useIngredientAnalysis:${type}] Valid analysis received!`);
             setPollingStatus(prev => ({ ...prev, isPolling: false }));
             pollingRef.current = false;
             setAnalysis(analysisData as unknown as IngredientAnalysis);
             
             toast({
               title: 'Analysis Complete',
-              description: `Found ${analysisData.ingredients?.length || 0} ingredients analyzed.`,
+              description: `Found ${analysisData.ingredients?.length || 0} ingredients analyzed for ${typeLabel}.`,
             });
             setIsLoading(false);
             return;
@@ -304,7 +310,7 @@ export function useIngredientAnalysis(categoryId?: string) {
       setIsLoading(false);
       pollingRef.current = false;
     }
-  }, [categoryId, toast]);
+  }, [categoryId, type, toast]);
 
   const clearAnalysis = useCallback(async () => {
     setAnalysis(null);
@@ -317,12 +323,13 @@ export function useIngredientAnalysis(categoryId?: string) {
         await supabase
           .from('ingredient_analyses')
           .delete()
-          .eq('category_id', categoryId);
+          .eq('category_id', categoryId)
+          .eq('type', type);
       } catch (e) {
-        console.error('[useIngredientAnalysis] Error clearing analysis:', e);
+        console.error(`[useIngredientAnalysis:${type}] Error clearing analysis:`, e);
       }
     }
-  }, [categoryId]);
+  }, [categoryId, type]);
 
   return {
     analysis,
@@ -333,5 +340,6 @@ export function useIngredientAnalysis(categoryId?: string) {
     runAnalysis,
     clearAnalysis,
     hasAnalysis: !!analysis && isValidAnalysis(analysis),
+    type,
   };
 }

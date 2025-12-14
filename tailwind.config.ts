@@ -242,7 +242,7 @@ export default {
         "check-bounce": "check-bounce 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)",
         "shake": "shake 0.4s ease-in-out",
         "pop": "pop 0.2s ease-out",
-        "glow-pulse": "glow-pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+        "glow-pulse": "glow-pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite",
         "progress-shine": "progress-shine 1.5s ease-in-out infinite",
         "thumb-bounce": "thumb-bounce 0.2s ease-out",
         "slide-up": "slide-up 0.3s ease-out",

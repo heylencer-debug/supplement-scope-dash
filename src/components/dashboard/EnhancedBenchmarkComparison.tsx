@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, Fragment } from "react";
+import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -89,6 +90,21 @@ interface EnhancedBenchmarkComparisonProps {
     formula_brief_content?: string | null;
     opportunity_index?: number;
     recommended_price?: number;
+    products_snapshot?: {
+      formula_references?: Array<{
+        asin: string;
+        age_months?: number;
+        monthly_revenue?: number;
+        monthly_sales?: number;
+        brand?: string;
+        title?: string;
+      }>;
+      top_performers?: Array<{
+        asin: string;
+        monthly_revenue?: number;
+        monthly_sales?: number;
+      }>;
+    } | null;
   } | null;
   isLoading?: boolean;
 }
@@ -1023,11 +1039,30 @@ export function EnhancedBenchmarkComparison({
     clearAnalysis: clearCompetitiveAnalysis,
   } = useCompetitiveAnalysis(categoryId);
   
-  // All products sorted by monthly sales for selection pool
-  const allProductsSorted = useMemo(() => 
-    [...(products || [])].sort((a, b) => (b.monthly_sales || 0) - (a.monthly_sales || 0)),
-    [products]
-  );
+  // Get formula reference ASINs for prioritization
+  const formulaReferenceAsins = useMemo(() => {
+    const refs = analysisData?.products_snapshot?.formula_references || [];
+    return new Set(refs.map(r => r.asin));
+  }, [analysisData?.products_snapshot?.formula_references]);
+
+  // Helper to check if product is a formula reference (New Winner)
+  const isFormulaReference = (asin: string) => formulaReferenceAsins.has(asin);
+
+  // All products sorted - prioritize formula references, then by monthly sales
+  const allProductsSorted = useMemo(() => {
+    const allProducts = [...(products || [])];
+    
+    // Separate formula reference products from others
+    const formulaProducts = allProducts.filter(p => formulaReferenceAsins.has(p.asin));
+    const otherProducts = allProducts.filter(p => !formulaReferenceAsins.has(p.asin));
+    
+    // Sort each group by monthly_sales
+    const sortedFormula = formulaProducts.sort((a, b) => (b.monthly_sales || 0) - (a.monthly_sales || 0));
+    const sortedOthers = otherProducts.sort((a, b) => (b.monthly_sales || 0) - (a.monthly_sales || 0));
+    
+    // Return formula references first, then others
+    return [...sortedFormula, ...sortedOthers];
+  }, [products, formulaReferenceAsins]);
 
   // Filtered products based on search query
   const filteredProducts = useMemo(() => {
@@ -2580,13 +2615,31 @@ export function EnhancedBenchmarkComparison({
                       </div>
                     )}
                     
-                    <div className="bg-gradient-to-r from-muted to-muted/80 px-3 py-2">
+                    <div className={cn(
+                      "bg-gradient-to-r px-3 py-2",
+                      isFormulaReference(product.asin) 
+                        ? "from-chart-4/20 to-chart-4/10 border-b-2 border-chart-4" 
+                        : "from-muted to-muted/80"
+                    )}>
                       <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 md:w-7 md:h-7 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
+                        <div className={cn(
+                          "w-6 h-6 md:w-7 md:h-7 rounded-full flex items-center justify-center font-bold text-xs",
+                          isFormulaReference(product.asin)
+                            ? "bg-chart-4 text-white"
+                            : "bg-primary/10 text-primary"
+                        )}>
                           #{idx + 1}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="font-semibold text-xs md:text-sm truncate">{product.brand || 'Unknown'}</p>
+                          <div className="flex items-center gap-1.5">
+                            <p className="font-semibold text-xs md:text-sm truncate">{product.brand || 'Unknown'}</p>
+                            {isFormulaReference(product.asin) && (
+                              <Badge variant="default" className="text-[8px] h-4 bg-chart-4 text-white gap-0.5 shrink-0">
+                                <Zap className="w-2.5 h-2.5" />
+                                New Winner
+                              </Badge>
+                            )}
+                          </div>
                           <p className="text-[10px] text-muted-foreground truncate">{product.title?.substring(0, 25)}...</p>
                         </div>
                       </div>
@@ -2638,16 +2691,38 @@ export function EnhancedBenchmarkComparison({
                         </div>
                       </div>
 
-                      {/* Product Stats Grid */}
+                      {/* Product Stats Grid - Highlight for Formula References */}
                       <div className="grid grid-cols-2 gap-1.5">
-                        <div className="bg-secondary/50 rounded p-1.5">
+                        <div className={cn(
+                          "rounded p-1.5",
+                          isFormulaReference(product.asin) ? "bg-chart-4/10 border border-chart-4/30" : "bg-secondary/50"
+                        )}>
                           <p className="text-[9px] text-muted-foreground">Listing Age</p>
-                          <p className="text-[10px] font-semibold">{product.age_months ? `${product.age_months} mo` : '—'}</p>
+                          <p className={cn(
+                            "text-[10px] font-semibold",
+                            isFormulaReference(product.asin) && "text-chart-4"
+                          )}>
+                            {product.age_months ? `${product.age_months} mo` : '—'}
+                          </p>
                         </div>
-                        <div className="bg-secondary/50 rounded p-1.5">
-                          <p className="text-[9px] text-muted-foreground">BSR Rank</p>
-                          <p className="text-[10px] font-semibold">{product.bsr_current ? `#${product.bsr_current.toLocaleString()}` : (product.rank ? `#${product.rank.toLocaleString()}` : '—')}</p>
+                        <div className={cn(
+                          "rounded p-1.5",
+                          isFormulaReference(product.asin) ? "bg-chart-4/10 border border-chart-4/30" : "bg-secondary/50"
+                        )}>
+                          <p className="text-[9px] text-muted-foreground">Revenue/mo</p>
+                          <p className={cn(
+                            "text-[10px] font-semibold",
+                            isFormulaReference(product.asin) && "text-chart-4"
+                          )}>
+                            {product.monthly_revenue ? `$${product.monthly_revenue.toLocaleString()}` : '—'}
+                          </p>
                         </div>
+                      </div>
+                      
+                      {/* BSR Rank - separate row */}
+                      <div className="bg-secondary/50 rounded p-1.5">
+                        <p className="text-[9px] text-muted-foreground">BSR Rank</p>
+                        <p className="text-[10px] font-semibold">{product.bsr_current ? `#${product.bsr_current.toLocaleString()}` : (product.rank ? `#${product.rank.toLocaleString()}` : '—')}</p>
                       </div>
 
                       {/* Mini BSR Trend Chart */}

@@ -2926,12 +2926,38 @@ export function EnhancedBenchmarkComparison({
                                       border: '1px solid hsl(var(--border))',
                                       borderRadius: '6px',
                                       fontSize: '9px',
-                                      padding: '4px 8px'
+                                      padding: '6px 10px'
                                     }}
-                                    formatter={(value: number, name: string) => [
-                                      name === 'bsr' ? `#${value.toLocaleString()}` : value.toLocaleString(),
-                                      name === 'bsr' ? 'BSR Rank' : 'Sales'
-                                    ]}
+                                    labelStyle={{ fontWeight: 600, marginBottom: '4px' }}
+                                    labelFormatter={(label) => `${label} ago`}
+                                    content={({ active, payload, label }) => {
+                                      if (!active || !payload?.length) return null;
+                                      const bsrData = payload.find(p => p.dataKey === 'bsr');
+                                      const salesData = payload.find(p => p.dataKey === 'sales');
+                                      return (
+                                        <div className="bg-card border border-border rounded-md p-2 shadow-lg">
+                                          <p className="text-[10px] font-semibold mb-1.5 text-foreground">{label} ago</p>
+                                          {bsrData?.value != null && (
+                                            <div className="flex items-center justify-between gap-3 text-[9px]">
+                                              <span className="flex items-center gap-1">
+                                                <span className="w-2 h-2 rounded-full bg-chart-4" />
+                                                BSR Rank
+                                              </span>
+                                              <span className="font-semibold">#{Number(bsrData.value).toLocaleString()}</span>
+                                            </div>
+                                          )}
+                                          {salesData?.value != null && (
+                                            <div className="flex items-center justify-between gap-3 text-[9px] mt-1">
+                                              <span className="flex items-center gap-1">
+                                                <span className="w-2 h-2 rounded-full bg-chart-1" />
+                                                Monthly Sales
+                                              </span>
+                                              <span className="font-semibold">{Number(salesData.value).toLocaleString()} units</span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    }}
                                   />
                                   {bsrValues.length > 0 && (
                                     <Line 

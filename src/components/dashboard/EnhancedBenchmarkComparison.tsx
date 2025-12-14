@@ -1025,6 +1025,7 @@ export function EnhancedBenchmarkComparison({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
+  const [showOnlyNewWinners, setShowOnlyNewWinners] = useState(false);
   const [competitorAnalysisOpen, setCompetitorAnalysisOpen] = useState(false);
   const [selectedCompetitorBrand, setSelectedCompetitorBrand] = useState<string | null>(null);
   const { toast } = useToast();
@@ -1075,10 +1076,25 @@ export function EnhancedBenchmarkComparison({
     );
   }, [allProductsSorted, searchQuery]);
 
-  // Get selected products or default to top 3
-  const displayedProducts = selectedIds.length > 0 
-    ? allProductsSorted.filter(p => selectedIds.includes(p.id))
-    : allProductsSorted.slice(0, MAX_COMPETITORS);
+  // Count of formula references available
+  const formulaReferencesCount = useMemo(() => {
+    if (!products) return 0;
+    return products.filter(p => formulaReferenceAsins.has(p.asin)).length;
+  }, [products, formulaReferenceAsins]);
+
+  // Get selected products or default to top products, with optional New Winners filter
+  const displayedProducts = useMemo(() => {
+    let result = selectedIds.length > 0 
+      ? allProductsSorted.filter(p => selectedIds.includes(p.id))
+      : allProductsSorted.slice(0, MAX_COMPETITORS);
+    
+    // Apply New Winners filter if enabled
+    if (showOnlyNewWinners && formulaReferenceAsins.size > 0) {
+      result = result.filter(p => formulaReferenceAsins.has(p.asin));
+    }
+    
+    return result;
+  }, [selectedIds, allProductsSorted, showOnlyNewWinners, formulaReferenceAsins]);
 
   const loading = isLoading || productsLoading;
 
@@ -2027,6 +2043,31 @@ export function EnhancedBenchmarkComparison({
                 <Button variant="ghost" size="sm" onClick={clearSelection} className="h-8 px-2 text-xs">
                   <X className="w-3 h-3 mr-1" />
                   Clear Selection
+                </Button>
+              )}
+              
+              {/* New Winners Filter Toggle */}
+              {formulaReferencesCount > 0 && (
+                <Button 
+                  variant={showOnlyNewWinners ? "default" : "outline"} 
+                  size="sm" 
+                  onClick={() => setShowOnlyNewWinners(!showOnlyNewWinners)}
+                  className={cn(
+                    "h-8 gap-1.5",
+                    showOnlyNewWinners && "bg-chart-4 hover:bg-chart-4/90"
+                  )}
+                >
+                  <Zap className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">New Winners</span>
+                  <Badge 
+                    variant="secondary" 
+                    className={cn(
+                      "ml-1 h-5 px-1.5 text-[10px]",
+                      showOnlyNewWinners && "bg-white/20 text-white"
+                    )}
+                  >
+                    {formulaReferencesCount}
+                  </Badge>
                 </Button>
               )}
               <Popover open={filterOpen} onOpenChange={setFilterOpen}>

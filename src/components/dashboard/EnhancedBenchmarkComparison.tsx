@@ -2155,7 +2155,10 @@ export function EnhancedBenchmarkComparison({
                 size="sm" 
                 onClick={runCompetitiveAnalysis}
                 disabled={competitiveLoading || competitivePolling}
-                className="h-8 gap-1.5"
+                className={cn(
+                  "h-8 gap-1.5 transition-all duration-300 hover:shadow-[0_0_20px_hsl(var(--primary)/0.4)] hover:scale-105",
+                  !competitiveAnalysis && !competitiveLoading && !competitivePolling && "animate-glow-pulse"
+                )}
               >
                 {(competitiveLoading || competitivePolling) ? (
                   <>

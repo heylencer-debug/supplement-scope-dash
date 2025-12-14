@@ -1,3 +1,4 @@
+import { cn } from "@/lib/utils";
 import { PackagingDesignAnalysis } from "@/hooks/usePackagingAnalysis";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -453,7 +454,10 @@ export function AIPackagingResults({ analysis, mockupImageUrl, onSaveMockup, onR
                 onClick={generateAIMockup}
                 disabled={isGenerating}
                 size="sm"
-                className="gap-2"
+                className={cn(
+                  "gap-2 transition-all duration-300 hover:shadow-[0_0_20px_hsl(var(--primary)/0.4)] hover:scale-105",
+                  !isGenerating && !generatedMockup && "animate-glow-pulse"
+                )}
               >
                 {isGenerating ? (
                   <>

@@ -125,7 +125,7 @@ export default function ProcessingScreen({ categoryName, onRefresh, isRefetching
           <Button
             onClick={onRefresh}
             variant="outline"
-            className="gap-2"
+            className="gap-2 transition-all duration-300 hover:shadow-[0_0_20px_hsl(var(--primary)/0.4)] hover:scale-105 animate-glow-pulse"
             disabled={isRefetching}
           >
             {isRefetching ? (

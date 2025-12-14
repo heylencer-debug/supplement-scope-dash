@@ -2835,64 +2835,139 @@ export function EnhancedBenchmarkComparison({
                         <p className="text-[10px] font-semibold">{product.bsr_current ? `#${product.bsr_current.toLocaleString()}` : (product.rank ? `#${product.rank.toLocaleString()}` : '—')}</p>
                       </div>
 
-                      {/* Mini BSR Trend Chart */}
+                      {/* Mini Performance Trend Chart (2yr) */}
                       {(() => {
-                        const historical = product.historical_data as { bsr_monthly?: Record<string, number> } | null;
+                        const historical = product.historical_data as { 
+                          bsr_monthly?: Record<string, number>;
+                          sales_monthly?: Record<string, number>;
+                        } | null;
                         const bsrMonthly = historical?.bsr_monthly;
-                        if (!bsrMonthly || Object.keys(bsrMonthly).length === 0) return null;
+                        const salesMonthly = historical?.sales_monthly;
                         
-                        const chartData = ['month_6', 'month_5', 'month_4', 'month_3', 'month_2', 'month_1'].map((key, idx) => ({
-                          month: ['6m', '5m', '4m', '3m', '2m', '1m'][idx],
-                          bsr: bsrMonthly[key] ?? null
-                        })).filter(d => d.bsr !== null);
+                        if ((!bsrMonthly || Object.keys(bsrMonthly).length === 0) && 
+                            (!salesMonthly || Object.keys(salesMonthly).length === 0)) return null;
+                        
+                        // Build 24-month data array (oldest to newest for chart display)
+                        const months = Array.from({length: 24}, (_, i) => `month_${24 - i}`);
+                        const chartData = months.map((key, idx) => ({
+                          month: `${24 - idx}m`,
+                          bsr: bsrMonthly?.[key] ?? null,
+                          sales: salesMonthly?.[key] ?? null
+                        })).filter(d => d.bsr !== null || d.sales !== null);
                         
                         if (chartData.length < 2) return null;
                         
-                        const values = chartData.map(d => d.bsr as number);
-                        const min = Math.min(...values);
-                        const max = Math.max(...values);
-                        const first = values[0];
-                        const last = values[values.length - 1];
-                        const improved = last < first; // Lower BSR = better
+                        // BSR trend calculation
+                        const bsrValues = chartData.map(d => d.bsr).filter((v): v is number => v !== null);
+                        const bsrFirst = bsrValues[0];
+                        const bsrLast = bsrValues[bsrValues.length - 1];
+                        const bsrImproved = bsrLast < bsrFirst; // Lower BSR = better
+                        const bsrChange = bsrFirst && bsrLast ? Math.abs(bsrFirst - bsrLast) : 0;
+                        
+                        // Sales trend calculation
+                        const salesValues = chartData.map(d => d.sales).filter((v): v is number => v !== null);
+                        const salesFirst = salesValues[0];
+                        const salesLast = salesValues[salesValues.length - 1];
+                        const salesGrowth = salesFirst && salesLast && salesFirst > 0 
+                          ? Math.round(((salesLast - salesFirst) / salesFirst) * 100) 
+                          : 0;
+                        
+                        // Calculate domains for dual axis
+                        const bsrMin = bsrValues.length > 0 ? Math.min(...bsrValues) * 0.9 : 0;
+                        const bsrMax = bsrValues.length > 0 ? Math.max(...bsrValues) * 1.1 : 100;
+                        const salesMin = salesValues.length > 0 ? Math.min(...salesValues) * 0.9 : 0;
+                        const salesMax = salesValues.length > 0 ? Math.max(...salesValues) * 1.1 : 100;
                         
                         return (
                           <div className="bg-secondary/50 rounded p-1.5">
                             <div className="flex items-center justify-between mb-1">
                               <p className="text-[9px] font-semibold flex items-center gap-1">
                                 <BarChart3 className="w-3 h-3 text-primary" />
-                                BSR Trend (6mo)
+                                Performance (2yr)
                               </p>
-                              <Badge variant="secondary" className={`text-[8px] h-4 ${improved ? 'bg-chart-4/20 text-chart-4' : 'bg-destructive/20 text-destructive'}`}>
-                                {improved ? '↑' : '↓'} {Math.abs(first - last).toLocaleString()}
-                              </Badge>
+                              <div className="flex gap-1">
+                                {bsrValues.length >= 2 && (
+                                  <Badge variant="secondary" className={`text-[7px] h-4 px-1 ${bsrImproved ? 'bg-chart-4/20 text-chart-4' : 'bg-destructive/20 text-destructive'}`}>
+                                    BSR {bsrImproved ? '↑' : '↓'}
+                                  </Badge>
+                                )}
+                                {salesValues.length >= 2 && (
+                                  <Badge variant="secondary" className={`text-[7px] h-4 px-1 ${salesGrowth >= 0 ? 'bg-chart-1/20 text-chart-1' : 'bg-destructive/20 text-destructive'}`}>
+                                    {salesGrowth >= 0 ? '+' : ''}{salesGrowth}%
+                                  </Badge>
+                                )}
+                              </div>
                             </div>
-                            <div className="h-[60px] w-full">
+                            <div className="h-[100px] w-full">
                               <ResponsiveContainer width="100%" height="100%">
                                 <LineChart data={chartData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                                  <YAxis hide reversed domain={[min * 0.9, max * 1.1]} />
-                                  <XAxis dataKey="month" tick={{ fontSize: 8 }} axisLine={false} tickLine={false} />
+                                  <YAxis 
+                                    yAxisId="bsr" 
+                                    hide 
+                                    reversed 
+                                    domain={[bsrMin, bsrMax]} 
+                                  />
+                                  <YAxis 
+                                    yAxisId="sales" 
+                                    hide 
+                                    orientation="right" 
+                                    domain={[salesMin, salesMax]} 
+                                  />
+                                  <XAxis 
+                                    dataKey="month" 
+                                    tick={{ fontSize: 7 }} 
+                                    axisLine={false} 
+                                    tickLine={false}
+                                    interval={5}
+                                  />
                                   <Tooltip 
                                     contentStyle={{ 
                                       backgroundColor: 'hsl(var(--card))', 
                                       border: '1px solid hsl(var(--border))',
                                       borderRadius: '6px',
-                                      fontSize: '10px',
+                                      fontSize: '9px',
                                       padding: '4px 8px'
                                     }}
-                                    formatter={(value: number) => [`#${value.toLocaleString()}`, 'BSR']}
+                                    formatter={(value: number, name: string) => [
+                                      name === 'bsr' ? `#${value.toLocaleString()}` : value.toLocaleString(),
+                                      name === 'bsr' ? 'BSR Rank' : 'Sales'
+                                    ]}
                                   />
-                                  <Line 
-                                    type="monotone" 
-                                    dataKey="bsr" 
-                                    stroke={improved ? 'hsl(var(--chart-4))' : 'hsl(var(--destructive))'} 
-                                    strokeWidth={2} 
-                                    dot={{ r: 2 }} 
-                                    activeDot={{ r: 4 }}
-                                  />
+                                  {bsrValues.length > 0 && (
+                                    <Line 
+                                      yAxisId="bsr"
+                                      type="monotone" 
+                                      dataKey="bsr" 
+                                      stroke={bsrImproved ? 'hsl(var(--chart-4))' : 'hsl(var(--destructive))'} 
+                                      strokeWidth={1.5} 
+                                      dot={false} 
+                                      activeDot={{ r: 3 }}
+                                      name="bsr"
+                                    />
+                                  )}
+                                  {salesValues.length > 0 && (
+                                    <Line 
+                                      yAxisId="sales"
+                                      type="monotone" 
+                                      dataKey="sales" 
+                                      stroke="hsl(var(--chart-1))" 
+                                      strokeWidth={1.5} 
+                                      dot={false} 
+                                      activeDot={{ r: 3 }}
+                                      name="sales"
+                                    />
+                                  )}
                                 </LineChart>
                               </ResponsiveContainer>
                             </div>
-                            <p className="text-[8px] text-muted-foreground text-center">Lower = Better</p>
+                            <div className="flex justify-center gap-3 mt-1">
+                              <span className="text-[7px] text-muted-foreground flex items-center gap-1">
+                                <span className="w-2 h-0.5 bg-chart-4 rounded" /> BSR (↓ better)
+                              </span>
+                              <span className="text-[7px] text-muted-foreground flex items-center gap-1">
+                                <span className="w-2 h-0.5 bg-chart-1 rounded" /> Sales
+                              </span>
+                            </div>
                           </div>
                         );
                       })()}

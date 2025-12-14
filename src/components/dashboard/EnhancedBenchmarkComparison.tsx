@@ -934,32 +934,71 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
           <CardContent className="pt-0 p-3 sm:p-4 md:p-6">
             {/* Tabbed Navigation for New Winners vs Top Performers */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-              <div className="flex items-center bg-muted rounded-lg p-0.5">
+              <div className="relative flex items-center bg-muted rounded-lg p-0.5">
+                {/* Sliding indicator */}
+                <div 
+                  className={cn(
+                    "absolute top-0.5 bottom-0.5 bg-background rounded-md shadow-sm transition-all duration-300 ease-out",
+                    activeTab === 'new_winners' ? 'left-0.5 w-[calc(50%-2px)]' : 'left-[calc(50%+2px)] w-[calc(50%-2px)]'
+                  )}
+                />
                 <Button 
-                  variant={activeTab === 'new_winners' ? 'secondary' : 'ghost'}
+                  variant="ghost"
                   size="sm"
-                  className="h-8 px-3 text-xs gap-1.5 rounded-md"
+                  className={cn(
+                    "relative z-10 h-8 px-3 text-xs gap-1.5 rounded-md transition-all duration-200",
+                    activeTab === 'new_winners' 
+                      ? 'text-foreground font-medium' 
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
                   onClick={() => setActiveTab('new_winners')}
                 >
-                  <Zap className="w-3 h-3" />
-                  New Winners
+                  <Zap className={cn(
+                    "w-3 h-3 transition-all duration-200",
+                    activeTab === 'new_winners' && "text-amber-500 scale-110"
+                  )} />
+                  <span className={cn(
+                    "transition-transform duration-200",
+                    activeTab === 'new_winners' && "translate-x-0.5"
+                  )}>
+                    New Winners
+                  </span>
                   {newWinnersAnalysis.hasAnalysis && (
-                    <CheckCircle className="w-3 h-3 text-green-500" />
+                    <CheckCircle className={cn(
+                      "w-3 h-3 text-green-500 transition-all duration-200",
+                      activeTab === 'new_winners' && "scale-110"
+                    )} />
                   )}
                   {newWinnersAnalysis.pollingStatus.isPolling && (
                     <Loader2 className="w-3 h-3 animate-spin text-primary" />
                   )}
                 </Button>
                 <Button 
-                  variant={activeTab === 'top_performers' ? 'secondary' : 'ghost'}
+                  variant="ghost"
                   size="sm"
-                  className="h-8 px-3 text-xs gap-1.5 rounded-md"
+                  className={cn(
+                    "relative z-10 h-8 px-3 text-xs gap-1.5 rounded-md transition-all duration-200",
+                    activeTab === 'top_performers' 
+                      ? 'text-foreground font-medium' 
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
                   onClick={() => setActiveTab('top_performers')}
                 >
-                  <Trophy className="w-3 h-3" />
-                  Top Performers
+                  <Trophy className={cn(
+                    "w-3 h-3 transition-all duration-200",
+                    activeTab === 'top_performers' && "text-primary scale-110"
+                  )} />
+                  <span className={cn(
+                    "transition-transform duration-200",
+                    activeTab === 'top_performers' && "translate-x-0.5"
+                  )}>
+                    Top Performers
+                  </span>
                   {topPerformersAnalysis.hasAnalysis && (
-                    <CheckCircle className="w-3 h-3 text-green-500" />
+                    <CheckCircle className={cn(
+                      "w-3 h-3 text-green-500 transition-all duration-200",
+                      activeTab === 'top_performers' && "scale-110"
+                    )} />
                   )}
                   {topPerformersAnalysis.pollingStatus.isPolling && (
                     <Loader2 className="w-3 h-3 animate-spin text-primary" />

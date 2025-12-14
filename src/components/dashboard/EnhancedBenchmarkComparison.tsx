@@ -5,6 +5,7 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Progress } from "@/components/ui/progress";
-import { Star, TrendingUp, TrendingDown, Pill, Target, MessageSquare, Package, Users, Megaphone, AlertTriangle, CheckCircle, XCircle, Palette, Search, Filter, X, Trophy, ThumbsUp, ThumbsDown, Check, FlaskConical, Scale, Award, Beaker, ChevronDown, ChevronUp, BarChart3, DollarSign, Eye, Layers, Shield, Tag, Sparkles, FileText, Loader2, Zap, Brain, ArrowUp, ArrowDown, Minus, Plus, RefreshCw, ArrowRight } from "lucide-react";
+import { Star, TrendingUp, TrendingDown, Pill, Target, MessageSquare, Package, Users, Megaphone, AlertTriangle, CheckCircle, XCircle, Palette, Search, Filter, X, Trophy, ThumbsUp, ThumbsDown, Check, FlaskConical, Scale, Award, Beaker, ChevronDown, ChevronUp, BarChart3, DollarSign, Eye, Layers, Shield, Tag, Sparkles, FileText, Loader2, Zap, Brain, ArrowUp, ArrowDown, Minus, Plus, RefreshCw, ArrowRight, ArrowUpDown, Calendar, Clock } from "lucide-react";
 import { useProducts, Product } from "@/hooks/useProducts";
 import ProductDetailModal from "@/components/ProductDetailModal";
 import { useToast } from "@/hooks/use-toast";
@@ -1027,6 +1028,7 @@ export function EnhancedBenchmarkComparison({
   const [searchQuery, setSearchQuery] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
   const [showOnlyNewWinners, setShowOnlyNewWinners] = useState(false);
+  const [sortBy, setSortBy] = useState<'sales' | 'revenue' | 'age' | 'growth'>('sales');
   const [competitorAnalysisOpen, setCompetitorAnalysisOpen] = useState(false);
   const [selectedCompetitorBrand, setSelectedCompetitorBrand] = useState<string | null>(null);
   const { toast } = useToast();
@@ -1050,7 +1052,27 @@ export function EnhancedBenchmarkComparison({
   // Helper to check if product is a formula reference (New Winner)
   const isFormulaReference = (asin: string) => formulaReferenceAsins.has(asin);
 
-  // All products sorted - prioritize formula references, then by monthly sales
+  // Sort comparator based on selected sort option
+  const getSortValue = useCallback((product: Product) => {
+    switch (sortBy) {
+      case 'revenue':
+        return product.monthly_revenue || 0;
+      case 'age':
+        // Lower age = newer = higher priority, so we negate
+        return -(product.age_months || 999);
+      case 'growth':
+        // Estimate growth rate from reviews and age
+        const reviewsPerMonth = product.age_months && product.age_months > 0 
+          ? (product.reviews || 0) / product.age_months 
+          : 0;
+        return reviewsPerMonth;
+      case 'sales':
+      default:
+        return product.monthly_sales || 0;
+    }
+  }, [sortBy]);
+
+  // All products sorted - prioritize formula references, then by selected sort option
   const allProductsSorted = useMemo(() => {
     const allProducts = [...(products || [])];
     
@@ -1058,13 +1080,13 @@ export function EnhancedBenchmarkComparison({
     const formulaProducts = allProducts.filter(p => formulaReferenceAsins.has(p.asin));
     const otherProducts = allProducts.filter(p => !formulaReferenceAsins.has(p.asin));
     
-    // Sort each group by monthly_sales
-    const sortedFormula = formulaProducts.sort((a, b) => (b.monthly_sales || 0) - (a.monthly_sales || 0));
-    const sortedOthers = otherProducts.sort((a, b) => (b.monthly_sales || 0) - (a.monthly_sales || 0));
+    // Sort each group by selected sort option
+    const sortedFormula = formulaProducts.sort((a, b) => getSortValue(b) - getSortValue(a));
+    const sortedOthers = otherProducts.sort((a, b) => getSortValue(b) - getSortValue(a));
     
     // Return formula references first, then others
     return [...sortedFormula, ...sortedOthers];
-  }, [products, formulaReferenceAsins]);
+  }, [products, formulaReferenceAsins, getSortValue]);
 
   // Filtered products based on search query
   const filteredProducts = useMemo(() => {
@@ -2083,6 +2105,40 @@ export function EnhancedBenchmarkComparison({
                   </UITooltip>
                 </TooltipProvider>
               )}
+              
+              {/* Sort Dropdown */}
+              <Select value={sortBy} onValueChange={(value: 'sales' | 'revenue' | 'age' | 'growth') => setSortBy(value)}>
+                <SelectTrigger className="h-8 w-[130px] text-xs">
+                  <ArrowUpDown className="w-3 h-3 mr-1.5" />
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sales" className="text-xs">
+                    <span className="flex items-center gap-1.5">
+                      <TrendingUp className="w-3 h-3" />
+                      Monthly Sales
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="revenue" className="text-xs">
+                    <span className="flex items-center gap-1.5">
+                      <DollarSign className="w-3 h-3" />
+                      Revenue
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="age" className="text-xs">
+                    <span className="flex items-center gap-1.5">
+                      <Calendar className="w-3 h-3" />
+                      Newest First
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="growth" className="text-xs">
+                    <span className="flex items-center gap-1.5">
+                      <Clock className="w-3 h-3" />
+                      Growth Rate
+                    </span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
               <Popover open={filterOpen} onOpenChange={setFilterOpen}>
                 <PopoverTrigger asChild>
                   <Button variant="outline" size="sm" className="h-8 gap-1.5">

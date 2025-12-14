@@ -10,6 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Progress } from "@/components/ui/progress";
 import { Star, TrendingUp, TrendingDown, Pill, Target, MessageSquare, Package, Users, Megaphone, AlertTriangle, CheckCircle, XCircle, Palette, Search, Filter, X, Trophy, ThumbsUp, ThumbsDown, Check, FlaskConical, Scale, Award, Beaker, ChevronDown, ChevronUp, BarChart3, DollarSign, Eye, Layers, Shield, Tag, Sparkles, FileText, Loader2, Zap, Brain, ArrowUp, ArrowDown, Minus, Plus, RefreshCw, ArrowRight } from "lucide-react";
 import { useProducts, Product } from "@/hooks/useProducts";
@@ -2048,27 +2049,39 @@ export function EnhancedBenchmarkComparison({
               
               {/* New Winners Filter Toggle */}
               {formulaReferencesCount > 0 && (
-                <Button 
-                  variant={showOnlyNewWinners ? "default" : "outline"} 
-                  size="sm" 
-                  onClick={() => setShowOnlyNewWinners(!showOnlyNewWinners)}
-                  className={cn(
-                    "h-8 gap-1.5",
-                    showOnlyNewWinners && "bg-chart-4 hover:bg-chart-4/90"
-                  )}
-                >
-                  <Zap className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">New Winners</span>
-                  <Badge 
-                    variant="secondary" 
-                    className={cn(
-                      "ml-1 h-5 px-1.5 text-[10px]",
-                      showOnlyNewWinners && "bg-white/20 text-white"
-                    )}
-                  >
-                    {formulaReferencesCount}
-                  </Badge>
-                </Button>
+                <TooltipProvider>
+                  <UITooltip>
+                    <TooltipTrigger asChild>
+                      <Button 
+                        variant={showOnlyNewWinners ? "default" : "outline"} 
+                        size="sm" 
+                        onClick={() => setShowOnlyNewWinners(!showOnlyNewWinners)}
+                        className={cn(
+                          "h-8 gap-1.5",
+                          showOnlyNewWinners && "bg-chart-4 hover:bg-chart-4/90"
+                        )}
+                      >
+                        <Zap className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">New Winners</span>
+                        <Badge 
+                          variant="secondary" 
+                          className={cn(
+                            "ml-1 h-5 px-1.5 text-[10px]",
+                            showOnlyNewWinners && "bg-white/20 text-white"
+                          )}
+                        >
+                          {formulaReferencesCount}
+                        </Badge>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-xs text-center">
+                      <p className="font-semibold">Formula Reference Products</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        High-growth "New Winners" selected as formulation benchmarks. These products show strong recent performance and serve as models for your formula strategy.
+                      </p>
+                    </TooltipContent>
+                  </UITooltip>
+                </TooltipProvider>
               )}
               <Popover open={filterOpen} onOpenChange={setFilterOpen}>
                 <PopoverTrigger asChild>

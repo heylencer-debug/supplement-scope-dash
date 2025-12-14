@@ -1025,100 +1025,106 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
               )}
             </div>
 
-            {/* Tab Description */}
-            <div className="mb-4 p-3 rounded-lg bg-muted/50 border border-border/50">
-              {activeTab === 'new_winners' ? (
-                <p className="text-xs text-muted-foreground">
-                  <Zap className="w-3 h-3 inline mr-1 text-amber-500" />
-                  <strong>New Winners:</strong> Compare against young, high-growth products (Formula References) that are disrupting the market with innovative formulations.
-                </p>
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  <Trophy className="w-3 h-3 inline mr-1 text-primary" />
-                  <strong>Top Performers:</strong> Compare against established best-sellers with proven track records and market-leading formulations.
-                </p>
-              )}
-            </div>
-
-            {/* Show AI Analysis Results when available */}
-            {activeAnalysisData.analysis ? (
-              <AIAnalysisResults 
-                analysis={activeAnalysisData.analysis} 
-                onRefresh={activeAnalysisData.runAnalysis} 
-                isLoading={activeAnalysisData.isLoading} 
-              />
-            ) : activeAnalysisData.pollingStatus.isPolling ? (
-              /* Polling Progress Indicator */
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <div className="relative mb-6">
-                  <div className="p-4 rounded-full bg-primary/10 animate-pulse">
-                    <Brain className="w-8 h-8 text-primary" />
-                  </div>
-                  <div className="absolute -bottom-1 -right-1 bg-card rounded-full p-1 border border-border">
-                    <Loader2 className="w-4 h-4 text-primary animate-spin" />
-                  </div>
-                </div>
-                <h3 className="text-lg font-semibold text-foreground mb-2">
-                  Analyzing {activeTab === 'new_winners' ? 'New Winners' : 'Top Performers'}
-                </h3>
-                <p className="text-sm text-muted-foreground max-w-md mb-4">
-                  AI is analyzing your formulation against {activeTab === 'new_winners' ? 'emerging high-growth products' : 'market-leading competitors'}. This may take 1-2 minutes...
-                </p>
-                
-                {/* Progress Bar */}
-                <div className="w-full max-w-xs mb-4">
-                  <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                    <span>Polling for results...</span>
-                    <span>{activeAnalysisData.pollingStatus.attempt} / {activeAnalysisData.pollingStatus.maxAttempts}</span>
-                  </div>
-                  <div className="h-2 bg-muted rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-primary transition-all duration-500 ease-out rounded-full"
-                      style={{ width: `${(activeAnalysisData.pollingStatus.attempt / activeAnalysisData.pollingStatus.maxAttempts) * 100}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* Time Elapsed */}
-                {activeAnalysisData.pollingStatus.startedAt && (
+            {/* Tab Content with fade transition */}
+            <div 
+              key={activeTab}
+              className="animate-fade-in"
+            >
+              {/* Tab Description */}
+              <div className="mb-4 p-3 rounded-lg bg-muted/50 border border-border/50">
+                {activeTab === 'new_winners' ? (
                   <p className="text-xs text-muted-foreground">
-                    Time elapsed: {Math.floor((Date.now() - activeAnalysisData.pollingStatus.startedAt.getTime()) / 1000)}s
+                    <Zap className="w-3 h-3 inline mr-1 text-amber-500" />
+                    <strong>New Winners:</strong> Compare against young, high-growth products (Formula References) that are disrupting the market with innovative formulations.
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    <Trophy className="w-3 h-3 inline mr-1 text-primary" />
+                    <strong>Top Performers:</strong> Compare against established best-sellers with proven track records and market-leading formulations.
                   </p>
                 )}
               </div>
-            ) : (
-              /* Empty State - Prompt to run analysis */
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <div className="p-4 rounded-full bg-primary/10 mb-4">
-                  {activeTab === 'new_winners' ? (
-                    <Zap className="w-8 h-8 text-amber-500" />
-                  ) : (
-                    <Trophy className="w-8 h-8 text-primary" />
+
+              {/* Show AI Analysis Results when available */}
+              {activeAnalysisData.analysis ? (
+                <AIAnalysisResults 
+                  analysis={activeAnalysisData.analysis} 
+                  onRefresh={activeAnalysisData.runAnalysis} 
+                  isLoading={activeAnalysisData.isLoading} 
+                />
+              ) : activeAnalysisData.pollingStatus.isPolling ? (
+                /* Polling Progress Indicator */
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <div className="relative mb-6">
+                    <div className="p-4 rounded-full bg-primary/10 animate-pulse">
+                      <Brain className="w-8 h-8 text-primary" />
+                    </div>
+                    <div className="absolute -bottom-1 -right-1 bg-card rounded-full p-1 border border-border">
+                      <Loader2 className="w-4 h-4 text-primary animate-spin" />
+                    </div>
+                  </div>
+                  <h3 className="text-lg font-semibold text-foreground mb-2">
+                    Analyzing {activeTab === 'new_winners' ? 'New Winners' : 'Top Performers'}
+                  </h3>
+                  <p className="text-sm text-muted-foreground max-w-md mb-4">
+                    AI is analyzing your formulation against {activeTab === 'new_winners' ? 'emerging high-growth products' : 'market-leading competitors'}. This may take 1-2 minutes...
+                  </p>
+                  
+                  {/* Progress Bar */}
+                  <div className="w-full max-w-xs mb-4">
+                    <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                      <span>Polling for results...</span>
+                      <span>{activeAnalysisData.pollingStatus.attempt} / {activeAnalysisData.pollingStatus.maxAttempts}</span>
+                    </div>
+                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-primary transition-all duration-500 ease-out rounded-full"
+                        style={{ width: `${(activeAnalysisData.pollingStatus.attempt / activeAnalysisData.pollingStatus.maxAttempts) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Time Elapsed */}
+                  {activeAnalysisData.pollingStatus.startedAt && (
+                    <p className="text-xs text-muted-foreground">
+                      Time elapsed: {Math.floor((Date.now() - activeAnalysisData.pollingStatus.startedAt.getTime()) / 1000)}s
+                    </p>
                   )}
                 </div>
-                <h3 className="text-lg font-semibold text-foreground mb-2">
-                  {activeTab === 'new_winners' ? 'New Winners Analysis' : 'Top Performers Analysis'}
-                </h3>
-                <p className="text-sm text-muted-foreground max-w-md mb-6">
-                  {activeTab === 'new_winners' 
-                    ? 'Analyze your formulation against young, high-growth products to identify emerging trends and innovative formulation strategies.'
-                    : 'Analyze your formulation against established market leaders to understand proven formulation strategies and competitive positioning.'
-                  }
-                </p>
-                <Button 
-                  onClick={activeAnalysisData.runAnalysis}
-                  disabled={activeAnalysisData.isLoading || !categoryId}
-                  className="gap-2"
-                >
-                  {activeAnalysisData.isLoading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Brain className="w-4 h-4" />
-                  )}
-                  {activeAnalysisData.isLoading ? 'Analyzing...' : `Analyze ${activeTab === 'new_winners' ? 'New Winners' : 'Top Performers'}`}
-                </Button>
-              </div>
-            )}
+              ) : (
+                /* Empty State - Prompt to run analysis */
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <div className="p-4 rounded-full bg-primary/10 mb-4">
+                    {activeTab === 'new_winners' ? (
+                      <Zap className="w-8 h-8 text-amber-500" />
+                    ) : (
+                      <Trophy className="w-8 h-8 text-primary" />
+                    )}
+                  </div>
+                  <h3 className="text-lg font-semibold text-foreground mb-2">
+                    {activeTab === 'new_winners' ? 'New Winners Analysis' : 'Top Performers Analysis'}
+                  </h3>
+                  <p className="text-sm text-muted-foreground max-w-md mb-6">
+                    {activeTab === 'new_winners' 
+                      ? 'Analyze your formulation against young, high-growth products to identify emerging trends and innovative formulation strategies.'
+                      : 'Analyze your formulation against established market leaders to understand proven formulation strategies and competitive positioning.'
+                    }
+                  </p>
+                  <Button 
+                    onClick={activeAnalysisData.runAnalysis}
+                    disabled={activeAnalysisData.isLoading || !categoryId}
+                    className="gap-2"
+                  >
+                    {activeAnalysisData.isLoading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Brain className="w-4 h-4" />
+                    )}
+                    {activeAnalysisData.isLoading ? 'Analyzing...' : `Analyze ${activeTab === 'new_winners' ? 'New Winners' : 'Top Performers'}`}
+                  </Button>
+                </div>
+              )}
+            </div>
           </CardContent>
         </CollapsibleContent>
       </Card>

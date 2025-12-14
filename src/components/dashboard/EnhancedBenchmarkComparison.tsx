@@ -1011,7 +1011,7 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                 <Button 
                   variant="default"
                   size="sm" 
-                  className="h-8 px-3 text-xs transition-all duration-300 hover:shadow-[0_0_20px_hsl(var(--primary)/0.4)] hover:scale-105"
+                  className="h-8 px-3 text-xs transition-all duration-300 hover:shadow-[0_0_20px_hsl(var(--primary)/0.4)] hover:scale-105 animate-glow-pulse"
                   onClick={(e) => { e.stopPropagation(); activeAnalysisData.runAnalysis(); }}
                   disabled={activeAnalysisData.isLoading || !categoryId}
                 >
@@ -1113,7 +1113,10 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                   <Button 
                     onClick={activeAnalysisData.runAnalysis}
                     disabled={activeAnalysisData.isLoading || !categoryId}
-                    className="gap-2 transition-all duration-300 hover:shadow-[0_0_20px_hsl(var(--primary)/0.4)] hover:scale-105"
+                    className={cn(
+                      "gap-2 transition-all duration-300 hover:shadow-[0_0_20px_hsl(var(--primary)/0.4)] hover:scale-105",
+                      !activeAnalysisData.isLoading && "animate-glow-pulse"
+                    )}
                   >
                     {activeAnalysisData.isLoading ? (
                       <Loader2 className="w-4 h-4 animate-spin" />

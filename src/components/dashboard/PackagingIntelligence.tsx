@@ -1,3 +1,4 @@
+import { cn } from "@/lib/utils";
 import { useMemo, useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -415,7 +416,10 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
               size="sm"
               onClick={() => runAnalysis()}
               disabled={isAnalyzing || isLoadingFromDb || !categoryId}
-              className="text-xs h-7"
+              className={cn(
+                "text-xs h-7 transition-all duration-300 hover:shadow-[0_0_20px_hsl(var(--primary)/0.4)] hover:scale-105",
+                !hasAnalysis && !isAnalyzing && "animate-glow-pulse"
+              )}
             >
               {isAnalyzing ? (
                 <>

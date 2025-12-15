@@ -13,9 +13,9 @@ serve(async (req) => {
   try {
     const { designBrief } = await req.json();
     
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+    const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
+    if (!OPENROUTER_API_KEY) {
+      throw new Error("OPENROUTER_API_KEY is not configured");
     }
 
     // Validate required design data
@@ -157,25 +157,26 @@ serve(async (req) => {
 
     const prompt = promptParts.join("\n");
 
-    console.log("Generating product mockup with Nano Banana Pro model");
+    console.log("Generating product mockup with Nano Banana Pro via OpenRouter");
     console.log("Design brief received:", JSON.stringify(designBrief, null, 2));
     console.log("Generated prompt:", prompt);
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
         "Content-Type": "application/json",
+        "HTTP-Referer": "https://lovable.dev",
+        "X-Title": "Noodle Search"
       },
       body: JSON.stringify({
-        model: "google/gemini-3-pro-image-preview",
+        model: "google/gemini-2.5-flash-preview-image-generation",
         messages: [
           {
             role: "user",
             content: prompt
           }
-        ],
-        modalities: ["image", "text"]
+        ]
       })
     });
 
@@ -200,14 +201,28 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    console.log("AI response received");
+    console.log("OpenRouter response received:", JSON.stringify(data).substring(0, 500));
 
-    // Extract the generated image
-    const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    // Extract the generated image - OpenRouter may return it in different formats
+    let imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    
+    // Alternative format: inline_data in content parts
+    if (!imageUrl && data.choices?.[0]?.message?.content) {
+      const content = data.choices[0].message.content;
+      if (Array.isArray(content)) {
+        const imagePart = content.find((part: any) => part.type === 'image_url' || part.inline_data);
+        if (imagePart?.image_url?.url) {
+          imageUrl = imagePart.image_url.url;
+        } else if (imagePart?.inline_data?.data) {
+          imageUrl = `data:${imagePart.inline_data.mime_type || 'image/png'};base64,${imagePart.inline_data.data}`;
+        }
+      }
+    }
+    
     const textResponse = data.choices?.[0]?.message?.content;
 
     if (!imageUrl) {
-      console.error("No image in response:", JSON.stringify(data).substring(0, 1000));
+      console.error("No image in response:", JSON.stringify(data));
       throw new Error("No image generated in response");
     }
 

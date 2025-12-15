@@ -261,57 +261,139 @@ Use the extract_packaging_analysis tool.`;
       }
     }
 
-    // Save category-level results using upsert with explicit image_analysis preservation
+    // Save category-level results with retry logic and verification
     const imageAnalysisData = { competitor_analyses: enrichedAnalyses };
     
-    console.log(`[analyze-packaging-images] Saving ${enrichedAnalyses.length} analyses to packaging_analyses table`);
+    console.log(`[analyze-packaging-images] ========== SAVING STEP 1 DATA ==========`);
+    console.log(`[analyze-packaging-images] Category ID: ${categoryId}`);
+    console.log(`[analyze-packaging-images] Analyses count: ${enrichedAnalyses.length}`);
+    console.log(`[analyze-packaging-images] Data size: ${JSON.stringify(imageAnalysisData).length} bytes`);
     
-    // First check if record exists
-    const { data: existingRecord, error: fetchError } = await supabase
-      .from("packaging_analyses")
-      .select("id, analysis")
-      .eq("category_id", categoryId)
-      .maybeSingle();
+    // Retry logic - try up to 3 times
+    let saveSuccess = false;
+    let lastError: any = null;
     
-    if (fetchError) {
-      console.error(`[analyze-packaging-images] Error fetching existing record:`, fetchError);
+    for (let attempt = 1; attempt <= 3 && !saveSuccess; attempt++) {
+      console.log(`[analyze-packaging-images] Save attempt ${attempt}/3`);
+      
+      try {
+        // First check if record exists
+        const { data: existingRecord, error: fetchError } = await supabase
+          .from("packaging_analyses")
+          .select("id, analysis, image_analysis")
+          .eq("category_id", categoryId)
+          .maybeSingle();
+        
+        if (fetchError) {
+          console.error(`[analyze-packaging-images] Attempt ${attempt}: Error fetching existing record:`, fetchError);
+          lastError = fetchError;
+          continue;
+        }
+
+        console.log(`[analyze-packaging-images] Existing record found: ${!!existingRecord}`);
+        if (existingRecord) {
+          console.log(`[analyze-packaging-images] Existing analysis: ${existingRecord.analysis ? 'present' : 'null'}`);
+          console.log(`[analyze-packaging-images] Existing image_analysis: ${existingRecord.image_analysis ? 'present' : 'null'}`);
+        }
+
+        if (existingRecord) {
+          // UPDATE existing record - only update image_analysis column
+          console.log(`[analyze-packaging-images] Attempt ${attempt}: Updating existing record...`);
+          const { data: updateData, error: updateError } = await supabase
+            .from("packaging_analyses")
+            .update({ 
+              image_analysis: imageAnalysisData, 
+              updated_at: new Date().toISOString() 
+            })
+            .eq("category_id", categoryId)
+            .select('id, image_analysis, analysis');
+          
+          if (updateError) {
+            console.error(`[analyze-packaging-images] Attempt ${attempt}: Update error:`, updateError);
+            lastError = updateError;
+            continue;
+          }
+          
+          console.log(`[analyze-packaging-images] Attempt ${attempt}: Update returned data:`, updateData ? 'yes' : 'no');
+        } else {
+          // INSERT new record
+          console.log(`[analyze-packaging-images] Attempt ${attempt}: Inserting new record...`);
+          const { data: insertData, error: insertError } = await supabase
+            .from("packaging_analyses")
+            .insert({ 
+              category_id: categoryId, 
+              analysis: {}, 
+              image_analysis: imageAnalysisData 
+            })
+            .select('id, image_analysis, analysis');
+          
+          if (insertError) {
+            console.error(`[analyze-packaging-images] Attempt ${attempt}: Insert error:`, insertError);
+            lastError = insertError;
+            continue;
+          }
+          
+          console.log(`[analyze-packaging-images] Attempt ${attempt}: Insert returned data:`, insertData ? 'yes' : 'no');
+        }
+
+        // VERIFICATION: Re-fetch to confirm data was saved
+        console.log(`[analyze-packaging-images] Attempt ${attempt}: Verifying save...`);
+        const { data: verifyRecord, error: verifyError } = await supabase
+          .from("packaging_analyses")
+          .select("id, image_analysis, analysis, updated_at")
+          .eq("category_id", categoryId)
+          .maybeSingle();
+        
+        if (verifyError) {
+          console.error(`[analyze-packaging-images] Attempt ${attempt}: Verification fetch error:`, verifyError);
+          lastError = verifyError;
+          continue;
+        }
+        
+        if (!verifyRecord) {
+          console.error(`[analyze-packaging-images] Attempt ${attempt}: VERIFICATION FAILED - no record found after save`);
+          lastError = new Error('Record not found after save');
+          continue;
+        }
+        
+        const hasImageAnalysis = verifyRecord.image_analysis && 
+          (verifyRecord.image_analysis as any)?.competitor_analyses?.length > 0;
+        
+        console.log(`[analyze-packaging-images] Attempt ${attempt}: VERIFICATION RESULT:`);
+        console.log(`  - Record ID: ${verifyRecord.id}`);
+        console.log(`  - image_analysis present: ${hasImageAnalysis}`);
+        console.log(`  - image_analysis count: ${(verifyRecord.image_analysis as any)?.competitor_analyses?.length || 0}`);
+        console.log(`  - analysis present: ${!!verifyRecord.analysis && Object.keys(verifyRecord.analysis as object).length > 0}`);
+        console.log(`  - updated_at: ${verifyRecord.updated_at}`);
+        
+        if (hasImageAnalysis) {
+          saveSuccess = true;
+          console.log(`[analyze-packaging-images] ✅ SAVE VERIFIED SUCCESSFULLY on attempt ${attempt}`);
+        } else {
+          console.error(`[analyze-packaging-images] Attempt ${attempt}: image_analysis is empty after save!`);
+          lastError = new Error('image_analysis empty after save');
+        }
+        
+      } catch (attemptError) {
+        console.error(`[analyze-packaging-images] Attempt ${attempt}: Exception:`, attemptError);
+        lastError = attemptError;
+      }
+      
+      // Wait before retry
+      if (!saveSuccess && attempt < 3) {
+        console.log(`[analyze-packaging-images] Waiting 1 second before retry...`);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+    
+    if (!saveSuccess) {
+      console.error(`[analyze-packaging-images] ❌ FAILED TO SAVE after 3 attempts. Last error:`, lastError);
     }
 
-    if (existingRecord) {
-      console.log(`[analyze-packaging-images] Updating existing record for category ${categoryId}`);
-      const { error: updateError } = await supabase
-        .from("packaging_analyses")
-        .update({ 
-          image_analysis: imageAnalysisData, 
-          updated_at: new Date().toISOString() 
-        })
-        .eq("category_id", categoryId);
-      
-      if (updateError) {
-        console.error(`[analyze-packaging-images] Error updating record:`, updateError);
-      } else {
-        console.log(`[analyze-packaging-images] Successfully updated image_analysis for category ${categoryId}`);
-      }
-    } else {
-      console.log(`[analyze-packaging-images] Inserting new record for category ${categoryId}`);
-      const { error: insertError } = await supabase
-        .from("packaging_analyses")
-        .insert({ 
-          category_id: categoryId, 
-          analysis: {}, 
-          image_analysis: imageAnalysisData 
-        });
-      
-      if (insertError) {
-        console.error(`[analyze-packaging-images] Error inserting record:`, insertError);
-      } else {
-        console.log(`[analyze-packaging-images] Successfully inserted new record for category ${categoryId}`);
-      }
-    }
-
-    console.log(`[analyze-packaging-images] Completed saving ${enrichedAnalyses.length} analyses`);
+    console.log(`[analyze-packaging-images] ========== STEP 1 SAVE COMPLETE ==========`);
   } catch (error) {
-    console.error("[analyze-packaging-images] Error:", error);
+    console.error("[analyze-packaging-images] Fatal error:", error);
+    console.error("[analyze-packaging-images] Stack:", error instanceof Error ? error.stack : 'N/A');
   }
 }
 

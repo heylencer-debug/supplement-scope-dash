@@ -939,52 +939,143 @@ ${perProductImageAnalysisSummary}
         const analysis = JSON.parse(toolCall.function.arguments);
         console.log('Packaging analysis complete:', analysis.summary?.design_strategy?.substring(0, 100));
 
-        // Save analysis to database - ONLY update the 'analysis' column, leave 'image_analysis' untouched
-        // First check if record exists
-        const { data: existingRecord, error: fetchError } = await supabase
-          .from('packaging_analyses')
-          .select('id')
-          .eq('category_id', categoryId)
-          .maybeSingle();
+        // Save analysis to database with retry logic and verification
+        console.log('========== SAVING STEP 2 DATA ==========');
+        console.log(`Category ID: ${categoryId}`);
+        console.log(`Analysis data size: ${JSON.stringify(analysis).length} bytes`);
         
-        if (fetchError) {
-          console.error('Error fetching existing record:', fetchError);
-        }
+        let saveSuccess = false;
+        let lastError: any = null;
+        
+        for (let attempt = 1; attempt <= 3 && !saveSuccess; attempt++) {
+          console.log(`Step 2 save attempt ${attempt}/3`);
+          
+          try {
+            // First check if record exists and get existing image_analysis
+            const { data: existingRecord, error: fetchError } = await supabase
+              .from('packaging_analyses')
+              .select('id, image_analysis, analysis')
+              .eq('category_id', categoryId)
+              .maybeSingle();
+            
+            if (fetchError) {
+              console.error(`Attempt ${attempt}: Error fetching existing record:`, fetchError);
+              lastError = fetchError;
+              continue;
+            }
 
-        if (existingRecord) {
-          // Record exists - UPDATE only the 'analysis' column
-          console.log('Updating existing record with strategy analysis (preserving image_analysis)');
-          const { error: updateError } = await supabase
-            .from('packaging_analyses')
-            .update({ 
-              analysis: analysis,
-              updated_at: new Date().toISOString()
-            })
-            .eq('category_id', categoryId);
+            console.log(`Existing record found: ${!!existingRecord}`);
+            if (existingRecord) {
+              const hasExistingImageAnalysis = existingRecord.image_analysis && 
+                (existingRecord.image_analysis as any)?.competitor_analyses?.length > 0;
+              console.log(`Existing image_analysis: ${hasExistingImageAnalysis ? 'PRESENT with ' + (existingRecord.image_analysis as any)?.competitor_analyses?.length + ' analyses' : 'null/empty'}`);
+              console.log(`Existing analysis: ${existingRecord.analysis ? 'present' : 'null'}`);
+            }
 
-          if (updateError) {
-            console.error('Error updating packaging analysis:', updateError);
-          } else {
-            console.log('Packaging strategy analysis saved to database successfully');
+            if (existingRecord) {
+              // UPDATE existing record - ONLY update 'analysis' column, preserve 'image_analysis'
+              console.log(`Attempt ${attempt}: Updating 'analysis' column only (preserving image_analysis)...`);
+              const { data: updateData, error: updateError } = await supabase
+                .from('packaging_analyses')
+                .update({ 
+                  analysis: analysis,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('category_id', categoryId)
+                .select('id, image_analysis, analysis');
+
+              if (updateError) {
+                console.error(`Attempt ${attempt}: Update error:`, updateError);
+                lastError = updateError;
+                continue;
+              }
+              
+              console.log(`Attempt ${attempt}: Update returned data:`, updateData ? 'yes' : 'no');
+            } else {
+              // INSERT new record with empty image_analysis
+              console.log(`Attempt ${attempt}: Inserting new record with analysis...`);
+              const { data: insertData, error: insertError } = await supabase
+                .from('packaging_analyses')
+                .insert({
+                  category_id: categoryId,
+                  analysis: analysis,
+                  image_analysis: null
+                })
+                .select('id, image_analysis, analysis');
+
+              if (insertError) {
+                console.error(`Attempt ${attempt}: Insert error:`, insertError);
+                lastError = insertError;
+                continue;
+              }
+              
+              console.log(`Attempt ${attempt}: Insert returned data:`, insertData ? 'yes' : 'no');
+            }
+
+            // VERIFICATION: Re-fetch to confirm data was saved correctly
+            console.log(`Attempt ${attempt}: Verifying save...`);
+            const { data: verifyRecord, error: verifyError } = await supabase
+              .from('packaging_analyses')
+              .select('id, image_analysis, analysis, updated_at')
+              .eq('category_id', categoryId)
+              .maybeSingle();
+            
+            if (verifyError) {
+              console.error(`Attempt ${attempt}: Verification fetch error:`, verifyError);
+              lastError = verifyError;
+              continue;
+            }
+            
+            if (!verifyRecord) {
+              console.error(`Attempt ${attempt}: VERIFICATION FAILED - no record found after save`);
+              lastError = new Error('Record not found after save');
+              continue;
+            }
+            
+            const hasAnalysis = verifyRecord.analysis && Object.keys(verifyRecord.analysis as object).length > 0;
+            const hasImageAnalysis = verifyRecord.image_analysis && 
+              (verifyRecord.image_analysis as any)?.competitor_analyses?.length > 0;
+            
+            console.log(`Attempt ${attempt}: VERIFICATION RESULT:`);
+            console.log(`  - Record ID: ${verifyRecord.id}`);
+            console.log(`  - analysis present: ${hasAnalysis}`);
+            console.log(`  - image_analysis present: ${hasImageAnalysis}`);
+            console.log(`  - image_analysis count: ${(verifyRecord.image_analysis as any)?.competitor_analyses?.length || 0}`);
+            console.log(`  - updated_at: ${verifyRecord.updated_at}`);
+            
+            if (hasAnalysis) {
+              saveSuccess = true;
+              console.log(`✅ STEP 2 SAVE VERIFIED SUCCESSFULLY on attempt ${attempt}`);
+              
+              if (!hasImageAnalysis) {
+                console.warn('⚠️ WARNING: image_analysis is null/empty after Step 2 save - Step 1 may not have completed');
+              }
+            } else {
+              console.error(`Attempt ${attempt}: analysis is empty after save!`);
+              lastError = new Error('analysis empty after save');
+            }
+            
+          } catch (attemptError) {
+            console.error(`Attempt ${attempt}: Exception:`, attemptError);
+            lastError = attemptError;
           }
-        } else {
-          // No record exists - INSERT new row with only 'analysis' column
-          console.log('Inserting new record with strategy analysis');
-          const { error: insertError } = await supabase
-            .from('packaging_analyses')
-            .insert({
-              category_id: categoryId,
-              analysis: analysis
-            });
-
-          if (insertError) {
-            console.error('Error inserting packaging analysis:', insertError);
-          } else {
-            console.log('Packaging strategy analysis inserted successfully');
+          
+          // Wait before retry
+          if (!saveSuccess && attempt < 3) {
+            console.log('Waiting 1 second before retry...');
+            await new Promise(resolve => setTimeout(resolve, 1000));
           }
         }
+        
+        if (!saveSuccess) {
+          console.error('❌ STEP 2 FAILED TO SAVE after 3 attempts. Last error:', lastError);
+        }
+        
+        console.log('========== STEP 2 SAVE COMPLETE ==========');
+        
       } catch (error) {
         console.error('Background packaging analysis error:', error);
+        console.error('Stack:', error instanceof Error ? error.stack : 'N/A');
       }
     }
 

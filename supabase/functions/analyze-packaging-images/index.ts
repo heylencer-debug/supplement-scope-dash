@@ -40,7 +40,7 @@ async function analyzeImagesInBackground(
   categoryId: string,
   supabaseUrl: string,
   supabaseKey: string,
-  lovableApiKey: string
+  openrouterApiKey: string
 ) {
   console.log(`[analyze-packaging-images] Starting background analysis for category: ${categoryId}`);
   
@@ -110,16 +110,18 @@ For EACH product, analyze:
 
 Respond with your analysis using the extract_packaging_analysis tool.`;
 
-    console.log('[analyze-packaging-images] Calling Gemini Vision API...');
+    console.log('[analyze-packaging-images] Calling OpenRouter GPT-4o Vision API...');
     
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${lovableApiKey}`,
+        Authorization: `Bearer ${openrouterApiKey}`,
         "Content-Type": "application/json",
+        "HTTP-Referer": "https://lovable.dev",
+        "X-Title": "Noodle Search Packaging Analysis"
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "openai/gpt-4o",
         messages: [
           {
             role: "user",
@@ -317,21 +319,21 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
+    const openrouterApiKey = Deno.env.get("OPENROUTER_API_KEY");
 
     if (!supabaseUrl || !supabaseKey) {
       throw new Error("Supabase configuration missing");
     }
 
-    if (!lovableApiKey) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+    if (!openrouterApiKey) {
+      throw new Error("OPENROUTER_API_KEY is not configured");
     }
 
     console.log(`[analyze-packaging-images] Starting analysis for category: ${categoryId}`);
 
     // Start background task
     EdgeRuntime.waitUntil(
-      analyzeImagesInBackground(categoryId, supabaseUrl, supabaseKey, lovableApiKey)
+      analyzeImagesInBackground(categoryId, supabaseUrl, supabaseKey, openrouterApiKey)
     );
 
     return new Response(

@@ -930,27 +930,49 @@ ${perProductImageAnalysisSummary}
         const analysis = JSON.parse(toolCall.function.arguments);
         console.log('Packaging analysis complete:', analysis.summary?.design_strategy?.substring(0, 100));
 
-        // Fetch existing image_analysis to preserve it (Step 1 data)
-        const { data: existingRecord } = await supabase
+        // Save analysis to database - ONLY update the 'analysis' column, leave 'image_analysis' untouched
+        // First check if record exists
+        const { data: existingRecord, error: fetchError } = await supabase
           .from('packaging_analyses')
-          .select('image_analysis')
+          .select('id')
           .eq('category_id', categoryId)
           .maybeSingle();
+        
+        if (fetchError) {
+          console.error('Error fetching existing record:', fetchError);
+        }
 
-        // Save analysis to database (upsert) - PRESERVE image_analysis from Step 1
-        const { error: upsertError } = await supabase
-          .from('packaging_analyses')
-          .upsert({
-            category_id: categoryId,
-            analysis: analysis,
-            image_analysis: existingRecord?.image_analysis || null,
-            updated_at: new Date().toISOString()
-          }, { onConflict: 'category_id' });
+        if (existingRecord) {
+          // Record exists - UPDATE only the 'analysis' column
+          console.log('Updating existing record with strategy analysis (preserving image_analysis)');
+          const { error: updateError } = await supabase
+            .from('packaging_analyses')
+            .update({ 
+              analysis: analysis,
+              updated_at: new Date().toISOString()
+            })
+            .eq('category_id', categoryId);
 
-        if (upsertError) {
-          console.error('Error saving packaging analysis to database:', upsertError);
+          if (updateError) {
+            console.error('Error updating packaging analysis:', updateError);
+          } else {
+            console.log('Packaging strategy analysis saved to database successfully');
+          }
         } else {
-          console.log('Packaging analysis saved to database successfully');
+          // No record exists - INSERT new row with only 'analysis' column
+          console.log('Inserting new record with strategy analysis');
+          const { error: insertError } = await supabase
+            .from('packaging_analyses')
+            .insert({
+              category_id: categoryId,
+              analysis: analysis
+            });
+
+          if (insertError) {
+            console.error('Error inserting packaging analysis:', insertError);
+          } else {
+            console.log('Packaging strategy analysis inserted successfully');
+          }
         }
       } catch (error) {
         console.error('Background packaging analysis error:', error);

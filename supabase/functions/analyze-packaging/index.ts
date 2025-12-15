@@ -271,7 +271,7 @@ PRODUCT ${idx + 1}: ${analysis.brand || 'Unknown'} - ${analysis.title || 'N/A'}
             'X-Title': 'Noodle Search Packaging Analysis',
           },
           body: JSON.stringify({
-            model: 'anthropic/claude-sonnet-4',
+            model: 'anthropic/claude-sonnet-4.5',
             max_tokens: 4096,
             tools: [
               {

@@ -71,7 +71,7 @@ serve(async (req) => {
     // Fetch top 5 competitors by monthly_sales with packaging data and images
     const { data: competitors, error: competitorsError } = await supabase
       .from('products')
-      .select('brand, title, main_image_url, image_urls, price, claims, claims_on_label, marketing_analysis, monthly_sales, servings_per_container, packaging_type, feature_bullets, review_analysis')
+      .select('brand, title, main_image_url, image_urls, price, claims, claims_on_label, marketing_analysis, monthly_sales, servings_per_container, packaging_type, feature_bullets, review_analysis, packaging_image_analysis')
       .eq('category_id', categoryId)
       .order('monthly_sales', { ascending: false })
       .limit(5);
@@ -83,6 +83,16 @@ serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Fetch existing per-product image analysis from Step 1
+    const { data: existingImageAnalysis } = await supabase
+      .from('packaging_analyses')
+      .select('image_analysis')
+      .eq('category_id', categoryId)
+      .maybeSingle();
+
+    const perProductAnalyses = (existingImageAnalysis?.image_analysis as any)?.competitor_analyses || [];
+    console.log(`Found ${perProductAnalyses.length} per-product image analyses from Step 1`);
 
     // Extract competitor image URLs for Claude to analyze
     const competitorImages: { type: string; source: { type: string; url: string } }[] = [];
@@ -137,6 +147,46 @@ THEIR VISUAL STRATEGY:
 - Conversion Triggers: ${designBlueprint.conversion_triggers || 'N/A'}
 - Differentiation: ${designBlueprint.differentiation_factor || 'N/A'}`;
     }).join('\n\n') || 'No competitor data available';
+
+    // Format per-product image analysis from Step 1
+    const perProductImageAnalysisSummary = perProductAnalyses.length > 0 
+      ? perProductAnalyses.map((analysis: any, idx: number) => {
+          const labelContent = analysis.label_content || {};
+          const messagingTone = analysis.messaging_tone || {};
+          const productContents = analysis.product_contents || {};
+          const packaging = analysis.packaging || {};
+          
+          return `
+PRODUCT ${idx + 1}: ${analysis.brand || 'Unknown'} - ${analysis.title || 'N/A'}
+───────────────────────────────────────
+📝 LABEL CONTENT (COPY THIS STYLE):
+   • Main Title: ${labelContent.main_title || 'N/A'}
+   • Subtitle: ${labelContent.subtitle || 'N/A'}
+   • Elements on Label: ${(labelContent.elements as string[])?.join(', ') || 'N/A'}
+   • Badges/Certifications: ${(labelContent.badges as string[])?.join(', ') || 'N/A'}
+   • Claims on Label: ${(labelContent.claims as string[])?.join(', ') || 'N/A'}
+
+🎯 MESSAGING TONE (MATCH THIS EXACTLY):
+   • Primary Tone: ${messagingTone.primary_tone || 'N/A'}
+   • Tone Descriptors: ${(messagingTone.tone_descriptors as string[])?.join(', ') || 'N/A'}
+   • Urgency Level: ${messagingTone.urgency_level || 'N/A'}
+   • Emotional Appeal: ${messagingTone.emotional_appeal || 'N/A'}
+
+🍬 PRODUCT CONTENTS (COPY THIS FOR OUR PRODUCT APPEARANCE):
+   • Type: ${productContents.type || 'N/A'}
+   • Shape: ${productContents.shape || 'N/A'}
+   • Colors: ${(productContents.colors as string[])?.join(', ') || 'N/A'}
+   • Color Pattern: ${productContents.color_pattern || 'N/A'}
+   • Texture: ${productContents.texture_appearance || 'N/A'}
+   • Size: ${productContents.size_estimate || 'N/A'}
+
+📦 PACKAGING FORMAT (USE THIS SAME TYPE):
+   • Type: ${packaging.type || 'N/A'}
+   • Material: ${packaging.material || 'N/A'}
+   • Color: ${packaging.color || 'N/A'}
+   • Features: ${(packaging.features as string[])?.join(', ') || 'N/A'}`;
+        }).join('\n\n')
+      : 'No per-product image analysis available - analyze packaging images first (Step 1)';
 
     // Helper function to get copy style instructions
     function getCopyStyleInstructions(style: string | undefined): string {
@@ -379,6 +429,18 @@ ${formulaBriefContent}
 
 ## COMPETITOR INTELLIGENCE (STUDY THEM, MATCH THEIR APPROACH):
 ${competitorPackagingSummary}
+
+## 🔬 PER-PRODUCT PACKAGING IMAGE ANALYSIS (FROM STEP 1 - COPY THESE EXACTLY):
+The following analysis was extracted directly from competitor product images using AI vision.
+YOU MUST COPY THEIR APPROACH for our packaging design.
+
+${perProductImageAnalysisSummary}
+
+## WHAT TO COPY FROM THE ABOVE PER-PRODUCT ANALYSIS:
+1. **LABEL STYLE**: Match the headline format, claim placement, and badge arrangement from top sellers
+2. **MESSAGING TONE**: Use the SAME primary tone and urgency level as the best performers
+3. **PRODUCT APPEARANCE**: Our product should look similar (same shapes, similar colors, textures)
+4. **PACKAGING FORMAT**: Use the same bottle/pouch type as market leaders
 
 ## HOW TO WIN (WITHOUT BEING RADICALLY DIFFERENT):
 1. MATCH the visual style of the #1 seller (colors, fonts, layout)

@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
-import { FileText, Download, Copy, Check } from "lucide-react";
+import { FileText, Download, Copy, Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCategoryAnalysis } from "@/hooks/useCategoryAnalyses";
 import { useCategoryContext } from "@/contexts/CategoryContext";
 import { useCategoryByName } from "@/hooks/useCategoryByName";
 import { DocumentContainer } from "@/components/document/DocumentContainer";
 import { useToast } from "@/hooks/use-toast";
+import { pdf } from "@react-pdf/renderer";
+import { StrategyBriefPDF } from "@/components/document/StrategyBriefPDF";
 
 interface FormulaBriefContent {
   formula_brief_content?: string;
@@ -18,6 +20,7 @@ export default function StrategyBrief() {
   const urlCategoryName = rawUrlCategoryName ? rawUrlCategoryName.replace(/^=+/, "").trim() : null;
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
   const documentRef = useRef<HTMLDivElement>(null);
   
   const { currentCategoryId, categoryName: contextCategoryName, setCategoryContext } = useCategoryContext();
@@ -56,18 +59,38 @@ export default function StrategyBrief() {
     }
   };
 
-  const handleDownloadPDF = () => {
-    if (!documentRef.current) return;
-    const content = documentRef.current.innerHTML;
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      toast({ title: "Popup blocked", description: "Please allow popups to download the PDF.", variant: "destructive" });
+  const handleDownloadPDF = async () => {
+    if (!formulaBriefContent) {
+      toast({ title: "PDF not available", description: "No document content to export.", variant: "destructive" });
       return;
     }
-    printWindow.document.write(`<!DOCTYPE html><html><head><title>Formula Strategy Brief - ${categoryName || 'Document'}</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',-apple-system,sans-serif;padding:40px;color:#1a1a2e;line-height:1.6}h1{font-size:28px;font-weight:bold;color:#4318FF;border-bottom:2px solid #4318FF20;padding-bottom:16px;margin-bottom:24px}h2{font-size:20px;font-weight:600;margin-top:32px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #e5e7eb}h3{font-size:18px;font-weight:500;margin-top:24px;margin-bottom:8px}p{margin-bottom:12px;color:#64748b}ul,ol{margin-left:24px;margin-bottom:12px;color:#64748b}li{margin-bottom:4px}table{width:100%;border-collapse:collapse;margin:16px 0;font-size:14px}th{background:#4318FF10;padding:12px;text-align:left;font-weight:600;border:1px solid #e5e7eb}td{padding:12px;border:1px solid #e5e7eb;color:#64748b}tr:nth-child(even){background:#f9fafb}strong{color:#1a1a2e}blockquote{border-left:4px solid #4318FF;padding:12px 16px;margin:16px 0;background:#4318FF08}code{background:#f1f5f9;padding:2px 6px;border-radius:4px;font-family:monospace}@media print{body{padding:20px}@page{margin:15mm}}</style></head><body>${content}</body></html>`);
-    printWindow.document.close();
-    setTimeout(() => { printWindow.print(); printWindow.close(); }, 250);
-    toast({ title: "Print dialog opened", description: "Select 'Save as PDF' in the print dialog to download." });
+
+    setGeneratingPdf(true);
+    try {
+      const blob = await pdf(
+        <StrategyBriefPDF 
+          content={formulaBriefContent} 
+          categoryName={categoryName || 'Document'} 
+          createdAt={analysis?.created_at || undefined}
+        />
+      ).toBlob();
+      
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Formula-Strategy-Brief-${categoryName || 'Document'}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      toast({ title: "PDF downloaded", description: "Your strategy brief has been saved as PDF." });
+    } catch (err) {
+      console.error('PDF generation error:', err);
+      toast({ title: "PDF generation failed", description: "Unable to generate PDF. Please try again.", variant: "destructive" });
+    } finally {
+      setGeneratingPdf(false);
+    }
   };
 
   if (!categoryName && !isLoading) {
@@ -99,8 +122,12 @@ export default function StrategyBrief() {
             <Button variant="outline" size="sm" className="gap-2" onClick={handleCopyToClipboard} disabled={!formulaBriefContent || isLoading}>
               {copied ? <><Check className="w-4 h-4" />Copied</> : <><Copy className="w-4 h-4" />Copy</>}
             </Button>
-            <Button variant="outline" size="sm" className="gap-2" onClick={handleDownloadPDF} disabled={isLoading || !formulaBriefContent}>
-              <Download className="w-4 h-4" />Download PDF
+            <Button variant="outline" size="sm" className="gap-2" onClick={handleDownloadPDF} disabled={isLoading || generatingPdf || !formulaBriefContent}>
+              {generatingPdf ? (
+                <><Loader2 className="w-4 h-4 animate-spin" />Generating...</>
+              ) : (
+                <><Download className="w-4 h-4" />Download PDF</>
+              )}
             </Button>
           </div>
         </div>

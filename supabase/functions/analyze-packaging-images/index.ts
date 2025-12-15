@@ -71,19 +71,23 @@ async function analyzeImagesInBackground(
     }));
 
     const productList = products.map((p, idx) => 
-      `Product ${idx + 1}: ${p.brand} - ${p.title} (ASIN: ${p.asin})`
+      `Image ${idx + 1}: ${p.brand} - ${p.title} (ASIN: ${p.asin})`
     ).join("\n");
 
-    const prompt = `Analyze these ${products.length} product packaging images.
+    const prompt = `You are analyzing ${products.length} product packaging images. The images are provided IN ORDER matching the list below.
 
-Products:
+CRITICAL: The images are provided in the EXACT same order as this list. Image 1 corresponds to the first product listed, Image 2 to the second, etc.
+
+Product Image Order (match analysis by position):
 ${productList}
 
-For EACH product, extract:
-1. **Label Content**: Main title, subtitle, elements, badges/certifications, claims
+For EACH image (in order, 1 to ${products.length}), analyze and extract:
+1. **Label Content**: Main title shown on packaging, subtitle, visual elements, badges/certifications visible, marketing claims
 2. **Messaging Tone**: primary_tone (clinical/playful/premium/aggressive/wellness/natural/scientific), tone_descriptors (3-5 adjectives), urgency_level (low/medium/high), emotional_appeal (trust-building/fear-based/aspirational/nurturing/fun)
-3. **Product Contents** (the actual product inside): type (gummy/treat/soft chew/powder/capsule/etc), shape (bear/bone/circle/square/heart/star/oval/irregular), colors, color_pattern (solid/multi-colored/swirled/layered), texture_appearance (smooth/ridged/coated/sugar-coated), size_estimate (small/medium/large)
+3. **Product Contents** (the actual product visible inside/on packaging): type (gummy/treat/soft chew/powder/capsule/etc), shape (bear/bone/circle/square/heart/star/oval/irregular), colors of the product, color_pattern (solid/multi-colored/swirled/layered), texture_appearance (smooth/ridged/coated/sugar-coated), size_estimate (small/medium/large)
 4. **Packaging**: type, material, color, features
+
+IMPORTANT: Return analyses in the SAME ORDER as the images/products listed above. product_index 1 = first image = first product in the list.
 
 Use the extract_packaging_analysis tool.`;
 

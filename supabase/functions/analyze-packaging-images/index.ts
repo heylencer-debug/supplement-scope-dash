@@ -11,10 +11,7 @@ const corsHeaders = {
 };
 
 interface CompetitorPackagingAnalysis {
-  brand: string;
-  title: string;
-  asin: string;
-  image_url: string;
+  product_index: number;
   label_content: {
     main_title: string;
     subtitle: string | null;
@@ -22,11 +19,19 @@ interface CompetitorPackagingAnalysis {
     badges: string[];
     claims: string[];
   };
-  product_form: {
+  messaging_tone: {
+    primary_tone: string;
+    tone_descriptors: string[];
+    urgency_level: "low" | "medium" | "high";
+    emotional_appeal: string;
+  };
+  product_contents: {
     type: string;
     shape: string | null;
     colors: string[];
-    texture_notes: string | null;
+    color_pattern: string | null;
+    texture_appearance: string | null;
+    size_estimate: string | null;
   };
   packaging: {
     type: string;
@@ -45,73 +50,43 @@ async function analyzeImagesInBackground(
   console.log(`[analyze-packaging-images] Starting background analysis for category: ${categoryId}`);
   
   const supabase = createClient(supabaseUrl, supabaseKey);
-  
+
   try {
-    // Fetch top 15 competitors with images
     const { data: products, error: productsError } = await supabase
-      .from('products')
-      .select('asin, brand, title, main_image_url, image_urls, monthly_sales')
-      .eq('category_id', categoryId)
-      .not('main_image_url', 'is', null)
-      .order('monthly_sales', { ascending: false, nullsFirst: false })
+      .from("products")
+      .select("id, asin, brand, title, main_image_url, price")
+      .eq("category_id", categoryId)
+      .not("main_image_url", "is", null)
+      .order("monthly_sales", { ascending: false, nullsFirst: false })
       .limit(15);
 
-    if (productsError) {
-      console.error('[analyze-packaging-images] Error fetching products:', productsError);
-      throw new Error(`Failed to fetch products: ${productsError.message}`);
-    }
+    if (productsError) throw productsError;
+    if (!products || products.length === 0) return;
 
-    if (!products || products.length === 0) {
-      console.log('[analyze-packaging-images] No products with images found');
-      throw new Error('No products with images found in this category');
-    }
+    console.log(`[analyze-packaging-images] Found ${products.length} products`);
 
-    console.log(`[analyze-packaging-images] Found ${products.length} products with images`);
+    const imageContent = products.map((p) => ({
+      type: "image_url" as const,
+      image_url: { url: p.main_image_url, detail: "high" as const }
+    }));
 
-    // Build image content for Gemini Vision
-    const imageContents = products.map((product, idx) => {
-      const imageUrl = product.main_image_url || (product.image_urls && product.image_urls[0]);
-      return {
-        type: "image_url" as const,
-        image_url: { url: imageUrl }
-      };
-    });
+    const productList = products.map((p, idx) => 
+      `Product ${idx + 1}: ${p.brand} - ${p.title} (ASIN: ${p.asin})`
+    ).join("\n");
 
-    // Add text prompt
-    const productListText = products.map((p, i) => 
-      `Product ${i + 1}: ${p.brand || 'Unknown Brand'} - ${p.title || 'Unknown Title'} (ASIN: ${p.asin})`
-    ).join('\n');
+    const prompt = `Analyze these ${products.length} product packaging images.
 
-    const prompt = `Analyze the product packaging in these ${products.length} images. For each product image (in order), extract the following structured information:
+Products:
+${productList}
 
-Product List (in order of images):
-${productListText}
+For EACH product, extract:
+1. **Label Content**: Main title, subtitle, elements, badges/certifications, claims
+2. **Messaging Tone**: primary_tone (clinical/playful/premium/aggressive/wellness/natural/scientific), tone_descriptors (3-5 adjectives), urgency_level (low/medium/high), emotional_appeal (trust-building/fear-based/aspirational/nurturing/fun)
+3. **Product Contents** (the actual product inside): type (gummy/treat/soft chew/powder/capsule/etc), shape (bear/bone/circle/square/heart/star/oval/irregular), colors, color_pattern (solid/multi-colored/swirled/layered), texture_appearance (smooth/ridged/coated/sugar-coated), size_estimate (small/medium/large)
+4. **Packaging**: type, material, color, features
 
-For EACH product, analyze:
+Use the extract_packaging_analysis tool.`;
 
-1. **Label Content**: 
-   - Main title text visible on the packaging
-   - Subtitle/tagline if present
-   - Key elements (serving size, quantity, weight, etc.)
-   - Certification badges (Non-GMO, USDA Organic, GMP Certified, etc.)
-   - Health/benefit claims visible on the label
-
-2. **Product Form** (if visible):
-   - Type: gummy, powder, softgel, capsule, tablet, liquid, soft chew, treat, etc.
-   - Shape: bear, bone, round, oval, cube, irregular, etc. (for gummies/treats)
-   - Colors of the actual product (if visible through packaging)
-   - Texture notes: smooth, ribbed, coated, etc.
-
-3. **Packaging**:
-   - Type: bottle, pouch, jar, box, sachet, tube, etc.
-   - Material: plastic, glass, foil, cardboard, etc.
-   - Primary color of packaging
-   - Features: flip-top lid, resealable, child-resistant, pump, dropper, etc.
-
-Respond with your analysis using the extract_packaging_analysis tool.`;
-
-    console.log('[analyze-packaging-images] Calling OpenRouter GPT-4o Vision API...');
-    
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -122,183 +97,135 @@ Respond with your analysis using the extract_packaging_analysis tool.`;
       },
       body: JSON.stringify({
         model: "openai/gpt-4o",
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: prompt },
-              ...imageContents
-            ]
-          }
-        ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "extract_packaging_analysis",
-              description: "Extract structured packaging analysis for each competitor product image",
-              parameters: {
-                type: "object",
-                properties: {
-                  competitor_analyses: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        product_index: { 
-                          type: "number", 
-                          description: "1-indexed position matching the product list order" 
+        messages: [{ role: "user", content: [{ type: "text", text: prompt }, ...imageContent] }],
+        tools: [{
+          type: "function",
+          function: {
+            name: "extract_packaging_analysis",
+            description: "Extract packaging analysis",
+            parameters: {
+              type: "object",
+              properties: {
+                analyses: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      product_index: { type: "number" },
+                      label_content: {
+                        type: "object",
+                        properties: {
+                          main_title: { type: "string" },
+                          subtitle: { type: "string", nullable: true },
+                          elements: { type: "array", items: { type: "string" } },
+                          badges: { type: "array", items: { type: "string" } },
+                          claims: { type: "array", items: { type: "string" } }
                         },
-                        label_content: {
-                          type: "object",
-                          properties: {
-                            main_title: { type: "string", description: "Main product title visible on packaging" },
-                            subtitle: { type: "string", description: "Tagline or subtitle if present" },
-                            elements: { 
-                              type: "array", 
-                              items: { type: "string" },
-                              description: "Key info elements: serving size, quantity, weight, etc."
-                            },
-                            badges: { 
-                              type: "array", 
-                              items: { type: "string" },
-                              description: "Certification badges: Non-GMO, USDA Organic, GMP, etc."
-                            },
-                            claims: { 
-                              type: "array", 
-                              items: { type: "string" },
-                              description: "Health/benefit claims on the label"
-                            }
-                          },
-                          required: ["main_title", "elements", "badges", "claims"]
-                        },
-                        product_form: {
-                          type: "object",
-                          properties: {
-                            type: { type: "string", description: "gummy, powder, softgel, capsule, tablet, liquid, soft chew, treat, etc." },
-                            shape: { type: "string", description: "Shape if visible: bear, bone, round, oval, etc." },
-                            colors: { 
-                              type: "array", 
-                              items: { type: "string" },
-                              description: "Product colors if visible"
-                            },
-                            texture_notes: { type: "string", description: "Texture description if visible" }
-                          },
-                          required: ["type"]
-                        },
-                        packaging: {
-                          type: "object",
-                          properties: {
-                            type: { type: "string", description: "bottle, pouch, jar, box, sachet, tube, etc." },
-                            material: { type: "string", description: "plastic, glass, foil, cardboard, etc." },
-                            color: { type: "string", description: "Primary packaging color" },
-                            features: { 
-                              type: "array", 
-                              items: { type: "string" },
-                              description: "Features: flip-top, resealable, child-resistant, etc."
-                            }
-                          },
-                          required: ["type", "material", "color"]
-                        }
+                        required: ["main_title", "elements", "badges", "claims"]
                       },
-                      required: ["product_index", "label_content", "product_form", "packaging"]
-                    }
+                      messaging_tone: {
+                        type: "object",
+                        properties: {
+                          primary_tone: { type: "string" },
+                          tone_descriptors: { type: "array", items: { type: "string" } },
+                          urgency_level: { type: "string", enum: ["low", "medium", "high"] },
+                          emotional_appeal: { type: "string" }
+                        },
+                        required: ["primary_tone", "tone_descriptors", "urgency_level", "emotional_appeal"]
+                      },
+                      product_contents: {
+                        type: "object",
+                        properties: {
+                          type: { type: "string" },
+                          shape: { type: "string", nullable: true },
+                          colors: { type: "array", items: { type: "string" } },
+                          color_pattern: { type: "string", nullable: true },
+                          texture_appearance: { type: "string", nullable: true },
+                          size_estimate: { type: "string", nullable: true }
+                        },
+                        required: ["type", "colors"]
+                      },
+                      packaging: {
+                        type: "object",
+                        properties: {
+                          type: { type: "string" },
+                          material: { type: "string" },
+                          color: { type: "string" },
+                          features: { type: "array", items: { type: "string" } }
+                        },
+                        required: ["type", "material", "color", "features"]
+                      }
+                    },
+                    required: ["product_index", "label_content", "messaging_tone", "product_contents", "packaging"]
                   }
-                },
-                required: ["competitor_analyses"]
-              }
+                }
+              },
+              required: ["analyses"]
             }
           }
-        ],
+        }],
         tool_choice: { type: "function", function: { name: "extract_packaging_analysis" } }
-      })
+      }),
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[analyze-packaging-images] Gemini API error:', response.status, errorText);
-      throw new Error(`AI API error: ${response.status}`);
-    }
+    if (!response.ok) throw new Error(`API error: ${response.status}`);
 
-    const aiData = await response.json();
-    console.log('[analyze-packaging-images] AI response received');
+    const data = await response.json();
+    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+    if (!toolCall) throw new Error("No tool call in response");
 
-    // Extract tool call result
-    const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
-    if (!toolCall || toolCall.function.name !== 'extract_packaging_analysis') {
-      console.error('[analyze-packaging-images] No valid tool call in response');
-      throw new Error('AI did not return expected structured output');
-    }
+    const analyses: CompetitorPackagingAnalysis[] = JSON.parse(toolCall.function.arguments).analyses;
+    console.log(`[analyze-packaging-images] Parsed ${analyses.length} analyses`);
 
-    const analysisResult = JSON.parse(toolCall.function.arguments);
-    
-    // Merge with product data
-    const enrichedAnalyses: CompetitorPackagingAnalysis[] = analysisResult.competitor_analyses.map((analysis: any) => {
+    const enrichedAnalyses = [];
+    for (const analysis of analyses) {
       const productIdx = analysis.product_index - 1;
-      const product = products[productIdx];
-      
-      if (!product) {
-        console.warn(`[analyze-packaging-images] No product found for index ${analysis.product_index}`);
-        return null;
+      if (productIdx >= 0 && productIdx < products.length) {
+        const product = products[productIdx];
+        
+        enrichedAnalyses.push({
+          brand: product.brand || "Unknown",
+          title: product.title || "Unknown",
+          asin: product.asin,
+          image_url: product.main_image_url,
+          label_content: analysis.label_content,
+          messaging_tone: analysis.messaging_tone,
+          product_contents: analysis.product_contents,
+          packaging: analysis.packaging
+        });
+        
+        // Update individual product
+        await supabase.from("products").update({ 
+          packaging_image_analysis: {
+            label_content: analysis.label_content,
+            messaging_tone: analysis.messaging_tone,
+            product_contents: analysis.product_contents,
+            packaging: analysis.packaging,
+            analyzed_at: new Date().toISOString()
+          }
+        }).eq("id", product.id);
       }
-      
-      return {
-        brand: product.brand || 'Unknown Brand',
-        title: product.title || 'Unknown Product',
-        asin: product.asin,
-        image_url: product.main_image_url || (product.image_urls && product.image_urls[0]),
-        label_content: {
-          main_title: analysis.label_content?.main_title || '',
-          subtitle: analysis.label_content?.subtitle || null,
-          elements: analysis.label_content?.elements || [],
-          badges: analysis.label_content?.badges || [],
-          claims: analysis.label_content?.claims || []
-        },
-        product_form: {
-          type: analysis.product_form?.type || 'unknown',
-          shape: analysis.product_form?.shape || null,
-          colors: analysis.product_form?.colors || [],
-          texture_notes: analysis.product_form?.texture_notes || null
-        },
-        packaging: {
-          type: analysis.packaging?.type || 'unknown',
-          material: analysis.packaging?.material || 'unknown',
-          color: analysis.packaging?.color || 'unknown',
-          features: analysis.packaging?.features || []
-        }
-      };
-    }).filter(Boolean);
+    }
 
-    console.log(`[analyze-packaging-images] Processed ${enrichedAnalyses.length} competitor analyses`);
-
-    // Save to database - first check if record exists
+    // Save category-level results
     const { data: existingRecord } = await supabase
-      .from('packaging_analyses')
-      .select('id, analysis')
-      .eq('category_id', categoryId)
+      .from("packaging_analyses")
+      .select("id, analysis")
+      .eq("category_id", categoryId)
       .maybeSingle();
 
-    const { error: upsertError } = await supabase
-      .from('packaging_analyses')
-      .upsert(
-        {
-          category_id: categoryId,
-          analysis: existingRecord?.analysis || {}, // Preserve existing or use empty object for NOT NULL constraint
-          image_analysis: { competitor_analyses: enrichedAnalyses },
-          updated_at: new Date().toISOString()
-        },
-        { onConflict: 'category_id' }
-      );
-
-    if (upsertError) {
-      console.error('[analyze-packaging-images] Error saving to DB:', upsertError);
-      throw new Error(`Failed to save analysis: ${upsertError.message}`);
+    if (existingRecord) {
+      await supabase.from("packaging_analyses")
+        .update({ image_analysis: { competitor_analyses: enrichedAnalyses }, updated_at: new Date().toISOString() })
+        .eq("category_id", categoryId);
+    } else {
+      await supabase.from("packaging_analyses")
+        .insert({ category_id: categoryId, analysis: {}, image_analysis: { competitor_analyses: enrichedAnalyses } });
     }
 
-    console.log('[analyze-packaging-images] Analysis saved successfully');
-    
+    console.log(`[analyze-packaging-images] Saved ${enrichedAnalyses.length} analyses`);
   } catch (error) {
-    console.error('[analyze-packaging-images] Background task error:', error);
+    console.error("[analyze-packaging-images] Error:", error);
   }
 }
 

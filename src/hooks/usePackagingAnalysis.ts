@@ -73,9 +73,20 @@ export interface PackagingDesignAnalysis {
   };
 }
 
+// Structure for dual mockup URLs
+export interface MockupImages {
+  match_leaders: string | null;
+  match_disruptors: string | null;
+}
+
 export function usePackagingAnalysis(categoryId?: string) {
   const [analysis, setAnalysis] = useState<PackagingDesignAnalysis | null>(null);
   const [mockupImageUrl, setMockupImageUrl] = useState<string | null>(null);
+  // Dual mockup URLs for Match Leaders and Match Disruptors
+  const [mockupImages, setMockupImages] = useState<MockupImages>({
+    match_leaders: null,
+    match_disruptors: null,
+  });
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingFromDb, setIsLoadingFromDb] = useState(true);
@@ -93,6 +104,7 @@ export function usePackagingAnalysis(categoryId?: string) {
   useEffect(() => {
     setAnalysis(null);
     setMockupImageUrl(null);
+    setMockupImages({ match_leaders: null, match_disruptors: null });
     setUpdatedAt(null);
     setIsLoadingFromDb(true);
     setWasRestoredFromDb(false);
@@ -121,8 +133,28 @@ export function usePackagingAnalysis(categoryId?: string) {
             setAnalysis(data.analysis as unknown as PackagingDesignAnalysis);
             setWasRestoredFromDb(true);
           }
+          // Handle legacy single mockup URL
           if (data.mockup_image_url) {
-            setMockupImageUrl(data.mockup_image_url);
+            // Check if it's a JSON object (new format) or string (legacy format)
+            if (typeof data.mockup_image_url === 'string') {
+              try {
+                const parsed = JSON.parse(data.mockup_image_url);
+                if (parsed && typeof parsed === 'object') {
+                  setMockupImages({
+                    match_leaders: parsed.match_leaders || null,
+                    match_disruptors: parsed.match_disruptors || null,
+                  });
+                  // Set legacy URL to leaders for backwards compatibility
+                  setMockupImageUrl(parsed.match_leaders || null);
+                } else {
+                  // It was a string, not JSON
+                  setMockupImageUrl(data.mockup_image_url);
+                }
+              } catch {
+                // Not JSON, use as legacy URL
+                setMockupImageUrl(data.mockup_image_url);
+              }
+            }
           }
           if (data.updated_at) {
             setUpdatedAt(new Date(data.updated_at));
@@ -138,25 +170,49 @@ export function usePackagingAnalysis(categoryId?: string) {
     loadFromDb();
   }, [categoryId]);
 
-  // Save mockup image to database
-  const saveMockupImage = useCallback(async (imageUrl: string) => {
+  // Save mockup image to database - now supports strategy type
+  const saveMockupImage = useCallback(async (imageUrl: string, strategyType?: 'match_leaders' | 'match_disruptors') => {
     if (!categoryId) return;
 
     try {
-      const { error: updateError } = await supabase
-        .from('packaging_analyses')
-        .update({ mockup_image_url: imageUrl })
-        .eq('category_id', categoryId);
+      // Update local state
+      if (strategyType) {
+        const newMockupImages = {
+          ...mockupImages,
+          [strategyType]: imageUrl,
+        };
+        setMockupImages(newMockupImages);
+        
+        // Also update legacy field for backwards compatibility
+        if (strategyType === 'match_leaders') {
+          setMockupImageUrl(imageUrl);
+        }
 
-      if (updateError) {
-        console.error('Error saving mockup to DB:', updateError);
+        // Save as JSON string to the mockup_image_url column
+        const { error: updateError } = await supabase
+          .from('packaging_analyses')
+          .update({ mockup_image_url: JSON.stringify(newMockupImages) })
+          .eq('category_id', categoryId);
+
+        if (updateError) {
+          console.error('Error saving mockup to DB:', updateError);
+        }
       } else {
+        // Legacy behavior - save single URL
         setMockupImageUrl(imageUrl);
+        const { error: updateError } = await supabase
+          .from('packaging_analyses')
+          .update({ mockup_image_url: imageUrl })
+          .eq('category_id', categoryId);
+
+        if (updateError) {
+          console.error('Error saving mockup to DB:', updateError);
+        }
       }
     } catch (e) {
       console.error('Error saving mockup to DB:', e);
     }
-  }, [categoryId]);
+  }, [categoryId, mockupImages]);
 
   const runAnalysis = useCallback(async (copyStyle?: string) => {
     if (!categoryId) {
@@ -282,6 +338,7 @@ export function usePackagingAnalysis(categoryId?: string) {
   const clearAnalysis = useCallback(async () => {
     setAnalysis(null);
     setMockupImageUrl(null);
+    setMockupImages({ match_leaders: null, match_disruptors: null });
     setUpdatedAt(null);
     setWasRestoredFromDb(false);
     setError(null);
@@ -302,6 +359,7 @@ export function usePackagingAnalysis(categoryId?: string) {
   return {
     analysis,
     mockupImageUrl,
+    mockupImages,
     updatedAt,
     saveMockupImage,
     isLoading,

@@ -408,106 +408,99 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
             </Badge>
           )}
         </CardTitle>
-        <CardDescription className="flex items-center justify-between flex-wrap gap-2">
-          <span>Market intelligence for optimal packaging format, pricing, and positioning</span>
-          <div className="flex items-center gap-2">
-            {hasAnalysis && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={clearAnalysis}
-                className="text-xs h-7"
-              >
-                <Trash2 className="w-3 h-3 mr-1" />
-                Clear
-              </Button>
-            )}
-            <Button
-              variant={hasAnalysis ? "outline" : "default"}
-              size="sm"
-              onClick={() => runAnalysis()}
-              disabled={isAnalyzing || isLoadingFromDb || !categoryId}
-              className={cn(
-                "text-xs h-7 transition-all duration-300 hover:shadow-[0_0_20px_hsl(var(--primary)/0.4)] hover:scale-105",
-                !hasAnalysis && !isAnalyzing && "animate-glow-pulse"
-              )}
-            >
-              {isAnalyzing ? (
-                <>
-                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                  {pollingStatus.isPolling 
-                    ? `Analyzing... (${pollingStatus.attempt}/${pollingStatus.maxAttempts})`
-                    : 'Starting...'}
-                </>
-              ) : hasAnalysis ? (
-                <>
-                  <RefreshCw className="w-3 h-3 mr-1" />
-                  Refresh AI Analysis
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-3 h-3 mr-1" />
-                  Analyze with AI
-                </>
-              )}
-            </Button>
-          </div>
+        <CardDescription>
+          Market intelligence for optimal packaging format, pricing, and positioning
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
-        {/* AI Analysis Progress Indicator */}
-        {isAnalyzing && pollingStatus.isPolling && pollingStatus.startedAt && (
-          <AnalysisProgressIndicator 
-            startedAt={pollingStatus.startedAt}
-            attempt={pollingStatus.attempt}
-            maxAttempts={pollingStatus.maxAttempts}
-          />
-        )}
-
-        {/* AI Analysis Loading State */}
-        {isLoadingFromDb && (
-          <div className="p-4 bg-muted/30 rounded-lg border border-border/50 animate-pulse">
-            <div className="flex items-center gap-2">
-              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Loading saved AI analysis...</span>
-            </div>
+      <CardContent className="space-y-8">
+        {/* Workflow Progress Indicator */}
+        <div className="flex items-center justify-center gap-2 p-4 bg-muted/30 rounded-xl border border-border/50">
+          {/* Step 1 */}
+          <div className={cn(
+            "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-colors",
+            hasImageAnalysis 
+              ? "bg-chart-4/10 text-chart-4 border border-chart-4/30" 
+              : isAnalyzingImages 
+                ? "bg-primary/10 text-primary border border-primary/30" 
+                : "bg-muted text-muted-foreground border border-border"
+          )}>
+            {hasImageAnalysis ? (
+              <CheckCircle2 className="w-3.5 h-3.5" />
+            ) : isAnalyzingImages ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <span className="w-4 h-4 rounded-full bg-muted-foreground/30 flex items-center justify-center text-[10px]">1</span>
+            )}
+            <span>Competitor Analysis</span>
           </div>
-        )}
-
-        {/* AI Analysis Available Indicator */}
-        {aiAnalysis && !isLoadingFromDb && (
-          <div className="p-3 bg-chart-4/5 rounded-lg border border-chart-4/20 mb-4">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-chart-4" />
-              <span className="text-sm font-medium text-chart-4">AI Packaging Analysis Available</span>
-              <span className="text-xs text-muted-foreground ml-auto">Scroll down to view results</span>
-            </div>
+          
+          <div className="w-8 h-px bg-border" />
+          
+          {/* Step 2 */}
+          <div className={cn(
+            "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-colors",
+            hasAnalysis 
+              ? "bg-chart-4/10 text-chart-4 border border-chart-4/30" 
+              : isAnalyzing 
+                ? "bg-primary/10 text-primary border border-primary/30" 
+                : "bg-muted text-muted-foreground border border-border"
+          )}>
+            {hasAnalysis ? (
+              <CheckCircle2 className="w-3.5 h-3.5" />
+            ) : isAnalyzing ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <span className="w-4 h-4 rounded-full bg-muted-foreground/30 flex items-center justify-center text-[10px]">2</span>
+            )}
+            <span>Our Strategy</span>
           </div>
-        )}
+          
+          <div className="w-8 h-px bg-border" />
+          
+          {/* Step 3 */}
+          <div className={cn(
+            "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-colors",
+            mockupImageUrl 
+              ? "bg-chart-4/10 text-chart-4 border border-chart-4/30" 
+              : "bg-muted text-muted-foreground border border-border"
+          )}>
+            {mockupImageUrl ? (
+              <CheckCircle2 className="w-3.5 h-3.5" />
+            ) : (
+              <span className="w-4 h-4 rounded-full bg-muted-foreground/30 flex items-center justify-center text-[10px]">3</span>
+            )}
+            <span>Mockup</span>
+          </div>
+        </div>
 
-        {aiAnalysis && (
-          <AIPackagingResults 
-            analysis={aiAnalysis} 
-            mockupImageUrl={mockupImageUrl} 
-            onSaveMockup={saveMockupImage}
-            onRegenerateCopy={(style) => runAnalysis(style)}
-            isRegenerating={isAnalyzing}
-          />
-        )}
-
-        {/* Competitor Packaging Visual Analysis */}
-        <div className="space-y-4">
+        {/* ============================================ */}
+        {/* STEP 1: Per Product Packaging Content Analysis */}
+        {/* ============================================ */}
+        <div className="space-y-4 p-5 bg-muted/20 rounded-xl border border-border/50">
           <div className="flex items-center justify-between">
-            <h4 className="text-sm font-medium text-foreground flex items-center gap-2">
-              <Camera className="w-4 h-4 text-chart-3" />
-              Competitor Packaging Visual Analysis
-              {hasImageAnalysis && (
-                <Badge variant="secondary" className="ml-2 bg-chart-3/10 text-chart-3 border-chart-3/20 text-[10px] font-medium">
-                  <Sparkles className="w-3 h-3 mr-1" />
-                  {imageAnalysis?.competitor_analyses?.length || 0} analyzed
-                </Badge>
-              )}
-            </h4>
+            <div className="flex items-center gap-3">
+              <div className={cn(
+                "w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold",
+                hasImageAnalysis ? "bg-chart-4 text-white" : "bg-primary text-white"
+              )}>
+                1
+              </div>
+              <div>
+                <h4 className="text-sm font-medium text-foreground flex items-center gap-2">
+                  <Camera className="w-4 h-4 text-chart-3" />
+                  Competitor Packaging Analysis
+                  {hasImageAnalysis && (
+                    <Badge variant="secondary" className="ml-2 bg-chart-3/10 text-chart-3 border-chart-3/20 text-[10px] font-medium">
+                      <Sparkles className="w-3 h-3 mr-1" />
+                      {imageAnalysis?.competitor_analyses?.length || 0} analyzed
+                    </Badge>
+                  )}
+                </h4>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Analyze competitor product images to extract packaging details, colors, and messaging
+                </p>
+              </div>
+            </div>
             <div className="flex items-center gap-2">
               {hasImageAnalysis && (
                 <Button
@@ -521,13 +514,13 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
                 </Button>
               )}
               <Button
-                variant={hasImageAnalysis ? "outline" : "secondary"}
+                variant={hasImageAnalysis ? "outline" : "default"}
                 size="sm"
                 onClick={() => runImageAnalysis()}
                 disabled={isAnalyzingImages || isLoadingImagesFromDb || !categoryId}
                 className={cn(
                   "text-xs h-7 transition-all duration-300",
-                  !hasImageAnalysis && !isAnalyzingImages && "animate-glow-pulse"
+                  !hasImageAnalysis && !isAnalyzingImages && "animate-glow-pulse hover:shadow-[0_0_20px_hsl(var(--primary)/0.4)] hover:scale-105"
                 )}
               >
                 {isAnalyzingImages ? (
@@ -545,7 +538,7 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
                 ) : (
                   <>
                     <Camera className="w-3 h-3 mr-1" />
-                    Analyze Images
+                    Analyze Competitor Images
                   </>
                 )}
               </Button>
@@ -581,12 +574,185 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
             <div className="p-6 bg-muted/20 rounded-xl border border-dashed border-border text-center">
               <Camera className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
               <p className="text-sm text-muted-foreground">
-                Click "Analyze Images" to have AI extract packaging details from competitor product images
+                Click "Analyze Competitor Images" to have AI extract packaging details from competitor product images
               </p>
               <p className="text-xs text-muted-foreground mt-1">
                 Includes label text, product form & shape, colors, badges, and packaging type
               </p>
             </div>
+          )}
+        </div>
+
+        {/* ============================================ */}
+        {/* STEP 2: Our Product Packaging Strategy */}
+        {/* ============================================ */}
+        <div className={cn(
+          "space-y-4 p-5 rounded-xl border",
+          hasImageAnalysis 
+            ? "bg-muted/20 border-border/50" 
+            : "bg-muted/10 border-dashed border-border/30 opacity-60"
+        )}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={cn(
+                "w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold",
+                hasAnalysis ? "bg-chart-4 text-white" : hasImageAnalysis ? "bg-primary text-white" : "bg-muted-foreground/30 text-muted-foreground"
+              )}>
+                2
+              </div>
+              <div>
+                <h4 className="text-sm font-medium text-foreground flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-primary" />
+                  Our Packaging Strategy
+                  {hasAnalysis && (
+                    <Badge variant="secondary" className="ml-2 bg-chart-4/10 text-chart-4 border-chart-4/20 text-[10px] font-medium">
+                      <CheckCircle2 className="w-3 h-3 mr-1" />
+                      Complete
+                    </Badge>
+                  )}
+                </h4>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Generate AI-powered packaging design recommendations based on competitor insights
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {hasAnalysis && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearAnalysis}
+                  className="text-xs h-7"
+                >
+                  <Trash2 className="w-3 h-3 mr-1" />
+                  Clear
+                </Button>
+              )}
+              <Button
+                variant={hasAnalysis ? "outline" : "default"}
+                size="sm"
+                onClick={() => runAnalysis()}
+                disabled={isAnalyzing || isLoadingFromDb || !categoryId || !hasImageAnalysis}
+                className={cn(
+                  "text-xs h-7 transition-all duration-300",
+                  hasImageAnalysis && !hasAnalysis && !isAnalyzing && "animate-glow-pulse hover:shadow-[0_0_20px_hsl(var(--primary)/0.4)] hover:scale-105"
+                )}
+              >
+                {isAnalyzing ? (
+                  <>
+                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                    {pollingStatus.isPolling 
+                      ? `Analyzing... (${pollingStatus.attempt}/${pollingStatus.maxAttempts})`
+                      : 'Starting...'}
+                  </>
+                ) : hasAnalysis ? (
+                  <>
+                    <RefreshCw className="w-3 h-3 mr-1" />
+                    Refresh Analysis
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3 h-3 mr-1" />
+                    Generate Strategy
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+
+          {/* Show hint if Step 1 not done */}
+          {!hasImageAnalysis && !isAnalyzingImages && (
+            <div className="p-4 bg-muted/30 rounded-lg border border-border/50 text-center">
+              <p className="text-sm text-muted-foreground">
+                Complete Step 1 first to analyze competitor packaging
+              </p>
+            </div>
+          )}
+
+          {/* AI Analysis Progress Indicator */}
+          {isAnalyzing && pollingStatus.isPolling && pollingStatus.startedAt && (
+            <AnalysisProgressIndicator 
+              startedAt={pollingStatus.startedAt}
+              attempt={pollingStatus.attempt}
+              maxAttempts={pollingStatus.maxAttempts}
+            />
+          )}
+
+          {/* AI Analysis Loading State */}
+          {isLoadingFromDb && (
+            <div className="p-4 bg-muted/30 rounded-lg border border-border/50 animate-pulse">
+              <div className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Loading saved AI analysis...</span>
+              </div>
+            </div>
+          )}
+
+          {/* AI Analysis Results (without mockup section) */}
+          {aiAnalysis && (
+            <AIPackagingResults 
+              analysis={aiAnalysis} 
+              mockupImageUrl={null}
+              onSaveMockup={undefined}
+              onRegenerateCopy={(style) => runAnalysis(style)}
+              isRegenerating={isAnalyzing}
+              hideMockupSection={true}
+            />
+          )}
+        </div>
+
+        {/* ============================================ */}
+        {/* STEP 3: Generate Packaging Mockup */}
+        {/* ============================================ */}
+        <div className={cn(
+          "space-y-4 p-5 rounded-xl border",
+          hasAnalysis 
+            ? "bg-muted/20 border-border/50" 
+            : "bg-muted/10 border-dashed border-border/30 opacity-60"
+        )}>
+          <div className="flex items-center gap-3">
+            <div className={cn(
+              "w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold",
+              mockupImageUrl ? "bg-chart-4 text-white" : hasAnalysis ? "bg-primary text-white" : "bg-muted-foreground/30 text-muted-foreground"
+            )}>
+              3
+            </div>
+            <div>
+              <h4 className="text-sm font-medium text-foreground flex items-center gap-2">
+                <Package className="w-4 h-4 text-chart-2" />
+                Product Mockup
+                {mockupImageUrl && (
+                  <Badge variant="secondary" className="ml-2 bg-chart-4/10 text-chart-4 border-chart-4/20 text-[10px] font-medium">
+                    <CheckCircle2 className="w-3 h-3 mr-1" />
+                    Generated
+                  </Badge>
+                )}
+              </h4>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Visualize your packaging design with an AI-generated product mockup
+              </p>
+            </div>
+          </div>
+
+          {/* Show hint if Step 2 not done */}
+          {!hasAnalysis && !isAnalyzing && (
+            <div className="p-4 bg-muted/30 rounded-lg border border-border/50 text-center">
+              <p className="text-sm text-muted-foreground">
+                Complete Step 2 first to generate your packaging strategy
+              </p>
+            </div>
+          )}
+
+          {/* Mockup Section - only show if Step 2 is done */}
+          {aiAnalysis && (
+            <AIPackagingResults 
+              analysis={aiAnalysis} 
+              mockupImageUrl={mockupImageUrl}
+              onSaveMockup={saveMockupImage}
+              onRegenerateCopy={undefined}
+              isRegenerating={false}
+              showOnlyMockup={true}
+            />
           )}
         </div>
 

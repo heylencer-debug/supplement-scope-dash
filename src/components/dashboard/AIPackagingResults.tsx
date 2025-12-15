@@ -48,6 +48,8 @@ interface AIPackagingResultsProps {
   onSaveMockup?: (imageUrl: string) => Promise<void>;
   onRegenerateCopy?: (style: string) => void;
   isRegenerating?: boolean;
+  hideMockupSection?: boolean;
+  showOnlyMockup?: boolean;
 }
 
 // Visual mockup component for front panel
@@ -223,7 +225,7 @@ function FrontPanelMockup({
   );
 }
 
-export function AIPackagingResults({ analysis, mockupImageUrl, onSaveMockup, onRegenerateCopy, isRegenerating }: AIPackagingResultsProps) {
+export function AIPackagingResults({ analysis, mockupImageUrl, onSaveMockup, onRegenerateCopy, isRegenerating, hideMockupSection, showOnlyMockup }: AIPackagingResultsProps) {
   const { toast } = useToast();
   const [rationaleOpen, setRationaleOpen] = useState(false);
   const [generatedMockup, setGeneratedMockup] = useState<string | null>(mockupImageUrl || null);
@@ -384,8 +386,139 @@ export function AIPackagingResults({ analysis, mockupImageUrl, onSaveMockup, onR
     document.body.removeChild(link);
   };
 
+  // If showOnlyMockup is true, only render the mockup section
+  if (showOnlyMockup) {
+    return (
+      <div className="space-y-4">
+        {/* Packaging Format Selector */}
+        <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border border-border/50">
+          <div className="flex-1">
+            <label className="text-xs font-medium text-muted-foreground mb-1 block">
+              Packaging Format
+            </label>
+            <Select value={selectedPackagingFormat} onValueChange={setSelectedPackagingFormat}>
+              <SelectTrigger className="w-full bg-background">
+                <SelectValue placeholder="Select packaging format" />
+              </SelectTrigger>
+              <SelectContent>
+                {packagingFormatOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {selectedPackagingFormat !== recommendedPackagingFormat && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedPackagingFormat(recommendedPackagingFormat)}
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              Reset to recommended
+            </Button>
+          )}
+        </div>
+
+        {/* Generate Mockup Button */}
+        <div className="flex items-center justify-center">
+          <Button 
+            onClick={generateAIMockup}
+            disabled={isGenerating}
+            size="lg"
+            className={cn(
+              "gap-2 transition-all duration-300 hover:shadow-[0_0_20px_hsl(var(--primary)/0.4)] hover:scale-105",
+              !isGenerating && !generatedMockup && "animate-glow-pulse"
+            )}
+          >
+            {isGenerating ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Generating Mockup...
+              </>
+            ) : generatedMockup ? (
+              <>
+                <RefreshCw className="w-4 h-4" />
+                Regenerate Mockup
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4" />
+                Generate AI Mockup
+              </>
+            )}
+          </Button>
+        </div>
+
+        {/* Mockup Display */}
+        {generatedMockup ? (
+          <div className="relative group max-w-md mx-auto">
+            <img 
+              src={generatedMockup} 
+              alt="AI Generated Product Mockup"
+              className="w-full rounded-xl shadow-lg cursor-pointer hover:opacity-90 transition-opacity"
+              onClick={() => setIsImageModalOpen(true)}
+            />
+            {/* Hover overlay with zoom hint */}
+            <div 
+              className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+              onClick={() => setIsImageModalOpen(true)}
+            >
+              <div className="bg-black/50 text-white px-3 py-1.5 rounded-full text-xs flex items-center gap-1.5">
+                <ZoomIn className="w-3 h-3" />
+                Click to enlarge
+              </div>
+            </div>
+            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); downloadMockup(); }} className="gap-1">
+                <Download className="w-3 h-3" />
+                Save
+              </Button>
+            </div>
+          </div>
+        ) : !isGenerating ? (
+          <div className="max-w-md mx-auto h-[300px] rounded-xl border-2 border-dashed border-border/50 flex flex-col items-center justify-center text-muted-foreground bg-muted/20">
+            <ImageIcon className="w-12 h-12 mb-3 opacity-30" />
+            <p className="text-sm font-medium">No AI mockup yet</p>
+            <p className="text-xs mt-1">Click "Generate AI Mockup" above</p>
+          </div>
+        ) : null}
+
+        {/* Full Image Modal */}
+        <Dialog open={isImageModalOpen} onOpenChange={setIsImageModalOpen}>
+          <DialogContent className="max-w-4xl w-full p-0 overflow-hidden">
+            <DialogHeader className="p-4 pb-2">
+              <DialogTitle className="flex items-center gap-2">
+                <ImageIcon className="w-5 h-5 text-primary" />
+                AI Product Mockup
+              </DialogTitle>
+            </DialogHeader>
+            <div className="p-4 pt-0">
+              {generatedMockup && (
+                <div className="relative">
+                  <img 
+                    src={generatedMockup} 
+                    alt="AI Generated Product Mockup - Full Size"
+                    className="w-full h-auto rounded-lg shadow-lg"
+                  />
+                  <div className="absolute bottom-4 right-4 flex gap-2">
+                    <Button size="sm" variant="secondary" onClick={downloadMockup} className="gap-1.5 shadow-lg">
+                      <Download className="w-4 h-4" />
+                      Download
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6 mt-6">
+    <div className="space-y-6">
       {/* Regenerate Copy Section */}
       {onRegenerateCopy && (
         <div className="flex items-center justify-between p-4 bg-gradient-to-r from-primary/5 to-chart-2/5 rounded-xl border border-primary/20">
@@ -436,161 +569,163 @@ export function AIPackagingResults({ analysis, mockupImageUrl, onSaveMockup, onR
         </div>
       )}
 
-      {/* Section 0: Visual Mockup Preview */}
-      <Card className="border-chart-2/20 bg-gradient-to-br from-muted/30 to-muted/10">
-        <CardHeader className="pb-4">
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Package className="w-5 h-5 text-chart-2" />
-                  Front Panel Preview
-                </CardTitle>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Visual mockup showing colors, typography, and layout.
-                </p>
-              </div>
-              <Button 
-                onClick={generateAIMockup}
-                disabled={isGenerating}
-                size="sm"
-                className={cn(
-                  "gap-2 transition-all duration-300 hover:shadow-[0_0_20px_hsl(var(--primary)/0.4)] hover:scale-105",
-                  !isGenerating && !generatedMockup && "animate-glow-pulse"
-                )}
-              >
-                {isGenerating ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4" />
-                    Generate AI Image
-                  </>
-                )}
-              </Button>
-            </div>
-            
-            {/* Packaging Format Selector */}
-            <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border border-border/50">
-              <div className="flex-1">
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                  Packaging Format
-                </label>
-                <Select value={selectedPackagingFormat} onValueChange={setSelectedPackagingFormat}>
-                  <SelectTrigger className="w-full bg-background">
-                    <SelectValue placeholder="Select packaging format" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {packagingFormatOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              {selectedPackagingFormat !== recommendedPackagingFormat && (
-                <Button
-                  variant="ghost"
+      {/* Section 0: Visual Mockup Preview - Hidden when hideMockupSection is true */}
+      {!hideMockupSection && (
+        <Card className="border-chart-2/20 bg-gradient-to-br from-muted/30 to-muted/10">
+          <CardHeader className="pb-4">
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Package className="w-5 h-5 text-chart-2" />
+                    Front Panel Preview
+                  </CardTitle>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Visual mockup showing colors, typography, and layout.
+                  </p>
+                </div>
+                <Button 
+                  onClick={generateAIMockup}
+                  disabled={isGenerating}
                   size="sm"
-                  onClick={() => setSelectedPackagingFormat(recommendedPackagingFormat)}
-                  className="text-xs text-muted-foreground hover:text-foreground"
+                  className={cn(
+                    "gap-2 transition-all duration-300 hover:shadow-[0_0_20px_hsl(var(--primary)/0.4)] hover:scale-105",
+                    !isGenerating && !generatedMockup && "animate-glow-pulse"
+                  )}
                 >
-                  Reset to recommended
+                  {isGenerating ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4" />
+                      Generate AI Image
+                    </>
+                  )}
                 </Button>
-              )}
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* CSS Mockup */}
-            <div>
-              <p className="text-xs font-medium text-muted-foreground mb-3 text-center">Layout Preview</p>
-              <FrontPanelMockup
-                primaryColor={primaryColor}
-                secondaryColor={secondaryColor}
-                accentColor={accentColor}
-                headlineFont={headlineFont}
-                bodyFont={bodyFont}
-                primaryClaim={primaryClaim}
-                certifications={certifications}
-                callToAction={callToAction}
-                bulletPoints={bulletPoints}
-              />
-            </div>
-
-            {/* AI Generated Mockup */}
-            <div>
-              <p className="text-xs font-medium text-muted-foreground mb-3 text-center">AI Product Render</p>
-              {generatedMockup ? (
-                <div className="relative group">
-                  <img 
-                    src={generatedMockup} 
-                    alt="AI Generated Product Mockup"
-                    className="w-full max-w-xs mx-auto rounded-xl shadow-lg cursor-pointer hover:opacity-90 transition-opacity"
-                    onClick={() => setIsImageModalOpen(true)}
-                  />
-                  {/* Hover overlay with zoom hint */}
-                  <div 
-                    className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                    onClick={() => setIsImageModalOpen(true)}
+              </div>
+              
+              {/* Packaging Format Selector */}
+              <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border border-border/50">
+                <div className="flex-1">
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                    Packaging Format
+                  </label>
+                  <Select value={selectedPackagingFormat} onValueChange={setSelectedPackagingFormat}>
+                    <SelectTrigger className="w-full bg-background">
+                      <SelectValue placeholder="Select packaging format" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {packagingFormatOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {selectedPackagingFormat !== recommendedPackagingFormat && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedPackagingFormat(recommendedPackagingFormat)}
+                    className="text-xs text-muted-foreground hover:text-foreground"
                   >
-                    <div className="bg-black/50 text-white px-3 py-1.5 rounded-full text-xs flex items-center gap-1.5">
-                      <ZoomIn className="w-3 h-3" />
-                      Click to enlarge
+                    Reset to recommended
+                  </Button>
+                )}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* CSS Mockup */}
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-3 text-center">Layout Preview</p>
+                <FrontPanelMockup
+                  primaryColor={primaryColor}
+                  secondaryColor={secondaryColor}
+                  accentColor={accentColor}
+                  headlineFont={headlineFont}
+                  bodyFont={bodyFont}
+                  primaryClaim={primaryClaim}
+                  certifications={certifications}
+                  callToAction={callToAction}
+                  bulletPoints={bulletPoints}
+                />
+              </div>
+
+              {/* AI Generated Mockup */}
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-3 text-center">AI Product Render</p>
+                {generatedMockup ? (
+                  <div className="relative group">
+                    <img 
+                      src={generatedMockup} 
+                      alt="AI Generated Product Mockup"
+                      className="w-full max-w-xs mx-auto rounded-xl shadow-lg cursor-pointer hover:opacity-90 transition-opacity"
+                      onClick={() => setIsImageModalOpen(true)}
+                    />
+                    {/* Hover overlay with zoom hint */}
+                    <div 
+                      className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                      onClick={() => setIsImageModalOpen(true)}
+                    >
+                      <div className="bg-black/50 text-white px-3 py-1.5 rounded-full text-xs flex items-center gap-1.5">
+                        <ZoomIn className="w-3 h-3" />
+                        Click to enlarge
+                      </div>
+                    </div>
+                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); downloadMockup(); }} className="gap-1">
+                        <Download className="w-3 h-3" />
+                        Save
+                      </Button>
                     </div>
                   </div>
-                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); downloadMockup(); }} className="gap-1">
-                      <Download className="w-3 h-3" />
-                      Save
-                    </Button>
+                ) : (
+                  <div className="w-full max-w-xs mx-auto h-[400px] rounded-xl border-2 border-dashed border-border/50 flex flex-col items-center justify-center text-muted-foreground bg-muted/20">
+                    <ImageIcon className="w-12 h-12 mb-3 opacity-30" />
+                    <p className="text-sm font-medium">No AI mockup yet</p>
+                    <p className="text-xs mt-1">Click "Generate AI Image" above</p>
                   </div>
-                </div>
-              ) : (
-                <div className="w-full max-w-xs mx-auto h-[400px] rounded-xl border-2 border-dashed border-border/50 flex flex-col items-center justify-center text-muted-foreground bg-muted/20">
-                  <ImageIcon className="w-12 h-12 mb-3 opacity-30" />
-                  <p className="text-sm font-medium">No AI mockup yet</p>
-                  <p className="text-xs mt-1">Click "Generate AI Image" above</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </CardContent>
-
-      {/* Full Image Modal */}
-      <Dialog open={isImageModalOpen} onOpenChange={setIsImageModalOpen}>
-        <DialogContent className="max-w-4xl w-full p-0 overflow-hidden">
-          <DialogHeader className="p-4 pb-2">
-            <DialogTitle className="flex items-center gap-2">
-              <ImageIcon className="w-5 h-5 text-primary" />
-              AI Product Mockup
-            </DialogTitle>
-          </DialogHeader>
-          <div className="p-4 pt-0">
-            {generatedMockup && (
-              <div className="relative">
-                <img 
-                  src={generatedMockup} 
-                  alt="AI Generated Product Mockup - Full Size"
-                  className="w-full h-auto rounded-lg shadow-lg"
-                />
-                <div className="absolute bottom-4 right-4 flex gap-2">
-                  <Button size="sm" variant="secondary" onClick={downloadMockup} className="gap-1.5 shadow-lg">
-                    <Download className="w-4 h-4" />
-                    Download
-                  </Button>
-                </div>
+                )}
               </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-      </Card>
+            </div>
+          </CardContent>
+
+          {/* Full Image Modal */}
+          <Dialog open={isImageModalOpen} onOpenChange={setIsImageModalOpen}>
+            <DialogContent className="max-w-4xl w-full p-0 overflow-hidden">
+              <DialogHeader className="p-4 pb-2">
+                <DialogTitle className="flex items-center gap-2">
+                  <ImageIcon className="w-5 h-5 text-primary" />
+                  AI Product Mockup
+                </DialogTitle>
+              </DialogHeader>
+              <div className="p-4 pt-0">
+                {generatedMockup && (
+                  <div className="relative">
+                    <img 
+                      src={generatedMockup} 
+                      alt="AI Generated Product Mockup - Full Size"
+                      className="w-full h-auto rounded-lg shadow-lg"
+                    />
+                    <div className="absolute bottom-4 right-4 flex gap-2">
+                      <Button size="sm" variant="secondary" onClick={downloadMockup} className="gap-1.5 shadow-lg">
+                        <Download className="w-4 h-4" />
+                        Download
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+        </Card>
+      )}
 
       {/* Section 1: Design Brief Card */}
       <Card className="border-primary/20">

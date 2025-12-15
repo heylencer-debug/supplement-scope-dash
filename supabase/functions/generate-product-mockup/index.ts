@@ -170,7 +170,7 @@ serve(async (req) => {
         "X-Title": "Noodle Search"
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-preview-image-generation",
+        model: "google/gemini-3-pro-image-preview",
         messages: [
           {
             role: "user",

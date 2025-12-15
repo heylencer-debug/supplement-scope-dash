@@ -70,14 +70,112 @@ serve(async (req) => {
     
     // ============ FORMULATION-BASED COMPETITIVE ANALYSIS ============
     
-    // Extract our formulation data
+    // ============ PARSE COMPLETE FORMULA BRIEF FOR ALL INGREDIENTS ============
+    // The formula_brief_content contains markdown tables with ALL ingredients
+    // We need to parse these tables to get the true ingredient count
+    
+    interface ParsedIngredient {
+      name: string;
+      dosage: string;
+      category: 'primary' | 'secondary' | 'tertiary' | 'functional';
+      benefitCategory?: string;
+    }
+    
+    const parsedIngredients: ParsedIngredient[] = [];
+    
+    // Parse markdown tables from formula_brief_content
+    // Looking for tables with ingredient data (headers contain "Ingredient" and "Amount" or "Dosage")
+    if (formulaBriefContent) {
+      // Split content into lines for parsing
+      const lines = formulaBriefContent.split('\n');
+      let currentSection = '';
+      let inTable = false;
+      let tableHeaders: string[] = [];
+      
+      for (const line of lines) {
+        // Detect section headers
+        if (line.includes('PRIMARY ACTIVE') || line.includes('Primary Active')) {
+          currentSection = 'primary';
+          inTable = false;
+        } else if (line.includes('SECONDARY ACTIVE') || line.includes('Secondary Active')) {
+          currentSection = 'secondary';
+          inTable = false;
+        } else if (line.includes('TERTIARY ACTIVE') || line.includes('Tertiary Active')) {
+          currentSection = 'tertiary';
+          inTable = false;
+        } else if (line.includes('FUNCTIONAL') || line.includes('Excipient') || line.includes('Other Ingredients')) {
+          currentSection = 'functional';
+          inTable = false;
+        }
+        
+        // Parse table rows (lines with | separators)
+        if (line.includes('|') && line.trim().startsWith('|')) {
+          const cells = line.split('|').map((c: string) => c.trim()).filter((c: string) => c);
+          
+          // Check if this is a header row
+          if (cells.some((c: string) => c.toLowerCase().includes('ingredient') || c.toLowerCase().includes('active'))) {
+            tableHeaders = cells.map((c: string) => c.toLowerCase());
+            inTable = true;
+            continue;
+          }
+          
+          // Check if this is the separator row (contains dashes)
+          if (cells.every((c: string) => /^[-:]+$/.test(c))) {
+            continue;
+          }
+          
+          // This is a data row - extract ingredient info
+          if (inTable && cells.length >= 2 && currentSection) {
+            const ingredientName = cells[0];
+            // Find dosage column (usually 2nd or 3rd column)
+            const dosageIdx = tableHeaders.findIndex(h => 
+              h.includes('amount') || h.includes('dose') || h.includes('per serving') || h.includes('dosage')
+            );
+            const dosage = dosageIdx >= 0 && cells[dosageIdx] ? cells[dosageIdx] : cells[1] || '';
+            
+            // Skip if ingredient name looks like a header or is empty
+            if (ingredientName && 
+                !ingredientName.toLowerCase().includes('ingredient') && 
+                ingredientName.length > 2 &&
+                !/^[-]+$/.test(ingredientName)) {
+              parsedIngredients.push({
+                name: ingredientName,
+                dosage: dosage,
+                category: currentSection as 'primary' | 'secondary' | 'tertiary' | 'functional'
+              });
+            }
+          }
+        }
+      }
+    }
+    
+    console.log(`Parsed ${parsedIngredients.length} ingredients from formula brief markdown`);
+    
+    // Fallback to old method if parsing didn't find ingredients
     const ourFormulation = categoryScores?.product_development?.formulation || {};
-    const ourIngredients: string[] = ourFormulation.recommended_ingredients || [];
+    const fallbackIngredients: string[] = ourFormulation.recommended_ingredients || [];
+    
+    // Use parsed ingredients if we found them, otherwise fallback
+    const ourIngredients: string[] = parsedIngredients.length > 0 
+      ? parsedIngredients.map(i => `${i.name} ${i.dosage}`.trim())
+      : fallbackIngredients;
+    
+    // Count by category for more accurate claims
+    const primaryActiveCount = parsedIngredients.filter(i => i.category === 'primary').length;
+    const secondaryActiveCount = parsedIngredients.filter(i => i.category === 'secondary').length;
+    const tertiaryActiveCount = parsedIngredients.filter(i => i.category === 'tertiary').length;
+    const functionalCount = parsedIngredients.filter(i => i.category === 'functional').length;
+    const totalActiveCount = primaryActiveCount + secondaryActiveCount + tertiaryActiveCount;
+    
+    console.log(`Ingredient breakdown: Primary=${primaryActiveCount}, Secondary=${secondaryActiveCount}, Tertiary=${tertiaryActiveCount}, Functional=${functionalCount}, Total Active=${totalActiveCount}`);
+    
     const ourKeyFeatures: string[] = ourFormulation.key_features || [];
     const ourThingsToAvoid: string[] = categoryScores?.product_development?.avoid || [];
     const ourFormFactor = ourFormulation.form_factor || '';
     const ourServingSize = ourFormulation.serving_size || '';
-    const ourIngredientCount = ourIngredients.length;
+    
+    // Use total active ingredients for the primary count (not including functional excipients)
+    const ourIngredientCount = totalActiveCount > 0 ? totalActiveCount : ourIngredients.length;
     
     // Benefit category mapping for label icons/badges
     const benefitCategories: Record<string, string[]> = {
@@ -114,7 +212,7 @@ serve(async (req) => {
       claimsOnLabel: string[];
     }
     
-    console.log(`Our formulation: ${ourIngredientCount} ingredients, ${ourBenefitClaims.length} benefit categories`);
+    console.log(`Our formulation: ${ourIngredientCount} active ingredients, ${ourBenefitClaims.length} benefit categories`);
 
     // Fetch TOP 2 Performers (established best-sellers by monthly_sales)
     const { data: topPerformers, error: performersError } = await supabase

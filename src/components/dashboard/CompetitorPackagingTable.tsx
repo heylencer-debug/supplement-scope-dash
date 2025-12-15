@@ -192,31 +192,45 @@ export function CompetitorPackagingTable({ analyses }: CompetitorPackagingTableP
 
                     {/* Label Content */}
                     <TableCell className="py-3">
-                      <div className="space-y-1">
-                        <p className="font-medium text-sm text-foreground line-clamp-1">
-                          {item.label_content?.main_title || item.brand}
-                        </p>
-                        {item.label_content?.subtitle && (
-                          <p className="text-xs text-muted-foreground line-clamp-1">
-                            {item.label_content.subtitle}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-sm text-foreground line-clamp-1">
+                            {item.label_content?.main_title || item.brand}
                           </p>
-                        )}
-                        <div className="flex flex-wrap gap-1">
-                          {item.label_content?.badges?.slice(0, 2).map((badge, idx) => (
-                            <Badge 
-                              key={idx} 
-                              variant="secondary" 
-                              className="text-[9px] py-0 px-1.5 bg-chart-4/10 text-chart-4 border-chart-4/20"
-                            >
-                              {badge}
-                            </Badge>
-                          ))}
-                          {(item.label_content?.badges?.length || 0) > 2 && (
-                            <Badge variant="outline" className="text-[9px] py-0 px-1.5">
-                              +{item.label_content.badges.length - 2}
+                          {item.label_content?.x_in_1_claim && (
+                            <Badge className="bg-chart-1 text-white font-bold text-[10px] py-0 px-1.5 shrink-0">
+                              {item.label_content.x_in_1_claim}
                             </Badge>
                           )}
                         </div>
+                        {item.label_content?.serving_info && (
+                          <p className="text-xs text-muted-foreground">
+                            {item.label_content.serving_info}
+                          </p>
+                        )}
+                        {item.label_content?.benefit_claims && item.label_content.benefit_claims.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {item.label_content.benefit_claims.slice(0, 4).map((benefit, idx) => (
+                              <Badge 
+                                key={idx} 
+                                variant="outline" 
+                                className="text-[9px] py-0 px-1.5 bg-chart-4/10 text-chart-4 border-chart-4/20"
+                              >
+                                {benefit}
+                              </Badge>
+                            ))}
+                            {item.label_content.benefit_claims.length > 4 && (
+                              <Badge variant="outline" className="text-[9px] py-0 px-1.5">
+                                +{item.label_content.benefit_claims.length - 4}
+                              </Badge>
+                            )}
+                          </div>
+                        )}
+                        {item.label_content?.flavor_text && (
+                          <p className="text-[10px] text-chart-2 font-medium">
+                            {item.label_content.flavor_text}
+                          </p>
+                        )}
                       </div>
                     </TableCell>
 
@@ -314,37 +328,69 @@ export function CompetitorPackagingTable({ analyses }: CompetitorPackagingTableP
                       <TableCell colSpan={6} className="p-4">
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                           {/* Full Label Content */}
-                          <div>
+                          <div className="md:col-span-2">
                             <h4 className="text-xs font-semibold text-foreground mb-2 flex items-center gap-1.5">
                               <Tag className="w-3.5 h-3.5 text-chart-1" />
                               Label Details
                             </h4>
-                            {item.label_content?.elements && item.label_content.elements.length > 0 && (
-                              <div className="mb-2">
-                                <p className="text-[10px] uppercase text-muted-foreground mb-1">Elements</p>
-                                <ul className="text-xs space-y-0.5">
-                                  {item.label_content.elements.map((el, idx) => (
-                                    <li key={idx} className="text-foreground">• {el}</li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-                            {item.label_content?.claims && item.label_content.claims.length > 0 && (
-                              <div>
-                                <p className="text-[10px] uppercase text-muted-foreground mb-1">Claims</p>
-                                <div className="flex flex-wrap gap-1">
-                                  {item.label_content.claims.map((claim, idx) => (
-                                    <Badge 
-                                      key={idx} 
-                                      variant="secondary" 
-                                      className="text-[10px] py-0.5"
-                                    >
-                                      {claim}
-                                    </Badge>
-                                  ))}
+                            <div className="space-y-3">
+                              {item.label_content?.x_in_1_claim && (
+                                <div>
+                                  <p className="text-[10px] uppercase text-muted-foreground mb-1">Main Claim</p>
+                                  <Badge className="bg-chart-1 text-white font-bold">
+                                    {item.label_content.x_in_1_claim}
+                                  </Badge>
                                 </div>
-                              </div>
-                            )}
+                              )}
+                              {item.label_content?.serving_info && (
+                                <div>
+                                  <p className="text-[10px] uppercase text-muted-foreground mb-1">Serving Info</p>
+                                  <p className="text-xs text-foreground">{item.label_content.serving_info}</p>
+                                </div>
+                              )}
+                              {item.label_content?.benefit_claims && item.label_content.benefit_claims.length > 0 && (
+                                <div>
+                                  <p className="text-[10px] uppercase text-muted-foreground mb-1">Benefit Claims ({item.label_content.benefit_claims.length})</p>
+                                  <div className="flex flex-wrap gap-1">
+                                    {item.label_content.benefit_claims.map((benefit, idx) => (
+                                      <Badge 
+                                        key={idx} 
+                                        variant="outline" 
+                                        className="text-[10px] py-0.5 bg-chart-4/10 text-chart-4 border-chart-4/20"
+                                      >
+                                        {benefit}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              {item.label_content?.certifications && item.label_content.certifications.length > 0 && (
+                                <div>
+                                  <p className="text-[10px] uppercase text-muted-foreground mb-1">Certifications</p>
+                                  <div className="flex flex-wrap gap-1">
+                                    {item.label_content.certifications.map((cert, idx) => (
+                                      <Badge 
+                                        key={idx} 
+                                        variant="secondary" 
+                                        className="text-[10px] py-0.5"
+                                      >
+                                        {cert}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              {item.label_content?.all_visible_text && item.label_content.all_visible_text.length > 0 && (
+                                <div>
+                                  <p className="text-[10px] uppercase text-muted-foreground mb-1">All Visible Text ({item.label_content.all_visible_text.length})</p>
+                                  <ul className="text-xs space-y-0.5 max-h-32 overflow-y-auto pr-2">
+                                    {item.label_content.all_visible_text.map((text, idx) => (
+                                      <li key={idx} className="text-foreground">• {text}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                            </div>
                           </div>
 
                           {/* Full Messaging Tone */}

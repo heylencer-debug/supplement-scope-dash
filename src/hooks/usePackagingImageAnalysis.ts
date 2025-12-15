@@ -29,6 +29,14 @@ export interface CompetitorPackagingAnalysis {
     elements: string[];
     badges: string[];
     claims: string[];
+    // Enhanced extraction fields
+    x_in_1_claim?: string | null;
+    benefit_claims?: string[];
+    serving_info?: string | null;
+    flavor_text?: string | null;
+    all_visible_text?: string[];
+    certifications?: string[];
+    supporting_claims?: string[];
   };
   messaging_tone: MessagingTone;
   product_contents: ProductContents;

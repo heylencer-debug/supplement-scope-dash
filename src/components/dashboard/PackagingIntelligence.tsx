@@ -11,6 +11,7 @@ import { usePackagingAnalysis } from "@/hooks/usePackagingAnalysis";
 import { usePackagingImageAnalysis } from "@/hooks/usePackagingImageAnalysis";
 import { AIPackagingResults } from "./AIPackagingResults";
 import { DualPackagingStrategies, isDualStrategyAnalysis } from "./DualPackagingStrategies";
+import { DualMockupGenerator } from "./DualMockupGenerator";
 import { CompetitorPackagingTable } from "./CompetitorPackagingTable";
 import { formatDistanceToNow } from "date-fns";
 
@@ -119,6 +120,7 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
   const {
     analysis: aiAnalysis,
     mockupImageUrl,
+    mockupImages,
     updatedAt: strategyUpdatedAt,
     saveMockupImage,
     isLoading: isAnalyzing,
@@ -473,16 +475,20 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
           {/* Step 3 */}
           <div className={cn(
             "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-colors",
-            mockupImageUrl 
+            (mockupImages.match_leaders && mockupImages.match_disruptors)
               ? "bg-chart-4/10 text-chart-4 border border-chart-4/30" 
-              : "bg-muted text-muted-foreground border border-border"
+              : (mockupImages.match_leaders || mockupImages.match_disruptors)
+                ? "bg-chart-2/10 text-chart-2 border border-chart-2/30"
+                : "bg-muted text-muted-foreground border border-border"
           )}>
-            {mockupImageUrl ? (
+            {(mockupImages.match_leaders && mockupImages.match_disruptors) ? (
               <CheckCircle2 className="w-3.5 h-3.5" />
+            ) : (mockupImages.match_leaders || mockupImages.match_disruptors) ? (
+              <span className="text-[10px] font-bold">½</span>
             ) : (
               <span className="w-4 h-4 rounded-full bg-muted-foreground/30 flex items-center justify-center text-[10px]">3</span>
             )}
-            <span>Mockup</span>
+            <span>Mockups</span>
           </div>
         </div>
 
@@ -497,7 +503,7 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
               </span>
             </div>
             <Badge variant="secondary" className="bg-chart-4/10 text-chart-4 border-chart-4/20 text-[10px]">
-              {hasImageAnalysis && hasAnalysis && mockupImageUrl ? '3/3 Complete' : 
+              {hasImageAnalysis && hasAnalysis && mockupImages.match_leaders && mockupImages.match_disruptors ? '3/3 Complete' : 
                hasImageAnalysis && hasAnalysis ? '2/3 Complete' : 
                hasImageAnalysis ? '1/3 Complete' : 'In Progress'}
             </Badge>
@@ -740,7 +746,7 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
         </div>
 
         {/* ============================================ */}
-        {/* STEP 3: Generate Packaging Mockup */}
+        {/* STEP 3: Generate Packaging Mockups */}
         {/* ============================================ */}
         <div className={cn(
           "space-y-4 p-5 rounded-xl border",
@@ -751,23 +757,33 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
           <div className="flex items-center gap-3">
             <div className={cn(
               "w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold",
-              mockupImageUrl ? "bg-chart-4 text-white" : hasAnalysis ? "bg-primary text-white" : "bg-muted-foreground/30 text-muted-foreground"
+              (mockupImages.match_leaders && mockupImages.match_disruptors) 
+                ? "bg-chart-4 text-white" 
+                : (mockupImages.match_leaders || mockupImages.match_disruptors)
+                  ? "bg-chart-2 text-white"
+                  : hasAnalysis 
+                    ? "bg-primary text-white" 
+                    : "bg-muted-foreground/30 text-muted-foreground"
             )}>
               3
             </div>
             <div>
               <h4 className="text-sm font-medium text-foreground flex items-center gap-2">
                 <Package className="w-4 h-4 text-chart-2" />
-                Product Mockup
-                {mockupImageUrl && (
+                Product Mockups
+                {mockupImages.match_leaders && mockupImages.match_disruptors ? (
                   <Badge variant="secondary" className="ml-2 bg-chart-4/10 text-chart-4 border-chart-4/20 text-[10px] font-medium">
                     <CheckCircle2 className="w-3 h-3 mr-1" />
-                    Generated
+                    Both Generated
                   </Badge>
-                )}
+                ) : (mockupImages.match_leaders || mockupImages.match_disruptors) ? (
+                  <Badge variant="secondary" className="ml-2 bg-chart-2/10 text-chart-2 border-chart-2/20 text-[10px] font-medium">
+                    1/2 Generated
+                  </Badge>
+                ) : null}
               </h4>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Visualize your packaging design with an AI-generated product mockup
+                Generate AI mockups for both Match Leaders and Match Disruptors strategies
               </p>
             </div>
           </div>
@@ -781,17 +797,24 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
             </div>
           )}
 
-          {/* Mockup Section - only show if Step 2 is done */}
-          {aiAnalysis && (
+          {/* Dual Mockup Section - only show if Step 2 is done with dual strategies */}
+          {aiAnalysis && isDualStrategyAnalysis(aiAnalysis) ? (
+            <DualMockupGenerator
+              analysis={aiAnalysis}
+              mockupImages={mockupImages}
+              onSaveMockup={saveMockupImage}
+            />
+          ) : aiAnalysis ? (
+            // Fallback for legacy single-strategy analysis
             <AIPackagingResults 
               analysis={aiAnalysis} 
               mockupImageUrl={mockupImageUrl}
-              onSaveMockup={saveMockupImage}
+              onSaveMockup={(url) => saveMockupImage(url)}
               onRegenerateCopy={undefined}
               isRegenerating={false}
               showOnlyMockup={true}
             />
-          )}
+          ) : null}
         </div>
 
         {/* Top Row: Format Stats */}

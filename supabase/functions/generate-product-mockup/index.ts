@@ -138,22 +138,72 @@ serve(async (req) => {
       promptParts.push("- Could be abstract shapes, nature elements, or subtle human silhouettes");
     }
 
+    // BENEFIT BULLET POINTS - Key selling points visible on front label
+    if (bulletPoints?.length > 0) {
+      promptParts.push("");
+      promptParts.push("BENEFIT BULLET POINTS (must be visible on front label with checkmark or icon):");
+      bulletPoints.slice(0, 5).forEach((bullet: string) => {
+        // Extract short version for label (first 8-10 words or up to first colon)
+        const colonIndex = bullet.indexOf(':');
+        const shortBullet = colonIndex > 0 
+          ? bullet.substring(0, colonIndex).trim()
+          : bullet.split(' ').slice(0, 8).join(' ');
+        promptParts.push(`✓ ${shortBullet}`);
+      });
+      promptParts.push("- Display these as checkmarks (✓) or bullet icons on the front panel");
+      promptParts.push("- Use clear, bold typography for benefit claims - must be readable");
+      promptParts.push("- Position prominently below the main headline");
+    }
+
+    // MODERN GRAPHIC ELEMENTS
+    promptParts.push("");
+    promptParts.push("MODERN GRAPHIC ELEMENTS (critical for contemporary premium look):");
+    promptParts.push("- Include subtle geometric shapes or abstract wave/curve patterns as background elements");
+    promptParts.push("- Add gradient overlays or color blocking sections for visual interest");
+    promptParts.push("- Use modern flat icons for benefits (checkmarks, shields, leaf icons, medical cross)");
+    promptParts.push("- Include ribbon banners or badge shapes for key claims like 'X-in-1' or 'Vet Recommended'");
+    promptParts.push("- Add subtle texture or grain effect for premium tactile feel");
+    if (isPetProduct) {
+      promptParts.push("- Include paw print icons, bone shapes, or pet silhouettes as decorative accent elements");
+      promptParts.push("- Consider a stylized pet illustration (line art or flat design) as a hero element");
+    }
+
+    // MODERN LAYOUT & TYPOGRAPHY
+    promptParts.push("");
+    promptParts.push("MODERN LAYOUT & TYPOGRAPHY:");
+    promptParts.push("- Use BOLD, condensed sans-serif for headlines (like Montserrat Black, Avenir Heavy, Proxima Nova Bold)");
+    promptParts.push("- Strong size contrast: headline very large, subheads medium, body small");
+    promptParts.push("- Asymmetric or modern grid layout - NOT boring centered design");
+    promptParts.push("- Color-blocked sections to organize information (header zone, benefits zone, details zone)");
+    promptParts.push("- Floating badges or callout bubbles for key claims");
+    promptParts.push("- Consider angled elements or diagonal lines for dynamic energy");
+
+    // DESIGN INSPIRATION
+    promptParts.push("");
+    promptParts.push("DESIGN INSPIRATION (match this premium aesthetic):");
+    promptParts.push("- AG1/Athletic Greens: Clean lines, scientific credibility, bold green, modern minimalism");
+    promptParts.push("- Ritual: Elegant simplicity, lots of white space, sophisticated typography");
+    promptParts.push("- Native Pet: Bold claims, playful colors, friendly but premium");
+    promptParts.push("- Ollie/Open Farm: Nature-inspired but modern, premium pet aesthetic");
+    promptParts.push("- Think 2024 D2C supplement brand, not 2010 GNC shelf product");
+
     promptParts.push("");
     promptParts.push("PREMIUM PACKAGING REQUIREMENTS:");
     promptParts.push(`- Modern, sleek ${packagingFormat} with matte or soft-touch finish appearance`);
-    promptParts.push("- Clean visual hierarchy - headline largest, details smaller but readable");
-    promptParts.push("- Good use of whitespace, not cluttered");
-    promptParts.push("- Premium feel with subtle textures, gradients, or metallic accents on logo/badges");
-    promptParts.push("- Professional supplement brand aesthetic (not cheap or generic looking)");
-    promptParts.push("- Typography: Modern sans-serif, clean and professional");
+    promptParts.push("- Clean visual hierarchy - headline largest, benefits prominent, details smaller but readable");
+    promptParts.push("- Good use of whitespace, not cluttered but information-rich");
+    promptParts.push("- Premium feel with subtle textures, gradients, and metallic accents on logo/badges");
+    promptParts.push("- Professional D2C supplement brand aesthetic (not cheap pharmacy or generic looking)");
+    promptParts.push("- MUST include visible benefit claims/bullet points on front panel");
+    
     promptParts.push("");
     promptParts.push("PHOTOGRAPHY STYLE:");
-    promptParts.push("- Professional product photography, e-commerce quality");
+    promptParts.push("- Professional product photography, Amazon/e-commerce hero image quality");
     promptParts.push("- Clean white or very light gradient background");
-    promptParts.push("- Soft studio lighting with gentle shadows");
-    promptParts.push("- Product at slight angle to show dimension");
-    promptParts.push("- Sharp focus, high resolution, photorealistic");
-    promptParts.push("- Would look great on Amazon or brand website");
+    promptParts.push("- Soft studio lighting with gentle shadows for depth");
+    promptParts.push("- Product at slight 3/4 angle to show dimension and label detail");
+    promptParts.push("- Sharp focus, high resolution, photorealistic rendering");
+    promptParts.push("- Would look premium on Amazon, Chewy, or brand DTC website");
 
     const prompt = promptParts.join("\n");
 

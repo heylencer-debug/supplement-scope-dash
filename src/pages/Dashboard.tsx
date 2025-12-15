@@ -71,7 +71,8 @@ interface ActionItem {
 
 export default function Dashboard() {
   const [searchParams] = useSearchParams();
-  const urlCategoryName = searchParams.get("category");
+  const rawUrlCategoryName = searchParams.get("category");
+  const urlCategoryName = rawUrlCategoryName ? rawUrlCategoryName.replace(/^=+/, "").trim() : null;
   const { setCategoryContext, categoryName: contextCategoryName } = useCategoryContext();
   const queryClient = useQueryClient();
 

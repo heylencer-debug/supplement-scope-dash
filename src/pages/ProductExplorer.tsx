@@ -39,7 +39,8 @@ type SortDirection = "asc" | "desc";
 
 export default function ProductExplorer() {
   const [searchParams] = useSearchParams();
-  const urlCategoryName = searchParams.get("category");
+  const rawUrlCategoryName = searchParams.get("category");
+  const urlCategoryName = rawUrlCategoryName ? rawUrlCategoryName.replace(/^=+/, "").trim() : null;
   
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("current");

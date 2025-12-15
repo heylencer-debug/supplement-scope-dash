@@ -819,12 +819,20 @@ ${perProductImageAnalysisSummary}
         const analysis = JSON.parse(toolCall.function.arguments);
         console.log('Packaging analysis complete:', analysis.summary?.design_strategy?.substring(0, 100));
 
-        // Save analysis to database (upsert)
+        // Fetch existing image_analysis to preserve it (Step 1 data)
+        const { data: existingRecord } = await supabase
+          .from('packaging_analyses')
+          .select('image_analysis')
+          .eq('category_id', categoryId)
+          .maybeSingle();
+
+        // Save analysis to database (upsert) - PRESERVE image_analysis from Step 1
         const { error: upsertError } = await supabase
           .from('packaging_analyses')
           .upsert({
             category_id: categoryId,
             analysis: analysis,
+            image_analysis: existingRecord?.image_analysis || null,
             updated_at: new Date().toISOString()
           }, { onConflict: 'category_id' });
 

@@ -558,7 +558,13 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
                 <h4 className="text-sm font-medium text-foreground flex items-center gap-2">
                   <Camera className="w-4 h-4 text-chart-3" />
                   Competitor Packaging Analysis
-                  {hasImageAnalysis && (
+                  {hasImageAnalysis && imageAnalysisWasRestored && (
+                    <Badge variant="secondary" className="ml-2 bg-chart-4/10 text-chart-4 border-chart-4/20 text-[10px] font-medium">
+                      <History className="w-3 h-3 mr-1" />
+                      Loaded from DB
+                    </Badge>
+                  )}
+                  {hasImageAnalysis && !imageAnalysisWasRestored && (
                     <Badge variant="secondary" className="ml-2 bg-chart-3/10 text-chart-3 border-chart-3/20 text-[10px] font-medium">
                       <Sparkles className="w-3 h-3 mr-1" />
                       {imageAnalysis?.competitor_analyses?.length || 0} analyzed
@@ -623,8 +629,8 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
             />
           )}
 
-          {/* Loading from DB */}
-          {isLoadingImagesFromDb && (
+          {/* Loading from DB - only show if loading AND no analysis yet */}
+          {isLoadingImagesFromDb && !hasImageAnalysis && (
             <div className="p-4 bg-muted/30 rounded-lg border border-border/50 animate-pulse">
               <div className="flex items-center gap-2">
                 <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
@@ -673,7 +679,13 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
                 <h4 className="text-sm font-medium text-foreground flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-primary" />
                   Our Packaging Strategy
-                  {hasAnalysis && (
+                  {hasAnalysis && strategyWasRestored && (
+                    <Badge variant="secondary" className="ml-2 bg-chart-4/10 text-chart-4 border-chart-4/20 text-[10px] font-medium">
+                      <History className="w-3 h-3 mr-1" />
+                      Loaded from DB
+                    </Badge>
+                  )}
+                  {hasAnalysis && !strategyWasRestored && (
                     <Badge variant="secondary" className="ml-2 bg-chart-4/10 text-chart-4 border-chart-4/20 text-[10px] font-medium">
                       <CheckCircle2 className="w-3 h-3 mr-1" />
                       Complete
@@ -747,8 +759,8 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
             />
           )}
 
-          {/* AI Analysis Loading State */}
-          {isLoadingFromDb && (
+          {/* AI Analysis Loading State - only show if loading AND no analysis yet */}
+          {isLoadingFromDb && !hasAnalysis && (
             <div className="p-4 bg-muted/30 rounded-lg border border-border/50 animate-pulse">
               <div className="flex items-center gap-2">
                 <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />

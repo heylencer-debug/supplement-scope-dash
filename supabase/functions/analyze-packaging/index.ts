@@ -206,33 +206,38 @@ serve(async (req) => {
       }
     });
     
-    // Generate STRATEGIC alternative claims when we can't win on ingredient count
-    const strategicAlternativeClaims: { forLeaders: string[]; forDisruptors: string[] } = {
-      forLeaders: [],
-      forDisruptors: []
+    // ============ MATCH OR IMPROVE CLAIM STRATEGY ============
+    // NEVER weaken claims - always match or improve competitor X-in-1 claims
+    
+    // Calculate MAXIMUM claim we can make by creative counting
+    const totalBenefitCount = ourBenefitClaims.length;
+    const combinedClaimCount = ourIngredientCount + totalBenefitCount; // "7 actives + 6 benefits = 13"
+    
+    // Create match-or-improve claims for each strategy
+    const matchOrImproveClaims = {
+      forLeaders: {
+        targetClaim: avgTopPerformerCount,
+        ourClaim: ourIngredientCount >= avgTopPerformerCount 
+          ? `${ourIngredientCount}-in-1`  // Match or beat
+          : combinedClaimCount >= avgTopPerformerCount 
+            ? `${combinedClaimCount}-in-1 Complete` // Use combined count
+            : `${ourIngredientCount} Active + ${totalBenefitCount} Benefit Formula`, // Still position competitively
+        strategy: ourIngredientCount >= avgTopPerformerCount ? 'DIRECT_MATCH' : 'COMBINED_CLAIM'
+      },
+      forDisruptors: {
+        targetClaim: avgNewWinnerCount,
+        ourClaim: ourIngredientCount >= avgNewWinnerCount 
+          ? `${ourIngredientCount}-in-1` // Match or beat
+          : combinedClaimCount >= avgNewWinnerCount * 0.7
+            ? `Complete ${combinedClaimCount}-Point Formula` // Use combined count creatively
+            : `${ourIngredientCount} Powerhouse Actives at Full Strength`, // Attack dust dosing
+        strategy: ourIngredientCount >= avgNewWinnerCount ? 'DIRECT_MATCH' : 
+                  combinedClaimCount >= avgNewWinnerCount * 0.7 ? 'COMBINED_CLAIM' : 'QUALITY_ATTACK'
+      }
     };
     
-    if (vsLeadersPosition === 'BELOW') {
-      // We have fewer ingredients than leaders - emphasize QUALITY over QUANTITY
-      strategicAlternativeClaims.forLeaders.push('Maximum Potency Formula');
-      strategicAlternativeClaims.forLeaders.push('Clinical-Strength Actives');
-      strategicAlternativeClaims.forLeaders.push(`${ourIngredientCount} Targeted Actives`);
-      strategicAlternativeClaims.forLeaders.push('Complete Core Formula');
-      strategicAlternativeClaims.forLeaders.push('Full Therapeutic Dosages');
-      if (ourDosageHighlights.length > 0) {
-        strategicAlternativeClaims.forLeaders.push('Research-Backed Dosages');
-      }
-    }
+    console.log(`Match-or-Improve Strategy - Leaders: ${matchOrImproveClaims.forLeaders.strategy} (${matchOrImproveClaims.forLeaders.ourClaim}), Disruptors: ${matchOrImproveClaims.forDisruptors.strategy} (${matchOrImproveClaims.forDisruptors.ourClaim})`);
     
-    if (vsDisruptorsPosition === 'SIGNIFICANTLY_BELOW') {
-      // We have way fewer ingredients than disruptors - ATTACK their weakness (dust dosing)
-      strategicAlternativeClaims.forDisruptors.push('Zero Fillers, Pure Results');
-      strategicAlternativeClaims.forDisruptors.push(`${ourIngredientCount} Powerhouse Actives`);
-      strategicAlternativeClaims.forDisruptors.push('Quality Over Quantity');
-      strategicAlternativeClaims.forDisruptors.push('Maximum Potency Per Chew');
-      strategicAlternativeClaims.forDisruptors.push('Every Ingredient at Full Dose');
-      strategicAlternativeClaims.forDisruptors.push('No Dust Dosing');
-    }
 
     // Fetch existing per-product image analysis from Step 1
     const { data: existingImageAnalysis } = await supabase
@@ -395,7 +400,9 @@ Average ingredient count: ${avgNewWinnerCount} ingredients
 ${newWinnerSummary}
 `;
 
-    // Format per-product image analysis from Step 1
+    // Format per-product image analysis from Step 1 - ENHANCED with X-in-1 claims extraction
+    const extractedCompetitorClaims: { brand: string; xIn1Claim: string | null; benefitClaims: string[] }[] = [];
+    
     const perProductImageAnalysisSummary = perProductAnalyses.length > 0 
       ? perProductAnalyses.map((analysis: any, idx: number) => {
           const labelContent = analysis.label_content || {};
@@ -403,15 +410,32 @@ ${newWinnerSummary}
           const productContents = analysis.product_contents || {};
           const packaging = analysis.packaging || {};
           
+          // Extract X-in-1 claims for use in match-or-improve strategy
+          const xIn1Claim = labelContent.x_in_1_claim || 
+            labelContent.main_title?.match(/\d+[-\s]?in[-\s]?1/i)?.[0] ||
+            (labelContent.all_visible_text as string[])?.find((t: string) => /\d+[-\s]?in[-\s]?1/i.test(t)) ||
+            null;
+          
+          extractedCompetitorClaims.push({
+            brand: analysis.brand || 'Unknown',
+            xIn1Claim,
+            benefitClaims: labelContent.benefit_claims || []
+          });
+          
           return `
 PRODUCT ${idx + 1}: ${analysis.brand || 'Unknown'} - ${analysis.title || 'N/A'}
 ───────────────────────────────────────
 📝 LABEL CONTENT (COPY THIS STYLE):
    • Main Title: ${labelContent.main_title || 'N/A'}
    • Subtitle: ${labelContent.subtitle || 'N/A'}
-   • Elements on Label: ${(labelContent.elements as string[])?.join(', ') || 'N/A'}
-   • Badges/Certifications: ${(labelContent.badges as string[])?.join(', ') || 'N/A'}
-   • Claims on Label: ${(labelContent.claims as string[])?.join(', ') || 'N/A'}
+   • ⭐ X-in-1 CLAIM: ${xIn1Claim || 'None detected'}
+   • Benefit Claims: ${(labelContent.benefit_claims as string[])?.join(', ') || 'N/A'}
+   • Serving Info: ${labelContent.serving_info || 'N/A'}
+   • Flavor: ${labelContent.flavor_text || 'N/A'}
+   • ALL Visible Text: ${(labelContent.all_visible_text as string[])?.slice(0, 10).join(' | ') || 'N/A'}
+   • Badges/Certifications: ${(labelContent.badges as string[])?.join(', ') || (labelContent.certifications as string[])?.join(', ') || 'N/A'}
+   • Claims: ${(labelContent.claims as string[])?.join(', ') || 'N/A'}
+   • Supporting Claims: ${(labelContent.supporting_claims as string[])?.join(', ') || 'N/A'}
 
 🎯 MESSAGING TONE (MATCH THIS EXACTLY):
    • Primary Tone: ${messagingTone.primary_tone || 'N/A'}
@@ -434,6 +458,19 @@ PRODUCT ${idx + 1}: ${analysis.brand || 'Unknown'} - ${analysis.title || 'N/A'}
    • Features: ${(packaging.features as string[])?.join(', ') || 'N/A'}`;
         }).join('\n\n')
       : 'No per-product image analysis available - analyze packaging images first (Step 1)';
+    
+    // Extract highest competitor X-in-1 claims for reference
+    const competitorXIn1Claims = extractedCompetitorClaims
+      .filter(c => c.xIn1Claim)
+      .map(c => ({ brand: c.brand, claim: c.xIn1Claim as string, number: parseInt(c.xIn1Claim?.match(/\d+/)?.[0] || '0') }));
+    const highestCompetitorXIn1 = competitorXIn1Claims.length > 0 
+      ? Math.max(...competitorXIn1Claims.map(c => c.number))
+      : avgTopPerformerCount;
+    
+    console.log(`Extracted ${competitorXIn1Claims.length} X-in-1 claims from Step 1. Highest: ${highestCompetitorXIn1}`);
+    const competitorClaimsSummary = competitorXIn1Claims.length > 0
+      ? competitorXIn1Claims.map(c => `${c.brand}: "${c.claim}"`).join(', ')
+      : 'No X-in-1 claims detected in Step 1 analysis';
 
     // Helper function to get copy style instructions
     function getCopyStyleInstructions(style: string | undefined): string {
@@ -672,91 +709,67 @@ These dosages may be HIGHER than competitors who spread their ingredients thin a
 
 ## STRATEGY 1: MATCH LEADERS (vs Top Performers with ~${avgTopPerformerCount} ingredients)
 
-${vsLeadersPosition === 'BELOW' 
-  ? `⚠️ **CRITICAL**: We have ${ourIngredientCount} vs their ${avgTopPerformerCount}. DO NOT use "${ourIngredientCount}-in-1" as primary claim - it's WEAKER!
+**🎯 MATCH OR IMPROVE - NEVER WEAKEN:**
+- Top performers use claims like: "${avgTopPerformerCount}-in-1"
+- OUR RECOMMENDED CLAIM: **"${matchOrImproveClaims.forLeaders.ourClaim}"**
+- Strategy: ${matchOrImproveClaims.forLeaders.strategy}
 
-**INSTEAD, emphasize QUALITY OVER QUANTITY:**
-PRIMARY CLAIM OPTIONS (choose the best):
-${strategicAlternativeClaims.forLeaders.map(c => `• "${c}"`).join('\n')}
+${matchOrImproveClaims.forLeaders.strategy === 'DIRECT_MATCH' 
+  ? `✅ We match or beat their count! Use "${ourIngredientCount}-in-1" confidently - it's EQUAL OR BETTER.`
+  : matchOrImproveClaims.forLeaders.strategy === 'COMBINED_CLAIM'
+    ? `✅ Use COMBINED counting: ${ourIngredientCount} active ingredients + ${totalBenefitCount} benefit areas = "${combinedClaimCount}-in-1 Complete Formula"`
+    : `✅ Position competitively: "${ourIngredientCount} Active + ${totalBenefitCount} Benefit Formula" - emphasizes comprehensive coverage`
+}
 
-**POSITIONING ANGLES:**
-• "Every ingredient at full clinical dosage" (imply theirs might not be)
-• "No fillers, no fluff - just results"
-• "${ourIngredientCount} Targeted Actives" (implies precision vs bloat)
-• "Maximum Potency Formula" (quality positioning)
-${ourDosageHighlights.length > 0 ? `• Highlight specific dosages: ${ourDosageHighlights.slice(0, 3).map(d => d.dosage).join(', ')}` : ''}
-
-**FRONT LABEL EXAMPLE:**
-┌─────────────────────────────────────┐
-│        [BRAND NAME]                 │
-│   MAXIMUM POTENCY CHEWS             │
-│                                     │
-│   ${ourIngredientCount} Targeted Actives             │
-│   at Full Clinical Dosages          │
-│                                     │
-│ [${ourBenefitClaims.slice(0, 4).join('] [')}]   │
-│                                     │
-│  ✓ No Fillers ✓ Vet Formulated     │
-│  90 Soft Chews                      │
-└─────────────────────────────────────┘`
-  : `✅ We match or beat their count! Use "${ourIngredientCount}-in-1 Complete Formula" confidently.
+**YOUR PRIMARY CLAIM MUST BE:** "${matchOrImproveClaims.forLeaders.ourClaim}"
+DO NOT use a weaker claim than top performers!
 
 **FRONT LABEL EXAMPLE:**
 ┌─────────────────────────────────────┐
 │        [BRAND NAME]                 │
-│   ADVANCED ${ourIngredientCount}-IN-1 FORMULA       │
+│   ${matchOrImproveClaims.forLeaders.ourClaim.toUpperCase().padEnd(30)}│
 │                                     │
 │ ${ourBenefitClaims.slice(0, 4).join(' • ')}     │
 │                                     │
 │  ✓ Human-Grade ✓ Vet Formulated    │
 │  90 Soft Chews                      │
-└─────────────────────────────────────┘`}
+└─────────────────────────────────────┘
 
 ## STRATEGY 2: MATCH DISRUPTORS (vs New Winners with ~${avgNewWinnerCount} ingredients)
 
-${vsDisruptorsPosition === 'SIGNIFICANTLY_BELOW'
-  ? `⚠️ **CRITICAL**: We have ${ourIngredientCount} vs their ${avgNewWinnerCount}+. DO NOT compete on ingredient count - we CANNOT win!
+**🎯 MATCH OR IMPROVE - NEVER APPEAR WEAKER:**
+- New winners use aggressive claims like: "${avgNewWinnerCount}-in-1"
+- OUR RECOMMENDED CLAIM: **"${matchOrImproveClaims.forDisruptors.ourClaim}"**
+- Strategy: ${matchOrImproveClaims.forDisruptors.strategy}
 
-**ATTACK STRATEGY - Turn their strength into a weakness:**
+${matchOrImproveClaims.forDisruptors.strategy === 'DIRECT_MATCH' 
+  ? `✅ We match or beat their count! Use bold "${ourIngredientCount}-in-1" claim.`
+  : matchOrImproveClaims.forDisruptors.strategy === 'COMBINED_CLAIM'
+    ? `✅ Use CREATIVE counting: "Complete ${combinedClaimCount}-Point Formula" (${ourIngredientCount} actives + ${totalBenefitCount} benefits)`
+    : `✅ ATTACK their dust dosing: "${ourIngredientCount} Powerhouse Actives at Full Strength" - implies their high count = tiny doses`
+}
 
-The ${avgNewWinnerCount}-in-1 products likely have "DUST DOSING" - tiny amounts of many ingredients to inflate the count. OUR ${ourIngredientCount} are at FULL THERAPEUTIC DOSES.
+**YOUR PRIMARY CLAIM MUST BE:** "${matchOrImproveClaims.forDisruptors.ourClaim}"
+DO NOT appear weaker than the disruptors!
 
-PRIMARY CLAIM OPTIONS (attack their weakness):
-${strategicAlternativeClaims.forDisruptors.map(c => `• "${c}"`).join('\n')}
-
-**POSITIONING ANGLES:**
-• "23 ingredients = 23 tiny doses. 7 Powerhouse Actives = REAL results."
+${matchOrImproveClaims.forDisruptors.strategy === 'QUALITY_ATTACK' ? `
+**ATTACK ANGLES (use these in your copy):**
+• "${avgNewWinnerCount} ingredients = ${avgNewWinnerCount} tiny doses. ${ourIngredientCount} Powerhouse Actives = REAL results."
 • "They count ingredients. We count results."
 • "Full clinical doses, not marketing doses"
-• "Quality Over Quantity - ${ourIngredientCount} at Full Strength"
-${ourDosageHighlights.length > 0 ? `• Attack example: "Our ${ourDosageHighlights[0]?.ingredient} at ${ourDosageHighlights[0]?.dosage} vs their dust-dosed version"` : ''}
+${ourDosageHighlights.length > 0 ? `• "Our ${ourDosageHighlights[0]?.ingredient} at ${ourDosageHighlights[0]?.dosage} - not a dust dose"` : ''}
+` : ''}
 
 **FRONT LABEL EXAMPLE:**
 ┌─────────────────────────────────────┐
 │        [BRAND NAME]                 │
-│   MAXIMUM STRENGTH FORMULA          │
-│                                     │
-│   ${ourIngredientCount} POWERHOUSE ACTIVES          │
-│   at Full Clinical Doses            │
-│   (No Dust Dosing!)                 │
-│                                     │
-│ [${ourBenefitClaims.slice(0, 4).join('] [')}]   │
-│                                     │
-│  ✓ Zero Fillers ✓ Full Therapeutic │
-│  90 Soft Chews                      │
-└─────────────────────────────────────┘`
-  : `✅ We're competitive! Use "${ourIngredientCount}-in-1 Complete Formula" with bold, value-focused messaging.
-
-**FRONT LABEL EXAMPLE:**
-┌─────────────────────────────────────┐
-│        [BRAND NAME]                 │
-│   COMPLETE ${ourIngredientCount}-IN-1 FORMULA       │
+│   ${matchOrImproveClaims.forDisruptors.ourClaim.toUpperCase().padEnd(30)}│
 │                                     │
 │ ${ourBenefitClaims.slice(0, 5).join(' • ')}     │
 │                                     │
 │  ✓ Maximum Value ✓ Full Spectrum   │
 │  90 Soft Chews                      │
-└─────────────────────────────────────┘`}
+└─────────────────────────────────────┘
 
 ## BENEFIT CATEGORIES WE CAN CLAIM:
 ${ourBenefitClaims.length > 0 ? ourBenefitClaims.map(b => `✓ ${b}`).join('\n') : 'Analyze from ingredients'}

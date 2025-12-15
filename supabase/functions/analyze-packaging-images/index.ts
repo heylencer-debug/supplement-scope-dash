@@ -15,9 +15,16 @@ interface CompetitorPackagingAnalysis {
   label_content: {
     main_title: string;
     subtitle: string | null;
+    x_in_1_claim: string | null;
+    benefit_claims: string[];
+    serving_info: string | null;
+    flavor_text: string | null;
+    all_visible_text: string[];
     elements: string[];
     badges: string[];
     claims: string[];
+    certifications: string[];
+    supporting_claims: string[];
   };
   messaging_tone: {
     primary_tone: string;
@@ -81,13 +88,49 @@ CRITICAL: The images are provided in the EXACT same order as this list. Image 1 
 Product Image Order (match analysis by position):
 ${productList}
 
-For EACH image (in order, 1 to ${products.length}), analyze and extract:
-1. **Label Content**: Main title shown on packaging, subtitle, visual elements, badges/certifications visible, marketing claims
-2. **Messaging Tone**: primary_tone (clinical/playful/premium/aggressive/wellness/natural/scientific), tone_descriptors (3-5 adjectives), urgency_level (low/medium/high), emotional_appeal (trust-building/fear-based/aspirational/nurturing/fun)
-3. **Product Contents** (the actual product visible inside/on packaging): type (gummy/treat/soft chew/powder/capsule/etc), shape (bear/bone/circle/square/heart/star/oval/irregular), colors of the product, color_pattern (solid/multi-colored/swirled/layered), texture_appearance (smooth/ridged/coated/sugar-coated), size_estimate (small/medium/large)
-4. **Packaging**: type, material, color, features
+## 🎯 YOUR MISSION: EXTRACT EVERY SINGLE PIECE OF TEXT VISIBLE ON THE FRONT OF EACH PACKAGE
 
-IMPORTANT: Return analyses in the SAME ORDER as the images/products listed above. product_index 1 = first image = first product in the list.
+For EACH image (in order, 1 to ${products.length}), analyze and extract:
+
+### 1. LABEL CONTENT - READ EVERY WORD ON THE PACKAGING
+**DO NOT SUMMARIZE - CAPTURE EXACT TEXT AS IT APPEARS ON THE LABEL:**
+
+- **main_title**: The primary headline/product name EXACTLY as written (e.g., "Premium Dog Vitamins", "Advanced Joint Support")
+- **subtitle**: Any secondary headline/subtitle EXACTLY as written
+- **x_in_1_claim**: The EXACT X-in-1 claim if present (e.g., "15-in-1", "8 in 1", "23-in-1 Complete") - THIS IS CRITICAL!
+- **benefit_claims**: ALL benefit statements listed (e.g., "Hip & Joint", "Skin & Coat", "Digestive Health", "Immune Support") - list EVERY ONE
+- **serving_info**: Serving count/quantity (e.g., "90 Soft Chews", "120 Count", "240 Treats")
+- **flavor_text**: Any flavor mentions (e.g., "Salmon Flavor", "Chicken & Bacon", "Peanut Butter")
+- **all_visible_text**: EVERY single text element on the front label as an array - include EVERYTHING you can read
+- **elements**: Visual elements/icons present (e.g., "dog silhouette", "bone icon", "heart icon")
+- **badges**: ALL badges/certifications visible with EXACT TEXT (e.g., "Made in USA", "Vet Formulated", "GMP Certified", "Non-GMO")
+- **claims**: ALL marketing claims (e.g., "Human-Grade Ingredients", "No Fillers", "Grain-Free")
+- **certifications**: Specific certification badges (e.g., "NASC Quality Seal", "FDA Registered Facility")
+- **supporting_claims**: Secondary claims (e.g., "For Dogs of All Ages", "Great Taste Dogs Love")
+
+### 2. MESSAGING TONE (COPY THIS STYLE):
+- primary_tone: (clinical/playful/premium/aggressive/wellness/natural/scientific)
+- tone_descriptors: 3-5 adjectives describing the overall feel
+- urgency_level: (low/medium/high)
+- emotional_appeal: (trust-building/fear-based/aspirational/nurturing/fun)
+
+### 3. PRODUCT CONTENTS (the actual product visible inside/on packaging):
+- type: (gummy/treat/soft chew/powder/capsule/etc)
+- shape: (bear/bone/circle/square/heart/star/oval/irregular)
+- colors: of the actual product
+- color_pattern: (solid/multi-colored/swirled/layered)
+- texture_appearance: (smooth/ridged/coated/sugar-coated)
+- size_estimate: (small/medium/large)
+
+### 4. PACKAGING:
+- type, material, color, features
+
+## ⚠️ CRITICAL INSTRUCTIONS:
+1. READ EVERY WORD on the front of the packaging - do not skip anything
+2. If you see "15-in-1" or "8 in 1" or any X-in-1 claim, capture it EXACTLY in x_in_1_claim
+3. List ALL benefit claims separately - if it says "Hip & Joint • Skin & Coat • Immune • Digestive", list all 4
+4. The all_visible_text array should contain EVERY text element - nothing should be missed
+5. Return analyses in the SAME ORDER as the images/products listed above
 
 Use the extract_packaging_analysis tool.`;
 
@@ -106,7 +149,7 @@ Use the extract_packaging_analysis tool.`;
           type: "function",
           function: {
             name: "extract_packaging_analysis",
-            description: "Extract packaging analysis",
+            description: "Extract complete packaging analysis including ALL visible text from labels",
             parameters: {
               type: "object",
               properties: {
@@ -119,13 +162,20 @@ Use the extract_packaging_analysis tool.`;
                       label_content: {
                         type: "object",
                         properties: {
-                          main_title: { type: "string" },
-                          subtitle: { type: "string", nullable: true },
-                          elements: { type: "array", items: { type: "string" } },
-                          badges: { type: "array", items: { type: "string" } },
-                          claims: { type: "array", items: { type: "string" } }
+                          main_title: { type: "string", description: "Primary headline EXACTLY as written" },
+                          subtitle: { type: "string", nullable: true, description: "Secondary headline if present" },
+                          x_in_1_claim: { type: "string", nullable: true, description: "EXACT X-in-1 claim (e.g., '15-in-1', '8 in 1')" },
+                          benefit_claims: { type: "array", items: { type: "string" }, description: "ALL benefit statements listed (Hip & Joint, Skin & Coat, etc.)" },
+                          serving_info: { type: "string", nullable: true, description: "Serving count (e.g., '90 Soft Chews')" },
+                          flavor_text: { type: "string", nullable: true, description: "Flavor mentions" },
+                          all_visible_text: { type: "array", items: { type: "string" }, description: "EVERY text element visible on front label" },
+                          elements: { type: "array", items: { type: "string" }, description: "Visual elements/icons" },
+                          badges: { type: "array", items: { type: "string" }, description: "ALL badges with exact text" },
+                          claims: { type: "array", items: { type: "string" }, description: "ALL marketing claims" },
+                          certifications: { type: "array", items: { type: "string" }, description: "Certification badges" },
+                          supporting_claims: { type: "array", items: { type: "string" }, description: "Secondary/supporting claims" }
                         },
-                        required: ["main_title", "elements", "badges", "claims"]
+                        required: ["main_title", "benefit_claims", "all_visible_text", "elements", "badges", "claims"]
                       },
                       messaging_tone: {
                         type: "object",

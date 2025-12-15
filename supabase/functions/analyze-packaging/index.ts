@@ -29,9 +29,9 @@ serve(async (req) => {
 
     console.log(`Packaging analysis request - categoryId: ${categoryId}, copyStyle: ${copyStyle || 'default'}`);
 
-    const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
-    if (!ANTHROPIC_API_KEY) {
-      console.error('ANTHROPIC_API_KEY is not configured');
+    const OPENROUTER_API_KEY = Deno.env.get('OPENROUTER_API_KEY');
+    if (!OPENROUTER_API_KEY) {
+      console.error('OPENROUTER_API_KEY is not configured');
       return new Response(
         JSON.stringify({ error: 'AI service not configured' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -262,23 +262,26 @@ PRODUCT ${idx + 1}: ${analysis.brand || 'Unknown'} - ${analysis.title || 'N/A'}
       console.log(`Starting background Claude API call for packaging analysis with style: ${copyStyle || 'default'}...`);
       
       try {
-        const response = await fetch('https://api.anthropic.com/v1/messages', {
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-api-key': ANTHROPIC_API_KEY!,
-            'anthropic-version': '2023-06-01',
+            'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+            'HTTP-Referer': 'https://lovable.dev',
+            'X-Title': 'Noodle Search Packaging Analysis',
           },
           body: JSON.stringify({
-            model: 'claude-sonnet-4-5',
+            model: 'anthropic/claude-sonnet-4',
             max_tokens: 4096,
             tools: [
               {
-                name: 'create_packaging_design',
-                description: 'Create a designer-ready packaging brief with concise copy and clear specifications.',
-                input_schema: {
-                  type: 'object',
-                  properties: {
+                type: 'function',
+                function: {
+                  name: 'create_packaging_design',
+                  description: 'Create a designer-ready packaging brief with concise copy and clear specifications.',
+                  parameters: {
+                    type: 'object',
+                    properties: {
                     design_brief: {
                       type: 'object',
                       description: 'Core design specifications for the designer',
@@ -380,8 +383,9 @@ PRODUCT ${idx + 1}: ${analysis.brand || 'Unknown'} - ${analysis.title || 'N/A'}
                   required: ['design_brief', 'elements_checklist', 'mock_content', 'client_rationale']
                 }
               }
-            ],
-            tool_choice: { type: 'tool', name: 'create_packaging_design' },
+            }
+          ],
+            tool_choice: { type: 'function', function: { name: 'create_packaging_design' } },
             messages: [
               {
                 role: 'user',
@@ -487,20 +491,20 @@ CREATE COPY THAT MAKES SHOPPERS THINK: "This is THE ONE I've been looking for."`
           return;
         }
 
-        const claudeResponse = await response.json();
-        console.log('Claude response received for packaging analysis');
-        console.log('Claude stop_reason:', claudeResponse.stop_reason);
-        console.log('Claude usage:', JSON.stringify(claudeResponse.usage));
+        const openrouterResponse = await response.json();
+        console.log('OpenRouter response received for packaging analysis');
+        console.log('OpenRouter finish_reason:', openrouterResponse.choices?.[0]?.finish_reason);
+        console.log('OpenRouter usage:', JSON.stringify(openrouterResponse.usage));
 
-        // Extract the tool use result
-        const toolUse = claudeResponse.content?.find((c: any) => c.type === 'tool_use');
-        if (!toolUse || !toolUse.input) {
-          console.error('No tool use in response. Content types:', claudeResponse.content?.map((c: any) => c.type));
-          console.error('Full response:', JSON.stringify(claudeResponse).substring(0, 1000));
+        // Extract the tool call result from OpenRouter format
+        const toolCall = openrouterResponse.choices?.[0]?.message?.tool_calls?.[0];
+        if (!toolCall || !toolCall.function?.arguments) {
+          console.error('No tool call in response. Message:', JSON.stringify(openrouterResponse.choices?.[0]?.message).substring(0, 500));
+          console.error('Full response:', JSON.stringify(openrouterResponse).substring(0, 1000));
           return;
         }
 
-        const analysis = toolUse.input;
+        const analysis = JSON.parse(toolCall.function.arguments);
         console.log('Packaging analysis complete:', analysis.summary?.design_strategy?.substring(0, 100));
 
         // Save analysis to database (upsert)

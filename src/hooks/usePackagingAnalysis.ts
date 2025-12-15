@@ -261,11 +261,12 @@ export function usePackagingAnalysis(categoryId?: string) {
           description: 'AI design analysis is running in background. This may take 1-2 minutes...',
         });
 
-        // Poll for results every 10 seconds, up to 10 minutes
+        // Poll for results - check immediately, then poll every 5s for first 2 min, then 10s
         const maxAttempts = 60;
         let attempts = 0;
+        const pollingStartedAt = new Date();
         
-        setPollingStatus({ isPolling: true, attempt: 0, maxAttempts, startedAt: new Date() });
+        setPollingStatus({ isPolling: true, attempt: 0, maxAttempts, startedAt: pollingStartedAt });
         
         const pollForResults = async (): Promise<PackagingDesignAnalysis | null> => {
           while (attempts < maxAttempts) {
@@ -273,8 +274,7 @@ export function usePackagingAnalysis(categoryId?: string) {
             setPollingStatus(prev => ({ ...prev, attempt: attempts }));
             console.log(`Polling for packaging results... attempt ${attempts}/${maxAttempts}`);
             
-            await new Promise(resolve => setTimeout(resolve, 10000)); // Wait 10 seconds
-            
+            // Check database FIRST, then wait
             const { data: dbData, error: dbError } = await supabase
               .from('packaging_analyses')
               .select('analysis, updated_at')
@@ -283,20 +283,19 @@ export function usePackagingAnalysis(categoryId?: string) {
 
             if (dbError) {
               console.error('Error polling for results:', dbError);
-              continue;
-            }
-
-            if (dbData?.analysis) {
-              // Check if this is a fresh analysis (updated within last 5 minutes)
+            } else if (dbData?.analysis) {
+              // Accept if updated AFTER we started polling
               const updatedAt = new Date(dbData.updated_at);
-              const now = new Date();
-              const diffMinutes = (now.getTime() - updatedAt.getTime()) / (1000 * 60);
-              
-              if (diffMinutes < 5) {
+              if (updatedAt >= pollingStartedAt) {
                 setPollingStatus(prev => ({ ...prev, isPolling: false }));
                 return dbData.analysis as unknown as PackagingDesignAnalysis;
               }
             }
+            
+            // Use faster polling (5s) for first 2 minutes, then slow to 10s
+            const elapsedMs = Date.now() - pollingStartedAt.getTime();
+            const pollInterval = elapsedMs < 120000 ? 5000 : 10000;
+            await new Promise(resolve => setTimeout(resolve, pollInterval));
           }
           setPollingStatus(prev => ({ ...prev, isPolling: false }));
           return null;

@@ -144,11 +144,12 @@ export function usePackagingImageAnalysis(categoryId?: string) {
           description: 'AI is analyzing competitor packaging images. This may take 1-2 minutes...',
         });
 
-        // Poll for results every 10 seconds, up to 5 minutes
+        // Poll for results - check immediately, then poll every 5s for first 2 min, then 10s
         const maxAttempts = 30;
         let attempts = 0;
+        const pollingStartedAt = new Date();
         
-        setPollingStatus({ isPolling: true, attempt: 0, maxAttempts, startedAt: new Date() });
+        setPollingStatus({ isPolling: true, attempt: 0, maxAttempts, startedAt: pollingStartedAt });
         
         const pollForResults = async (): Promise<PackagingImageAnalysis | null> => {
           while (attempts < maxAttempts) {
@@ -156,8 +157,7 @@ export function usePackagingImageAnalysis(categoryId?: string) {
             setPollingStatus(prev => ({ ...prev, attempt: attempts }));
             console.log(`Polling for image analysis results... attempt ${attempts}/${maxAttempts}`);
             
-            await new Promise(resolve => setTimeout(resolve, 10000));
-            
+            // Check database FIRST, then wait
             const { data: dbData, error: dbError } = await supabase
               .from('packaging_analyses')
               .select('image_analysis, updated_at')
@@ -166,19 +166,19 @@ export function usePackagingImageAnalysis(categoryId?: string) {
 
             if (dbError) {
               console.error('Error polling for results:', dbError);
-              continue;
-            }
-
-            if (dbData?.image_analysis) {
+            } else if (dbData?.image_analysis) {
+              // Accept if updated AFTER we started polling
               const updatedAt = new Date(dbData.updated_at);
-              const now = new Date();
-              const diffMinutes = (now.getTime() - updatedAt.getTime()) / (1000 * 60);
-              
-              if (diffMinutes < 5) {
+              if (updatedAt >= pollingStartedAt) {
                 setPollingStatus(prev => ({ ...prev, isPolling: false }));
                 return dbData.image_analysis as unknown as PackagingImageAnalysis;
               }
             }
+            
+            // Use faster polling (5s) for first 2 minutes, then slow to 10s
+            const elapsedMs = Date.now() - pollingStartedAt.getTime();
+            const pollInterval = elapsedMs < 120000 ? 5000 : 10000;
+            await new Promise(resolve => setTimeout(resolve, pollInterval));
           }
           setPollingStatus(prev => ({ ...prev, isPolling: false }));
           return null;

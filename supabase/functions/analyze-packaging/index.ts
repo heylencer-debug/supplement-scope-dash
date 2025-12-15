@@ -519,7 +519,7 @@ PRODUCT ${idx + 1}: ${analysis.brand || 'Unknown'} - ${analysis.title || 'N/A'}
           },
           body: JSON.stringify({
             model: 'google/gemini-3-pro-preview',
-            max_tokens: 4096,
+            max_tokens: 16384,
             tools: [
               {
                 type: 'function',

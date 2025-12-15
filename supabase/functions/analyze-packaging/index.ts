@@ -116,21 +116,73 @@ serve(async (req) => {
     
     console.log(`Our formulation: ${ourIngredientCount} ingredients, ${ourBenefitClaims.length} benefit categories`);
 
-    // Fetch top 5 competitors by monthly_sales with packaging data and images
-    const { data: competitors, error: competitorsError } = await supabase
+    // Fetch TOP 2 Performers (established best-sellers by monthly_sales)
+    const { data: topPerformers, error: performersError } = await supabase
       .from('products')
-      .select('brand, title, main_image_url, image_urls, price, claims, claims_on_label, marketing_analysis, monthly_sales, servings_per_container, packaging_type, feature_bullets, review_analysis, packaging_image_analysis, ingredients')
+      .select('brand, title, main_image_url, image_urls, price, claims, claims_on_label, marketing_analysis, monthly_sales, servings_per_container, packaging_type, feature_bullets, review_analysis, packaging_image_analysis, ingredients, age_months')
       .eq('category_id', categoryId)
       .order('monthly_sales', { ascending: false })
-      .limit(5);
+      .limit(2);
 
-    if (competitorsError) {
-      console.error('Error fetching competitors:', competitorsError);
+    if (performersError) {
+      console.error('Error fetching top performers:', performersError);
       return new Response(
-        JSON.stringify({ error: 'Failed to fetch competitor data' }),
+        JSON.stringify({ error: 'Failed to fetch top performer data' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Fetch TOP 2 New Winners (young products < 24 months with high sales)
+    const { data: newWinners, error: winnersError } = await supabase
+      .from('products')
+      .select('brand, title, main_image_url, image_urls, price, claims, claims_on_label, marketing_analysis, monthly_sales, servings_per_container, packaging_type, feature_bullets, review_analysis, packaging_image_analysis, ingredients, age_months')
+      .eq('category_id', categoryId)
+      .lt('age_months', 24)
+      .order('monthly_sales', { ascending: false })
+      .limit(2);
+
+    if (winnersError) {
+      console.error('Error fetching new winners:', winnersError);
+      // Non-fatal - continue with just top performers
+    }
+
+    // Combine both sets for comprehensive analysis (top performers + new winners)
+    const competitors = [...(topPerformers || []), ...(newWinners || [])];
+    const hasNewWinners = (newWinners?.length || 0) > 0;
+    
+    console.log(`Found ${topPerformers?.length || 0} top performers and ${newWinners?.length || 0} new winners`);
+    
+    // Separate ingredient analysis for each group
+    const analyzeCompetitorIngredients = (products: any[]) => {
+      return products.map(c => {
+        const ingredientText = c.ingredients || '';
+        const activeSection = ingredientText.split(/other ingredients/i)[0];
+        const ingredientItems = activeSection.split(',').filter((i: string) => i.trim().length > 2);
+        const count = ingredientItems.length;
+        const claimsArray = c.claims_on_label || (c.claims ? c.claims.split(',').map((cl: string) => cl.trim()) : []);
+        
+        return {
+          brand: c.brand || 'Unknown',
+          count,
+          age_months: c.age_months || null,
+          monthly_sales: c.monthly_sales || 0,
+          ingredientSample: ingredientItems.slice(0, 5).join(', ').substring(0, 100),
+          claimsOnLabel: claimsArray.slice(0, 10),
+          price: c.price
+        };
+      });
+    };
+    
+    const topPerformerData = analyzeCompetitorIngredients(topPerformers || []);
+    const newWinnerData = analyzeCompetitorIngredients(newWinners || []);
+    
+    // Calculate averages for each group
+    const avgTopPerformerCount = topPerformerData.length > 0 
+      ? Math.round(topPerformerData.reduce((sum, c) => sum + c.count, 0) / topPerformerData.length)
+      : 0;
+    const avgNewWinnerCount = newWinnerData.length > 0
+      ? Math.round(newWinnerData.reduce((sum, c) => sum + c.count, 0) / newWinnerData.length)
+      : 0;
 
     // Fetch existing per-product image analysis from Step 1
     const { data: existingImageAnalysis } = await supabase
@@ -160,30 +212,22 @@ serve(async (req) => {
 
     console.log(`Found ${competitorImages.length} competitor images to analyze`);
 
-    // Parse competitor ingredient counts and extract front label elements
-    const competitorIngredientData: CompetitorIngredientData[] = (competitors || []).map(c => {
-      const ingredientText = c.ingredients || '';
-      // Count active ingredients (before "Other Ingredients:" section)
-      const activeSection = ingredientText.split(/other ingredients/i)[0];
-      const ingredientItems = activeSection.split(',').filter((i: string) => i.trim().length > 2);
-      const count = ingredientItems.length;
-      
-      // Extract claims from label
-      const claimsArray = c.claims_on_label || (c.claims ? c.claims.split(',').map((cl: string) => cl.trim()) : []);
-      
-      return {
-        brand: c.brand || 'Unknown',
-        count,
-        ingredientSample: ingredientItems.slice(0, 5).join(', ').substring(0, 100),
-        claimsOnLabel: claimsArray.slice(0, 10)
-      };
-    });
+    // Parse competitor ingredient counts and extract front label elements (using combined data)
+    interface CompetitorIngredientData {
+      brand: string;
+      count: number;
+      ingredientSample: string;
+      claimsOnLabel: string[];
+      isNewWinner?: boolean;
+    }
     
-    // Calculate average competitor ingredient count
-    const totalCompetitorIngredients = competitorIngredientData.reduce((sum, c) => sum + c.count, 0);
-    const avgCompetitorCount = competitorIngredientData.length > 0 
-      ? Math.round(totalCompetitorIngredients / competitorIngredientData.length) 
-      : 0;
+    const competitorIngredientData: CompetitorIngredientData[] = [
+      ...topPerformerData.map(c => ({ ...c, isNewWinner: false })),
+      ...newWinnerData.map(c => ({ ...c, isNewWinner: true }))
+    ];
+    
+    // Use top performer average for conservative strategy comparison
+    const avgCompetitorCount = avgTopPerformerCount;
     
     // Find unique ingredients we have that competitors might not emphasize
     const uniqueIngredientHighlights: string[] = ourIngredients.filter(ourIng => {
@@ -245,43 +289,61 @@ serve(async (req) => {
     
     console.log(`Generated ${verifiableClaims.length} verifiable claims for front label`);
 
-    // Format competitor packaging data with richer details
-    const competitorPackagingSummary = competitors?.map((c, idx) => {
-      const designBlueprint = (c.marketing_analysis as any)?.design_blueprint || {};
-      const claimsArray = c.claims_on_label || (c.claims ? c.claims.split(',').map((cl: string) => cl.trim()) : []);
-      const bullets = c.feature_bullets || [];
-      const reviewData = c.review_analysis as any;
-      const painPoints = reviewData?.pain_points?.slice(0, 3).map((p: any) => p.issue || p).join('; ') || 'N/A';
-      const positiveThemes = reviewData?.positive_themes?.slice(0, 3).map((t: any) => t.theme || t).join('; ') || 'N/A';
-      const competitorData = competitorIngredientData[idx];
-      
-      return `
-COMPETITOR ${idx + 1}: ${c.brand || 'Unknown'} - BEST SELLER ($${c.monthly_sales?.toLocaleString() || 'N/A'}/month)
+    // Format competitor packaging data with separate sections for TOP PERFORMERS vs NEW WINNERS
+    const formatCompetitorData = (products: any[], label: string, ingredientData: any[]) => {
+      return products?.map((c, idx) => {
+        const designBlueprint = (c.marketing_analysis as any)?.design_blueprint || {};
+        const claimsArray = c.claims_on_label || (c.claims ? c.claims.split(',').map((cl: string) => cl.trim()) : []);
+        const bullets = c.feature_bullets || [];
+        const reviewData = c.review_analysis as any;
+        const painPoints = reviewData?.pain_points?.slice(0, 3).map((p: any) => p.issue || p).join('; ') || 'N/A';
+        const positiveThemes = reviewData?.positive_themes?.slice(0, 3).map((t: any) => t.theme || t).join('; ') || 'N/A';
+        const compData = ingredientData[idx];
+        
+        return `
+${label} #${idx + 1}: ${c.brand || 'Unknown'} ($${c.monthly_sales?.toLocaleString() || 'N/A'}/month) - Age: ${c.age_months || 'N/A'} months
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 - Title: ${c.title || 'N/A'}
 - Price: $${c.price || 'N/A'} | Servings: ${c.servings_per_container || 'N/A'}
 - Packaging: ${c.packaging_type || 'Bottle'}
-- INGREDIENT COUNT: ${competitorData?.count || 'Unknown'} active ingredients
+- INGREDIENT COUNT: ${compData?.count || 'Unknown'} active ingredients
 - Image URL: ${c.main_image_url || 'N/A'}
 
-THEIR FRONT LABEL CLAIMS (MATCH OR BEAT THESE):
+THEIR FRONT LABEL CLAIMS:
 ${claimsArray.slice(0, 8).map((cl: string) => `  • ${cl}`).join('\n') || '  N/A'}
 
-THEIR BULLET POINTS (from Amazon listing):
+THEIR BULLET POINTS:
 ${bullets.slice(0, 4).map((b: string) => `  • ${b}`).join('\n') || '  N/A'}
 
-WHAT CUSTOMERS LOVE ABOUT THEM:
+WHAT CUSTOMERS LOVE:
 ${positiveThemes}
 
-CUSTOMER COMPLAINTS (opportunities for us):
+CUSTOMER COMPLAINTS:
 ${painPoints}
 
-THEIR VISUAL STRATEGY:
+VISUAL STRATEGY:
 - Visual Style: ${designBlueprint.visual_style || 'N/A'}
-- Trust Signals: ${designBlueprint.trust_signals || 'N/A'}
-- Conversion Triggers: ${designBlueprint.conversion_triggers || 'N/A'}
-- Differentiation: ${designBlueprint.differentiation_factor || 'N/A'}`;
-    }).join('\n\n') || 'No competitor data available';
+- Trust Signals: ${designBlueprint.trust_signals || 'N/A'}`;
+      }).join('\n\n') || 'No data available';
+    };
+    
+    const topPerformerSummary = formatCompetitorData(topPerformers || [], 'TOP PERFORMER', topPerformerData);
+    const newWinnerSummary = formatCompetitorData(newWinners || [], 'NEW WINNER', newWinnerData);
+    
+    // Combined summary for backward compatibility
+    const competitorPackagingSummary = `
+## 🏆 TOP PERFORMERS (Established Best-Sellers - CONSERVATIVE APPROACH)
+These are proven market leaders with consistent sales. Their approach is typically more conservative.
+Average ingredient count: ${avgTopPerformerCount} ingredients
+
+${topPerformerSummary}
+
+## 🚀 NEW WINNERS (Young High-Growth Products - AGGRESSIVE APPROACH)  
+These are newer products (<24 months) with high growth rates. They often use aggressive claims.
+Average ingredient count: ${avgNewWinnerCount} ingredients
+
+${newWinnerSummary}
+`;
 
     // Format per-product image analysis from Step 1
     const perProductImageAnalysisSummary = perProductAnalyses.length > 0 
@@ -412,115 +474,113 @@ PRODUCT ${idx + 1}: ${analysis.brand || 'Unknown'} - ${analysis.title || 'N/A'}
               {
                 type: 'function',
                 function: {
-                  name: 'create_packaging_design',
-                  description: 'Create a designer-ready packaging brief with concise copy and clear specifications.',
+                  name: 'create_dual_packaging_strategies',
+                  description: 'Create TWO packaging strategies: one matching established leaders (conservative) and one matching new disruptors (aggressive).',
                   parameters: {
                     type: 'object',
                     properties: {
-                    design_brief: {
-                      type: 'object',
-                      description: 'Core design specifications for the designer',
-                      properties: {
-                        primary_color: {
-                          type: 'object',
-                          properties: {
-                            hex: { type: 'string', description: 'Hex color code e.g. #2D5A3D' },
-                            name: { type: 'string', description: 'Color name e.g. Forest Green' }
+                      match_leaders: {
+                        type: 'object',
+                        description: 'CONSERVATIVE strategy to compete with TOP PERFORMERS (established best-sellers)',
+                        properties: {
+                          target_competitors: { type: 'array', items: { type: 'string' }, description: 'Names of the top performer brands this strategy matches' },
+                          strategy_summary: { type: 'string', description: '1-2 sentences explaining this conservative approach' },
+                          design_brief: {
+                            type: 'object',
+                            properties: {
+                              primary_color: { type: 'object', properties: { hex: { type: 'string' }, name: { type: 'string' } }, required: ['hex', 'name'] },
+                              secondary_color: { type: 'object', properties: { hex: { type: 'string' }, name: { type: 'string' } }, required: ['hex', 'name'] },
+                              accent_color: { type: 'object', properties: { hex: { type: 'string' }, name: { type: 'string' } }, required: ['hex', 'name'] },
+                              headline_font: { type: 'string' },
+                              body_font: { type: 'string' },
+                              primary_claim: { type: 'string', description: 'Conservative X-in-1 claim matching leaders (e.g., 8-in-1)' },
+                              key_differentiators: { type: 'array', items: { type: 'string' } },
+                              certifications: { type: 'array', items: { type: 'string' } }
+                            },
+                            required: ['primary_color', 'secondary_color', 'accent_color', 'headline_font', 'body_font', 'primary_claim', 'key_differentiators', 'certifications']
                           },
-                          required: ['hex', 'name']
-                        },
-                        secondary_color: {
-                          type: 'object',
-                          properties: {
-                            hex: { type: 'string' },
-                            name: { type: 'string' }
+                          elements_checklist: {
+                            type: 'object',
+                            properties: {
+                              front_panel_hierarchy: { type: 'array', items: { type: 'string' } },
+                              bullet_points: { type: 'array', items: { type: 'string' } },
+                              call_to_action: { type: 'string' },
+                              trust_signals: { type: 'array', items: { type: 'string' } }
+                            },
+                            required: ['front_panel_hierarchy', 'bullet_points', 'call_to_action', 'trust_signals']
                           },
-                          required: ['hex', 'name']
-                        },
-                        accent_color: {
-                          type: 'object',
-                          properties: {
-                            hex: { type: 'string' },
-                            name: { type: 'string' }
+                          mock_content: {
+                            type: 'object',
+                            properties: {
+                              front_panel_text: { type: 'string' },
+                              back_panel_text: { type: 'string' },
+                              side_panel_suggestions: { type: 'array', items: { type: 'string' } }
+                            },
+                            required: ['front_panel_text', 'back_panel_text', 'side_panel_suggestions']
                           },
-                          required: ['hex', 'name']
+                          reasoning: { type: 'string', description: 'Why this conservative approach works for competing with established leaders' }
                         },
-                        headline_font: { type: 'string', description: 'Font family name for headlines e.g. Montserrat Bold' },
-                        body_font: { type: 'string', description: 'Font family name for body text e.g. Open Sans' },
-                        primary_claim: { type: 'string', description: 'Main headline claim - 3-8 words MAX. This is the hero text on front panel.' },
-                        key_differentiators: { 
-                          type: 'array', 
-                          items: { type: 'string' }, 
-                          description: '3-5 short badges/tags that make us stand out e.g. "Clinically Dosed", "3rd Party Tested"' 
-                        },
-                        certifications: { 
-                          type: 'array', 
-                          items: { type: 'string' }, 
-                          description: 'Required certification badges e.g. "GMP Certified", "Non-GMO", "Vegan"' 
-                        }
+                        required: ['target_competitors', 'strategy_summary', 'design_brief', 'elements_checklist', 'mock_content', 'reasoning']
                       },
-                      required: ['primary_color', 'secondary_color', 'accent_color', 'headline_font', 'body_font', 'primary_claim', 'key_differentiators', 'certifications']
+                      match_disruptors: {
+                        type: 'object',
+                        description: 'AGGRESSIVE strategy to compete with NEW WINNERS (young, high-growth products)',
+                        properties: {
+                          target_competitors: { type: 'array', items: { type: 'string' }, description: 'Names of the new winner brands this strategy matches' },
+                          strategy_summary: { type: 'string', description: '1-2 sentences explaining this aggressive approach' },
+                          design_brief: {
+                            type: 'object',
+                            properties: {
+                              primary_color: { type: 'object', properties: { hex: { type: 'string' }, name: { type: 'string' } }, required: ['hex', 'name'] },
+                              secondary_color: { type: 'object', properties: { hex: { type: 'string' }, name: { type: 'string' } }, required: ['hex', 'name'] },
+                              accent_color: { type: 'object', properties: { hex: { type: 'string' }, name: { type: 'string' } }, required: ['hex', 'name'] },
+                              headline_font: { type: 'string' },
+                              body_font: { type: 'string' },
+                              primary_claim: { type: 'string', description: 'Aggressive X-in-1 claim matching disruptors (e.g., 23-in-1 or maximize our count)' },
+                              key_differentiators: { type: 'array', items: { type: 'string' } },
+                              certifications: { type: 'array', items: { type: 'string' } }
+                            },
+                            required: ['primary_color', 'secondary_color', 'accent_color', 'headline_font', 'body_font', 'primary_claim', 'key_differentiators', 'certifications']
+                          },
+                          elements_checklist: {
+                            type: 'object',
+                            properties: {
+                              front_panel_hierarchy: { type: 'array', items: { type: 'string' } },
+                              bullet_points: { type: 'array', items: { type: 'string' } },
+                              call_to_action: { type: 'string' },
+                              trust_signals: { type: 'array', items: { type: 'string' } }
+                            },
+                            required: ['front_panel_hierarchy', 'bullet_points', 'call_to_action', 'trust_signals']
+                          },
+                          mock_content: {
+                            type: 'object',
+                            properties: {
+                              front_panel_text: { type: 'string' },
+                              back_panel_text: { type: 'string' },
+                              side_panel_suggestions: { type: 'array', items: { type: 'string' } }
+                            },
+                            required: ['front_panel_text', 'back_panel_text', 'side_panel_suggestions']
+                          },
+                          reasoning: { type: 'string', description: 'Why this aggressive approach works for competing with new disruptors' }
+                        },
+                        required: ['target_competitors', 'strategy_summary', 'design_brief', 'elements_checklist', 'mock_content', 'reasoning']
+                      },
+                      recommendation: {
+                        type: 'object',
+                        description: 'Which strategy to choose and why',
+                        properties: {
+                          preferred_strategy: { type: 'string', enum: ['match_leaders', 'match_disruptors'], description: 'Which strategy is recommended' },
+                          reasoning: { type: 'string', description: 'Why this strategy is recommended based on market analysis and our formulation' }
+                        },
+                        required: ['preferred_strategy', 'reasoning']
+                      }
                     },
-                    elements_checklist: {
-                      type: 'object',
-                      description: 'Checklist of elements to include on the package',
-                      properties: {
-                        front_panel_hierarchy: { 
-                          type: 'array', 
-                          items: { type: 'string' }, 
-                          description: 'Elements in order of visual importance for front panel e.g. ["Brand Logo", "Primary Claim", "Serving Count", "Certification Badges"]' 
-                        },
-                        bullet_points: { 
-                          type: 'array', 
-                          items: { type: 'string' }, 
-                          description: '3-5 benefit bullets - CONCISE, 5-10 words each. Ready to use on package.' 
-                        },
-                        call_to_action: { type: 'string', description: 'CTA text - 2-5 words e.g. "Feel the Difference"' },
-                        trust_signals: { 
-                          type: 'array', 
-                          items: { type: 'string' }, 
-                          description: 'Trust elements to include e.g. "Made in USA", "Money-Back Guarantee", "Doctor Recommended"' 
-                        }
-                      },
-                      required: ['front_panel_hierarchy', 'bullet_points', 'call_to_action', 'trust_signals']
-                    },
-                    mock_content: {
-                      type: 'object',
-                      description: 'Ready-to-use text content exactly as it should appear on packaging',
-                      properties: {
-                        front_panel_text: { 
-                          type: 'string', 
-                          description: 'Complete front panel text layout. Format as it appears on the actual package with line breaks. Keep text SHORT - this is packaging, not a brochure.' 
-                        },
-                        back_panel_text: { 
-                          type: 'string', 
-                          description: 'Complete back panel text including benefits section, directions, and any required copy. Format with sections and line breaks.' 
-                        },
-                        side_panel_suggestions: { 
-                          type: 'array', 
-                          items: { type: 'string' }, 
-                          description: 'Brief suggestions for side panel content e.g. "Storage instructions", "Contact info", "Website QR code"' 
-                        }
-                      },
-                      required: ['front_panel_text', 'back_panel_text', 'side_panel_suggestions']
-                    },
-                    client_rationale: {
-                      type: 'object',
-                      description: 'Brief explanations for client presentation - why these design choices win',
-                      properties: {
-                        color_explanation: { type: 'string', description: '1-2 sentences explaining why this color palette beats competitors' },
-                        positioning_explanation: { type: 'string', description: '2-3 sentences on how this design positions us to win shelf space' },
-                        differentiation_summary: { type: 'string', description: '2-3 sentences on what makes this design stand out from top competitors' }
-                      },
-                      required: ['color_explanation', 'positioning_explanation', 'differentiation_summary']
-                    }
-                  },
-                  required: ['design_brief', 'elements_checklist', 'mock_content', 'client_rationale']
+                    required: ['match_leaders', 'match_disruptors', 'recommendation']
+                  }
                 }
               }
-            }
-          ],
-            tool_choice: { type: 'function', function: { name: 'create_packaging_design' } },
+            ],
+            tool_choice: { type: 'function', function: { name: 'create_dual_packaging_strategies' } },
             messages: [
               {
                 role: 'user',
@@ -529,129 +589,92 @@ PRODUCT ${idx + 1}: ${analysis.brand || 'Unknown'} - ${analysis.title || 'N/A'}
                   ...competitorImages,
                   {
                     type: 'text',
-                    text: `You are an EXPERT PACKAGING COPYWRITER & DESIGNER analyzing the BEST-SELLING competitor products in "${categoryName}" to create packaging that MATCHES THEIR PROVEN APPROACH while addressing their weaknesses.
+                    text: `You are an EXPERT PACKAGING COPYWRITER & DESIGNER analyzing TWO DISTINCT COMPETITOR GROUPS in "${categoryName}" to create TWO DIFFERENT PACKAGING STRATEGIES.
 
-## YOUR MISSION:
-Study the competitor product images I've included above VERY CAREFULLY. Look at:
-- Their EXACT color schemes and visual hierarchy
-- Their EXACT bullet point length (count the words!)
-- Their EXACT headline style (how many words? what tone?)
-- Their typography choices and font styles
-- Their trust signals and certifications placement
-- What makes shoppers pick them - and MATCH that approach
+## 🎯 YOUR MISSION: CREATE TWO STRATEGIES
 
-Your goal is to create packaging that LOOKS LIKE IT BELONGS next to the #1 best-seller. NOT to be radically different - but to FIT IN while being slightly better.
+You must create TWO complete packaging strategies:
+1. **MATCH LEADERS** - Conservative approach matching TOP PERFORMERS (established best-sellers)
+2. **MATCH DISRUPTORS** - Aggressive approach matching NEW WINNERS (young, high-growth products)
 
-## COPY STYLE DIRECTION:
-${getCopyStyleInstructions(copyStyle)}
+Study the competitor product images I've included above VERY CAREFULLY.
 
-## CRITICAL COPY RULES:
-- MATCH the competitor's bullet point length (if theirs are 5-7 words, yours should be too)
-- MATCH their headline style (if direct, be direct; if soft, be soft)
-- MATCH their tone (if clinical/pharmaceutical, be clinical; if friendly, be friendly)
-- DO NOT use aggressive urgency tactics unless competitors are also using them
-- DO NOT write infomercial-style copy unless that's what competitors do
-- Address the #1 customer pain point - but in the SAME STYLE as competitors
+## THE KEY INSIGHT:
 
-## STUDY THESE COMPETITOR BULLETS AND CREATE SIMILAR ONES:
-${competitors?.slice(0, 3).map((c, i) => {
-  const bullets = c.feature_bullets || [];
-  return `Competitor ${i + 1} (${c.brand}): ${bullets.slice(0, 3).map((b: string) => `"${b.substring(0, 60)}..."`).join(' | ')}`;
-}).join('\n') || 'N/A'}
+**TOP PERFORMERS** (established brands like Zesty Paws, Pet Honesty) use CONSERVATIVE claims:
+- Average ingredient count: ${avgTopPerformerCount} ingredients
+- They use claims like "8-in-1" or "10-in-1"
+- Clinical, trusted, proven approach
+- Focus on quality over quantity
 
-## OUR PRODUCT FORMULATION:
-${formulaBriefContent}
+**NEW WINNERS** (young high-growth brands) use AGGRESSIVE claims:
+- Average ingredient count: ${avgNewWinnerCount} ingredients  
+- They use claims like "23-in-1" or "26-in-1"
+- Bold, value-focused, comprehensive approach
+- Focus on quantity and value
 
-## RECOMMENDED PACKAGING FORMAT:
-- Type: ${recommendedPackaging.type || 'Premium Bottle'}
-- Key Design Elements: ${recommendedPackaging.design_elements?.join(', ') || 'Modern, clean, premium aesthetic'}
-
-## 🎯 FORMULATION-BASED FRONT LABEL STRATEGY (CRITICAL - USE THESE!)
-
-### OUR INGREDIENT COUNT VS COMPETITORS:
+## OUR FORMULATION (use this for BOTH strategies):
 - **OUR PRODUCT: ${ourIngredientCount} Active Ingredients** (${ourFormFactor || 'Standard Form'})
-${competitorIngredientData.map((c, i) => `- ${c.brand}: ${c.count} ingredients`).join('\n')}
-- **MARKET AVERAGE: ${avgCompetitorCount} ingredients**
+- Ingredients: ${ourIngredients.slice(0, 5).map(i => i.split(' ')[0]).join(', ')}${ourIngredients.length > 5 ? '...' : ''}
 
-### ✅ TRUE CLAIMS WE CAN PUT ON FRONT LABEL (based on our ACTUAL formulation):
+### ✅ VERIFIED TRUE CLAIMS WE CAN USE:
+${verifiableClaims.length > 0 ? verifiableClaims.map((c, i) => `${i + 1}. "${c}"`).join('\n') : 'Generate from ingredients'}
 
-**PRIMARY HEADLINE OPTIONS (use one of these - they are VERIFIED TRUE):**
-${verifiableClaims.length > 0 ? verifiableClaims.map((c, i) => `${i + 1}. "${c}"`).join('\n') : 'Generate from ingredients below'}
+### BENEFIT CATEGORIES WE CAN CLAIM:
+${ourBenefitClaims.length > 0 ? ourBenefitClaims.map(b => `✓ ${b}`).join('\n') : 'Analyze from ingredients'}
 
-**BENEFIT ICONS/BADGES WE CAN CLAIM (we have ingredients for all of these):**
-${ourBenefitClaims.length > 0 ? ourBenefitClaims.map(b => `✓ ${b}`).join('\n') : 'Analyze from ingredients below'}
-
-### 📊 OUR COMPLETE INGREDIENTS LIST (PUT THESE ON THE LABEL!):
-${ourIngredients.length > 0 ? ourIngredients.map((ing, i) => `${i + 1}. ${ing}`).join('\n') : 'See formulation document above'}
-
-### 🌟 KEY FEATURES TO HIGHLIGHT (from formulation):
+### KEY FEATURES:
 ${ourKeyFeatures.length > 0 ? ourKeyFeatures.map(f => `• ${f}`).join('\n') : 'N/A'}
 
-### 🚫 WHAT WE DON'T HAVE (turn into positive claims):
-${ourThingsToAvoid.length > 0 ? ourThingsToAvoid.map(avoid => `• "${avoid}" → Claim: "No ${avoid}"`).join('\n') : 'N/A'}
-
-### 🏆 UNIQUE ADVANTAGES (ingredients/features competitors may not have):
-${uniqueIngredientHighlights.length > 0 ? uniqueIngredientHighlights.map(ing => `• ${ing.split(' ').slice(0, 3).join(' ')} ← HIGHLIGHT THIS ON LABEL`).join('\n') : 'Focus on dosage/quality differentiation'}
-
-### COMPETITOR FRONT LABEL ANALYSIS (MATCH OR BEAT THESE):
-${competitorIngredientData.slice(0, 3).map((c, i) => `
-**${c.brand}** (${c.count} ingredients):
-Top Claims: ${c.claimsOnLabel.slice(0, 5).join(' | ') || 'N/A'}`).join('\n')}
-
-### ⚠️ CRITICAL FRONT LABEL RULES:
-1. If we have ${ourIngredientCount} ingredients, you can claim "${ourIngredientCount}-in-1" - NOT MORE!
-2. Only claim benefits we actually have ingredients for: ${ourBenefitClaims.join(', ') || 'TBD'}
-3. Every claim MUST be verifiable from our formulation above
-4. Our front label must be AS COMPLETE AS competitors - match their element count!
-5. Include serving count, quantity, flavor prominently like competitors do
-
-## COMPETITOR INTELLIGENCE (STUDY THEM, MATCH THEIR APPROACH):
+## COMPETITOR INTELLIGENCE:
 ${competitorPackagingSummary}
 
-## 🔬 PER-PRODUCT PACKAGING IMAGE ANALYSIS (FROM STEP 1 - COPY THESE EXACTLY):
-The following analysis was extracted directly from competitor product images using AI vision.
-YOU MUST COPY THEIR APPROACH for our packaging design.
-
+## 🔬 PER-PRODUCT IMAGE ANALYSIS:
 ${perProductImageAnalysisSummary}
 
-## WHAT TO COPY FROM THE ABOVE PER-PRODUCT ANALYSIS:
-1. **LABEL STYLE**: Match the headline format, claim placement, and badge arrangement from top sellers
-2. **MESSAGING TONE**: Use the SAME primary tone and urgency level as the best performers
-3. **PRODUCT APPEARANCE**: Our product should look similar (same shapes, similar colors, textures)
-4. **PACKAGING FORMAT**: Use the same bottle/pouch type as market leaders
+## ⚠️ CRITICAL RULES FOR BOTH STRATEGIES:
+1. We have ${ourIngredientCount} ingredients - use EXACTLY this number for X-in-1 claims
+2. Only claim benefits we have ingredients for: ${ourBenefitClaims.join(', ') || 'TBD'}
+3. Every claim MUST be verifiable from our formulation
+4. Front label must be AS COMPLETE as competitors
 
-## HOW TO WIN (WITHOUT BEING RADICALLY DIFFERENT):
-1. MATCH the visual style of the #1 seller (colors, fonts, layout)
-2. MATCH their bullet point length and tone exactly
-3. Our front label must have AS MANY elements as top competitors (X-in-1 claim, benefit icons, trust badges, serving count)
-4. Use the same trust signal approach but add 1 extra credibility cue
-5. ONLY differentiate where we genuinely have an advantage from our formulation
+## STRATEGY 1: MATCH LEADERS (Conservative)
+- Target: TOP PERFORMERS with ~${avgTopPerformerCount} ingredient claims
+- Use our ${ourIngredientCount}-in-1 claim (matches their conservative range)
+- Clinical, trusted, premium tone
+- Match their bullet point length and style exactly
+- Colors: Clean, professional, medical-grade aesthetic
 
-## YOUR DELIVERABLES:
+## STRATEGY 2: MATCH DISRUPTORS (Aggressive)
+- Target: NEW WINNERS with ${avgNewWinnerCount}+ ingredient claims  
+- Maximize our claim: "${ourIngredientCount}-in-1 Complete Formula"
+- Bold, value-focused, comprehensive tone
+- Emphasize quantity and completeness
+- Colors: Bold, energetic, stand-out aesthetic
+
+## YOUR DELIVERABLES (FOR EACH STRATEGY):
 
 **1. DESIGN BRIEF**: 
-   - Color palette (3 hex codes) - should feel premium and trustworthy for this category
-   - Typography - modern, clean, highly legible
-   - PRIMARY CLAIM: Use one from our verified claims above (or create similar based on our ACTUAL ingredients)
-   - Key differentiator badges (based on our REAL formulation advantages)
-   - Required certifications
+   - Color palette (3 hex codes) 
+   - Typography
+   - PRIMARY CLAIM (conservative vs aggressive)
+   - Key differentiator badges
+   - Certifications
 
 **2. ELEMENTS CHECKLIST**: 
-   - Front panel elements in visual hierarchy order - MUST match competitor element density
-   - 5 KILLER bullet points that sell (based on our ACTUAL benefits)
-   - CTA that drives action
-   - Trust signals that build confidence
+   - Front panel elements in hierarchy order
+   - 5 bullet points (match competitor style)
+   - CTA
+   - Trust signals
 
-**3. MOCK CONTENT** (COPY-PASTE READY):
-   - Front panel: Include X-in-1 claim (if applicable), benefit icons, serving count, quantity, key claims
-   - Make sure front panel has AS MANY elements as competitor front panels!
-   - Back panel: Complete with benefit section, ingredient highlights, directions, disclaimer
+**3. MOCK CONTENT**:
+   - Complete front panel text
+   - Complete back panel text
+   - Side panel suggestions
 
-**4. CLIENT RATIONALE**: 
-   - Why our formulation-based claims beat competitors
-   - What ingredient/benefit advantage we're leveraging
+**4. REASONING**: Why this strategy works for its target market
 
-REMEMBER: Every claim must be TRUE based on our ${ourIngredientCount}-ingredient formulation. Create the MOST COMPLETE front label possible that matches competitor density while being 100% verifiable.`
+**5. RECOMMENDATION**: Which strategy you recommend and why based on our formulation strength`
                   }
                 ]
               }

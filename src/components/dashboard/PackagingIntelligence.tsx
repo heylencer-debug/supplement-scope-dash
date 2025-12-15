@@ -10,6 +10,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 
 import { usePackagingAnalysis } from "@/hooks/usePackagingAnalysis";
 import { usePackagingImageAnalysis } from "@/hooks/usePackagingImageAnalysis";
 import { AIPackagingResults } from "./AIPackagingResults";
+import { DualPackagingStrategies, isDualStrategyAnalysis } from "./DualPackagingStrategies";
 import { CompetitorPackagingTable } from "./CompetitorPackagingTable";
 import { formatDistanceToNow } from "date-fns";
 
@@ -718,8 +719,15 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
             </div>
           )}
 
-          {/* AI Analysis Results (without mockup section) */}
-          {aiAnalysis && (
+          {/* AI Analysis Results - Check for dual strategies first */}
+          {aiAnalysis && isDualStrategyAnalysis(aiAnalysis) ? (
+            <DualPackagingStrategies 
+              analysis={aiAnalysis}
+              onSelectStrategy={(type, strategy) => {
+                console.log('Selected strategy:', type, strategy);
+              }}
+            />
+          ) : aiAnalysis ? (
             <AIPackagingResults 
               analysis={aiAnalysis} 
               mockupImageUrl={null}
@@ -728,7 +736,7 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
               isRegenerating={isAnalyzing}
               hideMockupSection={true}
             />
-          )}
+          ) : null}
         </div>
 
         {/* ============================================ */}

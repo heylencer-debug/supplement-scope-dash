@@ -46,8 +46,10 @@ export interface PackagingImageAnalysis {
 
 export function usePackagingImageAnalysis(categoryId?: string) {
   const [analysis, setAnalysis] = useState<PackagingImageAnalysis | null>(null);
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingFromDb, setIsLoadingFromDb] = useState(true);
+  const [wasRestoredFromDb, setWasRestoredFromDb] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pollingStatus, setPollingStatus] = useState<{
     isPolling: boolean;
@@ -60,7 +62,9 @@ export function usePackagingImageAnalysis(categoryId?: string) {
   // Reset state when categoryId changes
   useEffect(() => {
     setAnalysis(null);
+    setUpdatedAt(null);
     setIsLoadingFromDb(true);
+    setWasRestoredFromDb(false);
     setError(null);
   }, [categoryId]);
 
@@ -75,7 +79,7 @@ export function usePackagingImageAnalysis(categoryId?: string) {
       try {
         const { data, error: dbError } = await supabase
           .from('packaging_analyses')
-          .select('image_analysis')
+          .select('image_analysis, updated_at')
           .eq('category_id', categoryId)
           .maybeSingle();
 
@@ -83,6 +87,8 @@ export function usePackagingImageAnalysis(categoryId?: string) {
           console.error('Error loading packaging image analysis from DB:', dbError);
         } else if (data?.image_analysis) {
           setAnalysis(data.image_analysis as unknown as PackagingImageAnalysis);
+          setUpdatedAt(new Date(data.updated_at));
+          setWasRestoredFromDb(true);
         }
       } catch (e) {
         console.error('Error loading packaging image analysis from DB:', e);
@@ -174,6 +180,8 @@ export function usePackagingImageAnalysis(categoryId?: string) {
         
         if (result) {
           setAnalysis(result);
+          setUpdatedAt(new Date());
+          setWasRestoredFromDb(false);
           toast({
             title: 'Image Analysis Complete',
             description: `Analyzed packaging for ${result.competitor_analyses?.length || 0} competitor products.`,
@@ -197,6 +205,8 @@ export function usePackagingImageAnalysis(categoryId?: string) {
 
   const clearAnalysis = useCallback(async () => {
     setAnalysis(null);
+    setUpdatedAt(null);
+    setWasRestoredFromDb(false);
     setError(null);
     
     if (categoryId) {
@@ -214,8 +224,10 @@ export function usePackagingImageAnalysis(categoryId?: string) {
 
   return {
     analysis,
+    updatedAt,
     isLoading,
     isLoadingFromDb,
+    wasRestoredFromDb,
     error,
     pollingStatus,
     runAnalysis,

@@ -5,12 +5,14 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Package, CheckCircle2, Award, Tag, Shield, DollarSign, Hash, Eye, Zap, Sparkles, Loader2, RefreshCw, Trash2, Clock, Camera } from "lucide-react";
+import { Package, CheckCircle2, Award, Tag, Shield, DollarSign, Hash, Eye, Zap, Sparkles, Loader2, RefreshCw, Trash2, Clock, Camera, History } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { usePackagingAnalysis } from "@/hooks/usePackagingAnalysis";
 import { usePackagingImageAnalysis } from "@/hooks/usePackagingImageAnalysis";
 import { AIPackagingResults } from "./AIPackagingResults";
 import { CompetitorPackagingTable } from "./CompetitorPackagingTable";
+import { formatDistanceToNow } from "date-fns";
+
 interface PackagingData {
   type?: string;
   quantity?: string | number;
@@ -116,9 +118,11 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
   const {
     analysis: aiAnalysis,
     mockupImageUrl,
+    updatedAt: strategyUpdatedAt,
     saveMockupImage,
     isLoading: isAnalyzing,
     isLoadingFromDb,
+    wasRestoredFromDb: strategyWasRestored,
     pollingStatus,
     runAnalysis,
     clearAnalysis,
@@ -127,13 +131,21 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
 
   const {
     analysis: imageAnalysis,
+    updatedAt: imageAnalysisUpdatedAt,
     isLoading: isAnalyzingImages,
     isLoadingFromDb: isLoadingImagesFromDb,
+    wasRestoredFromDb: imageAnalysisWasRestored,
     pollingStatus: imagePollingStatus,
     runAnalysis: runImageAnalysis,
     clearAnalysis: clearImageAnalysis,
     hasAnalysis: hasImageAnalysis
   } = usePackagingImageAnalysis(categoryId);
+
+  // Show restored banner when any progress was restored
+  const hasRestoredProgress = (strategyWasRestored || imageAnalysisWasRestored) && !isLoadingFromDb && !isLoadingImagesFromDb;
+  const latestUpdatedAt = strategyUpdatedAt && imageAnalysisUpdatedAt 
+    ? (strategyUpdatedAt > imageAnalysisUpdatedAt ? strategyUpdatedAt : imageAnalysisUpdatedAt)
+    : strategyUpdatedAt || imageAnalysisUpdatedAt;
 
   const CHART_COLORS = [
     "hsl(var(--chart-1))",
@@ -472,6 +484,24 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
             <span>Mockup</span>
           </div>
         </div>
+
+        {/* Restored Progress Banner */}
+        {hasRestoredProgress && latestUpdatedAt && (
+          <div className="flex items-center gap-3 p-3 bg-chart-4/5 rounded-lg border border-chart-4/20 animate-enter">
+            <History className="w-4 h-4 text-chart-4" />
+            <div className="flex-1">
+              <span className="text-sm font-medium text-chart-4">Progress restored from previous session</span>
+              <span className="text-xs text-muted-foreground ml-2">
+                Last updated {formatDistanceToNow(latestUpdatedAt, { addSuffix: true })}
+              </span>
+            </div>
+            <Badge variant="secondary" className="bg-chart-4/10 text-chart-4 border-chart-4/20 text-[10px]">
+              {hasImageAnalysis && hasAnalysis && mockupImageUrl ? '3/3 Complete' : 
+               hasImageAnalysis && hasAnalysis ? '2/3 Complete' : 
+               hasImageAnalysis ? '1/3 Complete' : 'In Progress'}
+            </Badge>
+          </div>
+        )}
 
         {/* ============================================ */}
         {/* STEP 1: Per Product Packaging Content Analysis */}

@@ -76,8 +76,10 @@ export interface PackagingDesignAnalysis {
 export function usePackagingAnalysis(categoryId?: string) {
   const [analysis, setAnalysis] = useState<PackagingDesignAnalysis | null>(null);
   const [mockupImageUrl, setMockupImageUrl] = useState<string | null>(null);
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingFromDb, setIsLoadingFromDb] = useState(true);
+  const [wasRestoredFromDb, setWasRestoredFromDb] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pollingStatus, setPollingStatus] = useState<{
     isPolling: boolean;
@@ -91,7 +93,9 @@ export function usePackagingAnalysis(categoryId?: string) {
   useEffect(() => {
     setAnalysis(null);
     setMockupImageUrl(null);
+    setUpdatedAt(null);
     setIsLoadingFromDb(true);
+    setWasRestoredFromDb(false);
     setError(null);
   }, [categoryId]);
 
@@ -106,7 +110,7 @@ export function usePackagingAnalysis(categoryId?: string) {
       try {
         const { data, error: dbError } = await supabase
           .from('packaging_analyses')
-          .select('analysis, mockup_image_url')
+          .select('analysis, mockup_image_url, updated_at')
           .eq('category_id', categoryId)
           .maybeSingle();
 
@@ -115,9 +119,13 @@ export function usePackagingAnalysis(categoryId?: string) {
         } else if (data) {
           if (data.analysis) {
             setAnalysis(data.analysis as unknown as PackagingDesignAnalysis);
+            setWasRestoredFromDb(true);
           }
           if (data.mockup_image_url) {
             setMockupImageUrl(data.mockup_image_url);
+          }
+          if (data.updated_at) {
+            setUpdatedAt(new Date(data.updated_at));
           }
         }
       } catch (e) {
@@ -241,6 +249,8 @@ export function usePackagingAnalysis(categoryId?: string) {
         
         if (result) {
           setAnalysis(result);
+          setUpdatedAt(new Date());
+          setWasRestoredFromDb(false);
           toast({
             title: 'Packaging Analysis Complete',
             description: 'AI has generated your winning packaging design strategy.',
@@ -272,6 +282,8 @@ export function usePackagingAnalysis(categoryId?: string) {
   const clearAnalysis = useCallback(async () => {
     setAnalysis(null);
     setMockupImageUrl(null);
+    setUpdatedAt(null);
+    setWasRestoredFromDb(false);
     setError(null);
     
     // Delete from database
@@ -290,9 +302,11 @@ export function usePackagingAnalysis(categoryId?: string) {
   return {
     analysis,
     mockupImageUrl,
+    updatedAt,
     saveMockupImage,
     isLoading,
     isLoadingFromDb,
+    wasRestoredFromDb,
     error,
     pollingStatus,
     runAnalysis,

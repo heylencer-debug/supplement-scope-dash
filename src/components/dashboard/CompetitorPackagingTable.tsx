@@ -24,7 +24,11 @@ import {
   Circle,
   Square,
   Triangle,
-  Hexagon
+  Hexagon,
+  Heart,
+  Star,
+  MessageSquare,
+  Sparkles
 } from "lucide-react";
 import type { CompetitorPackagingAnalysis } from "@/hooks/usePackagingImageAnalysis";
 
@@ -32,18 +36,24 @@ interface CompetitorPackagingTableProps {
   analyses: CompetitorPackagingAnalysis[];
 }
 
-// Get icon for product form shape
+// Get icon for product content shape
 function getShapeIcon(shape: string | null) {
   if (!shape) return null;
   const lower = shape.toLowerCase();
-  if (lower.includes('bear') || lower.includes('round') || lower.includes('sphere')) {
+  if (lower.includes('bear') || lower.includes('round') || lower.includes('sphere') || lower.includes('circle')) {
     return <Circle className="w-3 h-3" />;
   }
-  if (lower.includes('bone') || lower.includes('rectangle')) {
+  if (lower.includes('bone') || lower.includes('rectangle') || lower.includes('square')) {
     return <Square className="w-3 h-3" />;
   }
   if (lower.includes('triangle') || lower.includes('wedge')) {
     return <Triangle className="w-3 h-3" />;
+  }
+  if (lower.includes('heart')) {
+    return <Heart className="w-3 h-3" />;
+  }
+  if (lower.includes('star')) {
+    return <Star className="w-3 h-3" />;
   }
   return <Hexagon className="w-3 h-3" />;
 }
@@ -77,6 +87,40 @@ function getColorStyle(color: string) {
   return 'bg-gray-300';
 }
 
+// Get tone badge color
+function getToneBadgeStyle(tone: string) {
+  const lower = tone.toLowerCase();
+  if (lower.includes('clinical') || lower.includes('scientific')) {
+    return 'bg-chart-3/10 text-chart-3 border-chart-3/20';
+  }
+  if (lower.includes('playful') || lower.includes('fun')) {
+    return 'bg-chart-2/10 text-chart-2 border-chart-2/20';
+  }
+  if (lower.includes('premium') || lower.includes('luxury')) {
+    return 'bg-chart-5/10 text-chart-5 border-chart-5/20';
+  }
+  if (lower.includes('aggressive') || lower.includes('urgent')) {
+    return 'bg-destructive/10 text-destructive border-destructive/20';
+  }
+  if (lower.includes('wellness') || lower.includes('natural')) {
+    return 'bg-chart-4/10 text-chart-4 border-chart-4/20';
+  }
+  return 'bg-muted text-muted-foreground border-border';
+}
+
+// Get urgency indicator
+function getUrgencyIndicator(level: string) {
+  switch (level) {
+    case 'high':
+      return { color: 'text-destructive', label: 'High Urgency' };
+    case 'medium':
+      return { color: 'text-chart-2', label: 'Medium Urgency' };
+    case 'low':
+    default:
+      return { color: 'text-chart-4', label: 'Low Urgency' };
+  }
+}
+
 export function CompetitorPackagingTable({ analyses }: CompetitorPackagingTableProps) {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
@@ -106,15 +150,17 @@ export function CompetitorPackagingTable({ analyses }: CompetitorPackagingTableP
         <TableHeader>
           <TableRow className="bg-muted/30 hover:bg-muted/30">
             <TableHead className="w-[80px]">Image</TableHead>
-            <TableHead className="min-w-[200px]">Label Content</TableHead>
-            <TableHead className="w-[150px]">Product Form</TableHead>
-            <TableHead className="w-[150px]">Packaging</TableHead>
+            <TableHead className="min-w-[180px]">Label Content</TableHead>
+            <TableHead className="w-[130px]">Messaging Tone</TableHead>
+            <TableHead className="w-[150px]">Product Contents</TableHead>
+            <TableHead className="w-[130px]">Packaging</TableHead>
             <TableHead className="w-[40px]"></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {analyses.map((item) => {
             const isExpanded = expandedRows.has(item.asin);
+            const urgencyInfo = item.messaging_tone ? getUrgencyIndicator(item.messaging_tone.urgency_level) : null;
             
             return (
               <Collapsible key={item.asin} open={isExpanded} onOpenChange={() => toggleRow(item.asin)} asChild>
@@ -148,15 +194,15 @@ export function CompetitorPackagingTable({ analyses }: CompetitorPackagingTableP
                     <TableCell className="py-3">
                       <div className="space-y-1">
                         <p className="font-medium text-sm text-foreground line-clamp-1">
-                          {item.label_content.main_title || item.brand}
+                          {item.label_content?.main_title || item.brand}
                         </p>
-                        {item.label_content.subtitle && (
+                        {item.label_content?.subtitle && (
                           <p className="text-xs text-muted-foreground line-clamp-1">
                             {item.label_content.subtitle}
                           </p>
                         )}
                         <div className="flex flex-wrap gap-1">
-                          {item.label_content.badges.slice(0, 3).map((badge, idx) => (
+                          {item.label_content?.badges?.slice(0, 2).map((badge, idx) => (
                             <Badge 
                               key={idx} 
                               variant="secondary" 
@@ -165,67 +211,86 @@ export function CompetitorPackagingTable({ analyses }: CompetitorPackagingTableP
                               {badge}
                             </Badge>
                           ))}
-                          {item.label_content.badges.length > 3 && (
+                          {(item.label_content?.badges?.length || 0) > 2 && (
                             <Badge variant="outline" className="text-[9px] py-0 px-1.5">
-                              +{item.label_content.badges.length - 3}
+                              +{item.label_content.badges.length - 2}
                             </Badge>
                           )}
                         </div>
                       </div>
                     </TableCell>
 
-                    {/* Product Form */}
+                    {/* Messaging Tone */}
                     <TableCell className="py-3">
-                      <div className="space-y-1.5">
-                        <div className="flex items-center gap-1.5">
-                          <Badge variant="outline" className="text-xs capitalize">
-                            {item.product_form.type}
+                      {item.messaging_tone ? (
+                        <div className="space-y-1.5">
+                          <Badge 
+                            variant="outline" 
+                            className={cn("text-xs capitalize", getToneBadgeStyle(item.messaging_tone.primary_tone))}
+                          >
+                            {item.messaging_tone.primary_tone}
                           </Badge>
+                          {urgencyInfo && (
+                            <p className={cn("text-[10px]", urgencyInfo.color)}>
+                              {urgencyInfo.label}
+                            </p>
+                          )}
                         </div>
-                        {item.product_form.shape && (
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                            {getShapeIcon(item.product_form.shape)}
-                            <span className="capitalize">{item.product_form.shape}</span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">N/A</span>
+                      )}
+                    </TableCell>
+
+                    {/* Product Contents */}
+                    <TableCell className="py-3">
+                      {item.product_contents ? (
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-1.5">
+                            <Badge variant="outline" className="text-xs capitalize">
+                              {item.product_contents.type}
+                            </Badge>
                           </div>
-                        )}
-                        {item.product_form.colors.length > 0 && (
-                          <div className="flex items-center gap-1">
-                            {item.product_form.colors.slice(0, 4).map((color, idx) => (
-                              <div 
-                                key={idx}
-                                className={cn(
-                                  "w-3 h-3 rounded-full",
-                                  getColorStyle(color)
-                                )}
-                                title={color}
-                              />
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                          {item.product_contents.shape && (
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                              {getShapeIcon(item.product_contents.shape)}
+                              <span className="capitalize">{item.product_contents.shape}</span>
+                            </div>
+                          )}
+                          {item.product_contents.colors && item.product_contents.colors.length > 0 && (
+                            <div className="flex items-center gap-1">
+                              {item.product_contents.colors.slice(0, 4).map((color, idx) => (
+                                <div 
+                                  key={idx}
+                                  className={cn(
+                                    "w-3 h-3 rounded-full",
+                                    getColorStyle(color)
+                                  )}
+                                  title={color}
+                                />
+                              ))}
+                              {item.product_contents.colors.length > 4 && (
+                                <span className="text-[10px] text-muted-foreground">
+                                  +{item.product_contents.colors.length - 4}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">N/A</span>
+                      )}
                     </TableCell>
 
                     {/* Packaging */}
                     <TableCell className="py-3">
                       <div className="space-y-1">
                         <p className="text-sm font-medium text-foreground capitalize">
-                          {item.packaging.type}
+                          {item.packaging?.type || 'N/A'}
                         </p>
-                        <p className="text-xs text-muted-foreground capitalize">
-                          {item.packaging.material} • {item.packaging.color}
-                        </p>
-                        {item.packaging.features.length > 0 && (
-                          <div className="flex flex-wrap gap-1">
-                            {item.packaging.features.slice(0, 2).map((feature, idx) => (
-                              <Badge 
-                                key={idx} 
-                                variant="secondary" 
-                                className="text-[9px] py-0 px-1.5"
-                              >
-                                {feature}
-                              </Badge>
-                            ))}
-                          </div>
+                        {item.packaging && (
+                          <p className="text-xs text-muted-foreground capitalize">
+                            {item.packaging.material} • {item.packaging.color}
+                          </p>
                         )}
                       </div>
                     </TableCell>
@@ -246,15 +311,15 @@ export function CompetitorPackagingTable({ analyses }: CompetitorPackagingTableP
                   {/* Expanded Content */}
                   <CollapsibleContent asChild>
                     <TableRow className="bg-muted/10 hover:bg-muted/10">
-                      <TableCell colSpan={5} className="p-4">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <TableCell colSpan={6} className="p-4">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                           {/* Full Label Content */}
                           <div>
                             <h4 className="text-xs font-semibold text-foreground mb-2 flex items-center gap-1.5">
                               <Tag className="w-3.5 h-3.5 text-chart-1" />
                               Label Details
                             </h4>
-                            {item.label_content.elements.length > 0 && (
+                            {item.label_content?.elements && item.label_content.elements.length > 0 && (
                               <div className="mb-2">
                                 <p className="text-[10px] uppercase text-muted-foreground mb-1">Elements</p>
                                 <ul className="text-xs space-y-0.5">
@@ -264,7 +329,7 @@ export function CompetitorPackagingTable({ analyses }: CompetitorPackagingTableP
                                 </ul>
                               </div>
                             )}
-                            {item.label_content.claims.length > 0 && (
+                            {item.label_content?.claims && item.label_content.claims.length > 0 && (
                               <div>
                                 <p className="text-[10px] uppercase text-muted-foreground mb-1">Claims</p>
                                 <div className="flex flex-wrap gap-1">
@@ -282,70 +347,148 @@ export function CompetitorPackagingTable({ analyses }: CompetitorPackagingTableP
                             )}
                           </div>
 
-                          {/* Full Badges */}
+                          {/* Full Messaging Tone */}
                           <div>
                             <h4 className="text-xs font-semibold text-foreground mb-2 flex items-center gap-1.5">
-                              <Award className="w-3.5 h-3.5 text-chart-4" />
-                              All Badges & Certifications
+                              <MessageSquare className="w-3.5 h-3.5 text-chart-3" />
+                              Messaging Tone
                             </h4>
-                            {item.label_content.badges.length > 0 ? (
-                              <div className="flex flex-wrap gap-1.5">
-                                {item.label_content.badges.map((badge, idx) => (
+                            {item.messaging_tone ? (
+                              <div className="space-y-2 text-xs">
+                                <div>
+                                  <span className="text-muted-foreground">Primary Tone: </span>
                                   <Badge 
-                                    key={idx} 
-                                    className="text-xs bg-chart-4/10 text-chart-4 border-chart-4/20"
+                                    variant="outline" 
+                                    className={cn("capitalize ml-1", getToneBadgeStyle(item.messaging_tone.primary_tone))}
                                   >
-                                    {badge}
+                                    {item.messaging_tone.primary_tone}
                                   </Badge>
-                                ))}
+                                </div>
+                                {item.messaging_tone.tone_descriptors && item.messaging_tone.tone_descriptors.length > 0 && (
+                                  <div>
+                                    <p className="text-muted-foreground mb-1">Descriptors:</p>
+                                    <div className="flex flex-wrap gap-1">
+                                      {item.messaging_tone.tone_descriptors.map((desc, idx) => (
+                                        <Badge key={idx} variant="secondary" className="text-[10px] capitalize">
+                                          {desc}
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                                <div>
+                                  <span className="text-muted-foreground">Urgency: </span>
+                                  <span className={cn("capitalize", urgencyInfo?.color)}>
+                                    {item.messaging_tone.urgency_level}
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground">Emotional Appeal: </span>
+                                  <span className="text-foreground capitalize">{item.messaging_tone.emotional_appeal}</span>
+                                </div>
                               </div>
                             ) : (
-                              <p className="text-xs text-muted-foreground">No badges detected</p>
+                              <p className="text-xs text-muted-foreground">No tone analysis available</p>
                             )}
                           </div>
 
-                          {/* Full Product Form */}
+                          {/* Full Product Contents */}
                           <div>
                             <h4 className="text-xs font-semibold text-foreground mb-2 flex items-center gap-1.5">
-                              <Palette className="w-3.5 h-3.5 text-chart-2" />
-                              Product Appearance
+                              <Sparkles className="w-3.5 h-3.5 text-chart-2" />
+                              Product Contents
                             </h4>
-                            <div className="space-y-2 text-xs">
-                              <div>
-                                <span className="text-muted-foreground">Type: </span>
-                                <span className="text-foreground capitalize">{item.product_form.type}</span>
-                              </div>
-                              {item.product_form.shape && (
+                            {item.product_contents ? (
+                              <div className="space-y-2 text-xs">
                                 <div>
-                                  <span className="text-muted-foreground">Shape: </span>
-                                  <span className="text-foreground capitalize">{item.product_form.shape}</span>
+                                  <span className="text-muted-foreground">Type: </span>
+                                  <span className="text-foreground capitalize">{item.product_contents.type}</span>
                                 </div>
-                              )}
-                              {item.product_form.colors.length > 0 && (
-                                <div className="flex items-center gap-2">
-                                  <span className="text-muted-foreground">Colors: </span>
-                                  <div className="flex items-center gap-1.5">
-                                    {item.product_form.colors.map((color, idx) => (
-                                      <div key={idx} className="flex items-center gap-1">
-                                        <div 
-                                          className={cn(
-                                            "w-3 h-3 rounded-full",
-                                            getColorStyle(color)
-                                          )}
-                                        />
-                                        <span className="text-foreground capitalize">{color}</span>
-                                      </div>
-                                    ))}
+                                {item.product_contents.shape && (
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-muted-foreground">Shape: </span>
+                                    {getShapeIcon(item.product_contents.shape)}
+                                    <span className="text-foreground capitalize">{item.product_contents.shape}</span>
                                   </div>
+                                )}
+                                {item.product_contents.colors && item.product_contents.colors.length > 0 && (
+                                  <div>
+                                    <span className="text-muted-foreground">Colors: </span>
+                                    <div className="flex items-center gap-1.5 mt-1">
+                                      {item.product_contents.colors.map((color, idx) => (
+                                        <div key={idx} className="flex items-center gap-1">
+                                          <div 
+                                            className={cn(
+                                              "w-3 h-3 rounded-full",
+                                              getColorStyle(color)
+                                            )}
+                                          />
+                                          <span className="text-foreground capitalize">{color}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                                {item.product_contents.color_pattern && (
+                                  <div>
+                                    <span className="text-muted-foreground">Pattern: </span>
+                                    <span className="text-foreground capitalize">{item.product_contents.color_pattern}</span>
+                                  </div>
+                                )}
+                                {item.product_contents.texture_appearance && (
+                                  <div>
+                                    <span className="text-muted-foreground">Texture: </span>
+                                    <span className="text-foreground capitalize">{item.product_contents.texture_appearance}</span>
+                                  </div>
+                                )}
+                                {item.product_contents.size_estimate && (
+                                  <div>
+                                    <span className="text-muted-foreground">Size: </span>
+                                    <span className="text-foreground capitalize">{item.product_contents.size_estimate}</span>
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <p className="text-xs text-muted-foreground">No content analysis available</p>
+                            )}
+                          </div>
+
+                          {/* Full Badges & Packaging */}
+                          <div>
+                            <h4 className="text-xs font-semibold text-foreground mb-2 flex items-center gap-1.5">
+                              <Award className="w-3.5 h-3.5 text-chart-4" />
+                              Badges & Packaging
+                            </h4>
+                            {item.label_content?.badges && item.label_content.badges.length > 0 ? (
+                              <div className="mb-3">
+                                <p className="text-[10px] uppercase text-muted-foreground mb-1">Certifications</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {item.label_content.badges.map((badge, idx) => (
+                                    <Badge 
+                                      key={idx} 
+                                      className="text-xs bg-chart-4/10 text-chart-4 border-chart-4/20"
+                                    >
+                                      {badge}
+                                    </Badge>
+                                  ))}
                                 </div>
-                              )}
-                              {item.product_form.texture_notes && (
-                                <div>
-                                  <span className="text-muted-foreground">Texture: </span>
-                                  <span className="text-foreground">{item.product_form.texture_notes}</span>
+                              </div>
+                            ) : (
+                              <p className="text-xs text-muted-foreground mb-3">No badges detected</p>
+                            )}
+                            
+                            {item.packaging && item.packaging.features && item.packaging.features.length > 0 && (
+                              <div>
+                                <p className="text-[10px] uppercase text-muted-foreground mb-1">Packaging Features</p>
+                                <div className="flex flex-wrap gap-1">
+                                  {item.packaging.features.map((feature, idx) => (
+                                    <Badge key={idx} variant="secondary" className="text-[10px]">
+                                      {feature}
+                                    </Badge>
+                                  ))}
                                 </div>
-                              )}
-                            </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </TableCell>

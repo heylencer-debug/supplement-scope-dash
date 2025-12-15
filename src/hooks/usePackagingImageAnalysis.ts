@@ -2,6 +2,22 @@ import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
+export interface MessagingTone {
+  primary_tone: string;
+  tone_descriptors: string[];
+  urgency_level: "low" | "medium" | "high";
+  emotional_appeal: string;
+}
+
+export interface ProductContents {
+  type: string;
+  shape: string | null;
+  colors: string[];
+  color_pattern: string | null;
+  texture_appearance: string | null;
+  size_estimate: string | null;
+}
+
 export interface CompetitorPackagingAnalysis {
   brand: string;
   title: string;
@@ -14,12 +30,8 @@ export interface CompetitorPackagingAnalysis {
     badges: string[];
     claims: string[];
   };
-  product_form: {
-    type: string;
-    shape: string | null;
-    colors: string[];
-    texture_notes: string | null;
-  };
+  messaging_tone: MessagingTone;
+  product_contents: ProductContents;
   packaging: {
     type: string;
     material: string;

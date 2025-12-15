@@ -700,6 +700,7 @@ export type Database = {
           ocr_confidence: string | null
           ocr_extracted: boolean | null
           other_ingredients: string | null
+          packaging_image_analysis: Json | null
           packaging_type: string | null
           parent_asin: string | null
           ppc_bid_estimate: number | null
@@ -798,6 +799,7 @@ export type Database = {
           ocr_confidence?: string | null
           ocr_extracted?: boolean | null
           other_ingredients?: string | null
+          packaging_image_analysis?: Json | null
           packaging_type?: string | null
           parent_asin?: string | null
           ppc_bid_estimate?: number | null
@@ -896,6 +898,7 @@ export type Database = {
           ocr_confidence?: string | null
           ocr_extracted?: boolean | null
           other_ingredients?: string | null
+          packaging_image_analysis?: Json | null
           packaging_type?: string | null
           parent_asin?: string | null
           ppc_bid_estimate?: number | null

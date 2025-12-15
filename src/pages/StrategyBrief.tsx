@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { FileText, Download, Copy, Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { useCategoryContext } from "@/contexts/CategoryContext";
 import { useCategoryByName } from "@/hooks/useCategoryByName";
 import { DocumentContainer } from "@/components/document/DocumentContainer";
 import { useToast } from "@/hooks/use-toast";
+import html2pdf from "html2pdf.js";
 
 interface FormulaBriefContent {
   formula_brief_content?: string;
@@ -18,6 +19,8 @@ export default function StrategyBrief() {
   const urlCategoryName = rawUrlCategoryName ? rawUrlCategoryName.replace(/^=+/, "").trim() : null;
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+  const documentRef = useRef<HTMLDivElement>(null);
   
   const { currentCategoryId, categoryName: contextCategoryName, setCategoryContext } = useCategoryContext();
   const categoryName = urlCategoryName || contextCategoryName;
@@ -46,9 +49,6 @@ export default function StrategyBrief() {
     return analysis3?.formula_brief_content || null;
   }, [analysis]);
 
-  // Get PDF URL if available
-  const pdfUrl = analysis?.formula_brief_pdf_url;
-
   const handleCopyToClipboard = async () => {
     if (!formulaBriefContent) return;
     
@@ -69,15 +69,42 @@ export default function StrategyBrief() {
     }
   };
 
-  const handleDownloadPDF = () => {
-    if (pdfUrl) {
-      window.open(pdfUrl, '_blank');
-    } else {
+  const handleDownloadPDF = async () => {
+    if (!documentRef.current || !formulaBriefContent) {
       toast({
         title: "PDF not available",
-        description: "The PDF version is still being generated. Please try again later.",
+        description: "No document content to export.",
         variant: "destructive",
       });
+      return;
+    }
+
+    setGeneratingPdf(true);
+    try {
+      const element = documentRef.current;
+      const opt = {
+        margin: [10, 10, 10, 10],
+        filename: `Formula-Strategy-Brief-${categoryName || 'Document'}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+      
+      await html2pdf().set(opt).from(element).save();
+      
+      toast({
+        title: "PDF downloaded",
+        description: "Your strategy brief has been saved as PDF.",
+      });
+    } catch (err) {
+      console.error('PDF generation error:', err);
+      toast({
+        title: "PDF generation failed",
+        description: "Unable to generate PDF. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setGeneratingPdf(false);
     }
   };
 
@@ -139,10 +166,19 @@ export default function StrategyBrief() {
               size="sm" 
               className="gap-2"
               onClick={handleDownloadPDF}
-              disabled={isLoading}
+              disabled={isLoading || generatingPdf || !formulaBriefContent}
             >
-              <Download className="w-4 h-4" />
-              Download PDF
+              {generatingPdf ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4" />
+                  Download PDF
+                </>
+              )}
             </Button>
           </div>
         </div>
@@ -150,11 +186,13 @@ export default function StrategyBrief() {
 
       {/* Document Content */}
       <div className="py-8 px-4">
-        <DocumentContainer 
-          content={formulaBriefContent} 
-          isLoading={isLoading}
-          title={`Formula Strategy Brief - ${categoryName}`}
-        />
+        <div ref={documentRef}>
+          <DocumentContainer 
+            content={formulaBriefContent} 
+            isLoading={isLoading}
+            title={`Formula Strategy Brief - ${categoryName}`}
+          />
+        </div>
       </div>
 
       {/* Footer info */}

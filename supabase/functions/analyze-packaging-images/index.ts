@@ -269,12 +269,19 @@ Respond with your analysis using the extract_packaging_analysis tool.`;
 
     console.log(`[analyze-packaging-images] Processed ${enrichedAnalyses.length} competitor analyses`);
 
-    // Save to database
+    // Save to database - first check if record exists
+    const { data: existingRecord } = await supabase
+      .from('packaging_analyses')
+      .select('id, analysis')
+      .eq('category_id', categoryId)
+      .maybeSingle();
+
     const { error: upsertError } = await supabase
       .from('packaging_analyses')
       .upsert(
         {
           category_id: categoryId,
+          analysis: existingRecord?.analysis || {}, // Preserve existing or use empty object for NOT NULL constraint
           image_analysis: { competitor_analyses: enrichedAnalyses },
           updated_at: new Date().toISOString()
         },

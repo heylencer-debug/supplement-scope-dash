@@ -520,17 +520,26 @@ ${newWinnerSummary}
             benefitClaims: labelContent.benefit_claims || []
           });
           
+          // Get COMPLETE visible text from competitor label - no truncation
+          const allVisibleText = (labelContent.all_visible_text as string[]) || [];
+          const completeVisibleText = allVisibleText.join('\n   ');
+          
           return `
 PRODUCT ${idx + 1}: ${analysis.brand || 'Unknown'} - ${analysis.title || 'N/A'}
-───────────────────────────────────────
-📝 LABEL CONTENT (COPY THIS STYLE):
+═══════════════════════════════════════════════════════════════════════════════
+
+📋 COMPLETE FRONT LABEL TEXT (REPLICATE THIS EXACT COPY STYLE):
+────────────────────────────────────────────────────────────────
+${completeVisibleText || 'No text extracted'}
+────────────────────────────────────────────────────────────────
+
+📝 LABEL CONTENT BREAKDOWN:
    • Main Title: ${labelContent.main_title || 'N/A'}
    • Subtitle: ${labelContent.subtitle || 'N/A'}
    • ⭐ X-in-1 CLAIM: ${xIn1Claim || 'None detected'}
    • Benefit Claims: ${(labelContent.benefit_claims as string[])?.join(', ') || 'N/A'}
    • Serving Info: ${labelContent.serving_info || 'N/A'}
    • Flavor: ${labelContent.flavor_text || 'N/A'}
-   • ALL Visible Text: ${(labelContent.all_visible_text as string[])?.slice(0, 10).join(' | ') || 'N/A'}
    • Badges/Certifications: ${(labelContent.badges as string[])?.join(', ') || (labelContent.certifications as string[])?.join(', ') || 'N/A'}
    • Claims: ${(labelContent.claims as string[])?.join(', ') || 'N/A'}
    • Supporting Claims: ${(labelContent.supporting_claims as string[])?.join(', ') || 'N/A'}

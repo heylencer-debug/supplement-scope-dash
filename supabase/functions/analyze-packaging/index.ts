@@ -68,6 +68,9 @@ serve(async (req) => {
     const categoryName = analysisData?.category_name || 'Unknown Category';
     const recommendedPackaging = categoryScores?.product_development?.packaging || {};
     
+    console.log(`Formula brief content length: ${formulaBriefContent.length} characters`);
+    console.log(`Formula brief preview: ${formulaBriefContent.substring(0, 200)}...`);
+    
     // ============ FORMULATION-BASED COMPETITIVE ANALYSIS ============
     
     // ============ PARSE COMPLETE FORMULA BRIEF FOR ALL INGREDIENTS ============
@@ -887,6 +890,17 @@ ${ourKeyFeatures.length > 0 ? ourKeyFeatures.map(f => `• ${f}`).join('\n') : '
 ## THINGS TO AVOID → POSITIVE CLAIMS:
 ${ourThingsToAvoid.length > 0 ? ourThingsToAvoid.slice(0, 4).map(a => `• No ${a} → "Free from ${a}"`).join('\n') : 'N/A'}
 
+## 📄 COMPLETE FORMULA BRIEF DOCUMENT (RAW):
+════════════════════════════════════════════════════════════════════════════════
+${formulaBriefContent || 'No formula brief content available'}
+════════════════════════════════════════════════════════════════════════════════
+
+**USE THE ABOVE DOCUMENT** to extract:
+- ALL ingredient tables (Primary Active, Secondary Active, Tertiary Active, Functional)
+- Exact dosages and forms for each ingredient
+- Key differentiators and positioning statements
+- Target market and competitive strategy
+
 ## COMPETITOR INTELLIGENCE:
 ${competitorPackagingSummary}
 
@@ -896,18 +910,19 @@ ${perProductImageAnalysisSummary}
 ## ⚠️ CRITICAL RULES:
 1. **Match Leaders**: ${vsLeadersPosition === 'BELOW' ? `DO NOT use "${ourIngredientCount}-in-1" - it's WEAKER! Use quality positioning instead.` : `Use "${ourIngredientCount}-in-1" confidently.`}
 2. **Match Disruptors**: ${vsDisruptorsPosition === 'SIGNIFICANTLY_BELOW' ? `DO NOT compete on count! Attack their "dust dosing" weakness with quality claims.` : `Use bold "${ourIngredientCount}-in-1" claim.`}
-3. Every claim MUST be verifiable from our formulation
+3. Every claim MUST be verifiable from our formulation document above
 4. Match competitor visual styles (colors, fonts, layout) while being STRATEGICALLY different on claims
+5. Count ALL active ingredients from the formula brief tables (Primary + Secondary + Tertiary) for accurate X-in-1 claims
 
 ## YOUR DELIVERABLES (FOR EACH STRATEGY):
 
-**1. DESIGN BRIEF**: Color palette, typography, PRIMARY CLAIM (strategic, not generic X-in-1 if we're weaker), differentiators, certifications
+**1. DESIGN BRIEF**: Color palette, typography, PRIMARY CLAIM (based on ACTUAL ingredient count from formula brief), differentiators, certifications
 
 **2. ELEMENTS CHECKLIST**: Front panel hierarchy, 5 bullet points matching competitor style, CTA, trust signals
 
 **3. MOCK CONTENT**: Complete front panel text, back panel text, side panel suggestions
 
-**4. REASONING**: Why this strategy is COMPETITIVE despite our ingredient count
+**4. REASONING**: Why this strategy is COMPETITIVE based on our complete formulation
 
 **5. RECOMMENDATION**: Which strategy you recommend based on market reality`
                   }

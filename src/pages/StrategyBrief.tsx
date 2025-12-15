@@ -7,8 +7,6 @@ import { useCategoryContext } from "@/contexts/CategoryContext";
 import { useCategoryByName } from "@/hooks/useCategoryByName";
 import { DocumentContainer } from "@/components/document/DocumentContainer";
 import { useToast } from "@/hooks/use-toast";
-import { pdf } from "@react-pdf/renderer";
-import { StrategyBriefPDF } from "@/components/document/StrategyBriefPDF";
 
 interface FormulaBriefContent {
   formula_brief_content?: string;
@@ -67,12 +65,18 @@ export default function StrategyBrief() {
 
     setGeneratingPdf(true);
     try {
+      // Dynamic import to avoid React bundling conflicts
+      const [{ pdf }, { StrategyBriefPDF }] = await Promise.all([
+        import("@react-pdf/renderer"),
+        import("@/components/document/StrategyBriefPDF")
+      ]);
+      
       const blob = await pdf(
-        <StrategyBriefPDF 
-          content={formulaBriefContent} 
-          categoryName={categoryName || 'Document'} 
-          createdAt={analysis?.created_at || undefined}
-        />
+        StrategyBriefPDF({ 
+          content: formulaBriefContent, 
+          categoryName: categoryName || 'Document', 
+          createdAt: analysis?.created_at || undefined
+        })
       ).toBlob();
       
       const url = URL.createObjectURL(blob);

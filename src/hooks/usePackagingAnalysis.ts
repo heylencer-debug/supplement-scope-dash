@@ -228,14 +228,15 @@ export function usePackagingAnalysis(categoryId?: string) {
     setError(null);
 
     try {
-      // First, delete any existing stale analysis to force a fresh one
-      console.log('Clearing existing packaging analysis before refresh...');
+      // Clear only the analysis column, preserve image_analysis from Step 1
+      console.log('Clearing Step 2 analysis before regeneration (preserving Step 1 image_analysis)...');
       await supabase
         .from('packaging_analyses')
-        .delete()
+        .update({ analysis: null, mockup_image_url: null })
         .eq('category_id', categoryId);
       
       setAnalysis(null);
+      setMockupImages({ match_leaders: null, match_disruptors: null });
 
       console.log('Calling analyze-packaging edge function with style:', copyStyle);
       const { data, error: fnError } = await supabase.functions.invoke('analyze-packaging', {

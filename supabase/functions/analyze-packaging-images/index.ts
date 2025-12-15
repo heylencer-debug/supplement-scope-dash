@@ -261,23 +261,55 @@ Use the extract_packaging_analysis tool.`;
       }
     }
 
-    // Save category-level results
-    const { data: existingRecord } = await supabase
+    // Save category-level results using upsert with explicit image_analysis preservation
+    const imageAnalysisData = { competitor_analyses: enrichedAnalyses };
+    
+    console.log(`[analyze-packaging-images] Saving ${enrichedAnalyses.length} analyses to packaging_analyses table`);
+    
+    // First check if record exists
+    const { data: existingRecord, error: fetchError } = await supabase
       .from("packaging_analyses")
       .select("id, analysis")
       .eq("category_id", categoryId)
       .maybeSingle();
-
-    if (existingRecord) {
-      await supabase.from("packaging_analyses")
-        .update({ image_analysis: { competitor_analyses: enrichedAnalyses }, updated_at: new Date().toISOString() })
-        .eq("category_id", categoryId);
-    } else {
-      await supabase.from("packaging_analyses")
-        .insert({ category_id: categoryId, analysis: {}, image_analysis: { competitor_analyses: enrichedAnalyses } });
+    
+    if (fetchError) {
+      console.error(`[analyze-packaging-images] Error fetching existing record:`, fetchError);
     }
 
-    console.log(`[analyze-packaging-images] Saved ${enrichedAnalyses.length} analyses`);
+    if (existingRecord) {
+      console.log(`[analyze-packaging-images] Updating existing record for category ${categoryId}`);
+      const { error: updateError } = await supabase
+        .from("packaging_analyses")
+        .update({ 
+          image_analysis: imageAnalysisData, 
+          updated_at: new Date().toISOString() 
+        })
+        .eq("category_id", categoryId);
+      
+      if (updateError) {
+        console.error(`[analyze-packaging-images] Error updating record:`, updateError);
+      } else {
+        console.log(`[analyze-packaging-images] Successfully updated image_analysis for category ${categoryId}`);
+      }
+    } else {
+      console.log(`[analyze-packaging-images] Inserting new record for category ${categoryId}`);
+      const { error: insertError } = await supabase
+        .from("packaging_analyses")
+        .insert({ 
+          category_id: categoryId, 
+          analysis: {}, 
+          image_analysis: imageAnalysisData 
+        });
+      
+      if (insertError) {
+        console.error(`[analyze-packaging-images] Error inserting record:`, insertError);
+      } else {
+        console.log(`[analyze-packaging-images] Successfully inserted new record for category ${categoryId}`);
+      }
+    }
+
+    console.log(`[analyze-packaging-images] Completed saving ${enrichedAnalyses.length} analyses`);
   } catch (error) {
     console.error("[analyze-packaging-images] Error:", error);
   }

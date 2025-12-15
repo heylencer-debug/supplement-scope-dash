@@ -432,63 +432,95 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
         <div className="flex items-center justify-center gap-2 p-4 bg-muted/30 rounded-xl border border-border/50">
           {/* Step 1 */}
           <div className={cn(
-            "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-colors",
+            "flex flex-col items-center gap-1 px-4 py-2 rounded-lg text-xs font-medium transition-colors min-w-[120px]",
             hasImageAnalysis 
               ? "bg-chart-4/10 text-chart-4 border border-chart-4/30" 
               : isAnalyzingImages 
                 ? "bg-primary/10 text-primary border border-primary/30" 
                 : "bg-muted text-muted-foreground border border-border"
           )}>
-            {hasImageAnalysis ? (
-              <CheckCircle2 className="w-3.5 h-3.5" />
-            ) : isAnalyzingImages ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <span className="w-4 h-4 rounded-full bg-muted-foreground/30 flex items-center justify-center text-[10px]">1</span>
-            )}
-            <span>Competitor Analysis</span>
+            <div className="flex items-center gap-1.5">
+              {hasImageAnalysis ? (
+                <CheckCircle2 className="w-4 h-4" />
+              ) : isAnalyzingImages ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <span className="w-5 h-5 rounded-full bg-muted-foreground/30 flex items-center justify-center text-[11px] font-bold">1</span>
+              )}
+              <span className="font-semibold">Competitor Analysis</span>
+            </div>
+            <span className={cn(
+              "text-[10px]",
+              hasImageAnalysis ? "text-chart-4/80" : isAnalyzingImages ? "text-primary/80" : "text-muted-foreground/60"
+            )}>
+              {hasImageAnalysis ? "✓ Saved" : isAnalyzingImages ? "Analyzing..." : "Not started"}
+            </span>
           </div>
           
-          <div className="w-8 h-px bg-border" />
+          <div className="w-6 h-px bg-border" />
           
           {/* Step 2 */}
           <div className={cn(
-            "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-colors",
+            "flex flex-col items-center gap-1 px-4 py-2 rounded-lg text-xs font-medium transition-colors min-w-[120px]",
             hasAnalysis 
               ? "bg-chart-4/10 text-chart-4 border border-chart-4/30" 
               : isAnalyzing 
                 ? "bg-primary/10 text-primary border border-primary/30" 
                 : "bg-muted text-muted-foreground border border-border"
           )}>
-            {hasAnalysis ? (
-              <CheckCircle2 className="w-3.5 h-3.5" />
-            ) : isAnalyzing ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <span className="w-4 h-4 rounded-full bg-muted-foreground/30 flex items-center justify-center text-[10px]">2</span>
-            )}
-            <span>Our Strategy</span>
+            <div className="flex items-center gap-1.5">
+              {hasAnalysis ? (
+                <CheckCircle2 className="w-4 h-4" />
+              ) : isAnalyzing ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <span className="w-5 h-5 rounded-full bg-muted-foreground/30 flex items-center justify-center text-[11px] font-bold">2</span>
+              )}
+              <span className="font-semibold">Our Strategy</span>
+            </div>
+            <span className={cn(
+              "text-[10px]",
+              hasAnalysis ? "text-chart-4/80" : isAnalyzing ? "text-primary/80" : "text-muted-foreground/60"
+            )}>
+              {hasAnalysis ? "✓ Saved" : isAnalyzing ? "Generating..." : "Not started"}
+            </span>
           </div>
           
-          <div className="w-8 h-px bg-border" />
+          <div className="w-6 h-px bg-border" />
           
           {/* Step 3 */}
           <div className={cn(
-            "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-colors",
+            "flex flex-col items-center gap-1 px-4 py-2 rounded-lg text-xs font-medium transition-colors min-w-[120px]",
             (mockupImages.match_leaders && mockupImages.match_disruptors)
               ? "bg-chart-4/10 text-chart-4 border border-chart-4/30" 
               : (mockupImages.match_leaders || mockupImages.match_disruptors)
                 ? "bg-chart-2/10 text-chart-2 border border-chart-2/30"
                 : "bg-muted text-muted-foreground border border-border"
           )}>
-            {(mockupImages.match_leaders && mockupImages.match_disruptors) ? (
-              <CheckCircle2 className="w-3.5 h-3.5" />
-            ) : (mockupImages.match_leaders || mockupImages.match_disruptors) ? (
-              <span className="text-[10px] font-bold">½</span>
-            ) : (
-              <span className="w-4 h-4 rounded-full bg-muted-foreground/30 flex items-center justify-center text-[10px]">3</span>
-            )}
-            <span>Mockups</span>
+            <div className="flex items-center gap-1.5">
+              {(mockupImages.match_leaders && mockupImages.match_disruptors) ? (
+                <CheckCircle2 className="w-4 h-4" />
+              ) : (mockupImages.match_leaders || mockupImages.match_disruptors) ? (
+                <span className="text-[11px] font-bold">½</span>
+              ) : (
+                <span className="w-5 h-5 rounded-full bg-muted-foreground/30 flex items-center justify-center text-[11px] font-bold">3</span>
+              )}
+              <span className="font-semibold">Mockups</span>
+            </div>
+            <span className={cn(
+              "text-[10px]",
+              (mockupImages.match_leaders && mockupImages.match_disruptors) 
+                ? "text-chart-4/80" 
+                : (mockupImages.match_leaders || mockupImages.match_disruptors)
+                  ? "text-chart-2/80"
+                  : "text-muted-foreground/60"
+            )}>
+              {(mockupImages.match_leaders && mockupImages.match_disruptors) 
+                ? "✓ Both Saved" 
+                : (mockupImages.match_leaders || mockupImages.match_disruptors)
+                  ? "½ Saved"
+                  : "Not started"}
+            </span>
           </div>
         </div>
 

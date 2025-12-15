@@ -14,7 +14,8 @@ interface FormulaBriefContent {
 
 export default function StrategyBrief() {
   const [searchParams] = useSearchParams();
-  const urlCategoryName = searchParams.get("category");
+  const rawUrlCategoryName = searchParams.get("category");
+  const urlCategoryName = rawUrlCategoryName ? rawUrlCategoryName.replace(/^=+/, "").trim() : null;
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
   

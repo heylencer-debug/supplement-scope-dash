@@ -10,10 +10,14 @@ export function useCategoryByName(searchTerm?: string) {
     queryFn: async () => {
       if (!searchTerm) return null;
 
+      // Be tolerant of bad inputs and historic data where category names were saved with a leading '='
+      const cleaned = searchTerm.replace(/^=+/, "").trim();
+      const escaped = cleaned.replace(/,/g, "\\,"); // supabase .or() uses comma separators
+
       const { data, error } = await supabase
         .from("categories")
         .select("*")
-        .ilike("name", `%${searchTerm}%`)
+        .or(`name.ilike.%${escaped}%,name.ilike.%=${escaped}%`)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();

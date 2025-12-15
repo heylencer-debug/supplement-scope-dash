@@ -22,7 +22,8 @@ export function Layout({ children }: LayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const currentCategory = searchParams.get("category");
+  const rawCurrentCategory = searchParams.get("category");
+  const currentCategory = rawCurrentCategory ? rawCurrentCategory.replace(/^=+/, "").trim() : null;
   const isNewAnalysisActive = location.pathname === "/" && !currentCategory;
 
   const [dismissedTabs, setDismissedTabs] = useState<string[]>([]);

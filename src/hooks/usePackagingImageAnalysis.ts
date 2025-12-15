@@ -1,0 +1,213 @@
+import { useState, useCallback, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+
+export interface CompetitorPackagingAnalysis {
+  brand: string;
+  title: string;
+  asin: string;
+  image_url: string;
+  label_content: {
+    main_title: string;
+    subtitle: string | null;
+    elements: string[];
+    badges: string[];
+    claims: string[];
+  };
+  product_form: {
+    type: string;
+    shape: string | null;
+    colors: string[];
+    texture_notes: string | null;
+  };
+  packaging: {
+    type: string;
+    material: string;
+    color: string;
+    features: string[];
+  };
+}
+
+export interface PackagingImageAnalysis {
+  competitor_analyses: CompetitorPackagingAnalysis[];
+}
+
+export function usePackagingImageAnalysis(categoryId?: string) {
+  const [analysis, setAnalysis] = useState<PackagingImageAnalysis | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingFromDb, setIsLoadingFromDb] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [pollingStatus, setPollingStatus] = useState<{
+    isPolling: boolean;
+    attempt: number;
+    maxAttempts: number;
+    startedAt: Date | null;
+  }>({ isPolling: false, attempt: 0, maxAttempts: 30, startedAt: null });
+  const { toast } = useToast();
+
+  // Reset state when categoryId changes
+  useEffect(() => {
+    setAnalysis(null);
+    setIsLoadingFromDb(true);
+    setError(null);
+  }, [categoryId]);
+
+  // Load from database on mount/when categoryId changes
+  useEffect(() => {
+    async function loadFromDb() {
+      if (!categoryId) {
+        setIsLoadingFromDb(false);
+        return;
+      }
+
+      try {
+        const { data, error: dbError } = await supabase
+          .from('packaging_analyses')
+          .select('image_analysis')
+          .eq('category_id', categoryId)
+          .maybeSingle();
+
+        if (dbError) {
+          console.error('Error loading packaging image analysis from DB:', dbError);
+        } else if (data?.image_analysis) {
+          setAnalysis(data.image_analysis as unknown as PackagingImageAnalysis);
+        }
+      } catch (e) {
+        console.error('Error loading packaging image analysis from DB:', e);
+      } finally {
+        setIsLoadingFromDb(false);
+      }
+    }
+
+    loadFromDb();
+  }, [categoryId]);
+
+  const runAnalysis = useCallback(async () => {
+    if (!categoryId) {
+      toast({
+        title: 'Error',
+        description: 'No category selected',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      console.log('Calling analyze-packaging-images edge function');
+      const { data, error: fnError } = await supabase.functions.invoke('analyze-packaging-images', {
+        body: { categoryId }
+      });
+
+      if (fnError) {
+        console.error('Edge function error:', fnError);
+        throw new Error(fnError.message);
+      }
+
+      if (data?.error) {
+        console.error('Analysis error:', data.error);
+        throw new Error(data.error);
+      }
+
+      // Function returns immediately with status: 'processing'
+      if (data?.status === 'processing') {
+        toast({
+          title: 'Image Analysis Started',
+          description: 'AI is analyzing competitor packaging images. This may take 1-2 minutes...',
+        });
+
+        // Poll for results every 10 seconds, up to 5 minutes
+        const maxAttempts = 30;
+        let attempts = 0;
+        
+        setPollingStatus({ isPolling: true, attempt: 0, maxAttempts, startedAt: new Date() });
+        
+        const pollForResults = async (): Promise<PackagingImageAnalysis | null> => {
+          while (attempts < maxAttempts) {
+            attempts++;
+            setPollingStatus(prev => ({ ...prev, attempt: attempts }));
+            console.log(`Polling for image analysis results... attempt ${attempts}/${maxAttempts}`);
+            
+            await new Promise(resolve => setTimeout(resolve, 10000));
+            
+            const { data: dbData, error: dbError } = await supabase
+              .from('packaging_analyses')
+              .select('image_analysis, updated_at')
+              .eq('category_id', categoryId)
+              .maybeSingle();
+
+            if (dbError) {
+              console.error('Error polling for results:', dbError);
+              continue;
+            }
+
+            if (dbData?.image_analysis) {
+              const updatedAt = new Date(dbData.updated_at);
+              const now = new Date();
+              const diffMinutes = (now.getTime() - updatedAt.getTime()) / (1000 * 60);
+              
+              if (diffMinutes < 5) {
+                setPollingStatus(prev => ({ ...prev, isPolling: false }));
+                return dbData.image_analysis as unknown as PackagingImageAnalysis;
+              }
+            }
+          }
+          setPollingStatus(prev => ({ ...prev, isPolling: false }));
+          return null;
+        };
+
+        const result = await pollForResults();
+        
+        if (result) {
+          setAnalysis(result);
+          toast({
+            title: 'Image Analysis Complete',
+            description: `Analyzed packaging for ${result.competitor_analyses?.length || 0} competitor products.`,
+          });
+        } else {
+          throw new Error('Analysis timed out. Please try again.');
+        }
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to analyze packaging images';
+      setError(message);
+      toast({
+        title: 'Analysis Failed',
+        description: message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [categoryId, toast]);
+
+  const clearAnalysis = useCallback(async () => {
+    setAnalysis(null);
+    setError(null);
+    
+    if (categoryId) {
+      try {
+        // Update to null instead of deleting the whole record
+        await supabase
+          .from('packaging_analyses')
+          .update({ image_analysis: null })
+          .eq('category_id', categoryId);
+      } catch (e) {
+        console.error('Error clearing packaging image analysis from DB:', e);
+      }
+    }
+  }, [categoryId]);
+
+  return {
+    analysis,
+    isLoading,
+    isLoadingFromDb,
+    error,
+    pollingStatus,
+    runAnalysis,
+    clearAnalysis,
+    hasAnalysis: !!analysis && (analysis.competitor_analyses?.length || 0) > 0,
+  };
+}

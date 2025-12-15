@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.analyze-competitors]
 verify_jwt = false
+
+[functions.analyze-packaging-images]
+verify_jwt = false

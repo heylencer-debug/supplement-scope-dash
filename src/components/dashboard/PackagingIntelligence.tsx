@@ -5,11 +5,12 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Package, CheckCircle2, Award, Tag, Shield, DollarSign, Hash, Eye, Zap, Sparkles, Loader2, RefreshCw, Trash2, Clock } from "lucide-react";
+import { Package, CheckCircle2, Award, Tag, Shield, DollarSign, Hash, Eye, Zap, Sparkles, Loader2, RefreshCw, Trash2, Clock, Camera } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { usePackagingAnalysis } from "@/hooks/usePackagingAnalysis";
+import { usePackagingImageAnalysis } from "@/hooks/usePackagingImageAnalysis";
 import { AIPackagingResults } from "./AIPackagingResults";
-
+import { CompetitorPackagingTable } from "./CompetitorPackagingTable";
 interface PackagingData {
   type?: string;
   quantity?: string | number;
@@ -123,6 +124,16 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
     clearAnalysis,
     hasAnalysis
   } = usePackagingAnalysis(categoryId);
+
+  const {
+    analysis: imageAnalysis,
+    isLoading: isAnalyzingImages,
+    isLoadingFromDb: isLoadingImagesFromDb,
+    pollingStatus: imagePollingStatus,
+    runAnalysis: runImageAnalysis,
+    clearAnalysis: clearImageAnalysis,
+    hasAnalysis: hasImageAnalysis
+  } = usePackagingImageAnalysis(categoryId);
 
   const CHART_COLORS = [
     "hsl(var(--chart-1))",
@@ -483,6 +494,101 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
             isRegenerating={isAnalyzing}
           />
         )}
+
+        {/* Competitor Packaging Visual Analysis */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-medium text-foreground flex items-center gap-2">
+              <Camera className="w-4 h-4 text-chart-3" />
+              Competitor Packaging Visual Analysis
+              {hasImageAnalysis && (
+                <Badge variant="secondary" className="ml-2 bg-chart-3/10 text-chart-3 border-chart-3/20 text-[10px] font-medium">
+                  <Sparkles className="w-3 h-3 mr-1" />
+                  {imageAnalysis?.competitor_analyses?.length || 0} analyzed
+                </Badge>
+              )}
+            </h4>
+            <div className="flex items-center gap-2">
+              {hasImageAnalysis && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearImageAnalysis}
+                  className="text-xs h-7"
+                >
+                  <Trash2 className="w-3 h-3 mr-1" />
+                  Clear
+                </Button>
+              )}
+              <Button
+                variant={hasImageAnalysis ? "outline" : "secondary"}
+                size="sm"
+                onClick={() => runImageAnalysis()}
+                disabled={isAnalyzingImages || isLoadingImagesFromDb || !categoryId}
+                className={cn(
+                  "text-xs h-7 transition-all duration-300",
+                  !hasImageAnalysis && !isAnalyzingImages && "animate-glow-pulse"
+                )}
+              >
+                {isAnalyzingImages ? (
+                  <>
+                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                    {imagePollingStatus.isPolling 
+                      ? `Analyzing... (${imagePollingStatus.attempt}/${imagePollingStatus.maxAttempts})`
+                      : 'Starting...'}
+                  </>
+                ) : hasImageAnalysis ? (
+                  <>
+                    <RefreshCw className="w-3 h-3 mr-1" />
+                    Refresh
+                  </>
+                ) : (
+                  <>
+                    <Camera className="w-3 h-3 mr-1" />
+                    Analyze Images
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+
+          {/* Image Analysis Progress */}
+          {isAnalyzingImages && imagePollingStatus.isPolling && imagePollingStatus.startedAt && (
+            <AnalysisProgressIndicator 
+              startedAt={imagePollingStatus.startedAt}
+              attempt={imagePollingStatus.attempt}
+              maxAttempts={imagePollingStatus.maxAttempts}
+            />
+          )}
+
+          {/* Loading from DB */}
+          {isLoadingImagesFromDb && (
+            <div className="p-4 bg-muted/30 rounded-lg border border-border/50 animate-pulse">
+              <div className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Loading saved image analysis...</span>
+              </div>
+            </div>
+          )}
+
+          {/* Image Analysis Results Table */}
+          {hasImageAnalysis && imageAnalysis?.competitor_analyses && (
+            <CompetitorPackagingTable analyses={imageAnalysis.competitor_analyses} />
+          )}
+
+          {/* Empty State */}
+          {!hasImageAnalysis && !isAnalyzingImages && !isLoadingImagesFromDb && (
+            <div className="p-6 bg-muted/20 rounded-xl border border-dashed border-border text-center">
+              <Camera className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">
+                Click "Analyze Images" to have AI extract packaging details from competitor product images
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Includes label text, product form & shape, colors, badges, and packaging type
+              </p>
+            </div>
+          )}
+        </div>
 
         {/* Top Row: Format Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

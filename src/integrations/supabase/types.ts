@@ -597,6 +597,7 @@ export type Database = {
           category_id: string
           created_at: string
           id: string
+          image_analysis: Json | null
           mockup_image_url: string | null
           updated_at: string
         }
@@ -605,6 +606,7 @@ export type Database = {
           category_id: string
           created_at?: string
           id?: string
+          image_analysis?: Json | null
           mockup_image_url?: string | null
           updated_at?: string
         }
@@ -613,6 +615,7 @@ export type Database = {
           category_id?: string
           created_at?: string
           id?: string
+          image_analysis?: Json | null
           mockup_image_url?: string | null
           updated_at?: string
         }

@@ -67,11 +67,59 @@ serve(async (req) => {
     const categoryScores = analysisData?.analysis_1_category_scores || {};
     const categoryName = analysisData?.category_name || 'Unknown Category';
     const recommendedPackaging = categoryScores?.product_development?.packaging || {};
+    
+    // ============ FORMULATION-BASED COMPETITIVE ANALYSIS ============
+    
+    // Extract our formulation data
+    const ourFormulation = categoryScores?.product_development?.formulation || {};
+    const ourIngredients: string[] = ourFormulation.recommended_ingredients || [];
+    const ourKeyFeatures: string[] = ourFormulation.key_features || [];
+    const ourThingsToAvoid: string[] = categoryScores?.product_development?.avoid || [];
+    const ourFormFactor = ourFormulation.form_factor || '';
+    const ourServingSize = ourFormulation.serving_size || '';
+    const ourIngredientCount = ourIngredients.length;
+    
+    // Benefit category mapping for label icons/badges
+    const benefitCategories: Record<string, string[]> = {
+      'Hip & Joint': ['glucosamine', 'chondroitin', 'msm', 'collagen', 'hyaluronic'],
+      'Skin & Coat': ['omega', 'fish oil', 'salmon', 'biotin', 'vitamin e', 'flaxseed', 'coconut'],
+      'Digestive Health': ['probiotic', 'prebiotic', 'pumpkin', 'fiber', 'enzyme', 'lactobacillus'],
+      'Immune Support': ['vitamin c', 'vitamin e', 'zinc', 'antioxidant', 'elderberry', 'turmeric'],
+      'Heart Health': ['coq10', 'taurine', 'l-carnitine', 'omega-3'],
+      'Brain & Cognitive': ['dha', 'epa', 'omega-3', 'phosphatidylserine'],
+      'Energy & Vitality': ['b vitamins', 'iron', 'coq10', 'ginseng'],
+      'Calming & Anxiety': ['chamomile', 'valerian', 'l-theanine', 'melatonin', 'hemp'],
+      'Liver Support': ['milk thistle', 'sam-e', 'silymarin'],
+      'Allergy Relief': ['quercetin', 'bromelain', 'colostrum'],
+    };
+    
+    // Calculate which benefit categories we can claim based on our ingredients
+    const ourBenefitClaims: string[] = [];
+    ourIngredients.forEach(ing => {
+      const ingLower = ing.toLowerCase();
+      for (const [benefit, keywords] of Object.entries(benefitCategories)) {
+        if (keywords.some(kw => ingLower.includes(kw))) {
+          if (!ourBenefitClaims.includes(benefit)) {
+            ourBenefitClaims.push(benefit);
+          }
+        }
+      }
+    });
+    
+    // Parse competitor ingredient counts for comparison
+    interface CompetitorIngredientData {
+      brand: string;
+      count: number;
+      ingredientSample: string;
+      claimsOnLabel: string[];
+    }
+    
+    console.log(`Our formulation: ${ourIngredientCount} ingredients, ${ourBenefitClaims.length} benefit categories`);
 
     // Fetch top 5 competitors by monthly_sales with packaging data and images
     const { data: competitors, error: competitorsError } = await supabase
       .from('products')
-      .select('brand, title, main_image_url, image_urls, price, claims, claims_on_label, marketing_analysis, monthly_sales, servings_per_container, packaging_type, feature_bullets, review_analysis, packaging_image_analysis')
+      .select('brand, title, main_image_url, image_urls, price, claims, claims_on_label, marketing_analysis, monthly_sales, servings_per_container, packaging_type, feature_bullets, review_analysis, packaging_image_analysis, ingredients')
       .eq('category_id', categoryId)
       .order('monthly_sales', { ascending: false })
       .limit(5);
@@ -112,6 +160,91 @@ serve(async (req) => {
 
     console.log(`Found ${competitorImages.length} competitor images to analyze`);
 
+    // Parse competitor ingredient counts and extract front label elements
+    const competitorIngredientData: CompetitorIngredientData[] = (competitors || []).map(c => {
+      const ingredientText = c.ingredients || '';
+      // Count active ingredients (before "Other Ingredients:" section)
+      const activeSection = ingredientText.split(/other ingredients/i)[0];
+      const ingredientItems = activeSection.split(',').filter((i: string) => i.trim().length > 2);
+      const count = ingredientItems.length;
+      
+      // Extract claims from label
+      const claimsArray = c.claims_on_label || (c.claims ? c.claims.split(',').map((cl: string) => cl.trim()) : []);
+      
+      return {
+        brand: c.brand || 'Unknown',
+        count,
+        ingredientSample: ingredientItems.slice(0, 5).join(', ').substring(0, 100),
+        claimsOnLabel: claimsArray.slice(0, 10)
+      };
+    });
+    
+    // Calculate average competitor ingredient count
+    const totalCompetitorIngredients = competitorIngredientData.reduce((sum, c) => sum + c.count, 0);
+    const avgCompetitorCount = competitorIngredientData.length > 0 
+      ? Math.round(totalCompetitorIngredients / competitorIngredientData.length) 
+      : 0;
+    
+    // Find unique ingredients we have that competitors might not emphasize
+    const uniqueIngredientHighlights: string[] = ourIngredients.filter(ourIng => {
+      const ingName = ourIng.split(/[\s(]/)[0].toLowerCase();
+      // Check if this ingredient is rarely mentioned in competitor claims
+      const mentionedInClaims = competitorIngredientData.some(c => 
+        c.claimsOnLabel.some(claim => claim.toLowerCase().includes(ingName))
+      );
+      return !mentionedInClaims && ingName.length > 3;
+    }).slice(0, 5);
+    
+    // Generate verifiable front label claims based on our formulation
+    const verifiableClaims: string[] = [];
+    
+    // X-in-1 claim (only if we have 6+ ingredients)
+    if (ourIngredientCount >= 6) {
+      verifiableClaims.push(`${ourIngredientCount}-in-1 Complete Formula`);
+    }
+    
+    // Benefit areas claim
+    if (ourBenefitClaims.length >= 3) {
+      verifiableClaims.push(`Supports ${ourBenefitClaims.length} Areas of Health`);
+    }
+    
+    // Ingredient advantage claim
+    if (ourIngredientCount > avgCompetitorCount && avgCompetitorCount > 0) {
+      verifiableClaims.push(`More Active Ingredients Than Leading Brands`);
+    }
+    
+    // Key features as claims (grain-free, chicken-free, etc.)
+    ourKeyFeatures.forEach(feature => {
+      const featureLower = feature.toLowerCase();
+      if (featureLower.includes('grain-free') || featureLower.includes('grain free')) {
+        verifiableClaims.push('Grain-Free Formula');
+      }
+      if (featureLower.includes('chicken-free') || featureLower.includes('no chicken')) {
+        verifiableClaims.push('Chicken-Free');
+      }
+      if (featureLower.includes('hypoallergenic')) {
+        verifiableClaims.push('Hypoallergenic');
+      }
+      if (featureLower.includes('all natural') || featureLower.includes('natural')) {
+        verifiableClaims.push('All Natural');
+      }
+    });
+    
+    // Things to avoid turned into positive claims
+    const avoidancePositiveClaims: string[] = ourThingsToAvoid.slice(0, 3).map(avoid => {
+      const avoidLower = avoid.toLowerCase();
+      if (avoidLower.includes('artificial')) return 'No Artificial Ingredients';
+      if (avoidLower.includes('filler')) return 'No Fillers';
+      if (avoidLower.includes('corn') || avoidLower.includes('wheat') || avoidLower.includes('soy')) return 'No Corn, Wheat, or Soy';
+      if (avoidLower.includes('proprietary')) return 'No Hidden Proprietary Blends';
+      if (avoidLower.includes('preservative')) return 'No Artificial Preservatives';
+      return `No ${avoid.split(' ').slice(0, 3).join(' ')}`;
+    }).filter(c => c);
+    
+    verifiableClaims.push(...avoidancePositiveClaims.slice(0, 2));
+    
+    console.log(`Generated ${verifiableClaims.length} verifiable claims for front label`);
+
     // Format competitor packaging data with richer details
     const competitorPackagingSummary = competitors?.map((c, idx) => {
       const designBlueprint = (c.marketing_analysis as any)?.design_blueprint || {};
@@ -120,6 +253,7 @@ serve(async (req) => {
       const reviewData = c.review_analysis as any;
       const painPoints = reviewData?.pain_points?.slice(0, 3).map((p: any) => p.issue || p).join('; ') || 'N/A';
       const positiveThemes = reviewData?.positive_themes?.slice(0, 3).map((t: any) => t.theme || t).join('; ') || 'N/A';
+      const competitorData = competitorIngredientData[idx];
       
       return `
 COMPETITOR ${idx + 1}: ${c.brand || 'Unknown'} - BEST SELLER ($${c.monthly_sales?.toLocaleString() || 'N/A'}/month)
@@ -127,9 +261,10 @@ COMPETITOR ${idx + 1}: ${c.brand || 'Unknown'} - BEST SELLER ($${c.monthly_sales
 - Title: ${c.title || 'N/A'}
 - Price: $${c.price || 'N/A'} | Servings: ${c.servings_per_container || 'N/A'}
 - Packaging: ${c.packaging_type || 'Bottle'}
+- INGREDIENT COUNT: ${competitorData?.count || 'Unknown'} active ingredients
 - Image URL: ${c.main_image_url || 'N/A'}
 
-THEIR LABEL CLAIMS:
+THEIR FRONT LABEL CLAIMS (MATCH OR BEAT THESE):
 ${claimsArray.slice(0, 8).map((cl: string) => `  • ${cl}`).join('\n') || '  N/A'}
 
 THEIR BULLET POINTS (from Amazon listing):
@@ -431,6 +566,45 @@ ${formulaBriefContent}
 - Type: ${recommendedPackaging.type || 'Premium Bottle'}
 - Key Design Elements: ${recommendedPackaging.design_elements?.join(', ') || 'Modern, clean, premium aesthetic'}
 
+## 🎯 FORMULATION-BASED FRONT LABEL STRATEGY (CRITICAL - USE THESE!)
+
+### OUR INGREDIENT COUNT VS COMPETITORS:
+- **OUR PRODUCT: ${ourIngredientCount} Active Ingredients** (${ourFormFactor || 'Standard Form'})
+${competitorIngredientData.map((c, i) => `- ${c.brand}: ${c.count} ingredients`).join('\n')}
+- **MARKET AVERAGE: ${avgCompetitorCount} ingredients**
+
+### ✅ TRUE CLAIMS WE CAN PUT ON FRONT LABEL (based on our ACTUAL formulation):
+
+**PRIMARY HEADLINE OPTIONS (use one of these - they are VERIFIED TRUE):**
+${verifiableClaims.length > 0 ? verifiableClaims.map((c, i) => `${i + 1}. "${c}"`).join('\n') : 'Generate from ingredients below'}
+
+**BENEFIT ICONS/BADGES WE CAN CLAIM (we have ingredients for all of these):**
+${ourBenefitClaims.length > 0 ? ourBenefitClaims.map(b => `✓ ${b}`).join('\n') : 'Analyze from ingredients below'}
+
+### 📊 OUR COMPLETE INGREDIENTS LIST (PUT THESE ON THE LABEL!):
+${ourIngredients.length > 0 ? ourIngredients.map((ing, i) => `${i + 1}. ${ing}`).join('\n') : 'See formulation document above'}
+
+### 🌟 KEY FEATURES TO HIGHLIGHT (from formulation):
+${ourKeyFeatures.length > 0 ? ourKeyFeatures.map(f => `• ${f}`).join('\n') : 'N/A'}
+
+### 🚫 WHAT WE DON'T HAVE (turn into positive claims):
+${ourThingsToAvoid.length > 0 ? ourThingsToAvoid.map(avoid => `• "${avoid}" → Claim: "No ${avoid}"`).join('\n') : 'N/A'}
+
+### 🏆 UNIQUE ADVANTAGES (ingredients/features competitors may not have):
+${uniqueIngredientHighlights.length > 0 ? uniqueIngredientHighlights.map(ing => `• ${ing.split(' ').slice(0, 3).join(' ')} ← HIGHLIGHT THIS ON LABEL`).join('\n') : 'Focus on dosage/quality differentiation'}
+
+### COMPETITOR FRONT LABEL ANALYSIS (MATCH OR BEAT THESE):
+${competitorIngredientData.slice(0, 3).map((c, i) => `
+**${c.brand}** (${c.count} ingredients):
+Top Claims: ${c.claimsOnLabel.slice(0, 5).join(' | ') || 'N/A'}`).join('\n')}
+
+### ⚠️ CRITICAL FRONT LABEL RULES:
+1. If we have ${ourIngredientCount} ingredients, you can claim "${ourIngredientCount}-in-1" - NOT MORE!
+2. Only claim benefits we actually have ingredients for: ${ourBenefitClaims.join(', ') || 'TBD'}
+3. Every claim MUST be verifiable from our formulation above
+4. Our front label must be AS COMPLETE AS competitors - match their element count!
+5. Include serving count, quantity, flavor prominently like competitors do
+
 ## COMPETITOR INTELLIGENCE (STUDY THEM, MATCH THEIR APPROACH):
 ${competitorPackagingSummary}
 
@@ -449,35 +623,35 @@ ${perProductImageAnalysisSummary}
 ## HOW TO WIN (WITHOUT BEING RADICALLY DIFFERENT):
 1. MATCH the visual style of the #1 seller (colors, fonts, layout)
 2. MATCH their bullet point length and tone exactly
-3. Only differentiate on the pain points where competitors are FAILING
+3. Our front label must have AS MANY elements as top competitors (X-in-1 claim, benefit icons, trust badges, serving count)
 4. Use the same trust signal approach but add 1 extra credibility cue
-5. Look like you belong on the same shelf - customers should feel familiar
+5. ONLY differentiate where we genuinely have an advantage from our formulation
 
 ## YOUR DELIVERABLES:
 
 **1. DESIGN BRIEF**: 
    - Color palette (3 hex codes) - should feel premium and trustworthy for this category
    - Typography - modern, clean, highly legible
-   - Primary claim that STOPS the scroll
-   - Key differentiator badges (what makes us special)
+   - PRIMARY CLAIM: Use one from our verified claims above (or create similar based on our ACTUAL ingredients)
+   - Key differentiator badges (based on our REAL formulation advantages)
    - Required certifications
 
 **2. ELEMENTS CHECKLIST**: 
-   - Front panel elements in visual hierarchy order
-   - 5 KILLER bullet points that sell
+   - Front panel elements in visual hierarchy order - MUST match competitor element density
+   - 5 KILLER bullet points that sell (based on our ACTUAL benefits)
    - CTA that drives action
    - Trust signals that build confidence
 
 **3. MOCK CONTENT** (COPY-PASTE READY):
-   - Front panel: Exact text with line breaks as it appears
-   - Back panel: Complete with benefit section, why it works, directions, disclaimer
-   - Think: Would I buy this product? Does this copy make me NEED it?
+   - Front panel: Include X-in-1 claim (if applicable), benefit icons, serving count, quantity, key claims
+   - Make sure front panel has AS MANY elements as competitor front panels!
+   - Back panel: Complete with benefit section, ingredient highlights, directions, disclaimer
 
 **4. CLIENT RATIONALE**: 
-   - Why this design beats the top sellers
-   - What gap in the market we're filling
+   - Why our formulation-based claims beat competitors
+   - What ingredient/benefit advantage we're leveraging
 
-CREATE COPY THAT MAKES SHOPPERS THINK: "This is THE ONE I've been looking for."`
+REMEMBER: Every claim must be TRUE based on our ${ourIngredientCount}-ingredient formulation. Create the MOST COMPLETE front label possible that matches competitor density while being 100% verifiable.`
                   }
                 ]
               }

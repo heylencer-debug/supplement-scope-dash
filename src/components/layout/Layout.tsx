@@ -258,7 +258,7 @@ export function Layout({ children }: LayoutProps) {
                                                 <span 
                                                   className={cn(
                                                     "w-2 h-2 rounded-full flex-shrink-0 transition-all",
-                                                    isComplete ? "bg-chart-4" : "bg-chart-2 animate-pulse"
+                                                    isComplete ? "bg-chart-4" : "bg-chart-2 animate-pulse [animation-duration:2.5s]"
                                                   )} 
                                                 />
                                               )}

@@ -119,6 +119,28 @@ export interface IngredientAnalysis {
       overall_assessment: string;
     };
   };
+  // Raw competitor formulation details
+  competitor_details?: Array<{
+    brand: string;
+    title: string;
+    price: number | null;
+    monthly_sales: number | null;
+    age_months: number | null;
+    supplement_facts_complete: {
+      serving_size: string | null;
+      active_ingredients: any[] | null;
+      all_nutrients: any[] | null;
+      proprietary_blends: any[] | null;
+      claims_on_label: string[] | null;
+      directions: string | null;
+      warnings: string | null;
+      manufacturer: string | null;
+    } | null;
+    other_ingredients: string | null;
+    specifications: string | null;
+    important_information: string | null;
+    ingredients: string | null;
+  }>;
   // Error state fields
   status?: string;
   error?: boolean;

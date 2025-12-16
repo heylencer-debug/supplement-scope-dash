@@ -6,7 +6,7 @@ import {
   Brain, RefreshCw, CheckCircle, AlertTriangle, XCircle, Sparkles,
   ArrowUp, ArrowDown, Minus, Plus, Check, Target, Shield, TrendingUp,
   Clock, Zap, Users, FlaskConical, Link2, AlertCircle, Lightbulb,
-  ChevronRight, Beaker, Table2
+  ChevronRight, Beaker, Table2, Package, FileText, Info, DollarSign
 } from "lucide-react";
 import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, Radar, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell } from "recharts";
 import { IngredientAnalysis } from "@/hooks/useIngredientAnalysis";
@@ -19,7 +19,7 @@ interface AIAnalysisResultsProps {
 }
 
 export function AIAnalysisResults({ analysis, onRefresh, isLoading }: AIAnalysisResultsProps) {
-  const [activeTab, setActiveTab] = useState<'ingredients' | 'summary' | 'clinical' | 'customer' | 'competitive' | 'roadmap'>('ingredients');
+  const [activeTab, setActiveTab] = useState<'ingredients' | 'formulation' | 'summary' | 'clinical' | 'customer' | 'competitive' | 'roadmap'>('ingredients');
 
   // Guard against incomplete/error analysis data
   if (!analysis?.summary || !analysis?.charts || !analysis?.ingredients) {
@@ -159,6 +159,7 @@ export function AIAnalysisResults({ analysis, onRefresh, isLoading }: AIAnalysis
       <div className="flex items-center bg-muted rounded-lg p-0.5 overflow-x-auto">
         {[
           { id: 'ingredients', label: 'Ingredients', icon: Table2 },
+          { id: 'formulation', label: 'Formulation', icon: Package },
           { id: 'summary', label: 'Summary', icon: Target },
           { id: 'clinical', label: 'Clinical', icon: FlaskConical },
           { id: 'customer', label: 'Customer', icon: Users },
@@ -330,6 +331,219 @@ export function AIAnalysisResults({ analysis, onRefresh, isLoading }: AIAnalysis
           <Table2 className="w-8 h-8 mx-auto mb-2 opacity-50" />
           <p className="text-sm">No ingredient comparison data available</p>
           <p className="text-xs">Try refreshing the analysis</p>
+        </div>
+      )}
+
+      {/* Formulation Details Tab - Raw Competitor Data */}
+      {activeTab === 'formulation' && (
+        <div className="space-y-4">
+          {analysis.competitor_details && analysis.competitor_details.length > 0 ? (
+            <>
+              <div className="flex items-center gap-2 mb-2">
+                <Package className="w-4 h-4 text-primary" />
+                <p className="text-sm font-medium text-foreground">
+                  Competitor Formulation Deep Dive ({analysis.competitor_details.length} products)
+                </p>
+              </div>
+              
+              <ScrollArea className="h-[500px] pr-2">
+                <div className="space-y-4">
+                  {analysis.competitor_details.map((comp, idx) => (
+                    <div key={idx} className="bg-card rounded-lg border border-border/50 overflow-hidden">
+                      {/* Competitor Header */}
+                      <div className="bg-muted/50 p-3 border-b border-border/30">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium text-foreground">{comp.brand}</p>
+                            <p className="text-xs text-muted-foreground line-clamp-1">{comp.title}</p>
+                          </div>
+                          <div className="flex items-center gap-3 text-xs">
+                            {comp.price && (
+                              <span className="flex items-center gap-1 text-chart-4">
+                                <DollarSign className="w-3 h-3" />
+                                {comp.price.toFixed(2)}
+                              </span>
+                            )}
+                            {comp.monthly_sales && (
+                              <span className="text-muted-foreground">
+                                {comp.monthly_sales.toLocaleString()} sales/mo
+                              </span>
+                            )}
+                            {comp.age_months && (
+                              <Badge variant="outline" className="text-[9px]">
+                                {comp.age_months} months old
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="p-3 space-y-3">
+                        {/* Supplement Facts Complete */}
+                        {comp.supplement_facts_complete && (
+                          <div className="space-y-2">
+                            <p className="text-xs font-medium text-foreground flex items-center gap-1">
+                              <FileText className="w-3 h-3 text-primary" />
+                              Supplement Facts
+                            </p>
+                            <div className="grid grid-cols-2 gap-2 text-[10px]">
+                              {comp.supplement_facts_complete.serving_size && (
+                                <div className="bg-muted/30 rounded p-2">
+                                  <span className="text-muted-foreground">Serving Size:</span>
+                                  <p className="text-foreground font-medium">{comp.supplement_facts_complete.serving_size}</p>
+                                </div>
+                              )}
+                              {comp.supplement_facts_complete.manufacturer && (
+                                <div className="bg-muted/30 rounded p-2">
+                                  <span className="text-muted-foreground">Manufacturer:</span>
+                                  <p className="text-foreground font-medium">{comp.supplement_facts_complete.manufacturer}</p>
+                                </div>
+                              )}
+                            </div>
+                            
+                            {/* Active Ingredients */}
+                            {comp.supplement_facts_complete.active_ingredients && 
+                             Array.isArray(comp.supplement_facts_complete.active_ingredients) && 
+                             comp.supplement_facts_complete.active_ingredients.length > 0 && (
+                              <div className="bg-chart-4/5 rounded-lg p-2 border border-chart-4/20">
+                                <p className="text-[10px] font-medium text-chart-4 mb-1">Active Ingredients</p>
+                                <div className="flex flex-wrap gap-1">
+                                  {comp.supplement_facts_complete.active_ingredients.slice(0, 10).map((ing: any, i: number) => (
+                                    <Badge key={i} variant="outline" className="text-[8px] bg-background">
+                                      {typeof ing === 'string' ? ing : ing.name || ing.ingredient || JSON.stringify(ing).substring(0, 30)}
+                                      {ing.amount && ` - ${ing.amount}`}
+                                    </Badge>
+                                  ))}
+                                  {comp.supplement_facts_complete.active_ingredients.length > 10 && (
+                                    <Badge variant="outline" className="text-[8px] bg-background">
+                                      +{comp.supplement_facts_complete.active_ingredients.length - 10} more
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                            
+                            {/* Proprietary Blends */}
+                            {comp.supplement_facts_complete.proprietary_blends && (
+                              <div className="bg-chart-2/5 rounded-lg p-2 border border-chart-2/20">
+                                <p className="text-[10px] font-medium text-chart-2 mb-1">Proprietary Blends</p>
+                                <p className="text-[9px] text-foreground">
+                                  {typeof comp.supplement_facts_complete.proprietary_blends === 'string' 
+                                    ? comp.supplement_facts_complete.proprietary_blends 
+                                    : JSON.stringify(comp.supplement_facts_complete.proprietary_blends).substring(0, 200)}
+                                </p>
+                              </div>
+                            )}
+                            
+                            {/* Label Claims */}
+                            {comp.supplement_facts_complete.claims_on_label && 
+                             Array.isArray(comp.supplement_facts_complete.claims_on_label) &&
+                             comp.supplement_facts_complete.claims_on_label.length > 0 && (
+                              <div className="bg-primary/5 rounded-lg p-2 border border-primary/20">
+                                <p className="text-[10px] font-medium text-primary mb-1">Label Claims</p>
+                                <div className="flex flex-wrap gap-1">
+                                  {comp.supplement_facts_complete.claims_on_label.map((claim: string, i: number) => (
+                                    <Badge key={i} variant="outline" className="text-[8px] bg-background">
+                                      {claim}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            
+                            {/* Directions */}
+                            {comp.supplement_facts_complete.directions && (
+                              <div className="text-[10px]">
+                                <span className="text-muted-foreground">Directions: </span>
+                                <span className="text-foreground">{comp.supplement_facts_complete.directions}</span>
+                              </div>
+                            )}
+                            
+                            {/* Warnings */}
+                            {comp.supplement_facts_complete.warnings && (
+                              <div className="bg-destructive/5 rounded p-2 border border-destructive/20">
+                                <p className="text-[10px] font-medium text-destructive flex items-center gap-1">
+                                  <AlertTriangle className="w-3 h-3" />
+                                  Warnings
+                                </p>
+                                <p className="text-[9px] text-foreground mt-1">{comp.supplement_facts_complete.warnings}</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        
+                        {/* Other Ingredients */}
+                        {comp.other_ingredients && (
+                          <div className="space-y-1">
+                            <p className="text-xs font-medium text-foreground flex items-center gap-1">
+                              <Beaker className="w-3 h-3 text-muted-foreground" />
+                              Other Ingredients (Inactive/Fillers)
+                            </p>
+                            <p className="text-[10px] text-muted-foreground bg-muted/30 rounded p-2">
+                              {comp.other_ingredients}
+                            </p>
+                          </div>
+                        )}
+                        
+                        {/* Specifications */}
+                        {comp.specifications && (
+                          <div className="space-y-1">
+                            <p className="text-xs font-medium text-foreground flex items-center gap-1">
+                              <Info className="w-3 h-3 text-chart-3" />
+                              Specifications
+                            </p>
+                            <p className="text-[10px] text-muted-foreground bg-muted/30 rounded p-2">
+                              {comp.specifications}
+                            </p>
+                          </div>
+                        )}
+                        
+                        {/* Important Information */}
+                        {comp.important_information && (
+                          <div className="space-y-1">
+                            <p className="text-xs font-medium text-foreground flex items-center gap-1">
+                              <AlertCircle className="w-3 h-3 text-chart-2" />
+                              Important Information
+                            </p>
+                            <p className="text-[10px] text-muted-foreground bg-chart-2/5 rounded p-2 border border-chart-2/10">
+                              {comp.important_information}
+                            </p>
+                          </div>
+                        )}
+                        
+                        {/* Raw Ingredients (fallback) */}
+                        {comp.ingredients && !comp.supplement_facts_complete?.active_ingredients && (
+                          <div className="space-y-1">
+                            <p className="text-xs font-medium text-foreground flex items-center gap-1">
+                              <FlaskConical className="w-3 h-3 text-primary" />
+                              Ingredients List
+                            </p>
+                            <p className="text-[10px] text-muted-foreground bg-muted/30 rounded p-2 max-h-[100px] overflow-y-auto">
+                              {comp.ingredients}
+                            </p>
+                          </div>
+                        )}
+                        
+                        {/* Empty state for this competitor */}
+                        {!comp.supplement_facts_complete && !comp.other_ingredients && !comp.specifications && !comp.important_information && !comp.ingredients && (
+                          <div className="text-center py-4 text-muted-foreground">
+                            <Package className="w-6 h-6 mx-auto mb-1 opacity-50" />
+                            <p className="text-[10px]">No detailed formulation data available</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <Package className="w-8 h-8 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">No competitor formulation data available</p>
+              <p className="text-xs">Run a new analysis to fetch competitor details</p>
+            </div>
+          )}
         </div>
       )}
 

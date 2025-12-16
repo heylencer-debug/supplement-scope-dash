@@ -175,7 +175,43 @@ Your task is to compare "Our Concept" formulation against ${competitorLabel} and
 - Customer pain point solutions
 - Competitive advantages and vulnerabilities
 - Priority roadmap for improvements
-- Complete ingredient comparison table
+- COMPREHENSIVE ingredient comparison table (ALL ingredients)
+
+CRITICAL INSTRUCTIONS FOR INGREDIENT COMPARISON TABLE:
+
+1. EXTRACT ALL INGREDIENTS from Our Concept's formula brief markdown - parse EVERY ingredient table:
+   - Primary Active Ingredients
+   - Secondary Active Ingredients  
+   - Tertiary Active Ingredients
+   - Functional Excipients
+   You should find 25-40 total ingredients. The ingredient_comparison_table rows array MUST have one row per ingredient.
+
+2. For EACH Our Concept ingredient, analyze if competitors have:
+   - EXACT MATCH: Same ingredient (present = true, uses_alternative = false)
+   - FUNCTIONAL ALTERNATIVE: Different ingredient serving same function (present = false, uses_alternative = true, alternative_name = their ingredient)
+   - ABSENT: Neither exact nor alternative (present = false, uses_alternative = false)
+
+3. FUNCTIONAL ALTERNATIVES - Automatically detect when competitor uses different ingredient for same purpose:
+   - FIBER SOURCES: Pumpkin, Sweet Potato, Beet Fiber, Psyllium, Apple Pectin, Chicory Root are alternatives to each other
+   - PROBIOTICS: Different strains are alternatives (Bacillus coagulans, Lactobacillus, Bifidobacterium, DE111, etc.)
+   - PREBIOTICS: FOS, GOS, XOS, Inulin, Chicory Root, MOS are alternatives to each other
+   - OMEGA-3 SOURCES: Salmon Oil, Fish Oil, Flaxseed Oil, Krill Oil, Anchovy Oil are alternatives
+   - ANTI-INFLAMMATORIES: Turmeric, Ginger, Boswellia, Quercetin, MSM are alternatives
+   - DIGESTIVE ENZYMES: Protease, Amylase, Lipase, Papain, Bromelain, Cellulase are alternatives
+   - GUT SOOTHERS: Slippery Elm, Marshmallow Root, Licorice Root, Aloe Vera, L-Glutamine are alternatives
+   - IMMUNE SUPPORT: Colostrum, Beta-glucan, Echinacea, Astragalus are alternatives
+   - HUMECTANTS/BINDING: Glycerin, Vegetable Glycerin, Coconut Glycerin are alternatives
+   - PRESERVATIVES: Rosemary Extract, Mixed Tocopherols, Vitamin E, Natural Preservatives are alternatives
+
+4. When competitor uses an ALTERNATIVE, populate these fields:
+   - uses_alternative: true
+   - alternative_name: "Name of their ingredient"
+   - alternative_amount: "Their dosage"
+   - status: "alternative_used"
+   - comparison_note: "Uses [X] instead of [Y] for [function]"
+
+5. MINIMUM EXPECTED: The ingredient_comparison_table.rows array should have 25-40 rows (one per Our Concept ingredient).
+   The summary.total_our_ingredients should equal the actual count of rows.
 
 IMPORTANT: You must call the "save_ingredient_analysis" function with your complete analysis results. Do not respond with plain text.`;
 
@@ -186,8 +222,10 @@ ${type === 'new_winners'
   ? 'These are emerging high-growth products. Focus on innovative formulation trends and growth drivers.' 
   : 'These are established market leaders. Focus on proven formulation strategies and competitive positioning.'}
 
-## Our Concept Formula Brief:
+## Our Concept Formula Brief (RAW MARKDOWN - YOU MUST PARSE ALL INGREDIENT TABLES):
 ${formulaBriefContent || 'No formula brief available'}
+
+IMPORTANT: The formula brief above contains ingredient tables for Primary Active, Secondary Active, Tertiary Active, and Functional Excipients. You MUST extract EVERY ingredient from ALL tables and include a row in ingredient_comparison_table for EACH one (expect 25-40 total ingredients).
 
 ## ${competitorLabel}:
 ${competitorData.map((c: any) => `
@@ -196,16 +234,16 @@ ${competitorData.map((c: any) => `
 - Monthly Sales: ${c.monthly_sales || 'N/A'}
 ${c.age_months ? `- Product Age: ${c.age_months} months` : ''}
 
-#### PRIMARY INGREDIENTS (FULL):
+#### PRIMARY INGREDIENTS (FULL - NO TRUNCATION):
 ${typeof c.ingredients === 'string' ? c.ingredients : JSON.stringify(c.ingredients)}
 
-${c.other_ingredients ? `#### OTHER INGREDIENTS (FULL - Inactive/Fillers):
+${c.other_ingredients ? `#### OTHER INGREDIENTS (FULL - Inactive/Fillers - NO TRUNCATION):
 ${c.other_ingredients}` : ''}
 
-${c.nutrients ? `#### NUTRIENT PROFILE (FULL):
+${c.nutrients ? `#### NUTRIENT PROFILE (FULL - NO TRUNCATION):
 ${JSON.stringify(c.nutrients)}` : ''}
 
-${c.supplement_facts_complete ? `#### SUPPLEMENT FACTS COMPLETE (RAW):
+${c.supplement_facts_complete ? `#### SUPPLEMENT FACTS COMPLETE (RAW - NO TRUNCATION):
 ${JSON.stringify(c.supplement_facts_complete)}` : ''}
 
 ${c.specifications ? `#### SPECIFICATIONS (RAW):
@@ -217,7 +255,9 @@ ${JSON.stringify(c.important_information)}` : ''}
 #### CUSTOMER PAIN POINTS:
 ${JSON.stringify(c.pain_points)}`).join('\n\n---\n')}
 
-Provide a comprehensive analysis including SWOT, clinical dosage adequacy, customer insights, competitive matrix, priority roadmap, and a complete ingredient comparison table. Call the save_ingredient_analysis function with all fields populated.`;
+FINAL REMINDER: The ingredient_comparison_table MUST have a row for EVERY ingredient from Our Concept formula brief. Detect functional alternatives when competitors use different ingredients for the same purpose. Expect 25-40 total rows in the table.
+
+Provide a comprehensive analysis including SWOT, clinical dosage adequacy, customer insights, competitive matrix, priority roadmap, and the COMPLETE ingredient comparison table. Call the save_ingredient_analysis function with all fields populated.`;
 
         console.log(`[analyze-ingredients] Calling OpenRouter API for ${type} analysis...`);
 
@@ -423,56 +463,89 @@ Provide a comprehensive analysis including SWOT, clinical dosage adequacy, custo
                     },
                     rows: {
                       type: 'array',
+                      description: 'MUST contain one row per ingredient from Our Concept formula brief (expect 25-40 rows). Parse ALL ingredient tables.',
                       items: {
                         type: 'object',
                         properties: {
-                          ingredient: { type: 'string' },
-                          category: { type: 'string', description: 'primary_active, secondary_active, tertiary_active, excipient, or other' },
+                          ingredient: { type: 'string', description: 'Ingredient name exactly as listed in Our Concept formula brief' },
+                          category: { type: 'string', description: 'primary_active, secondary_active, tertiary_active, excipient' },
+                          functional_group: { type: 'string', description: 'e.g., fiber, probiotic, prebiotic, omega-3, enzyme, anti-inflammatory, gut-soother, immune, humectant, preservative' },
                           our_concept: {
                             type: 'object',
                             properties: {
-                              amount: { type: 'string' },
-                              form: { type: 'string' }
+                              amount: { type: 'string', description: 'Dosage from formula brief e.g., "1,200 mg"' },
+                              form: { type: 'string', description: 'Form/format of ingredient if specified' },
+                              function: { type: 'string', description: 'What this ingredient does functionally' }
                             }
                           },
                           competitor_1: {
                             type: 'object',
                             properties: {
-                              amount: { type: 'string' },
-                              present: { type: 'boolean' }
+                              amount: { type: 'string', description: 'Dosage if present' },
+                              present: { type: 'boolean', description: 'True if competitor has this exact ingredient' },
+                              uses_alternative: { type: 'boolean', description: 'True if competitor uses a different ingredient for the same function' },
+                              alternative_name: { type: 'string', description: 'Name of alternative ingredient if uses_alternative is true' },
+                              alternative_amount: { type: 'string', description: 'Dosage of alternative ingredient' }
                             }
                           },
                           competitor_2: {
                             type: 'object',
                             properties: {
                               amount: { type: 'string' },
-                              present: { type: 'boolean' }
+                              present: { type: 'boolean' },
+                              uses_alternative: { type: 'boolean' },
+                              alternative_name: { type: 'string' },
+                              alternative_amount: { type: 'string' }
                             }
                           },
                           competitor_3: {
                             type: 'object',
                             properties: {
                               amount: { type: 'string' },
-                              present: { type: 'boolean' }
+                              present: { type: 'boolean' },
+                              uses_alternative: { type: 'boolean' },
+                              alternative_name: { type: 'string' },
+                              alternative_amount: { type: 'string' }
                             }
                           },
-                          status: { type: 'string', description: 'in_all, unique_to_us, missing_from_us, or partial' },
-                          comparison_note: { type: 'string' }
+                          competitor_4: {
+                            type: 'object',
+                            properties: {
+                              amount: { type: 'string' },
+                              present: { type: 'boolean' },
+                              uses_alternative: { type: 'boolean' },
+                              alternative_name: { type: 'string' },
+                              alternative_amount: { type: 'string' }
+                            }
+                          },
+                          competitor_5: {
+                            type: 'object',
+                            properties: {
+                              amount: { type: 'string' },
+                              present: { type: 'boolean' },
+                              uses_alternative: { type: 'boolean' },
+                              alternative_name: { type: 'string' },
+                              alternative_amount: { type: 'string' }
+                            }
+                          },
+                          status: { type: 'string', description: 'in_all, unique_to_us, missing_from_us, partial, or alternative_used' },
+                          comparison_note: { type: 'string', description: 'Include alternative detection notes like "Uses X instead of Y for fiber"' }
                         },
-                        required: ['ingredient', 'category', 'our_concept', 'competitor_1', 'competitor_2', 'competitor_3', 'status', 'comparison_note']
+                        required: ['ingredient', 'category', 'functional_group', 'our_concept', 'competitor_1', 'competitor_2', 'competitor_3', 'status', 'comparison_note']
                       }
                     },
                     summary: {
                       type: 'object',
                       properties: {
-                        total_our_ingredients: { type: 'number' },
+                        total_our_ingredients: { type: 'number', description: 'Total count of Our Concept ingredients - should be 25-40' },
                         total_competitor_avg: { type: 'number' },
-                        overlap_count: { type: 'number' },
-                        unique_to_us_count: { type: 'number' },
-                        missing_from_us_count: { type: 'number' },
+                        overlap_count: { type: 'number', description: 'How many ingredients are exact matches across competitors' },
+                        unique_to_us_count: { type: 'number', description: 'How many ingredients are unique to Our Concept (no match or alternative)' },
+                        missing_from_us_count: { type: 'number', description: 'How many competitor ingredients we lack' },
+                        alternatives_detected_count: { type: 'number', description: 'How many times competitors used a functional alternative instead of our exact ingredient' },
                         overall_assessment: { type: 'string' }
                       },
-                      required: ['total_our_ingredients', 'total_competitor_avg', 'overlap_count', 'unique_to_us_count', 'missing_from_us_count', 'overall_assessment']
+                      required: ['total_our_ingredients', 'total_competitor_avg', 'overlap_count', 'unique_to_us_count', 'missing_from_us_count', 'alternatives_detected_count', 'overall_assessment']
                     }
                   },
                   required: ['our_concept_name', 'competitors', 'rows', 'summary']

@@ -183,7 +183,7 @@ export function AIAnalysisResults({ analysis, onRefresh, isLoading }: AIAnalysis
       {activeTab === 'ingredients' && analysis.ingredient_comparison_table && (
         <div className="space-y-4">
           {/* Summary Stats */}
-          <div className="grid grid-cols-5 gap-2">
+          <div className="grid grid-cols-6 gap-2">
             <div className="bg-card rounded-lg p-3 border border-border/50 text-center">
               <div className="text-xl font-bold text-primary">{analysis.ingredient_comparison_table.summary.total_our_ingredients}</div>
               <div className="text-[9px] text-muted-foreground">Our Ingredients</div>
@@ -199,6 +199,10 @@ export function AIAnalysisResults({ analysis, onRefresh, isLoading }: AIAnalysis
             <div className="bg-primary/10 rounded-lg p-3 border border-primary/30 text-center">
               <div className="text-xl font-bold text-primary">{analysis.ingredient_comparison_table.summary.unique_to_us_count}</div>
               <div className="text-[9px] text-primary">Unique to Us</div>
+            </div>
+            <div className="bg-chart-5/10 rounded-lg p-3 border border-chart-5/30 text-center">
+              <div className="text-xl font-bold text-chart-5">{analysis.ingredient_comparison_table.summary.alternatives_detected_count || 0}</div>
+              <div className="text-[9px] text-chart-5">🔄 Alternatives</div>
             </div>
             <div className="bg-destructive/10 rounded-lg p-3 border border-destructive/30 text-center">
               <div className="text-xl font-bold text-destructive">{analysis.ingredient_comparison_table.summary.missing_from_us_count}</div>
@@ -261,17 +265,48 @@ export function AIAnalysisResults({ analysis, onRefresh, isLoading }: AIAnalysis
                             'unique_to_us': 'bg-primary/20 text-primary border-primary/30',
                             'missing_from_us': 'bg-destructive/20 text-destructive border-destructive/30',
                             'partial': 'bg-chart-2/20 text-chart-2 border-chart-2/30',
+                            'alternative_used': 'bg-chart-5/20 text-chart-5 border-chart-5/30',
                           };
                           const statusLabels: Record<string, string> = {
                             'in_all': '✅ All',
                             'unique_to_us': '🟡 Unique',
                             'missing_from_us': '🔴 Missing',
                             'partial': '⚪ Partial',
+                            'alternative_used': '🔄 Alt',
+                          };
+                          
+                          // Helper to render competitor cell with alternative detection
+                          const renderCompetitorCell = (competitor: any) => {
+                            if (!competitor) return <span className="text-muted-foreground">—</span>;
+                            
+                            if (competitor.present) {
+                              return <span className="text-foreground">{competitor.amount || '✓'}</span>;
+                            }
+                            
+                            if (competitor.uses_alternative && competitor.alternative_name) {
+                              return (
+                                <div className="text-center">
+                                  <span className="text-chart-5 font-medium text-[10px]">🔄 {competitor.alternative_name}</span>
+                                  {competitor.alternative_amount && (
+                                    <span className="text-[9px] text-muted-foreground block">{competitor.alternative_amount}</span>
+                                  )}
+                                </div>
+                              );
+                            }
+                            
+                            return <span className="text-muted-foreground">—</span>;
                           };
                           
                           return (
                             <tr key={idx} className="border-t border-border/30 hover:bg-muted/30">
-                              <td className="p-2 font-medium text-foreground">{row.ingredient}</td>
+                              <td className="p-2 font-medium text-foreground">
+                                <div>
+                                  {row.ingredient}
+                                  {row.functional_group && (
+                                    <span className="text-[9px] text-muted-foreground block capitalize">{row.functional_group}</span>
+                                  )}
+                                </div>
+                              </td>
                               <td className="p-2 text-muted-foreground capitalize">{row.category.replace('_', ' ')}</td>
                               <td className="p-2 text-center">
                                 {row.our_concept.amount ? (
@@ -280,38 +315,23 @@ export function AIAnalysisResults({ analysis, onRefresh, isLoading }: AIAnalysis
                                     {row.our_concept.form && (
                                       <span className="text-[9px] text-muted-foreground block">{row.our_concept.form}</span>
                                     )}
+                                    {(row.our_concept as any).function && (
+                                      <span className="text-[8px] text-muted-foreground/70 block italic">{(row.our_concept as any).function}</span>
+                                    )}
                                   </div>
                                 ) : (
                                   <span className="text-muted-foreground">—</span>
                                 )}
                               </td>
+                              <td className="p-2 text-center">{renderCompetitorCell(row.competitor_1)}</td>
+                              <td className="p-2 text-center">{renderCompetitorCell(row.competitor_2)}</td>
+                              <td className="p-2 text-center">{renderCompetitorCell(row.competitor_3)}</td>
                               <td className="p-2 text-center">
-                                {row.competitor_1.present ? (
-                                  <span className="text-foreground">{row.competitor_1.amount || '✓'}</span>
-                                ) : (
-                                  <span className="text-muted-foreground">—</span>
-                                )}
-                              </td>
-                              <td className="p-2 text-center">
-                                {row.competitor_2.present ? (
-                                  <span className="text-foreground">{row.competitor_2.amount || '✓'}</span>
-                                ) : (
-                                  <span className="text-muted-foreground">—</span>
-                                )}
-                              </td>
-                              <td className="p-2 text-center">
-                                {row.competitor_3.present ? (
-                                  <span className="text-foreground">{row.competitor_3.amount || '✓'}</span>
-                                ) : (
-                                  <span className="text-muted-foreground">—</span>
-                                )}
-                              </td>
-                              <td className="p-2 text-center">
-                                <Badge variant="outline" className={`text-[8px] ${statusStyles[row.status]}`}>
-                                  {statusLabels[row.status]}
+                                <Badge variant="outline" className={`text-[8px] ${statusStyles[row.status] || statusStyles['partial']}`}>
+                                  {statusLabels[row.status] || row.status}
                                 </Badge>
                               </td>
-                              <td className="p-2 text-[10px] text-muted-foreground max-w-[150px]">{row.comparison_note}</td>
+                              <td className="p-2 text-[10px] text-muted-foreground max-w-[200px]">{row.comparison_note}</td>
                             </tr>
                           );
                         })}

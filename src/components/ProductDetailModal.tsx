@@ -152,10 +152,32 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
   const reviewAnalysis = product.review_analysis as ReviewAnalysis | null;
   const allNutrients = product.all_nutrients as unknown as Nutrient[] | null;
   const proprietaryBlends = product.proprietary_blends as unknown as ProprietaryBlend[] | null;
-  // Parse specifications - it's an ARRAY of {name, value} objects
-  const specificationsArray = product.specifications as unknown as SpecificationItem[] | null;
-  // Parse important_information - it has a sections array
-  const importantInfo = product.important_information as unknown as ImportantInformation | null;
+
+  // Normalize specifications: DB may be either an array [{name,value}] OR an object map.
+  const rawSpecifications = product.specifications as unknown;
+  const specificationsArray: SpecificationItem[] | null = Array.isArray(rawSpecifications)
+    ? (rawSpecifications as SpecificationItem[])
+    : rawSpecifications && typeof rawSpecifications === "object"
+      ? Object.entries(rawSpecifications as Record<string, unknown>).map(([name, value]) => ({
+          name,
+          value: value == null ? "" : String(value),
+        }))
+      : null;
+
+  // Normalize important_information: DB may be {sections:[{title,body}]} OR a legacy key/value map.
+  const rawImportantInfo = product.important_information as unknown;
+  const importantInfo: ImportantInformation | null =
+    rawImportantInfo && typeof rawImportantInfo === "object" && Array.isArray((rawImportantInfo as any).sections)
+      ? (rawImportantInfo as ImportantInformation)
+      : rawImportantInfo && typeof rawImportantInfo === "object"
+        ? {
+            sections: Object.entries(rawImportantInfo as Record<string, unknown>).map(([title, body]) => ({
+              title,
+              body: Array.isArray(body) ? body.map(String).join("\n") : body == null ? "" : String(body),
+            })),
+          }
+        : null;
+
   // Parse supplement_facts_complete for richer data
   const supplementFacts = product.supplement_facts_complete as unknown as SupplementFactsComplete | null;
   const categoryTree = product.category_tree as unknown as Array<{ name: string; url?: string }> | null;

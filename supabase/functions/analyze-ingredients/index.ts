@@ -544,13 +544,30 @@ Provide a comprehensive analysis including SWOT, clinical dosage adequacy, custo
 
         console.log(`[analyze-ingredients] Analysis result parsed successfully for ${type} with keys:`, Object.keys(analysisResult).join(', '));
 
+        // Include raw competitor data alongside AI analysis
+        const completeAnalysis = {
+          ...analysisResult,
+          competitor_details: competitorData.map((c: any) => ({
+            brand: c.brand,
+            title: c.title,
+            price: c.price,
+            monthly_sales: c.monthly_sales,
+            age_months: c.age_months,
+            supplement_facts_complete: c.supplement_facts_complete,
+            other_ingredients: c.other_ingredients,
+            specifications: c.specifications,
+            important_information: c.important_information,
+            ingredients: c.ingredients,
+          }))
+        };
+
         // Save to database with type
         const { error: saveError } = await supabase
           .from('ingredient_analyses')
           .upsert({
             category_id: categoryId,
             type: type,
-            analysis: analysisResult,
+            analysis: completeAnalysis,
             updated_at: new Date().toISOString()
           }, { onConflict: 'category_id,type' });
 

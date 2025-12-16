@@ -118,47 +118,23 @@ serve(async (req) => {
 
     console.log(`[analyze-ingredients] Marked as in_progress for type: ${type}`);
 
-    // Format competitor data with full formulation details
+    // Format competitor data with FULL formulation details (no truncation)
     const competitorData = (competitors || []).map((c: any, i: number) => {
-      // Parse supplement_facts_complete for detailed nutrient data
-      const supplementFacts = c.supplement_facts_complete || {};
-      
-      // Parse specifications array
-      const specs = Array.isArray(c.specifications) 
-        ? c.specifications.map((s: any) => `${s.name}: ${s.value}`).join(', ')
-        : c.specifications && typeof c.specifications === 'object'
-          ? Object.entries(c.specifications).map(([k, v]) => `${k}: ${v}`).join(', ')
-          : null;
-      
-      // Parse important_information
-      const importantInfo = c.important_information?.sections
-        ? c.important_information.sections.map((s: any) => `${s.title}: ${s.body}`).join(' | ')
-        : c.important_information && typeof c.important_information === 'object'
-          ? Object.entries(c.important_information).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join(' | ')
-          : null;
-
       return {
         rank: i + 1,
         brand: c.brand || 'Unknown',
         title: c.title || 'Unknown Product',
-        ingredients: c.ingredients || 'Not available',
-        other_ingredients: c.other_ingredients || null,
-        nutrients: c.all_nutrients || null,
-        supplement_facts_complete: {
-          serving_size: supplementFacts.serving_size || null,
-          active_ingredients: supplementFacts.active_ingredients || null,
-          all_nutrients: supplementFacts.all_nutrients || null,
-          proprietary_blends: supplementFacts.proprietary_blends || null,
-          claims_on_label: supplementFacts.claims_on_label || null,
-          directions: supplementFacts.directions || null,
-          warnings: supplementFacts.warnings || null,
-          manufacturer: supplementFacts.manufacturer || null,
-        },
-        specifications: specs,
-        important_information: importantInfo,
         price: c.price,
         monthly_sales: c.monthly_sales,
         age_months: c.age_months,
+        // Full raw data - no truncation
+        ingredients: c.ingredients || 'Not available',
+        other_ingredients: c.other_ingredients || null,
+        nutrients: c.all_nutrients || null,
+        // Complete raw objects
+        supplement_facts_complete: c.supplement_facts_complete || null,
+        specifications: c.specifications || null,
+        important_information: c.important_information || null,
         pain_points: c.review_analysis?.pain_points || []
       };
     });
@@ -219,18 +195,27 @@ ${competitorData.map((c: any) => `
 - Price: $${c.price || 'N/A'}
 - Monthly Sales: ${c.monthly_sales || 'N/A'}
 ${c.age_months ? `- Product Age: ${c.age_months} months` : ''}
-- Primary Ingredients: ${typeof c.ingredients === 'string' ? c.ingredients.substring(0, 1000) : JSON.stringify(c.ingredients).substring(0, 1000)}
-${c.other_ingredients ? `- Other Ingredients: ${c.other_ingredients.substring(0, 500)}` : ''}
-- Nutrient Profile: ${c.nutrients ? JSON.stringify(c.nutrients).substring(0, 1000) : 'Not available'}
-${c.supplement_facts_complete?.serving_size ? `- Serving Size: ${c.supplement_facts_complete.serving_size}` : ''}
-${c.supplement_facts_complete?.active_ingredients ? `- Active Ingredients: ${JSON.stringify(c.supplement_facts_complete.active_ingredients).substring(0, 600)}` : ''}
-${c.supplement_facts_complete?.proprietary_blends ? `- Proprietary Blends: ${JSON.stringify(c.supplement_facts_complete.proprietary_blends).substring(0, 400)}` : ''}
-${c.supplement_facts_complete?.claims_on_label ? `- Label Claims: ${c.supplement_facts_complete.claims_on_label.join(', ')}` : ''}
-${c.supplement_facts_complete?.directions ? `- Directions: ${c.supplement_facts_complete.directions}` : ''}
-${c.supplement_facts_complete?.warnings ? `- Warnings: ${c.supplement_facts_complete.warnings}` : ''}
-${c.specifications ? `- Specifications: ${c.specifications}` : ''}
-${c.important_information ? `- Important Information: ${c.important_information}` : ''}
-- Customer Pain Points: ${JSON.stringify(c.pain_points).substring(0, 400)}`).join('\n')}
+
+#### PRIMARY INGREDIENTS (FULL):
+${typeof c.ingredients === 'string' ? c.ingredients : JSON.stringify(c.ingredients)}
+
+${c.other_ingredients ? `#### OTHER INGREDIENTS (FULL - Inactive/Fillers):
+${c.other_ingredients}` : ''}
+
+${c.nutrients ? `#### NUTRIENT PROFILE (FULL):
+${JSON.stringify(c.nutrients)}` : ''}
+
+${c.supplement_facts_complete ? `#### SUPPLEMENT FACTS COMPLETE (RAW):
+${JSON.stringify(c.supplement_facts_complete)}` : ''}
+
+${c.specifications ? `#### SPECIFICATIONS (RAW):
+${JSON.stringify(c.specifications)}` : ''}
+
+${c.important_information ? `#### IMPORTANT INFORMATION (RAW - Safety/Usage):
+${JSON.stringify(c.important_information)}` : ''}
+
+#### CUSTOMER PAIN POINTS:
+${JSON.stringify(c.pain_points)}`).join('\n\n---\n')}
 
 Provide a comprehensive analysis including SWOT, clinical dosage adequacy, customer insights, competitive matrix, priority roadmap, and a complete ingredient comparison table. Call the save_ingredient_analysis function with all fields populated.`;
 

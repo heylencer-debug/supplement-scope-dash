@@ -510,7 +510,7 @@ export default function Dashboard() {
                                 <p className="font-medium text-sm">{data.fullName}</p>
                                 <p className="text-sm text-muted-foreground">Share: {data.value}%</p>
                                 <p className="text-sm text-primary">
-                                  ${(data.revenue / 1000).toFixed(1)}K/mo
+                                  ${(Number(data.revenue || 0) / 1000).toFixed(1)}K/mo
                                 </p>
                               </div>
                             );

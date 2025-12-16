@@ -26,9 +26,9 @@ export function LoadingIndicator({ size = "sm", className, text }: LoadingIndica
 export function LoadingPulse({ className }: { className?: string }) {
   return (
     <span className={cn("inline-flex items-center gap-1 animate-fade-in-up", className)}>
-      <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-pulse" />
-      <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-pulse [animation-delay:150ms]" />
-      <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-pulse [animation-delay:300ms]" />
+      <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-slow-pulse" />
+      <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-slow-pulse [animation-delay:150ms]" />
+      <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-slow-pulse [animation-delay:300ms]" />
     </span>
   );
 }
@@ -125,7 +125,7 @@ export function LoadingOverlay({ isLoading, text, variant = "spinner" }: Loading
         {variant === "dots" && <LoadingDots size="lg" />}
         {variant === "grow" && <SpinnerGrow size="lg" />}
         {text && (
-          <p className="text-sm font-medium text-muted-foreground animate-pulse">
+          <p className="text-sm font-medium text-muted-foreground animate-slow-pulse">
             {text}
           </p>
         )}
@@ -189,7 +189,7 @@ export function SkeletonShimmer({ className, variant = "rectangular" }: Skeleton
   return (
     <div
       className={cn(
-        "relative overflow-hidden bg-muted animate-pulse",
+        "relative overflow-hidden bg-muted animate-slow-pulse",
         variantClasses[variant],
         className
       )}

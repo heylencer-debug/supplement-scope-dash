@@ -142,6 +142,10 @@ export default {
           "0%, 100%": { boxShadow: "0 0 0 0 hsl(var(--primary) / 0)" },
           "50%": { boxShadow: "0 0 24px 6px hsl(var(--primary) / 0.25)" },
         },
+        "slow-pulse": {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0.5" },
+        },
         "progress-shine": {
           "0%": { transform: "translateX(-100%)" },
           "100%": { transform: "translateX(200%)" },
@@ -242,7 +246,8 @@ export default {
         "check-bounce": "check-bounce 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)",
         "shake": "shake 0.4s ease-in-out",
         "pop": "pop 0.2s ease-out",
-        "glow-pulse": "glow-pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+        "glow-pulse": "glow-pulse 10s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+        "slow-pulse": "slow-pulse 10s cubic-bezier(0.4, 0, 0.6, 1) infinite",
         "progress-shine": "progress-shine 1.5s ease-in-out infinite",
         "thumb-bounce": "thumb-bounce 0.2s ease-out",
         "slide-up": "slide-up 0.3s ease-out",

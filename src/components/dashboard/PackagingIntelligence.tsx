@@ -95,7 +95,7 @@ function AnalysisProgressIndicator({
     <div className="p-5 bg-primary/5 rounded-xl border border-primary/20">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-primary animate-pulse [animation-duration:3s]" />
+          <Sparkles className="w-5 h-5 text-primary animate-slow-pulse" />
           <span className="font-medium text-foreground">AI Packaging Analysis</span>
         </div>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -631,7 +631,7 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
 
           {/* Loading from DB - only show if loading AND no analysis yet */}
           {isLoadingImagesFromDb && !hasImageAnalysis && (
-            <div className="p-4 bg-muted/30 rounded-lg border border-border/50 animate-pulse [animation-duration:3s]">
+            <div className="p-4 bg-muted/30 rounded-lg border border-border/50 animate-slow-pulse">
               <div className="flex items-center gap-2">
                 <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">Loading saved image analysis...</span>
@@ -761,7 +761,7 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
 
           {/* AI Analysis Loading State - only show if loading AND no analysis yet */}
           {isLoadingFromDb && !hasAnalysis && (
-            <div className="p-4 bg-muted/30 rounded-lg border border-border/50 animate-pulse [animation-duration:3s]">
+            <div className="p-4 bg-muted/30 rounded-lg border border-border/50 animate-slow-pulse">
               <div className="flex items-center gap-2">
                 <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">Loading saved AI analysis...</span>

@@ -99,6 +99,44 @@ interface ProprietaryBlend {
   ingredients?: string[];
 }
 
+// Correct interfaces for database JSONB fields
+interface SpecificationItem {
+  name: string;
+  value: string;
+}
+
+interface ImportantInfoSection {
+  title: string;
+  body: string;
+}
+
+interface ImportantInformation {
+  sections?: ImportantInfoSection[];
+}
+
+interface SupplementFactsComplete {
+  active_ingredients?: Array<{ name: string; amount?: number | string; unit?: string }>;
+  all_nutrients?: Array<{ name: string; amount?: number | string; unit?: string; per_serving?: boolean }>;
+  claims_on_label?: string[];
+  confidence?: string;
+  directions?: string;
+  extraction_completeness?: {
+    image_quality?: string;
+    notes?: string;
+    panel_fully_visible?: boolean;
+    total_nutrients_found?: number;
+  };
+  found?: boolean;
+  found_in_image?: number;
+  inactive_ingredients?: string[] | null;
+  manufacturer?: string;
+  other_ingredients?: string | null;
+  panel_type?: string;
+  proprietary_blends?: Array<{ name: string; ingredients?: string[]; total_amount?: number | string; unit?: string }>;
+  serving_size?: string;
+  warnings?: string | null;
+}
+
 const SENTIMENT_COLORS = {
   positive: "hsl(var(--chart-2))",
   neutral: "hsl(var(--chart-4))",
@@ -114,9 +152,13 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
   const reviewAnalysis = product.review_analysis as ReviewAnalysis | null;
   const allNutrients = product.all_nutrients as unknown as Nutrient[] | null;
   const proprietaryBlends = product.proprietary_blends as unknown as ProprietaryBlend[] | null;
-  const specifications = product.specifications as Record<string, string> | null;
-  const importantInfo = product.important_information as Record<string, string | string[]> | null;
-  const categoryTree = product.category_tree as Array<{ name: string; url?: string }> | null;
+  // Parse specifications - it's an ARRAY of {name, value} objects
+  const specificationsArray = product.specifications as unknown as SpecificationItem[] | null;
+  // Parse important_information - it has a sections array
+  const importantInfo = product.important_information as unknown as ImportantInformation | null;
+  // Parse supplement_facts_complete for richer data
+  const supplementFacts = product.supplement_facts_complete as unknown as SupplementFactsComplete | null;
+  const categoryTree = product.category_tree as unknown as Array<{ name: string; url?: string }> | null;
 
   const allImages = [
     product.main_image_url,
@@ -1277,20 +1319,96 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
               {product.allergen_info && <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><AlertCircle className="w-4 h-4 text-yellow-500" />Allergen Information</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">{product.allergen_info}</p></CardContent></Card>}
               {product.warnings && <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><AlertCircle className="w-4 h-4 text-destructive" />Warnings</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">{product.warnings}</p></CardContent></Card>}
               {product.directions && <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Directions</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">{product.directions}</p></CardContent></Card>}
-              {specifications && Object.keys(specifications).length > 0 && (
-                <Card>
-                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Info className="w-4 h-4" />Specifications</CardTitle></CardHeader>
-                  <CardContent><div className="space-y-2">{Object.entries(specifications).map(([key, value]) => <div key={key} className="flex justify-between text-sm border-b border-border pb-2 last:border-0"><span className="text-muted-foreground">{key}</span><span className="font-medium text-right max-w-[60%]">{value}</span></div>)}</div></CardContent>
+              {/* Supplement Facts Complete - Enhanced Display */}
+              {supplementFacts && (
+                <Card className="border-chart-4/30">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-chart-4" />
+                      Extraction Details
+                      {supplementFacts.panel_type && (
+                        <Badge variant="outline" className="ml-2">{supplementFacts.panel_type}</Badge>
+                      )}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {supplementFacts.extraction_completeness && (
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Image Quality</p>
+                          <p className="font-medium capitalize">{supplementFacts.extraction_completeness.image_quality ?? "-"}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Panel Visible</p>
+                          <p className="font-medium">{supplementFacts.extraction_completeness.panel_fully_visible ? "Yes" : "No"}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Nutrients Found</p>
+                          <p className="font-medium">{supplementFacts.extraction_completeness.total_nutrients_found ?? "-"}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Confidence</p>
+                          <Badge variant={supplementFacts.confidence === "high" ? "default" : supplementFacts.confidence === "medium" ? "secondary" : "outline"}>
+                            {supplementFacts.confidence ?? "-"}
+                          </Badge>
+                        </div>
+                      </div>
+                    )}
+                    {supplementFacts.extraction_completeness?.notes && (
+                      <p className="text-xs text-muted-foreground italic">{supplementFacts.extraction_completeness.notes}</p>
+                    )}
+                    {supplementFacts.manufacturer && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">Manufacturer (from label)</p>
+                        <p className="text-sm font-medium">{supplementFacts.manufacturer}</p>
+                      </div>
+                    )}
+                    {supplementFacts.claims_on_label && supplementFacts.claims_on_label.length > 0 && (
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-2">Claims on Label</p>
+                        <div className="flex flex-wrap gap-1">
+                          {supplementFacts.claims_on_label.map((claim, idx) => (
+                            <Badge key={idx} variant="secondary" className="text-xs">{claim}</Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
                 </Card>
               )}
-              {importantInfo && Object.keys(importantInfo).length > 0 && (
+              {specificationsArray && specificationsArray.length > 0 && (
                 <Card>
-                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><AlertCircle className="w-4 h-4 text-yellow-500" />Important Information</CardTitle></CardHeader>
-                  <CardContent className="space-y-3">
-                    {Object.entries(importantInfo).map(([key, value]) => (
-                      <div key={key}>
-                        <p className="text-xs font-medium text-muted-foreground mb-1">{key}</p>
-                        {Array.isArray(value) ? <ul className="space-y-1">{value.map((item, idx) => <li key={idx} className="text-sm text-muted-foreground">• {item}</li>)}</ul> : <p className="text-sm text-muted-foreground">{value}</p>}
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      <Info className="w-4 h-4" />
+                      Specifications ({specificationsArray.length})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {specificationsArray.map((spec, idx) => (
+                        <div key={idx} className="flex justify-between text-sm border-b border-border pb-2 last:border-0">
+                          <span className="text-muted-foreground">{spec.name}</span>
+                          <span className="font-medium text-right max-w-[60%]">{spec.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+              {importantInfo?.sections && importantInfo.sections.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 text-yellow-500" />
+                      Important Information
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {importantInfo.sections.map((section, idx) => (
+                      <div key={idx}>
+                        <p className="text-sm font-medium text-foreground mb-1">{section.title}</p>
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">{section.body}</p>
                       </div>
                     ))}
                   </CardContent>

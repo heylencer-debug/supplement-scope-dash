@@ -428,8 +428,7 @@ export function AIPackagingResults({ analysis, mockupImageUrl, onSaveMockup, onR
             disabled={isGenerating}
             size="lg"
             className={cn(
-              "gap-2 transition-all duration-300 hover:shadow-[0_0_20px_hsl(var(--primary)/0.4)] hover:scale-105",
-              !isGenerating && !generatedMockup && "animate-glow-pulse"
+              "gap-2 transition-all duration-300 hover:shadow-[0_0_20px_hsl(var(--primary)/0.4)] hover:scale-105"
             )}
           >
             {isGenerating ? (
@@ -589,8 +588,7 @@ export function AIPackagingResults({ analysis, mockupImageUrl, onSaveMockup, onR
                   disabled={isGenerating}
                   size="sm"
                   className={cn(
-                    "gap-2 transition-all duration-300 hover:shadow-[0_0_20px_hsl(var(--primary)/0.4)] hover:scale-105",
-                    !isGenerating && !generatedMockup && "animate-glow-pulse"
+                    "gap-2 transition-all duration-300 hover:shadow-[0_0_20px_hsl(var(--primary)/0.4)] hover:scale-105"
                   )}
                 >
                   {isGenerating ? (

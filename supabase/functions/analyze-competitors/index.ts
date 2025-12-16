@@ -184,7 +184,7 @@ Provide a comprehensive competitive analysis.`;
       "X-Title": "Noodle Search Competitive Analysis",
     },
     body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
+      model: "google/gemini-3-pro-preview",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },

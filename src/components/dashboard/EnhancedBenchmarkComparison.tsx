@@ -2317,7 +2317,7 @@ export function EnhancedBenchmarkComparison({
                               <p className="text-xs font-medium truncate">{product.brand || 'Unknown'}</p>
                               <p className="text-[10px] text-muted-foreground truncate">{product.title?.substring(0, 40)}...</p>
                               <div className="flex items-center gap-2 mt-0.5">
-                                <span className="text-[10px] text-muted-foreground">${product.price?.toFixed(2)}</span>
+                                <span className="text-[10px] text-muted-foreground">${product.price != null ? Number(product.price).toFixed(2) : '—'}</span>
                                 <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
                                   <Star className="w-2.5 h-2.5 fill-chart-2 text-chart-2" />
                                   {product.rating?.toFixed(1)}
@@ -2396,7 +2396,7 @@ export function EnhancedBenchmarkComparison({
                           Target Price
                         </p>
                         <p className="text-base sm:text-lg font-bold text-chart-4">
-                          {pricing.price ? `$${pricing.price.toFixed(2)}` : '—'}
+                          {pricing.price != null ? `$${Number(pricing.price).toFixed(2)}` : '—'}
                         </p>
                         {pricing.tier && (
                           <Badge variant="secondary" className="text-[7px] sm:text-[8px] h-4 mt-1">
@@ -2893,7 +2893,7 @@ export function EnhancedBenchmarkComparison({
                       <div className="flex items-center justify-between gap-2">
                         <div className="p-1.5 bg-secondary rounded text-center flex-1">
                           <p className="text-[10px] text-muted-foreground">Price</p>
-                          <p className="text-sm md:text-base font-bold">{product.price ? `$${product.price.toFixed(2)}` : <span className="inline-flex"><span className="w-1 h-1 rounded-full bg-muted-foreground/60 mx-0.5" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60 mx-0.5" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60 mx-0.5" /></span>}</p>
+                          <p className="text-sm md:text-base font-bold">{product.price != null ? `$${Number(product.price).toFixed(2)}` : <span className="inline-flex"><span className="w-1 h-1 rounded-full bg-muted-foreground/60 mx-0.5" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60 mx-0.5" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60 mx-0.5" /></span>}</p>
                         </div>
                         <div className="p-1.5 bg-secondary rounded text-center flex-1">
                           <p className="text-[10px] text-muted-foreground">Rating</p>

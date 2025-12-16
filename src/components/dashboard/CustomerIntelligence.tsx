@@ -171,7 +171,7 @@ export default function CustomerIntelligence({
                       </TableCell>
                       <TableCell>
                         <Badge variant="secondary" className="text-xs">
-                          {point.frequency || <span className="inline-flex items-center gap-0.5"><span className="w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse [animation-delay:150ms]" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse [animation-delay:300ms]" /></span>}
+                          {point.frequency || <span className="inline-flex items-center gap-0.5"><span className="w-1 h-1 rounded-full bg-muted-foreground/60 animate-slow-pulse" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60 animate-slow-pulse [animation-delay:150ms]" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60 animate-slow-pulse [animation-delay:300ms]" /></span>}
                         </Badge>
                       </TableCell>
                       {primary_pain_points.some(p => p.solution) && (

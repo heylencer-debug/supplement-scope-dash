@@ -3235,9 +3235,9 @@ export function EnhancedBenchmarkComparison({
                             return (
                               <div className="text-[10px] text-muted-foreground">
                                 <span className="inline-flex items-center gap-1">
-                                  <span className="w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse" />
-                                  <span className="w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse [animation-delay:150ms]" />
-                                  <span className="w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse [animation-delay:300ms]" />
+                                  <span className="w-1 h-1 rounded-full bg-muted-foreground/60 animate-slow-pulse" />
+                                  <span className="w-1 h-1 rounded-full bg-muted-foreground/60 animate-slow-pulse [animation-delay:150ms]" />
+                                  <span className="w-1 h-1 rounded-full bg-muted-foreground/60 animate-slow-pulse [animation-delay:300ms]" />
                                   <span className="ml-1">Awaiting label scan</span>
                                 </span>
                               </div>

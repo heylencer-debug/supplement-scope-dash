@@ -11,7 +11,7 @@ interface DocumentContainerProps {
 export function DocumentContainer({ content, isLoading, title }: DocumentContainerProps) {
   if (isLoading) {
     return (
-      <div className="bg-white dark:bg-card max-w-[800px] mx-auto shadow-lg rounded-lg p-8 md:p-12 space-y-8 animate-pulse">
+      <div className="bg-white dark:bg-card max-w-[800px] mx-auto shadow-lg rounded-lg p-8 md:p-12 space-y-8 animate-slow-pulse">
         {/* Document Title */}
         <div className="border-b border-border pb-6">
           <Skeleton className="h-10 w-4/5 mb-3" />

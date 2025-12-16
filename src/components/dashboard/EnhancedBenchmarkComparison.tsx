@@ -1011,7 +1011,7 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                 <Button 
                   variant="default"
                   size="sm" 
-                  className="h-8 px-3 text-xs transition-all duration-300 hover:shadow-[0_0_20px_hsl(var(--primary)/0.4)] hover:scale-105 animate-glow-pulse"
+                  className="h-8 px-3 text-xs transition-all duration-300 hover:shadow-[0_0_20px_hsl(var(--primary)/0.4)] hover:scale-105"
                   onClick={(e) => { e.stopPropagation(); activeAnalysisData.runAnalysis(); }}
                   disabled={activeAnalysisData.isLoading || !categoryId}
                 >
@@ -1056,7 +1056,7 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                 /* Polling Progress Indicator */
                 <div className="flex flex-col items-center justify-center py-12 text-center">
                   <div className="relative mb-6">
-                    <div className="p-4 rounded-full bg-primary/10 animate-pulse">
+                    <div className="p-4 rounded-full bg-primary/10">
                       <Brain className="w-8 h-8 text-primary" />
                     </div>
                     <div className="absolute -bottom-1 -right-1 bg-card rounded-full p-1 border border-border">
@@ -1114,8 +1114,7 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                     onClick={activeAnalysisData.runAnalysis}
                     disabled={activeAnalysisData.isLoading || !categoryId}
                     className={cn(
-                      "gap-2 transition-all duration-300 hover:shadow-[0_0_20px_hsl(var(--primary)/0.4)] hover:scale-105",
-                      !activeAnalysisData.isLoading && "animate-glow-pulse"
+                      "gap-2 transition-all duration-300 hover:shadow-[0_0_20px_hsl(var(--primary)/0.4)] hover:scale-105"
                     )}
                   >
                     {activeAnalysisData.isLoading ? (
@@ -2156,8 +2155,7 @@ export function EnhancedBenchmarkComparison({
                 onClick={runCompetitiveAnalysis}
                 disabled={competitiveLoading || competitivePolling}
                 className={cn(
-                  "h-8 gap-1.5 transition-all duration-300 hover:shadow-[0_0_20px_hsl(var(--primary)/0.4)] hover:scale-105",
-                  !competitiveAnalysis && !competitiveLoading && !competitivePolling && "animate-glow-pulse"
+                  "h-8 gap-1.5 transition-all duration-300 hover:shadow-[0_0_20px_hsl(var(--primary)/0.4)] hover:scale-105"
                 )}
               >
                 {(competitiveLoading || competitivePolling) ? (
@@ -2895,13 +2893,13 @@ export function EnhancedBenchmarkComparison({
                       <div className="flex items-center justify-between gap-2">
                         <div className="p-1.5 bg-secondary rounded text-center flex-1">
                           <p className="text-[10px] text-muted-foreground">Price</p>
-                          <p className="text-sm md:text-base font-bold">{product.price ? `$${product.price.toFixed(2)}` : <span className="inline-flex"><span className="w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse mx-0.5" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse [animation-delay:150ms] mx-0.5" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse [animation-delay:300ms] mx-0.5" /></span>}</p>
+                          <p className="text-sm md:text-base font-bold">{product.price ? `$${product.price.toFixed(2)}` : <span className="inline-flex"><span className="w-1 h-1 rounded-full bg-muted-foreground/60 mx-0.5" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60 mx-0.5" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60 mx-0.5" /></span>}</p>
                         </div>
                         <div className="p-1.5 bg-secondary rounded text-center flex-1">
                           <p className="text-[10px] text-muted-foreground">Rating</p>
                         <div className="flex items-center justify-center gap-0.5">
                             <Star className="w-3 h-3 fill-chart-2 text-chart-2" />
-                            <span className="text-sm md:text-base font-bold">{product.rating ? product.rating.toFixed(1) : <span className="inline-flex"><span className="w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse mx-0.5" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse [animation-delay:150ms] mx-0.5" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse [animation-delay:300ms] mx-0.5" /></span>}</span>
+                            <span className="text-sm md:text-base font-bold">{product.rating ? product.rating.toFixed(1) : <span className="inline-flex"><span className="w-1 h-1 rounded-full bg-muted-foreground/60 mx-0.5" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60 mx-0.5" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60 mx-0.5" /></span>}</span>
                           </div>
                         </div>
                       </div>
@@ -3235,9 +3233,9 @@ export function EnhancedBenchmarkComparison({
                             return (
                               <div className="text-[10px] text-muted-foreground">
                                 <span className="inline-flex items-center gap-1">
-                                  <span className="w-1 h-1 rounded-full bg-muted-foreground/60 animate-slow-pulse" />
-                                  <span className="w-1 h-1 rounded-full bg-muted-foreground/60 animate-slow-pulse [animation-delay:150ms]" />
-                                  <span className="w-1 h-1 rounded-full bg-muted-foreground/60 animate-slow-pulse [animation-delay:300ms]" />
+                                  <span className="w-1 h-1 rounded-full bg-muted-foreground/60" />
+                                  <span className="w-1 h-1 rounded-full bg-muted-foreground/60" />
+                                  <span className="w-1 h-1 rounded-full bg-muted-foreground/60" />
                                   <span className="ml-1">Awaiting label scan</span>
                                 </span>
                               </div>
@@ -3376,7 +3374,7 @@ export function EnhancedBenchmarkComparison({
                           (() => {
                             const topWin = getCompetitorTopWin(product);
                             if (!topWin) {
-                              return <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground"><span className="w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse [animation-delay:150ms]" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse [animation-delay:300ms]" /></span>;
+                              return <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground"><span className="w-1 h-1 rounded-full bg-muted-foreground/60" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60" /></span>;
                             }
                             return (
                               <div className="flex items-center gap-1">
@@ -3405,7 +3403,7 @@ export function EnhancedBenchmarkComparison({
                             {(() => {
                               const strengths = getCompetitorStrengths(product);
                               if (strengths.length === 0) {
-                                return <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground"><span className="w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse [animation-delay:150ms]" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60 animate-pulse [animation-delay:300ms]" /></span>;
+                                return <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground"><span className="w-1 h-1 rounded-full bg-muted-foreground/60" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60" /></span>;
                               }
                               return strengths.map((s, i) => (
                                 <div key={i} className="flex items-start gap-1 text-[10px] text-muted-foreground">

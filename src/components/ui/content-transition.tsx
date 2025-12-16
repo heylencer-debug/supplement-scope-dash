@@ -17,7 +17,7 @@ export function ContentTransition({
   return (
     <div className={cn("relative", className)}>
       {isLoading ? (
-        <div className="animate-slow-pulse">{skeleton}</div>
+        <div>{skeleton}</div>
       ) : (
         <div className="animate-fade-in [animation-duration:500ms]">{children}</div>
       )}

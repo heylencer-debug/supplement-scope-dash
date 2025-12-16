@@ -227,7 +227,7 @@ function MockupCard({
         disabled={isGenerating}
         className={cn(
           "w-full gap-2 transition-all duration-300",
-          !isGenerating && !generatedMockup && "animate-glow-pulse hover:shadow-[0_0_20px_hsl(var(--primary)/0.4)] hover:scale-105"
+          !isGenerating && !generatedMockup && "hover:shadow-[0_0_20px_hsl(var(--primary)/0.4)] hover:scale-105"
         )}
         variant={generatedMockup ? "outline" : "default"}
       >

@@ -339,10 +339,31 @@ export function AIAnalysisResults({ analysis, onRefresh, isLoading }: AIAnalysis
         <div className="space-y-4">
           {analysis.competitor_details && analysis.competitor_details.length > 0 ? (
             <>
+              {/* Metadata Header - What was sent to AI */}
+              {analysis.data_sent_to_ai && (
+                <div className="bg-primary/5 rounded-lg p-3 border border-primary/20">
+                  <p className="text-xs font-medium text-primary mb-2 flex items-center gap-1">
+                    <Info className="w-3 h-3" />
+                    Data Sent to AI
+                  </p>
+                  <div className="flex flex-wrap gap-2 text-[10px]">
+                    <Badge variant="outline" className="bg-background">
+                      {analysis.data_sent_to_ai.competitor_count} competitors
+                    </Badge>
+                    <Badge variant="outline" className="bg-background">
+                      {analysis.data_sent_to_ai.competitor_label}
+                    </Badge>
+                    <Badge variant="outline" className={`bg-background ${analysis.data_sent_to_ai.formula_brief_included ? 'text-chart-4' : 'text-muted-foreground'}`}>
+                      Formula Brief: {analysis.data_sent_to_ai.formula_brief_included ? 'Included' : 'Not available'}
+                    </Badge>
+                  </div>
+                </div>
+              )}
+              
               <div className="flex items-center gap-2 mb-2">
                 <Package className="w-4 h-4 text-primary" />
                 <p className="text-sm font-medium text-foreground">
-                  Competitor Formulation Deep Dive ({analysis.competitor_details.length} products)
+                  Raw Competitor Formulation Data ({analysis.competitor_details.length} products)
                 </p>
               </div>
               
@@ -469,6 +490,16 @@ export function AIAnalysisResults({ analysis, onRefresh, isLoading }: AIAnalysis
                                 <p className="text-[9px] text-foreground mt-1">{comp.supplement_facts_complete.warnings}</p>
                               </div>
                             )}
+                            
+                            {/* Full Raw JSON Toggle */}
+                            <details className="mt-2">
+                              <summary className="text-[9px] text-primary cursor-pointer hover:underline">
+                                View Full Raw JSON
+                              </summary>
+                              <pre className="text-[8px] text-muted-foreground bg-muted/50 rounded p-2 mt-1 overflow-x-auto max-h-[150px] overflow-y-auto whitespace-pre-wrap">
+                                {JSON.stringify(comp.supplement_facts_complete, null, 2)}
+                              </pre>
+                            </details>
                           </div>
                         )}
                         
@@ -485,47 +516,81 @@ export function AIAnalysisResults({ analysis, onRefresh, isLoading }: AIAnalysis
                           </div>
                         )}
                         
-                        {/* Specifications */}
+                        {/* Specifications - Now Raw JSON */}
                         {comp.specifications && (
                           <div className="space-y-1">
                             <p className="text-xs font-medium text-foreground flex items-center gap-1">
                               <Info className="w-3 h-3 text-chart-3" />
-                              Specifications
+                              Specifications (Raw)
                             </p>
-                            <p className="text-[10px] text-muted-foreground bg-muted/30 rounded p-2">
-                              {comp.specifications}
-                            </p>
+                            <pre className="text-[9px] text-muted-foreground bg-muted/30 rounded p-2 overflow-x-auto max-h-[100px] overflow-y-auto whitespace-pre-wrap">
+                              {typeof comp.specifications === 'string' 
+                                ? comp.specifications 
+                                : JSON.stringify(comp.specifications, null, 2)}
+                            </pre>
                           </div>
                         )}
                         
-                        {/* Important Information */}
+                        {/* Important Information - Now Raw JSON */}
                         {comp.important_information && (
                           <div className="space-y-1">
                             <p className="text-xs font-medium text-foreground flex items-center gap-1">
                               <AlertCircle className="w-3 h-3 text-chart-2" />
-                              Important Information
+                              Important Information (Raw)
                             </p>
-                            <p className="text-[10px] text-muted-foreground bg-chart-2/5 rounded p-2 border border-chart-2/10">
-                              {comp.important_information}
+                            <pre className="text-[9px] text-muted-foreground bg-chart-2/5 rounded p-2 border border-chart-2/10 overflow-x-auto max-h-[100px] overflow-y-auto whitespace-pre-wrap">
+                              {typeof comp.important_information === 'string' 
+                                ? comp.important_information 
+                                : JSON.stringify(comp.important_information, null, 2)}
+                            </pre>
+                          </div>
+                        )}
+                        
+                        {/* Nutrients - Full JSON */}
+                        {comp.nutrients && (
+                          <div className="space-y-1">
+                            <p className="text-xs font-medium text-foreground flex items-center gap-1">
+                              <FlaskConical className="w-3 h-3 text-chart-4" />
+                              Nutrients (Raw)
                             </p>
+                            <pre className="text-[9px] text-muted-foreground bg-chart-4/5 rounded p-2 border border-chart-4/10 overflow-x-auto max-h-[100px] overflow-y-auto whitespace-pre-wrap">
+                              {typeof comp.nutrients === 'string' 
+                                ? comp.nutrients 
+                                : JSON.stringify(comp.nutrients, null, 2)}
+                            </pre>
                           </div>
                         )}
                         
                         {/* Raw Ingredients (fallback) */}
-                        {comp.ingredients && !comp.supplement_facts_complete?.active_ingredients && (
+                        {comp.ingredients && (
                           <div className="space-y-1">
                             <p className="text-xs font-medium text-foreground flex items-center gap-1">
                               <FlaskConical className="w-3 h-3 text-primary" />
-                              Ingredients List
+                              Ingredients List (Raw)
                             </p>
-                            <p className="text-[10px] text-muted-foreground bg-muted/30 rounded p-2 max-h-[100px] overflow-y-auto">
-                              {comp.ingredients}
+                            <pre className="text-[9px] text-muted-foreground bg-muted/30 rounded p-2 overflow-x-auto max-h-[100px] overflow-y-auto whitespace-pre-wrap">
+                              {typeof comp.ingredients === 'string' 
+                                ? comp.ingredients 
+                                : JSON.stringify(comp.ingredients, null, 2)}
+                            </pre>
+                          </div>
+                        )}
+                        
+                        {/* Pain Points */}
+                        {comp.pain_points && Array.isArray(comp.pain_points) && comp.pain_points.length > 0 && (
+                          <div className="space-y-1">
+                            <p className="text-xs font-medium text-foreground flex items-center gap-1">
+                              <AlertTriangle className="w-3 h-3 text-chart-2" />
+                              Pain Points (Raw)
                             </p>
+                            <pre className="text-[9px] text-muted-foreground bg-chart-2/5 rounded p-2 border border-chart-2/10 overflow-x-auto max-h-[100px] overflow-y-auto whitespace-pre-wrap">
+                              {JSON.stringify(comp.pain_points, null, 2)}
+                            </pre>
                           </div>
                         )}
                         
                         {/* Empty state for this competitor */}
-                        {!comp.supplement_facts_complete && !comp.other_ingredients && !comp.specifications && !comp.important_information && !comp.ingredients && (
+                        {!comp.supplement_facts_complete && !comp.other_ingredients && !comp.specifications && !comp.important_information && !comp.ingredients && !comp.nutrients && (
                           <div className="text-center py-4 text-muted-foreground">
                             <Package className="w-6 h-6 mx-auto mb-1 opacity-50" />
                             <p className="text-[10px]">No detailed formulation data available</p>

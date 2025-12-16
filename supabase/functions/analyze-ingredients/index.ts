@@ -529,21 +529,31 @@ Provide a comprehensive analysis including SWOT, clinical dosage adequacy, custo
 
         console.log(`[analyze-ingredients] Analysis result parsed successfully for ${type} with keys:`, Object.keys(analysisResult).join(', '));
 
-        // Include raw competitor data alongside AI analysis
+        // Include raw competitor data alongside AI analysis - this is the EXACT data sent to AI
         const completeAnalysis = {
           ...analysisResult,
           competitor_details: competitorData.map((c: any) => ({
+            rank: c.rank,
             brand: c.brand,
             title: c.title,
             price: c.price,
             monthly_sales: c.monthly_sales,
             age_months: c.age_months,
-            supplement_facts_complete: c.supplement_facts_complete,
+            // Full raw data exactly as sent to AI (no truncation)
+            ingredients: c.ingredients,
             other_ingredients: c.other_ingredients,
+            nutrients: c.nutrients,
+            supplement_facts_complete: c.supplement_facts_complete,
             specifications: c.specifications,
             important_information: c.important_information,
-            ingredients: c.ingredients,
-          }))
+            pain_points: c.pain_points,
+          })),
+          data_sent_to_ai: {
+            competitor_count: competitorData.length,
+            analysis_type: type,
+            competitor_label: competitorLabel,
+            formula_brief_included: !!formulaBriefContent
+          }
         };
 
         // Save to database with type

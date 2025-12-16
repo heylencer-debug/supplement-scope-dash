@@ -140,10 +140,10 @@ async function runCompetitiveAnalysis(supabase: any, categoryId: string) {
 }
 
 async function callAIForCompetitiveAnalysis(ourConcept: any, competitors: CompetitorData[]) {
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
 
-  if (!LOVABLE_API_KEY) {
-    throw new Error("LOVABLE_API_KEY is not configured");
+  if (!OPENROUTER_API_KEY) {
+    throw new Error("OPENROUTER_API_KEY is not configured");
   }
 
   const systemPrompt = `You are an expert competitive analyst for consumer products. Analyze "Our Concept" (a new product being developed) against existing competitors and provide strategic insights.
@@ -175,11 +175,13 @@ ${competitors.map((c, i) => `
 
 Provide a comprehensive competitive analysis.`;
 
-  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${LOVABLE_API_KEY}`,
+      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
       "Content-Type": "application/json",
+      "HTTP-Referer": Deno.env.get("SUPABASE_URL") || "https://lovable.dev",
+      "X-Title": "Noodle Search Competitive Analysis",
     },
     body: JSON.stringify({
       model: "google/gemini-2.5-flash",

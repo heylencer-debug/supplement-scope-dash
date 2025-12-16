@@ -100,14 +100,48 @@ export interface IngredientAnalysis {
     rows: Array<{
       ingredient: string;
       category: 'primary_active' | 'secondary_active' | 'tertiary_active' | 'excipient' | 'other';
+      functional_group?: string;
       our_concept: {
         amount: string | null;
         form: string | null;
+        function?: string;
       };
-      competitor_1: { amount: string | null; present: boolean };
-      competitor_2: { amount: string | null; present: boolean };
-      competitor_3: { amount: string | null; present: boolean };
-      status: 'in_all' | 'unique_to_us' | 'missing_from_us' | 'partial';
+      competitor_1: { 
+        amount: string | null; 
+        present: boolean;
+        uses_alternative?: boolean;
+        alternative_name?: string;
+        alternative_amount?: string;
+      };
+      competitor_2: { 
+        amount: string | null; 
+        present: boolean;
+        uses_alternative?: boolean;
+        alternative_name?: string;
+        alternative_amount?: string;
+      };
+      competitor_3: { 
+        amount: string | null; 
+        present: boolean;
+        uses_alternative?: boolean;
+        alternative_name?: string;
+        alternative_amount?: string;
+      };
+      competitor_4?: { 
+        amount: string | null; 
+        present: boolean;
+        uses_alternative?: boolean;
+        alternative_name?: string;
+        alternative_amount?: string;
+      };
+      competitor_5?: { 
+        amount: string | null; 
+        present: boolean;
+        uses_alternative?: boolean;
+        alternative_name?: string;
+        alternative_amount?: string;
+      };
+      status: 'in_all' | 'unique_to_us' | 'missing_from_us' | 'partial' | 'alternative_used';
       comparison_note: string;
     }>;
     summary: {
@@ -116,6 +150,7 @@ export interface IngredientAnalysis {
       overlap_count: number;
       unique_to_us_count: number;
       missing_from_us_count: number;
+      alternatives_detected_count?: number;
       overall_assessment: string;
     };
   };

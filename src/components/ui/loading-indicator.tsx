@@ -194,7 +194,7 @@ export function SkeletonShimmer({ className, variant = "rectangular" }: Skeleton
         className
       )}
     >
-      <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
+      <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent animate-shimmer" />
     </div>
   );
 }

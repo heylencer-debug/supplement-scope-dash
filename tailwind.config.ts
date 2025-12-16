@@ -268,6 +268,7 @@ export default {
         "icon-wiggle": "icon-wiggle 0.4s ease-in-out",
         "slide-indicator": "slide-indicator 0.3s ease-out forwards",
         "ripple": "ripple 0.6s ease-out forwards",
+        "shimmer": "shimmer 1.5s ease-in-out infinite",
       },
     },
   },

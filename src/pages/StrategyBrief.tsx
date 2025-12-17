@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { FileText, Download, Copy, Check, Loader2, Printer } from "lucide-react";
+import { FileText, Copy, Check, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCategoryAnalysis } from "@/hooks/useCategoryAnalyses";
 import { useCategoryContext } from "@/contexts/CategoryContext";
@@ -18,8 +18,6 @@ export default function StrategyBrief() {
   const urlCategoryName = rawUrlCategoryName ? rawUrlCategoryName.replace(/^=+/, "").trim() : null;
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
-  const [generatingPdf, setGeneratingPdf] = useState(false);
-  const documentRef = useRef<HTMLDivElement>(null);
   
   const { currentCategoryId, categoryName: contextCategoryName, setCategoryContext } = useCategoryContext();
   const categoryName = urlCategoryName || contextCategoryName;
@@ -54,49 +52,6 @@ export default function StrategyBrief() {
       setTimeout(() => setCopied(false), 2000);
     } catch {
       toast({ title: "Copy failed", description: "Unable to copy to clipboard.", variant: "destructive" });
-    }
-  };
-
-  const handleDownloadPDF = async () => {
-    if (!formulaBriefContent) {
-      toast({ title: "PDF not available", description: "No document content to export.", variant: "destructive" });
-      return;
-    }
-
-    setGeneratingPdf(true);
-    try {
-      // Dynamic import to avoid React bundling conflicts
-      const [{ pdf }, { StrategyBriefPDF }] = await Promise.all([
-        import("@react-pdf/renderer"),
-        import("@/components/document/StrategyBriefPDF")
-      ]);
-      
-      // Create React element using createElement since we can't use JSX here
-      const { createElement } = await import("react");
-      const pdfDocument = createElement(StrategyBriefPDF, {
-        content: formulaBriefContent,
-        categoryName: categoryName || 'Document',
-        createdAt: analysis?.created_at || undefined
-      });
-      
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const blob = await pdf(pdfDocument as any).toBlob();
-      
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `Formula-Strategy-Brief-${categoryName || 'Document'}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      
-      toast({ title: "PDF downloaded", description: "Your strategy brief has been saved as PDF." });
-    } catch (err) {
-      console.error('PDF generation error:', err);
-      toast({ title: "PDF generation failed", description: "Unable to generate PDF. Please try again.", variant: "destructive" });
-    } finally {
-      setGeneratingPdf(false);
     }
   };
 
@@ -136,20 +91,11 @@ export default function StrategyBrief() {
             <Button variant="outline" size="sm" className="gap-2" onClick={handlePrint} disabled={!formulaBriefContent || isLoading}>
               <Printer className="w-4 h-4" />Print
             </Button>
-            <Button variant="outline" size="sm" className="gap-2" onClick={handleDownloadPDF} disabled={isLoading || generatingPdf || !formulaBriefContent}>
-              {generatingPdf ? (
-                <><Loader2 className="w-4 h-4 animate-spin" />Generating...</>
-              ) : (
-                <><Download className="w-4 h-4" />Download PDF</>
-              )}
-            </Button>
           </div>
         </div>
       </div>
       <div className="py-8 px-4">
-        <div ref={documentRef}>
-          <DocumentContainer content={formulaBriefContent} isLoading={isLoading} title={`Formula Strategy Brief - ${categoryName}`} />
-        </div>
+        <DocumentContainer content={formulaBriefContent} isLoading={isLoading} title={`Formula Strategy Brief - ${categoryName}`} />
       </div>
       {analysis && !isLoading && (
         <div className="max-w-[800px] mx-auto px-4 pb-8">

@@ -10,77 +10,6 @@ declare const EdgeRuntime: {
   waitUntil: (promise: Promise<any>) => void;
 };
 
-// Pre-extract ingredients from formula brief markdown to ensure consistent counts
-interface ExtractedIngredient {
-  name: string;
-  amount: string;
-  category: string;
-}
-
-function extractIngredientsFromFormulaBrief(content: string): { 
-  ingredients: ExtractedIngredient[];
-  count: number;
-} {
-  const ingredients: ExtractedIngredient[] = [];
-  
-  if (!content) {
-    console.log('[extract-ingredients] No content provided');
-    return { ingredients: [], count: 0 };
-  }
-
-  // Define category patterns to match markdown sections (supports 3-4 hashes, uppercase headers)
-  const categoryPatterns = [
-    { category: 'primary_active', regex: /#{3,4}\s*PRIMARY\s*ACTIVE\s*INGREDIENTS?:?[^#]*?(?=#{3,4}|$)/gis },
-    { category: 'secondary_active', regex: /#{3,4}\s*SECONDARY\s*ACTIVE\s*INGREDIENTS?:?[^#]*?(?=#{3,4}|$)/gis },
-    { category: 'tertiary_active', regex: /#{3,4}\s*TERTIARY\s*ACTIVES?:?[^#]*?(?=#{3,4}|$)/gis },
-    { category: 'functional_excipient', regex: /#{3,4}\s*FUNCTIONAL\s*EXCIPIENTS?:?[^#]*?(?=#{3,4}|$)/gis }
-  ];
-
-  for (const { category, regex } of categoryPatterns) {
-    const sectionMatch = content.match(regex);
-    console.log(`[extract-ingredients] Category ${category}: found ${sectionMatch?.length || 0} sections`);
-    
-    if (sectionMatch) {
-      for (const section of sectionMatch) {
-        // Match table rows including sub-rows (lines starting with | - or | - *)
-        // Format: | Ingredient | Amount | ... | or | - *Ingredient* | Amount | ...
-        const tableRowRegex = /\|\s*[-*]?\s*\*?([^|*\n]+?)\*?\s*\|\s*([^|\n]+?)\s*\|/g;
-        let match;
-        
-        while ((match = tableRowRegex.exec(section)) !== null) {
-          let name = match[1].trim();
-          const amount = match[2].trim();
-          
-          // Clean up markdown formatting from name (remove leading - or *)
-          name = name.replace(/^[-*]\s*/, '').trim();
-          
-          // Skip headers and separator rows
-          if (
-            name.toLowerCase().includes('ingredient') ||
-            name.includes('---') ||
-            name.includes('===') ||
-            amount.toLowerCase().includes('amount') ||
-            amount.toLowerCase().includes('dosage') ||
-            amount.toLowerCase().includes('per serving') ||
-            amount.includes('---') ||
-            name.length === 0 ||
-            amount.length === 0
-          ) {
-            continue;
-          }
-          
-          ingredients.push({ name, amount, category });
-          console.log(`[extract-ingredients] Found: ${name} | ${amount} | ${category}`);
-        }
-      }
-    }
-  }
-
-  console.log(`[extract-ingredients] Extracted ${ingredients.length} ingredients from formula brief`);
-  
-  return { ingredients, count: ingredients.length };
-}
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -101,6 +30,41 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // SEQUENTIAL WORKFLOW: For top_performers, require new_winners analysis first
+    let groundTruthIngredientCount: number | null = null;
+    
+    if (type === 'top_performers') {
+      console.log(`[analyze-ingredients] Checking for existing new_winners analysis...`);
+      
+      const { data: newWinnersAnalysis, error: nwError } = await supabase
+        .from('ingredient_analyses')
+        .select('analysis')
+        .eq('category_id', categoryId)
+        .eq('type', 'new_winners')
+        .maybeSingle();
+      
+      if (nwError) {
+        console.error('[analyze-ingredients] Error checking new_winners analysis:', nwError);
+      }
+      
+      // Check if new_winners analysis exists and has ingredient count
+      const newWinnersCount = newWinnersAnalysis?.analysis?.ingredient_comparison_table?.summary?.total_our_ingredients;
+      
+      if (!newWinnersCount) {
+        console.log('[analyze-ingredients] new_winners analysis not found or incomplete - rejecting top_performers request');
+        return new Response(
+          JSON.stringify({ 
+            error: 'Please run New Winners analysis first to establish ingredient count',
+            code: 'NEW_WINNERS_REQUIRED'
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      groundTruthIngredientCount = newWinnersCount;
+      console.log(`[analyze-ingredients] Using ground truth ingredient count from new_winners: ${groundTruthIngredientCount}`);
+    }
 
     // Fetch category analysis data
     const { data: categoryAnalysis, error: analysisError } = await supabase
@@ -231,14 +195,36 @@ serve(async (req) => {
         const formulaBriefContent = categoryAnalysis.analysis_3_formula_brief?.formula_brief_content || '';
         const categoryName = categoryAnalysis.category_name || 'Unknown Category';
 
-        // PRE-EXTRACT INGREDIENTS for consistent counting across both analysis types
-        const ourIngredients = extractIngredientsFromFormulaBrief(formulaBriefContent);
-        console.log(`[analyze-ingredients] Pre-extracted ${ourIngredients.count} ingredients for ${type} analysis`);
-
         // Customize prompt based on analysis type
         const typeContext = type === 'new_winners' 
           ? `Focus on EMERGING TRENDS and GROWTH STRATEGIES. These are NEW WINNERS - young, high-growth products that are disrupting the market. Analyze what innovative formulation strategies they're using that are driving their rapid growth.`
           : `Focus on PROVEN FORMULATIONS and MARKET SHARE. These are TOP PERFORMERS - established best-sellers with proven track records. Analyze what formulation strategies have made them market leaders.`;
+
+        // Different instructions based on whether we have a ground truth count
+        let ingredientCountInstructions: string;
+        
+        if (groundTruthIngredientCount !== null) {
+          // Top Performers: Use the ground truth count from New Winners
+          ingredientCountInstructions = `
+CRITICAL: The New Winners analysis has already identified EXACTLY ${groundTruthIngredientCount} ingredients in Our Concept's formula.
+YOU MUST CREATE EXACTLY ${groundTruthIngredientCount} ROWS in ingredient_comparison_table - ONE ROW PER INGREDIENT.
+DO NOT ADD OR REMOVE ANY INGREDIENTS. The count MUST match ${groundTruthIngredientCount}.
+summary.total_our_ingredients MUST equal ${groundTruthIngredientCount}.`;
+        } else {
+          // New Winners: AI determines the count from raw data
+          ingredientCountInstructions = `
+CRITICAL: You must parse ALL ingredients from the formula brief below.
+This formula typically contains 25-40+ ingredients organized across:
+- PRIMARY ACTIVE INGREDIENTS
+- SECONDARY ACTIVE INGREDIENTS  
+- TERTIARY ACTIVES
+- FUNCTIONAL EXCIPIENTS
+
+Parse EVERY ingredient from the markdown tables. Count them carefully.
+Create ONE ROW per ingredient in ingredient_comparison_table.
+summary.total_our_ingredients MUST equal the actual count you extract.
+DO NOT MISS ANY INGREDIENTS - the New Winners analysis sets the ground truth count for Top Performers.`;
+        }
 
         const systemPrompt = `You are an expert supplement formulation analyst. Analyze ingredient formulations and provide comprehensive strategic recommendations.
 
@@ -252,54 +238,33 @@ Your task is to compare "Our Concept" formulation against ${competitorLabel} and
 - Priority roadmap for improvements
 - COMPREHENSIVE ingredient comparison table (ALL ingredients)
 
-CRITICAL INSTRUCTIONS FOR INGREDIENT COMPARISON TABLE:
+${ingredientCountInstructions}
 
-1. WE HAVE PRE-EXTRACTED EXACTLY ${ourIngredients.count} INGREDIENTS from Our Concept's formula.
-   YOU MUST CREATE EXACTLY ${ourIngredients.count} ROWS in ingredient_comparison_table - ONE ROW PER INGREDIENT.
-   DO NOT ADD OR REMOVE ANY INGREDIENTS FROM THE PROVIDED LIST.
+For EACH Our Concept ingredient, analyze if competitors have:
+- EXACT MATCH: Same ingredient (present = true, uses_alternative = false)
+- FUNCTIONAL ALTERNATIVE: Different ingredient serving same function (present = false, uses_alternative = true, alternative_name = their ingredient)
+- ABSENT: Neither exact nor alternative (present = false, uses_alternative = false)
 
-2. For EACH Our Concept ingredient, analyze if competitors have:
-   - EXACT MATCH: Same ingredient (present = true, uses_alternative = false)
-   - FUNCTIONAL ALTERNATIVE: Different ingredient serving same function (present = false, uses_alternative = true, alternative_name = their ingredient)
-   - ABSENT: Neither exact nor alternative (present = false, uses_alternative = false)
+FUNCTIONAL ALTERNATIVES - Automatically detect when competitor uses different ingredient for same purpose:
+- FIBER SOURCES: Pumpkin, Sweet Potato, Beet Fiber, Psyllium, Apple Pectin, Chicory Root are alternatives to each other
+- PROBIOTICS: Different strains are alternatives (Bacillus coagulans, Lactobacillus, Bifidobacterium, DE111, etc.)
+- PREBIOTICS: FOS, GOS, XOS, Inulin, Chicory Root, MOS are alternatives to each other
+- OMEGA-3 SOURCES: Salmon Oil, Fish Oil, Flaxseed Oil, Krill Oil, Anchovy Oil are alternatives
+- ANTI-INFLAMMATORIES: Turmeric, Ginger, Boswellia, Quercetin, MSM are alternatives
+- DIGESTIVE ENZYMES: Protease, Amylase, Lipase, Papain, Bromelain, Cellulase are alternatives
+- GUT SOOTHERS: Slippery Elm, Marshmallow Root, Licorice Root, Aloe Vera, L-Glutamine are alternatives
+- IMMUNE SUPPORT: Colostrum, Beta-glucan, Echinacea, Astragalus are alternatives
+- HUMECTANTS/BINDING: Glycerin, Vegetable Glycerin, Coconut Glycerin are alternatives
+- PRESERVATIVES: Rosemary Extract, Mixed Tocopherols, Vitamin E, Natural Preservatives are alternatives
 
-3. FUNCTIONAL ALTERNATIVES - Automatically detect when competitor uses different ingredient for same purpose:
-   - FIBER SOURCES: Pumpkin, Sweet Potato, Beet Fiber, Psyllium, Apple Pectin, Chicory Root are alternatives to each other
-   - PROBIOTICS: Different strains are alternatives (Bacillus coagulans, Lactobacillus, Bifidobacterium, DE111, etc.)
-   - PREBIOTICS: FOS, GOS, XOS, Inulin, Chicory Root, MOS are alternatives to each other
-   - OMEGA-3 SOURCES: Salmon Oil, Fish Oil, Flaxseed Oil, Krill Oil, Anchovy Oil are alternatives
-   - ANTI-INFLAMMATORIES: Turmeric, Ginger, Boswellia, Quercetin, MSM are alternatives
-   - DIGESTIVE ENZYMES: Protease, Amylase, Lipase, Papain, Bromelain, Cellulase are alternatives
-   - GUT SOOTHERS: Slippery Elm, Marshmallow Root, Licorice Root, Aloe Vera, L-Glutamine are alternatives
-   - IMMUNE SUPPORT: Colostrum, Beta-glucan, Echinacea, Astragalus are alternatives
-   - HUMECTANTS/BINDING: Glycerin, Vegetable Glycerin, Coconut Glycerin are alternatives
-   - PRESERVATIVES: Rosemary Extract, Mixed Tocopherols, Vitamin E, Natural Preservatives are alternatives
-
-4. When competitor uses an ALTERNATIVE, populate these fields:
-   - uses_alternative: true
-   - alternative_name: "Name of their ingredient"
-   - alternative_amount: "Their dosage"
-   - status: "alternative_used"
-   - comparison_note: "Uses [X] instead of [Y] for [function]"
-
-5. MANDATORY: ingredient_comparison_table.rows MUST have EXACTLY ${ourIngredients.count} rows.
-   summary.total_our_ingredients MUST equal ${ourIngredients.count}.
+When competitor uses an ALTERNATIVE, populate these fields:
+- uses_alternative: true
+- alternative_name: "Name of their ingredient"
+- alternative_amount: "Their dosage"
+- status: "alternative_used"
+- comparison_note: "Uses [X] instead of [Y] for [function]"
 
 IMPORTANT: You must call the "save_ingredient_analysis" function with your complete analysis results. Do not respond with plain text.`;
-
-        // Format pre-extracted ingredients for AI to use
-        const ingredientsByCategory = ourIngredients.ingredients.reduce((acc: Record<string, ExtractedIngredient[]>, ing) => {
-          if (!acc[ing.category]) acc[ing.category] = [];
-          acc[ing.category].push(ing);
-          return acc;
-        }, {});
-
-        const formattedOurIngredients = Object.entries(ingredientsByCategory)
-          .map(([cat, ings]) => {
-            const categoryLabel = cat.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-            return `### ${categoryLabel} (${ings.length} ingredients):\n${ings.map((i: ExtractedIngredient) => `- ${i.name}: ${i.amount}`).join('\n')}`;
-          })
-          .join('\n\n');
 
         const userPrompt = `Analyze the ingredient formulation for: ${categoryName}
 
@@ -308,15 +273,12 @@ ${type === 'new_winners'
   ? 'These are emerging high-growth products. Focus on innovative formulation trends and growth drivers.' 
   : 'These are established market leaders. Focus on proven formulation strategies and competitive positioning.'}
 
-## OUR CONCEPT INGREDIENTS (EXACTLY ${ourIngredients.count} total - YOU MUST CREATE EXACTLY ${ourIngredients.count} ROWS):
-
-${formattedOurIngredients}
-
-REMINDER: The ingredient_comparison_table.rows array MUST contain EXACTLY ${ourIngredients.count} rows - one for each ingredient listed above.
-summary.total_our_ingredients MUST equal ${ourIngredients.count}.
-
-## RAW FORMULA BRIEF (for additional context only - use pre-extracted list above for row count):
+## RAW FORMULA BRIEF (parse ALL ingredients from this - NO TRUNCATION):
 ${formulaBriefContent || 'No formula brief available'}
+
+${groundTruthIngredientCount !== null 
+  ? `REMINDER: You MUST create EXACTLY ${groundTruthIngredientCount} rows to match the New Winners analysis.` 
+  : 'REMINDER: Parse ALL ingredients from the formula brief above. Count carefully - this sets the ground truth.'}
 
 ## ${competitorLabel}:
 ${competitorData.map((c: any) => `
@@ -346,7 +308,7 @@ ${JSON.stringify(c.important_information)}` : ''}
 #### CUSTOMER PAIN POINTS:
 ${JSON.stringify(c.pain_points)}`).join('\n\n---\n')}
 
-FINAL REMINDER: The ingredient_comparison_table MUST have a row for EVERY ingredient from Our Concept formula brief. Detect functional alternatives when competitors use different ingredients for the same purpose. Expect 25-40 total rows in the table.
+FINAL REMINDER: Parse EVERY ingredient from Our Concept's formula brief. Detect functional alternatives when competitors use different ingredients for the same purpose.
 
 Provide a comprehensive analysis including SWOT, clinical dosage adequacy, customer insights, competitive matrix, priority roadmap, and the COMPLETE ingredient comparison table. Call the save_ingredient_analysis function with all fields populated.`;
 
@@ -387,9 +349,6 @@ Provide a comprehensive analysis including SWOT, clinical dosage adequacy, custo
                 charts: {
                   type: 'object',
                   properties: {
-                    coverage_score: { type: 'number', description: '0-100' },
-                    uniqueness_score: { type: 'number', description: '0-100' },
-                    efficacy_score: { type: 'number', description: '0-100' },
                     dosage_comparison: {
                       type: 'array',
                       items: {
@@ -399,66 +358,25 @@ Provide a comprehensive analysis including SWOT, clinical dosage adequacy, custo
                           our_amount: { type: 'number' },
                           competitor_avg: { type: 'number' },
                           unit: { type: 'string' }
-                        },
-                        required: ['ingredient', 'our_amount', 'competitor_avg', 'unit']
+                        }
                       }
-                    }
-                  },
-                  required: ['coverage_score', 'uniqueness_score', 'efficacy_score', 'dosage_comparison']
+                    },
+                    coverage_score: { type: 'number' },
+                    uniqueness_score: { type: 'number' },
+                    efficacy_score: { type: 'number' }
+                  }
                 },
                 actionable_insights: {
                   type: 'array',
                   items: {
                     type: 'object',
                     properties: {
-                      priority: { type: 'string', description: 'high, medium, or low' },
-                      insight: { type: 'string' },
-                      action: { type: 'string' }
-                    },
-                    required: ['priority', 'insight', 'action']
-                  }
-                },
-                swot: {
-                  type: 'object',
-                  properties: {
-                    strengths: { type: 'array', items: { type: 'string' } },
-                    weaknesses: { type: 'array', items: { type: 'string' } },
-                    opportunities: { type: 'array', items: { type: 'string' } },
-                    threats: { type: 'array', items: { type: 'string' } }
-                  },
-                  required: ['strengths', 'weaknesses', 'opportunities', 'threats']
-                },
-                clinical_analysis: {
-                  type: 'object',
-                  properties: {
-                    dosage_adequacy: {
-                      type: 'array',
-                      items: {
-                        type: 'object',
-                        properties: {
-                          ingredient: { type: 'string' },
-                          our_dosage: { type: 'string' },
-                          clinical_range: { type: 'string' },
-                          adequacy: { type: 'string', description: 'optimal, adequate, suboptimal, or insufficient' },
-                          research_note: { type: 'string' }
-                        },
-                        required: ['ingredient', 'our_dosage', 'clinical_range', 'adequacy', 'research_note']
-                      }
-                    },
-                    synergy_pairs: {
-                      type: 'array',
-                      items: {
-                        type: 'object',
-                        properties: {
-                          ingredients: { type: 'array', items: { type: 'string' } },
-                          synergy_type: { type: 'string' },
-                          present_in_formula: { type: 'boolean' }
-                        },
-                        required: ['ingredients', 'synergy_type', 'present_in_formula']
-                      }
+                      type: { type: 'string', description: 'add, increase, decrease, remove, or keep' },
+                      ingredient: { type: 'string' },
+                      reason: { type: 'string' },
+                      impact: { type: 'string', description: 'high, medium, or low' }
                     }
-                  },
-                  required: ['dosage_adequacy', 'synergy_pairs']
+                  }
                 },
                 customer_insights: {
                   type: 'object',
@@ -470,10 +388,9 @@ Provide a comprehensive analysis including SWOT, clinical dosage adequacy, custo
                         properties: {
                           pain_point: { type: 'string' },
                           solving_ingredient: { type: 'string' },
-                          confidence: { type: 'string', description: 'high, medium, or low' },
+                          confidence: { type: 'string' },
                           evidence: { type: 'string' }
-                        },
-                        required: ['pain_point', 'solving_ingredient', 'confidence', 'evidence']
+                        }
                       }
                     },
                     unaddressed_complaints: {
@@ -484,12 +401,10 @@ Provide a comprehensive analysis including SWOT, clinical dosage adequacy, custo
                           complaint: { type: 'string' },
                           suggested_solution: { type: 'string' },
                           ingredient_recommendation: { type: 'string' }
-                        },
-                        required: ['complaint', 'suggested_solution', 'ingredient_recommendation']
+                        }
                       }
                     }
-                  },
-                  required: ['pain_point_solutions', 'unaddressed_complaints']
+                  }
                 },
                 competitive_matrix: {
                   type: 'object',
@@ -502,9 +417,8 @@ Provide a comprehensive analysis including SWOT, clinical dosage adequacy, custo
                           category: { type: 'string' },
                           our_position: { type: 'string' },
                           vs_competitors: { type: 'string' },
-                          impact: { type: 'string', description: 'high, medium, or low' }
-                        },
-                        required: ['category', 'our_position', 'vs_competitors', 'impact']
+                          impact: { type: 'string' }
+                        }
                       }
                     },
                     vulnerabilities: {
@@ -515,26 +429,61 @@ Provide a comprehensive analysis including SWOT, clinical dosage adequacy, custo
                           category: { type: 'string' },
                           risk_description: { type: 'string' },
                           mitigation: { type: 'string' }
-                        },
-                        required: ['category', 'risk_description', 'mitigation']
+                        }
                       }
                     }
-                  },
-                  required: ['advantages', 'vulnerabilities']
+                  }
+                },
+                clinical_analysis: {
+                  type: 'object',
+                  properties: {
+                    dosage_adequacy: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          ingredient: { type: 'string' },
+                          our_dosage: { type: 'string' },
+                          clinical_range: { type: 'string' },
+                          adequacy: { type: 'string' },
+                          research_note: { type: 'string' }
+                        }
+                      }
+                    },
+                    synergy_pairs: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          ingredients: { type: 'array', items: { type: 'string' } },
+                          synergy_type: { type: 'string' },
+                          present_in_formula: { type: 'boolean' }
+                        }
+                      }
+                    }
+                  }
+                },
+                swot: {
+                  type: 'object',
+                  properties: {
+                    strengths: { type: 'array', items: { type: 'string' } },
+                    weaknesses: { type: 'array', items: { type: 'string' } },
+                    opportunities: { type: 'array', items: { type: 'string' } },
+                    threats: { type: 'array', items: { type: 'string' } }
+                  }
                 },
                 priority_roadmap: {
                   type: 'array',
                   items: {
                     type: 'object',
                     properties: {
-                      phase: { type: 'number', description: '1, 2, or 3' },
+                      phase: { type: 'number' },
                       action: { type: 'string' },
                       ingredient: { type: 'string' },
                       expected_impact: { type: 'string' },
-                      complexity: { type: 'string', description: 'easy, moderate, or complex' },
+                      complexity: { type: 'string' },
                       timeline: { type: 'string' }
-                    },
-                    required: ['phase', 'action', 'ingredient', 'expected_impact', 'complexity', 'timeline']
+                    }
                   }
                 },
                 ingredient_comparison_table: {
@@ -548,35 +497,33 @@ Provide a comprehensive analysis including SWOT, clinical dosage adequacy, custo
                         properties: {
                           brand: { type: 'string' },
                           product_name: { type: 'string' }
-                        },
-                        required: ['brand', 'product_name']
+                        }
                       }
                     },
                     rows: {
                       type: 'array',
-                      description: 'MUST contain one row per ingredient from Our Concept formula brief (expect 25-40 rows). Parse ALL ingredient tables.',
                       items: {
                         type: 'object',
                         properties: {
-                          ingredient: { type: 'string', description: 'Ingredient name exactly as listed in Our Concept formula brief' },
-                          category: { type: 'string', description: 'primary_active, secondary_active, tertiary_active, excipient' },
-                          functional_group: { type: 'string', description: 'e.g., fiber, probiotic, prebiotic, omega-3, enzyme, anti-inflammatory, gut-soother, immune, humectant, preservative' },
+                          ingredient: { type: 'string' },
+                          category: { type: 'string' },
+                          functional_group: { type: 'string' },
                           our_concept: {
                             type: 'object',
                             properties: {
-                              amount: { type: 'string', description: 'Dosage from formula brief e.g., "1,200 mg"' },
-                              form: { type: 'string', description: 'Form/format of ingredient if specified' },
-                              function: { type: 'string', description: 'What this ingredient does functionally' }
+                              amount: { type: 'string' },
+                              form: { type: 'string' },
+                              function: { type: 'string' }
                             }
                           },
                           competitor_1: {
                             type: 'object',
                             properties: {
-                              amount: { type: 'string', description: 'Dosage if present' },
-                              present: { type: 'boolean', description: 'True if competitor has this exact ingredient' },
-                              uses_alternative: { type: 'boolean', description: 'True if competitor uses a different ingredient for the same function' },
-                              alternative_name: { type: 'string', description: 'Name of alternative ingredient if uses_alternative is true' },
-                              alternative_amount: { type: 'string', description: 'Dosage of alternative ingredient' }
+                              amount: { type: 'string' },
+                              present: { type: 'boolean' },
+                              uses_alternative: { type: 'boolean' },
+                              alternative_name: { type: 'string' },
+                              alternative_amount: { type: 'string' }
                             }
                           },
                           competitor_2: {
@@ -619,30 +566,27 @@ Provide a comprehensive analysis including SWOT, clinical dosage adequacy, custo
                               alternative_amount: { type: 'string' }
                             }
                           },
-                          status: { type: 'string', description: 'in_all, unique_to_us, missing_from_us, partial, or alternative_used' },
-                          comparison_note: { type: 'string', description: 'Include alternative detection notes like "Uses X instead of Y for fiber"' }
-                        },
-                        required: ['ingredient', 'category', 'functional_group', 'our_concept', 'competitor_1', 'competitor_2', 'competitor_3', 'status', 'comparison_note']
+                          status: { type: 'string' },
+                          comparison_note: { type: 'string' }
+                        }
                       }
                     },
                     summary: {
                       type: 'object',
                       properties: {
-                        total_our_ingredients: { type: 'number', description: 'Total count of Our Concept ingredients - should be 25-40' },
+                        total_our_ingredients: { type: 'number' },
                         total_competitor_avg: { type: 'number' },
-                        overlap_count: { type: 'number', description: 'How many ingredients are exact matches across competitors' },
-                        unique_to_us_count: { type: 'number', description: 'How many ingredients are unique to Our Concept (no match or alternative)' },
-                        missing_from_us_count: { type: 'number', description: 'How many competitor ingredients we lack' },
-                        alternatives_detected_count: { type: 'number', description: 'How many times competitors used a functional alternative instead of our exact ingredient' },
+                        overlap_count: { type: 'number' },
+                        unique_to_us_count: { type: 'number' },
+                        missing_from_us_count: { type: 'number' },
+                        alternatives_detected_count: { type: 'number' },
                         overall_assessment: { type: 'string' }
-                      },
-                      required: ['total_our_ingredients', 'total_competitor_avg', 'overlap_count', 'unique_to_us_count', 'missing_from_us_count', 'alternatives_detected_count', 'overall_assessment']
+                      }
                     }
-                  },
-                  required: ['our_concept_name', 'competitors', 'rows', 'summary']
+                  }
                 }
               },
-              required: ['summary', 'ingredients', 'charts', 'actionable_insights', 'swot', 'clinical_analysis', 'customer_insights', 'competitive_matrix', 'priority_roadmap', 'ingredient_comparison_table']
+              required: ['summary', 'ingredients', 'charts', 'actionable_insights', 'ingredient_comparison_table']
             }
           }
         };
@@ -651,18 +595,20 @@ Provide a comprehensive analysis including SWOT, clinical dosage adequacy, custo
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+            'Content-Type': 'application/json',
             'HTTP-Referer': 'https://lovable.dev',
-            'X-Title': 'Noodle Search',
-            'Content-Type': 'application/json'
+            'X-Title': 'Noodle Search - Ingredient Analysis'
           },
           body: JSON.stringify({
-            model: 'google/gemini-3-pro-preview',
+            model: 'anthropic/claude-sonnet-4',
             messages: [
               { role: 'system', content: systemPrompt },
               { role: 'user', content: userPrompt }
             ],
             tools: [toolSchema],
-            tool_choice: { type: 'function', function: { name: 'save_ingredient_analysis' } }
+            tool_choice: { type: 'function', function: { name: 'save_ingredient_analysis' } },
+            max_tokens: 16000,
+            temperature: 0.1
           })
         });
 
@@ -673,87 +619,63 @@ Provide a comprehensive analysis including SWOT, clinical dosage adequacy, custo
         }
 
         const data = await response.json();
-        console.log(`[analyze-ingredients] OpenRouter response received for ${type}`);
+        console.log('[analyze-ingredients] OpenRouter API response received');
 
-        // Extract tool call
+        // Extract tool call result
         const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-        
-        if (!toolCall || toolCall.function?.name !== 'save_ingredient_analysis') {
-          console.error('[analyze-ingredients] No valid tool call in response:', JSON.stringify(data).substring(0, 500));
-          throw new Error('No valid tool call in OpenRouter response');
+        if (!toolCall || toolCall.function.name !== 'save_ingredient_analysis') {
+          console.error('[analyze-ingredients] No valid tool call in response');
+          throw new Error('AI did not return a valid analysis');
         }
 
         let analysisResult;
         try {
           analysisResult = JSON.parse(toolCall.function.arguments);
         } catch (parseError) {
-          console.error('[analyze-ingredients] Error parsing tool arguments:', parseError);
-          throw new Error('Failed to parse analysis result');
+          console.error('[analyze-ingredients] Failed to parse tool call arguments:', parseError);
+          throw new Error('Failed to parse AI analysis results');
         }
 
-        console.log(`[analyze-ingredients] Analysis result parsed successfully for ${type} with keys:`, Object.keys(analysisResult).join(', '));
-
-        // VALIDATION: Check if AI returned correct number of rows
-        const returnedRowCount = analysisResult.ingredient_comparison_table?.rows?.length || 0;
-        const expectedCount = ourIngredients.count;
+        // Log the ingredient count for debugging
+        const rowCount = analysisResult.ingredient_comparison_table?.rows?.length || 0;
+        const summaryCount = analysisResult.ingredient_comparison_table?.summary?.total_our_ingredients || 0;
+        console.log(`[analyze-ingredients] AI returned ${rowCount} ingredient rows, summary says ${summaryCount}`);
         
-        if (returnedRowCount !== expectedCount) {
-          console.warn(`[analyze-ingredients] WARNING: Expected ${expectedCount} rows but AI returned ${returnedRowCount} rows for ${type}`);
-        } else {
-          console.log(`[analyze-ingredients] VALIDATED: Row count matches expected (${expectedCount}) for ${type}`);
+        if (groundTruthIngredientCount !== null && rowCount !== groundTruthIngredientCount) {
+          console.warn(`[analyze-ingredients] WARNING: Row count (${rowCount}) does not match ground truth (${groundTruthIngredientCount})`);
         }
 
-        // Include raw competitor data alongside AI analysis - this is the EXACT data sent to AI
-        const completeAnalysis = {
-          ...analysisResult,
-          competitor_details: competitorData.map((c: any) => ({
-            rank: c.rank,
-            brand: c.brand,
-            title: c.title,
-            price: c.price,
-            monthly_sales: c.monthly_sales,
-            age_months: c.age_months,
-            // Full raw data exactly as sent to AI (no truncation)
-            ingredients: c.ingredients,
-            other_ingredients: c.other_ingredients,
-            nutrients: c.nutrients,
-            supplement_facts_complete: c.supplement_facts_complete,
-            specifications: c.specifications,
-            important_information: c.important_information,
-            pain_points: c.pain_points,
-          })),
-          data_sent_to_ai: {
-            competitor_count: competitorData.length,
-            analysis_type: type,
-            competitor_label: competitorLabel,
-            formula_brief_included: !!formulaBriefContent,
-            // Pre-extraction tracking for debugging consistency
-            our_ingredients_extracted: ourIngredients.count,
-            our_ingredients_list: ourIngredients.ingredients,
-            rows_returned_by_ai: returnedRowCount,
-            count_matches: returnedRowCount === expectedCount
-          }
+        // Add competitor details and metadata to the analysis
+        analysisResult.competitor_details = competitorData;
+        analysisResult.data_sent_to_ai = {
+          competitor_count: competitorData.length,
+          analysis_type: type,
+          competitor_label: competitorLabel,
+          formula_brief_included: !!formulaBriefContent,
+          ground_truth_count: groundTruthIngredientCount
         };
 
-        // Save to database with type
+        // Save to database
         const { error: saveError } = await supabase
           .from('ingredient_analyses')
           .upsert({
             category_id: categoryId,
             type: type,
-            analysis: completeAnalysis,
+            analysis: analysisResult,
             updated_at: new Date().toISOString()
           }, { onConflict: 'category_id,type' });
 
         if (saveError) {
           console.error('[analyze-ingredients] Error saving analysis:', saveError);
-          throw saveError;
+          throw new Error('Failed to save analysis results');
         }
 
-        console.log(`[analyze-ingredients] Analysis saved successfully for category: ${categoryId}, type: ${type}`);
+        console.log(`[analyze-ingredients] Successfully saved ${type} analysis with ${rowCount} ingredients`);
 
       } catch (error) {
         console.error('[analyze-ingredients] Background analysis error:', error);
+        
+        // Save error state
         await supabase
           .from('ingredient_analyses')
           .upsert({
@@ -761,29 +683,28 @@ Provide a comprehensive analysis including SWOT, clinical dosage adequacy, custo
             type: type,
             analysis: { 
               status: 'error', 
-              error: error instanceof Error ? error.message : 'Unknown error',
-              timestamp: new Date().toISOString()
+              error: true, 
+              message: error instanceof Error ? error.message : 'Unknown error occurred'
             },
             updated_at: new Date().toISOString()
           }, { onConflict: 'category_id,type' });
       }
     }
 
-    // Start background processing
+    // Start background analysis
     EdgeRuntime.waitUntil(runAnalysisInBackground());
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: `Ingredient analysis started for ${competitorLabel}`,
-        categoryId,
-        type
+        message: `${type === 'new_winners' ? 'New Winners' : 'Top Performers'} analysis started`,
+        type: type
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
-    console.error('[analyze-ingredients] Request error:', error);
+    console.error('[analyze-ingredients] Error:', error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

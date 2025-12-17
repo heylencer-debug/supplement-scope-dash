@@ -973,55 +973,73 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                     <Loader2 className="w-3 h-3 animate-spin text-primary" />
                   )}
                 </Button>
-                <Button 
-                  variant="ghost"
-                  size="sm"
-                  className={cn(
-                    "relative z-10 h-8 px-3 text-xs gap-1.5 rounded-md transition-all duration-200",
-                    activeTab === 'top_performers' 
-                      ? 'text-foreground font-medium' 
-                      : 'text-muted-foreground hover:text-foreground'
-                  )}
-                  onClick={() => setActiveTab('top_performers')}
-                >
-                  <Trophy className={cn(
-                    "w-3 h-3 transition-all duration-200",
-                    activeTab === 'top_performers' && "text-primary scale-110"
-                  )} />
-                  <span className={cn(
-                    "transition-transform duration-200",
-                    activeTab === 'top_performers' && "translate-x-0.5"
-                  )}>
-                    Top Performers
-                  </span>
-                  {topPerformersAnalysis.hasAnalysis && (
-                    <CheckCircle className={cn(
-                      "w-3 h-3 text-green-500 transition-all duration-200",
-                      activeTab === 'top_performers' && "scale-110"
-                    )} />
-                  )}
-                  {topPerformersAnalysis.pollingStatus.isPolling && (
-                    <Loader2 className="w-3 h-3 animate-spin text-primary" />
-                  )}
-                </Button>
+                <TooltipProvider>
+                  <UITooltip>
+                    <TooltipTrigger asChild>
+                      <span className="inline-block">
+                        <Button 
+                          variant="ghost"
+                          size="sm"
+                          className={cn(
+                            "relative z-10 h-8 px-3 text-xs gap-1.5 rounded-md transition-all duration-200",
+                            activeTab === 'top_performers' 
+                              ? 'text-foreground font-medium' 
+                              : 'text-muted-foreground hover:text-foreground',
+                            !newWinnersAnalysis.hasAnalysis && 'opacity-50 cursor-not-allowed'
+                          )}
+                          onClick={() => newWinnersAnalysis.hasAnalysis && setActiveTab('top_performers')}
+                          disabled={!newWinnersAnalysis.hasAnalysis}
+                        >
+                          <Trophy className={cn(
+                            "w-3 h-3 transition-all duration-200",
+                            activeTab === 'top_performers' && "text-primary scale-110"
+                          )} />
+                          <span className={cn(
+                            "transition-transform duration-200",
+                            activeTab === 'top_performers' && "translate-x-0.5"
+                          )}>
+                            Top Performers
+                          </span>
+                          {topPerformersAnalysis.hasAnalysis && (
+                            <CheckCircle className={cn(
+                              "w-3 h-3 text-green-500 transition-all duration-200",
+                              activeTab === 'top_performers' && "scale-110"
+                            )} />
+                          )}
+                          {topPerformersAnalysis.pollingStatus.isPolling && (
+                            <Loader2 className="w-3 h-3 animate-spin text-primary" />
+                          )}
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    {!newWinnersAnalysis.hasAnalysis && (
+                      <TooltipContent>
+                        <p>Run New Winners analysis first to establish ingredient count</p>
+                      </TooltipContent>
+                    )}
+                  </UITooltip>
+                </TooltipProvider>
               </div>
               
               {/* AI Analysis Button for active tab */}
               {!activeAnalysisData.hasAnalysis && !activeAnalysisData.pollingStatus.isPolling && (
-                <Button 
-                  variant="default"
-                  size="sm" 
-                  className="h-8 px-3 text-xs transition-all duration-300 hover:shadow-[0_0_20px_hsl(var(--primary)/0.4)] hover:scale-105"
-                  onClick={(e) => { e.stopPropagation(); activeAnalysisData.runAnalysis(); }}
-                  disabled={activeAnalysisData.isLoading || !categoryId}
-                >
-                  {activeAnalysisData.isLoading ? (
-                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                  ) : (
-                    <Brain className="w-3.5 h-3.5 mr-1.5" />
-                  )}
-                  Analyze {activeTab === 'new_winners' ? 'New Winners' : 'Top Performers'}
-                </Button>
+                // Hide button for Top Performers if New Winners not done
+                !(activeTab === 'top_performers' && !newWinnersAnalysis.hasAnalysis) && (
+                  <Button 
+                    variant="default"
+                    size="sm" 
+                    className="h-8 px-3 text-xs transition-all duration-300 hover:shadow-[0_0_20px_hsl(var(--primary)/0.4)] hover:scale-105"
+                    onClick={(e) => { e.stopPropagation(); activeAnalysisData.runAnalysis(); }}
+                    disabled={activeAnalysisData.isLoading || !categoryId}
+                  >
+                    {activeAnalysisData.isLoading ? (
+                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                    ) : (
+                      <Brain className="w-3.5 h-3.5 mr-1.5" />
+                    )}
+                    Analyze {activeTab === 'new_winners' ? 'New Winners' : 'Top Performers'}
+                  </Button>
+                )
               )}
             </div>
 
@@ -1104,26 +1122,54 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                   <h3 className="text-lg font-semibold text-foreground mb-2">
                     {activeTab === 'new_winners' ? 'New Winners Analysis' : 'Top Performers Analysis'}
                   </h3>
-                  <p className="text-sm text-muted-foreground max-w-md mb-6">
-                    {activeTab === 'new_winners' 
-                      ? 'Analyze your formulation against young, high-growth products to identify emerging trends and innovative formulation strategies.'
-                      : 'Analyze your formulation against established market leaders to understand proven formulation strategies and competitive positioning.'
-                    }
-                  </p>
-                  <Button 
-                    onClick={activeAnalysisData.runAnalysis}
-                    disabled={activeAnalysisData.isLoading || !categoryId}
-                    className={cn(
-                      "gap-2 transition-all duration-300 hover:shadow-[0_0_20px_hsl(var(--primary)/0.4)] hover:scale-105"
-                    )}
-                  >
-                    {activeAnalysisData.isLoading ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Brain className="w-4 h-4" />
-                    )}
-                    {activeAnalysisData.isLoading ? 'Analyzing...' : `Analyze ${activeTab === 'new_winners' ? 'New Winners' : 'Top Performers'}`}
-                  </Button>
+                  
+                  {/* Show requirement message for Top Performers if New Winners not done */}
+                  {activeTab === 'top_performers' && !newWinnersAnalysis.hasAnalysis ? (
+                    <>
+                      <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 mb-6 max-w-md">
+                        <p className="text-sm text-amber-600 dark:text-amber-400">
+                          <AlertTriangle className="w-4 h-4 inline mr-1.5 mb-0.5" />
+                          Run <strong>New Winners</strong> analysis first. This establishes the ingredient count that Top Performers will match for consistent comparison.
+                        </p>
+                      </div>
+                      <Button 
+                        onClick={() => setActiveTab('new_winners')}
+                        className="gap-2"
+                      >
+                        <Zap className="w-4 h-4" />
+                        Go to New Winners
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm text-muted-foreground max-w-md mb-6">
+                        {activeTab === 'new_winners' 
+                          ? 'Analyze your formulation against young, high-growth products to identify emerging trends and innovative formulation strategies.'
+                          : 'Analyze your formulation against established market leaders to understand proven formulation strategies and competitive positioning.'
+                        }
+                      </p>
+                      {/* Show ingredient count badge for Top Performers */}
+                      {activeTab === 'top_performers' && newWinnersAnalysis.hasAnalysis && (
+                        <Badge variant="outline" className="mb-4 text-xs">
+                          Using {newWinnersAnalysis.analysis?.ingredient_comparison_table?.summary?.total_our_ingredients || 'N/A'} ingredients from New Winners analysis
+                        </Badge>
+                      )}
+                      <Button 
+                        onClick={activeAnalysisData.runAnalysis}
+                        disabled={activeAnalysisData.isLoading || !categoryId || (activeTab === 'top_performers' && !newWinnersAnalysis.hasAnalysis)}
+                        className={cn(
+                          "gap-2 transition-all duration-300 hover:shadow-[0_0_20px_hsl(var(--primary)/0.4)] hover:scale-105"
+                        )}
+                      >
+                        {activeAnalysisData.isLoading ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Brain className="w-4 h-4" />
+                        )}
+                        {activeAnalysisData.isLoading ? 'Analyzing...' : `Analyze ${activeTab === 'new_winners' ? 'New Winners' : 'Top Performers'}`}
+                      </Button>
+                    </>
+                  )}
                 </div>
               )}
             </div>

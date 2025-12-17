@@ -279,10 +279,32 @@ export function useIngredientAnalysis(categoryId?: string, type: IngredientAnaly
 
       if (fnError) {
         console.error(`[useIngredientAnalysis:${type}] Edge function error:`, fnError);
+        // Check for NEW_WINNERS_REQUIRED error code
+        if (fnError.message?.includes('NEW_WINNERS_REQUIRED') || fnError.context?.code === 'NEW_WINNERS_REQUIRED') {
+          toast({
+            title: 'Run New Winners First',
+            description: 'Please analyze New Winners first to establish the ingredient count.',
+            variant: 'destructive',
+          });
+          setIsLoading(false);
+          pollingRef.current = false;
+          return;
+        }
         throw new Error(fnError.message);
       }
 
       if (data?.error) {
+        // Check for NEW_WINNERS_REQUIRED error code in response
+        if (data.code === 'NEW_WINNERS_REQUIRED') {
+          toast({
+            title: 'Run New Winners First',
+            description: 'Please analyze New Winners first to establish the ingredient count.',
+            variant: 'destructive',
+          });
+          setIsLoading(false);
+          pollingRef.current = false;
+          return;
+        }
         throw new Error(data.error);
       }
 

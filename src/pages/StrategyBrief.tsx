@@ -71,13 +71,16 @@ export default function StrategyBrief() {
         import("@/components/document/StrategyBriefPDF")
       ]);
       
-      const blob = await pdf(
-        StrategyBriefPDF({ 
-          content: formulaBriefContent, 
-          categoryName: categoryName || 'Document', 
-          createdAt: analysis?.created_at || undefined
-        })
-      ).toBlob();
+      // Create React element using createElement since we can't use JSX here
+      const { createElement } = await import("react");
+      const pdfDocument = createElement(StrategyBriefPDF, {
+        content: formulaBriefContent,
+        categoryName: categoryName || 'Document',
+        createdAt: analysis?.created_at || undefined
+      });
+      
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const blob = await pdf(pdfDocument as any).toBlob();
       
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');

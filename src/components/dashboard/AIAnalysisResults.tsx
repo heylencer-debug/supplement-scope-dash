@@ -236,7 +236,15 @@ export function AIAnalysisResults({ analysis, onRefresh, isLoading }: AIAnalysis
                 <tbody>
                   {/* Group by category */}
                   {['primary_active', 'secondary_active', 'tertiary_active', 'excipient', 'other'].map(category => {
-                    const categoryRows = analysis.ingredient_comparison_table?.rows.filter(r => r.category === category) || [];
+                    const normalizeCategory = (raw: unknown): 'primary_active' | 'secondary_active' | 'tertiary_active' | 'excipient' | 'other' => {
+                      const v = typeof raw === 'string' ? raw : '';
+                      if (v === 'primary_active' || v === 'secondary_active' || v === 'tertiary_active' || v === 'excipient' || v === 'other') return v;
+                      // AI sometimes returns a functional group label (e.g. "Immune Support") in `category`.
+                      // Treat unknown categories as "other" so rows still render.
+                      return 'other';
+                    };
+
+                    const categoryRows = analysis.ingredient_comparison_table?.rows.filter(r => normalizeCategory((r as any).category) === category) || [];
                     if (categoryRows.length === 0) return null;
                     
                     const categoryLabels: Record<string, { label: string; color: string; icon: string }> = {
@@ -307,7 +315,7 @@ export function AIAnalysisResults({ analysis, onRefresh, isLoading }: AIAnalysis
                                   )}
                                 </div>
                               </td>
-                              <td className="p-2 text-muted-foreground capitalize">{row.category.replace('_', ' ')}</td>
+                              <td className="p-2 text-muted-foreground capitalize">{typeof (row as any).category === 'string' ? (row as any).category : 'Other'}</td>
                               <td className="p-2 text-center">
                                 {row.our_concept.amount ? (
                                   <div>

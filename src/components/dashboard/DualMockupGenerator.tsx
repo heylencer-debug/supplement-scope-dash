@@ -10,7 +10,11 @@ import {
   Download, 
   ZoomIn,
   ImageIcon,
-  Package
+  Package,
+  Pencil,
+  ChevronDown,
+  ChevronUp,
+  RotateCcw
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import {
@@ -20,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -28,6 +33,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { MockupImages } from "@/hooks/usePackagingAnalysis";
 
 interface PackagingStrategy {
@@ -103,6 +113,12 @@ function MockupCard({
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedMockup, setGeneratedMockup] = useState<string | null>(mockupUrl);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+  const [isEditingContent, setIsEditingContent] = useState(false);
+  
+  // Editable mock content
+  const originalFrontPanelText = strategy.mock_content?.front_panel_text || '';
+  const [editedFrontPanelText, setEditedFrontPanelText] = useState(originalFrontPanelText);
+  const hasEdits = editedFrontPanelText !== originalFrontPanelText;
   
   const isLeaders = strategyType === 'match_leaders';
   const Icon = isLeaders ? Crown : Rocket;
@@ -117,6 +133,15 @@ function MockupCard({
   useEffect(() => {
     setGeneratedMockup(mockupUrl);
   }, [mockupUrl]);
+  
+  // Reset edited text when strategy changes
+  useEffect(() => {
+    setEditedFrontPanelText(strategy.mock_content?.front_panel_text || '');
+  }, [strategy.mock_content?.front_panel_text]);
+  
+  const resetToOriginal = () => {
+    setEditedFrontPanelText(originalFrontPanelText);
+  };
 
   const generateMockup = async () => {
     setIsGenerating(true);
@@ -137,7 +162,7 @@ function MockupCard({
             callToAction: elements?.call_to_action,
             headlineFont: designBrief.headline_font,
             bodyFont: designBrief.body_font,
-            frontPanelText: mockContent?.front_panel_text,
+            frontPanelText: editedFrontPanelText, // Use edited text
             backPanelText: mockContent?.back_panel_text,
             keyDifferentiators: designBrief.key_differentiators,
             trustSignals: elements?.trust_signals || [],
@@ -220,6 +245,56 @@ function MockupCard({
           </SelectContent>
         </Select>
       </div>
+
+      {/* Editable Mock Content */}
+      <Collapsible open={isEditingContent} onOpenChange={setIsEditingContent}>
+        <CollapsibleTrigger asChild>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="w-full justify-between h-8 px-2 text-xs text-muted-foreground hover:text-foreground"
+          >
+            <span className="flex items-center gap-1.5">
+              <Pencil className="w-3 h-3" />
+              Edit Front Panel Text
+              {hasEdits && (
+                <Badge variant="secondary" className="h-4 px-1 text-[10px] bg-amber-500/20 text-amber-600 border-amber-500/30">
+                  Modified
+                </Badge>
+              )}
+            </span>
+            {isEditingContent ? (
+              <ChevronUp className="w-3.5 h-3.5" />
+            ) : (
+              <ChevronDown className="w-3.5 h-3.5" />
+            )}
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-2 pt-2">
+          <Textarea
+            value={editedFrontPanelText}
+            onChange={(e) => setEditedFrontPanelText(e.target.value)}
+            placeholder="Enter front panel text..."
+            className="min-h-[120px] text-xs font-mono leading-relaxed resize-y"
+          />
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] text-muted-foreground">
+              This text will be rendered on the package label
+            </p>
+            {hasEdits && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={resetToOriginal}
+                className="h-6 px-2 text-[10px] text-muted-foreground hover:text-foreground gap-1"
+              >
+                <RotateCcw className="w-3 h-3" />
+                Reset
+              </Button>
+            )}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
 
       {/* Generate Button */}
       <Button 

@@ -607,7 +607,7 @@ Provide a comprehensive analysis including SWOT, clinical dosage adequacy, custo
             ],
             tools: [toolSchema],
             tool_choice: { type: 'function', function: { name: 'save_ingredient_analysis' } },
-            max_tokens: 16000,
+            max_tokens: 32000,
             temperature: 0.1
           })
         });
@@ -628,12 +628,50 @@ Provide a comprehensive analysis including SWOT, clinical dosage adequacy, custo
           throw new Error('AI did not return a valid analysis');
         }
 
+        // Try to repair common JSON issues
+        const repairJson = (jsonStr: string): string => {
+          let repaired = jsonStr;
+          
+          // Remove trailing commas before ] or }
+          repaired = repaired.replace(/,(\s*[}\]])/g, '$1');
+          
+          // Try to close unclosed brackets/braces at the end
+          const openBraces = (repaired.match(/{/g) || []).length;
+          const closeBraces = (repaired.match(/}/g) || []).length;
+          const openBrackets = (repaired.match(/\[/g) || []).length;
+          const closeBrackets = (repaired.match(/]/g) || []).length;
+          
+          // If truncated, try to close the structure
+          if (openBraces > closeBraces || openBrackets > closeBrackets) {
+            // Find last complete property and truncate there
+            const lastCompleteMatch = repaired.match(/^([\s\S]*"[^"]+"\s*:\s*(?:"[^"]*"|true|false|null|\d+(?:\.\d+)?|\{[^{}]*\}|\[[^\[\]]*\]))\s*,?\s*"[^"]*$/);
+            if (lastCompleteMatch) {
+              repaired = lastCompleteMatch[1];
+            }
+            
+            // Close missing brackets/braces
+            for (let i = 0; i < openBrackets - closeBrackets; i++) repaired += ']';
+            for (let i = 0; i < openBraces - closeBraces; i++) repaired += '}';
+          }
+          
+          return repaired;
+        };
+
         let analysisResult;
         try {
           analysisResult = JSON.parse(toolCall.function.arguments);
         } catch (parseError) {
-          console.error('[analyze-ingredients] Failed to parse tool call arguments:', parseError);
-          throw new Error('Failed to parse AI analysis results');
+          console.error('[analyze-ingredients] Initial parse failed, attempting repair...');
+          try {
+            const repairedJson = repairJson(toolCall.function.arguments);
+            analysisResult = JSON.parse(repairedJson);
+            console.log('[analyze-ingredients] JSON repair successful');
+          } catch (repairError) {
+            console.error('[analyze-ingredients] JSON repair failed:', repairError);
+            console.error('[analyze-ingredients] Raw response (first 500 chars):', toolCall.function.arguments.substring(0, 500));
+            console.error('[analyze-ingredients] Raw response (last 500 chars):', toolCall.function.arguments.substring(toolCall.function.arguments.length - 500));
+            throw new Error('Failed to parse AI analysis results - response may have been truncated');
+          }
         }
 
         // Log the ingredient count for debugging

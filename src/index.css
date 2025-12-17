@@ -197,4 +197,49 @@
       transition-duration: 0.01ms !important;
     }
   }
+  
+  /* Print styles for Strategy Brief */
+  @media print {
+    body {
+      background: white !important;
+      color: black !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    
+    /* Hide navigation, sidebar, and non-essential elements */
+    nav, aside, footer, [data-sidebar], .sidebar {
+      display: none !important;
+    }
+    
+    /* Reset backgrounds for printing */
+    * {
+      box-shadow: none !important;
+    }
+    
+    /* Clean document styling */
+    .prose {
+      max-width: 100% !important;
+      font-size: 11pt !important;
+      line-height: 1.5 !important;
+    }
+    
+    .prose h1 { font-size: 18pt !important; margin-top: 0 !important; }
+    .prose h2 { font-size: 14pt !important; page-break-after: avoid; }
+    .prose h3 { font-size: 12pt !important; page-break-after: avoid; }
+    
+    .prose table {
+      page-break-inside: avoid;
+      font-size: 9pt !important;
+    }
+    
+    /* Remove sticky positioning */
+    .sticky { position: static !important; }
+    
+    /* Page margins */
+    @page {
+      margin: 0.75in;
+      size: letter;
+    }
+  }
 }

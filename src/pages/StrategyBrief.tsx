@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
-import { FileText, Download, Copy, Check, Loader2 } from "lucide-react";
+import { FileText, Download, Copy, Check, Loader2, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCategoryAnalysis } from "@/hooks/useCategoryAnalyses";
 import { useCategoryContext } from "@/contexts/CategoryContext";
@@ -100,6 +100,10 @@ export default function StrategyBrief() {
     }
   };
 
+  const handlePrint = () => {
+    window.print();
+  };
+
   if (!categoryName && !isLoading) {
     return (
       <div className="flex flex-col items-center justify-center h-64 space-y-4">
@@ -110,8 +114,8 @@ export default function StrategyBrief() {
   }
 
   return (
-    <div className="min-h-screen bg-muted/30">
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
+    <div className="min-h-screen bg-muted/30 print:bg-white print:min-h-0">
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border print:static print:border-0 print:bg-transparent">
         <div className="max-w-[800px] mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -125,9 +129,12 @@ export default function StrategyBrief() {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 print:hidden">
             <Button variant="outline" size="sm" className="gap-2" onClick={handleCopyToClipboard} disabled={!formulaBriefContent || isLoading}>
               {copied ? <><Check className="w-4 h-4" />Copied</> : <><Copy className="w-4 h-4" />Copy</>}
+            </Button>
+            <Button variant="outline" size="sm" className="gap-2" onClick={handlePrint} disabled={!formulaBriefContent || isLoading}>
+              <Printer className="w-4 h-4" />Print
             </Button>
             <Button variant="outline" size="sm" className="gap-2" onClick={handleDownloadPDF} disabled={isLoading || generatingPdf || !formulaBriefContent}>
               {generatingPdf ? (

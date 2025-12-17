@@ -28,26 +28,31 @@ function extractIngredientsFromFormulaBrief(content: string): {
     return { ingredients: [], count: 0 };
   }
 
-  // Define category patterns to match markdown sections
+  // Define category patterns to match markdown sections (supports 3-4 hashes, uppercase headers)
   const categoryPatterns = [
-    { category: 'primary_active', regex: /###\s*Primary\s*Active[^#]*(?=###|$)/gis },
-    { category: 'secondary_active', regex: /###\s*Secondary\s*Active[^#]*(?=###|$)/gis },
-    { category: 'tertiary_active', regex: /###\s*Tertiary\s*Active[^#]*(?=###|$)/gis },
-    { category: 'functional_excipient', regex: /###\s*Functional\s*Excipient[^#]*(?=###|$)/gis }
+    { category: 'primary_active', regex: /#{3,4}\s*PRIMARY\s*ACTIVE\s*INGREDIENTS?:?[^#]*?(?=#{3,4}|$)/gis },
+    { category: 'secondary_active', regex: /#{3,4}\s*SECONDARY\s*ACTIVE\s*INGREDIENTS?:?[^#]*?(?=#{3,4}|$)/gis },
+    { category: 'tertiary_active', regex: /#{3,4}\s*TERTIARY\s*ACTIVES?:?[^#]*?(?=#{3,4}|$)/gis },
+    { category: 'functional_excipient', regex: /#{3,4}\s*FUNCTIONAL\s*EXCIPIENTS?:?[^#]*?(?=#{3,4}|$)/gis }
   ];
 
   for (const { category, regex } of categoryPatterns) {
     const sectionMatch = content.match(regex);
+    console.log(`[extract-ingredients] Category ${category}: found ${sectionMatch?.length || 0} sections`);
+    
     if (sectionMatch) {
       for (const section of sectionMatch) {
-        // Match table rows: | Ingredient | Amount | ... | or | Ingredient | Amount |
-        // Skip header rows that contain "Ingredient" or "---"
-        const tableRowRegex = /\|\s*([^|\n]+?)\s*\|\s*([^|\n]+?)\s*\|/g;
+        // Match table rows including sub-rows (lines starting with | - or | - *)
+        // Format: | Ingredient | Amount | ... | or | - *Ingredient* | Amount | ...
+        const tableRowRegex = /\|\s*[-*]?\s*\*?([^|*\n]+?)\*?\s*\|\s*([^|\n]+?)\s*\|/g;
         let match;
         
         while ((match = tableRowRegex.exec(section)) !== null) {
-          const name = match[1].trim();
+          let name = match[1].trim();
           const amount = match[2].trim();
+          
+          // Clean up markdown formatting from name (remove leading - or *)
+          name = name.replace(/^[-*]\s*/, '').trim();
           
           // Skip headers and separator rows
           if (
@@ -56,6 +61,7 @@ function extractIngredientsFromFormulaBrief(content: string): {
             name.includes('===') ||
             amount.toLowerCase().includes('amount') ||
             amount.toLowerCase().includes('dosage') ||
+            amount.toLowerCase().includes('per serving') ||
             amount.includes('---') ||
             name.length === 0 ||
             amount.length === 0
@@ -64,6 +70,7 @@ function extractIngredientsFromFormulaBrief(content: string): {
           }
           
           ingredients.push({ name, amount, category });
+          console.log(`[extract-ingredients] Found: ${name} | ${amount} | ${category}`);
         }
       }
     }

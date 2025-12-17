@@ -93,25 +93,26 @@ serve(async (req) => {
       promptParts.push(`- Accent color: ${accentColorHex}`);
     }
 
+    // EXACT FRONT PANEL TEXT - This is the MOST IMPORTANT section
+    // The AI must render THIS EXACT TEXT on the front of the package
     promptParts.push("");
-    promptParts.push("LABEL CONTENT (include all of this, but with clean modern typography):");
+    promptParts.push("=== CRITICAL: EXACT FRONT PANEL TEXT TO RENDER ===");
+    promptParts.push("The following text MUST appear on the front of the package EXACTLY as written:");
+    promptParts.push("(Render this text clearly and legibly on the label)");
+    promptParts.push("");
     
-    // Use the front panel mock content
     if (frontPanelText) {
-      // Extract key elements from front panel
-      const lines = frontPanelText.split('\n').filter((l: string) => l.trim());
-      const headline = lines[0] || primaryClaim;
-      const subheadline = lines.find((l: string) => l.includes('Support') || l.includes('For ')) || '';
-      const quantity = lines.find((l: string) => l.includes('CHEW') || l.includes('CAPSULE') || l.includes('SERVING')) || '';
-      const flavor = lines.find((l: string) => l.toLowerCase().includes('flavor')) || '';
-      
-      promptParts.push(`- Main headline: "${headline}"`);
-      if (subheadline) promptParts.push(`- Subheadline: "${subheadline}"`);
-      if (quantity) promptParts.push(`- Quantity: "${quantity}"`);
-      if (flavor) promptParts.push(`- Flavor callout: "${flavor}"`);
+      promptParts.push('"""');
+      promptParts.push(frontPanelText);
+      promptParts.push('"""');
     } else if (primaryClaim) {
-      promptParts.push(`- Main headline: "${primaryClaim}"`);
+      promptParts.push(`Main headline: "${primaryClaim}"`);
     }
+    
+    promptParts.push("");
+    promptParts.push("=== END EXACT TEXT ===");
+    promptParts.push("");
+    promptParts.push("ADDITIONAL LABEL ELEMENTS:");
     
     // Key differentiators as small badges/icons
     if (keyDifferentiators?.length > 0) {

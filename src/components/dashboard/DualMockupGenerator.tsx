@@ -16,8 +16,11 @@ import {
   ChevronUp,
   RotateCcw,
   Eye,
-  EyeOff
+  EyeOff,
+  Palette
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useState, useEffect } from "react";
 import {
   Select,
@@ -254,12 +257,25 @@ function MockupCard({
   const [generatedMockup, setGeneratedMockup] = useState<string | null>(mockupUrl);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [isEditingContent, setIsEditingContent] = useState(false);
+  const [isEditingColors, setIsEditingColors] = useState(false);
   const [showPreview, setShowPreview] = useState(true); // Show preview by default
   
   // Editable mock content
   const originalFrontPanelText = strategy.mock_content?.front_panel_text || '';
   const [editedFrontPanelText, setEditedFrontPanelText] = useState(originalFrontPanelText);
-  const hasEdits = editedFrontPanelText !== originalFrontPanelText;
+  const hasTextEdits = editedFrontPanelText !== originalFrontPanelText;
+  
+  // Editable colors
+  const originalPrimaryColor = strategy.design_brief?.primary_color?.hex || '#1e3a5f';
+  const originalSecondaryColor = strategy.design_brief?.secondary_color?.hex || '#ffffff';
+  const originalAccentColor = strategy.design_brief?.accent_color?.hex || '#0ea5e9';
+  const [editedPrimaryColor, setEditedPrimaryColor] = useState(originalPrimaryColor);
+  const [editedSecondaryColor, setEditedSecondaryColor] = useState(originalSecondaryColor);
+  const [editedAccentColor, setEditedAccentColor] = useState(originalAccentColor);
+  const hasColorEdits = 
+    editedPrimaryColor !== originalPrimaryColor ||
+    editedSecondaryColor !== originalSecondaryColor ||
+    editedAccentColor !== originalAccentColor;
   
   const isLeaders = strategyType === 'match_leaders';
   const Icon = isLeaders ? Crown : Rocket;
@@ -280,8 +296,21 @@ function MockupCard({
     setEditedFrontPanelText(strategy.mock_content?.front_panel_text || '');
   }, [strategy.mock_content?.front_panel_text]);
   
-  const resetToOriginal = () => {
+  // Reset edited colors when strategy changes
+  useEffect(() => {
+    setEditedPrimaryColor(strategy.design_brief?.primary_color?.hex || '#1e3a5f');
+    setEditedSecondaryColor(strategy.design_brief?.secondary_color?.hex || '#ffffff');
+    setEditedAccentColor(strategy.design_brief?.accent_color?.hex || '#0ea5e9');
+  }, [strategy.design_brief?.primary_color?.hex, strategy.design_brief?.secondary_color?.hex, strategy.design_brief?.accent_color?.hex]);
+  
+  const resetTextToOriginal = () => {
     setEditedFrontPanelText(originalFrontPanelText);
+  };
+  
+  const resetColorsToOriginal = () => {
+    setEditedPrimaryColor(originalPrimaryColor);
+    setEditedSecondaryColor(originalSecondaryColor);
+    setEditedAccentColor(originalAccentColor);
   };
 
   const generateMockup = async () => {
@@ -294,9 +323,9 @@ function MockupCard({
       const { data, error } = await supabase.functions.invoke('generate-product-mockup', {
         body: {
           designBrief: {
-            primaryColor: designBrief.primary_color,
-            secondaryColor: designBrief.secondary_color,
-            accentColor: designBrief.accent_color,
+            primaryColor: { hex: editedPrimaryColor, name: strategy.design_brief?.primary_color?.name || 'Primary' },
+            secondaryColor: { hex: editedSecondaryColor, name: strategy.design_brief?.secondary_color?.name || 'Secondary' },
+            accentColor: { hex: editedAccentColor, name: strategy.design_brief?.accent_color?.name || 'Accent' },
             primaryClaim: designBrief.primary_claim,
             certifications: designBrief.certifications,
             bulletPoints: elements?.bullet_points || [],
@@ -398,7 +427,7 @@ function MockupCard({
             <span className="flex items-center gap-1.5">
               <Pencil className="w-3 h-3" />
               Edit Front Panel Text
-              {hasEdits && (
+              {hasTextEdits && (
                 <Badge variant="secondary" className="h-4 px-1 text-[10px] bg-amber-500/20 text-amber-600 border-amber-500/30">
                   Modified
                 </Badge>
@@ -422,11 +451,111 @@ function MockupCard({
             <p className="text-[10px] text-muted-foreground">
               This text will be rendered on the package label
             </p>
-            {hasEdits && (
+            {hasTextEdits && (
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={resetToOriginal}
+                onClick={resetTextToOriginal}
+                className="h-6 px-2 text-[10px] text-muted-foreground hover:text-foreground gap-1"
+              >
+                <RotateCcw className="w-3 h-3" />
+                Reset
+              </Button>
+            )}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+
+      {/* Editable Colors */}
+      <Collapsible open={isEditingColors} onOpenChange={setIsEditingColors}>
+        <CollapsibleTrigger asChild>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="w-full justify-between h-8 px-2 text-xs text-muted-foreground hover:text-foreground"
+          >
+            <span className="flex items-center gap-1.5">
+              <Palette className="w-3 h-3" />
+              Edit Design Colors
+              {hasColorEdits && (
+                <Badge variant="secondary" className="h-4 px-1 text-[10px] bg-amber-500/20 text-amber-600 border-amber-500/30">
+                  Modified
+                </Badge>
+              )}
+            </span>
+            {isEditingColors ? (
+              <ChevronUp className="w-3.5 h-3.5" />
+            ) : (
+              <ChevronDown className="w-3.5 h-3.5" />
+            )}
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-3 pt-2">
+          <div className="grid grid-cols-3 gap-2">
+            <div className="space-y-1.5">
+              <Label className="text-[10px] text-muted-foreground">Primary</Label>
+              <div className="flex items-center gap-1.5">
+                <Input
+                  type="color"
+                  value={editedPrimaryColor}
+                  onChange={(e) => setEditedPrimaryColor(e.target.value)}
+                  className="w-8 h-8 p-0.5 cursor-pointer rounded border-border"
+                />
+                <Input
+                  type="text"
+                  value={editedPrimaryColor}
+                  onChange={(e) => setEditedPrimaryColor(e.target.value)}
+                  className="h-7 text-[10px] font-mono px-1.5 uppercase"
+                  maxLength={7}
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[10px] text-muted-foreground">Secondary</Label>
+              <div className="flex items-center gap-1.5">
+                <Input
+                  type="color"
+                  value={editedSecondaryColor}
+                  onChange={(e) => setEditedSecondaryColor(e.target.value)}
+                  className="w-8 h-8 p-0.5 cursor-pointer rounded border-border"
+                />
+                <Input
+                  type="text"
+                  value={editedSecondaryColor}
+                  onChange={(e) => setEditedSecondaryColor(e.target.value)}
+                  className="h-7 text-[10px] font-mono px-1.5 uppercase"
+                  maxLength={7}
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[10px] text-muted-foreground">Accent</Label>
+              <div className="flex items-center gap-1.5">
+                <Input
+                  type="color"
+                  value={editedAccentColor}
+                  onChange={(e) => setEditedAccentColor(e.target.value)}
+                  className="w-8 h-8 p-0.5 cursor-pointer rounded border-border"
+                />
+                <Input
+                  type="text"
+                  value={editedAccentColor}
+                  onChange={(e) => setEditedAccentColor(e.target.value)}
+                  className="h-7 text-[10px] font-mono px-1.5 uppercase"
+                  maxLength={7}
+                />
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] text-muted-foreground">
+              Colors used in preview and mockup generation
+            </p>
+            {hasColorEdits && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={resetColorsToOriginal}
                 className="h-6 px-2 text-[10px] text-muted-foreground hover:text-foreground gap-1"
               >
                 <RotateCcw className="w-3 h-3" />
@@ -522,9 +651,9 @@ function MockupCard({
       ) : !isGenerating && showPreview ? (
         <LabelPreview 
           text={editedFrontPanelText}
-          primaryColor={strategy.design_brief?.primary_color?.hex || '#1e3a5f'}
-          secondaryColor={strategy.design_brief?.secondary_color?.hex || '#ffffff'}
-          accentColor={strategy.design_brief?.accent_color?.hex || '#0ea5e9'}
+          primaryColor={editedPrimaryColor}
+          secondaryColor={editedSecondaryColor}
+          accentColor={editedAccentColor}
           packagingFormat={selectedFormat}
         />
       ) : !isGenerating ? (

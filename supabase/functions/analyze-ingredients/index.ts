@@ -214,14 +214,20 @@ summary.total_our_ingredients MUST equal ${groundTruthIngredientCount}.`;
           // New Winners: AI determines the count from raw data
           ingredientCountInstructions = `
 CRITICAL: You must parse ALL ingredients from the formula brief below.
-This formula typically contains 25-40+ ingredients organized across:
+This formula typically contains 30-45+ individual ingredients organized across:
 - PRIMARY ACTIVE INGREDIENTS
 - SECONDARY ACTIVE INGREDIENTS  
 - TERTIARY ACTIVES
 - FUNCTIONAL EXCIPIENTS
 
-Parse EVERY ingredient from the markdown tables. Count them carefully.
-Create ONE ROW per ingredient in ingredient_comparison_table.
+IMPORTANT - BLEND COMPONENTS MUST BE COUNTED INDIVIDUALLY:
+- "Probiotic Blend" containing Bacillus coagulans + Bacillus subtilis = 2 rows (not 1)
+- "Prebiotic Complex" containing FOS + GOS + Inulin = 3 rows (not 1)
+- "Enzyme Blend" containing Amylase + Lipase + Cellulase + Protease = 4 rows (not 1)
+- Each sub-ingredient in a blend gets its OWN ROW with its OWN dosage
+
+Parse EVERY ingredient AND every sub-ingredient from the markdown tables. 
+Create ONE ROW per ingredient/sub-ingredient in ingredient_comparison_table.
 summary.total_our_ingredients MUST equal the actual count you extract.
 DO NOT MISS ANY INGREDIENTS - the New Winners analysis sets the ground truth count for Top Performers.`;
         }

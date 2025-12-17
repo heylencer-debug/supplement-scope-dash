@@ -10,6 +10,70 @@ declare const EdgeRuntime: {
   waitUntil: (promise: Promise<any>) => void;
 };
 
+// Pre-extract ingredients from formula brief markdown to ensure consistent counts
+interface ExtractedIngredient {
+  name: string;
+  amount: string;
+  category: string;
+}
+
+function extractIngredientsFromFormulaBrief(content: string): { 
+  ingredients: ExtractedIngredient[];
+  count: number;
+} {
+  const ingredients: ExtractedIngredient[] = [];
+  
+  if (!content) {
+    console.log('[extract-ingredients] No content provided');
+    return { ingredients: [], count: 0 };
+  }
+
+  // Define category patterns to match markdown sections
+  const categoryPatterns = [
+    { category: 'primary_active', regex: /###\s*Primary\s*Active[^#]*(?=###|$)/gis },
+    { category: 'secondary_active', regex: /###\s*Secondary\s*Active[^#]*(?=###|$)/gis },
+    { category: 'tertiary_active', regex: /###\s*Tertiary\s*Active[^#]*(?=###|$)/gis },
+    { category: 'functional_excipient', regex: /###\s*Functional\s*Excipient[^#]*(?=###|$)/gis }
+  ];
+
+  for (const { category, regex } of categoryPatterns) {
+    const sectionMatch = content.match(regex);
+    if (sectionMatch) {
+      for (const section of sectionMatch) {
+        // Match table rows: | Ingredient | Amount | ... | or | Ingredient | Amount |
+        // Skip header rows that contain "Ingredient" or "---"
+        const tableRowRegex = /\|\s*([^|\n]+?)\s*\|\s*([^|\n]+?)\s*\|/g;
+        let match;
+        
+        while ((match = tableRowRegex.exec(section)) !== null) {
+          const name = match[1].trim();
+          const amount = match[2].trim();
+          
+          // Skip headers and separator rows
+          if (
+            name.toLowerCase().includes('ingredient') ||
+            name.includes('---') ||
+            name.includes('===') ||
+            amount.toLowerCase().includes('amount') ||
+            amount.toLowerCase().includes('dosage') ||
+            amount.includes('---') ||
+            name.length === 0 ||
+            amount.length === 0
+          ) {
+            continue;
+          }
+          
+          ingredients.push({ name, amount, category });
+        }
+      }
+    }
+  }
+
+  console.log(`[extract-ingredients] Extracted ${ingredients.length} ingredients from formula brief`);
+  
+  return { ingredients, count: ingredients.length };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -160,6 +224,10 @@ serve(async (req) => {
         const formulaBriefContent = categoryAnalysis.analysis_3_formula_brief?.formula_brief_content || '';
         const categoryName = categoryAnalysis.category_name || 'Unknown Category';
 
+        // PRE-EXTRACT INGREDIENTS for consistent counting across both analysis types
+        const ourIngredients = extractIngredientsFromFormulaBrief(formulaBriefContent);
+        console.log(`[analyze-ingredients] Pre-extracted ${ourIngredients.count} ingredients for ${type} analysis`);
+
         // Customize prompt based on analysis type
         const typeContext = type === 'new_winners' 
           ? `Focus on EMERGING TRENDS and GROWTH STRATEGIES. These are NEW WINNERS - young, high-growth products that are disrupting the market. Analyze what innovative formulation strategies they're using that are driving their rapid growth.`
@@ -179,12 +247,9 @@ Your task is to compare "Our Concept" formulation against ${competitorLabel} and
 
 CRITICAL INSTRUCTIONS FOR INGREDIENT COMPARISON TABLE:
 
-1. EXTRACT ALL INGREDIENTS from Our Concept's formula brief markdown - parse EVERY ingredient table:
-   - Primary Active Ingredients
-   - Secondary Active Ingredients  
-   - Tertiary Active Ingredients
-   - Functional Excipients
-   You should find 25-40 total ingredients. The ingredient_comparison_table rows array MUST have one row per ingredient.
+1. WE HAVE PRE-EXTRACTED EXACTLY ${ourIngredients.count} INGREDIENTS from Our Concept's formula.
+   YOU MUST CREATE EXACTLY ${ourIngredients.count} ROWS in ingredient_comparison_table - ONE ROW PER INGREDIENT.
+   DO NOT ADD OR REMOVE ANY INGREDIENTS FROM THE PROVIDED LIST.
 
 2. For EACH Our Concept ingredient, analyze if competitors have:
    - EXACT MATCH: Same ingredient (present = true, uses_alternative = false)
@@ -210,10 +275,24 @@ CRITICAL INSTRUCTIONS FOR INGREDIENT COMPARISON TABLE:
    - status: "alternative_used"
    - comparison_note: "Uses [X] instead of [Y] for [function]"
 
-5. MINIMUM EXPECTED: The ingredient_comparison_table.rows array should have 25-40 rows (one per Our Concept ingredient).
-   The summary.total_our_ingredients should equal the actual count of rows.
+5. MANDATORY: ingredient_comparison_table.rows MUST have EXACTLY ${ourIngredients.count} rows.
+   summary.total_our_ingredients MUST equal ${ourIngredients.count}.
 
 IMPORTANT: You must call the "save_ingredient_analysis" function with your complete analysis results. Do not respond with plain text.`;
+
+        // Format pre-extracted ingredients for AI to use
+        const ingredientsByCategory = ourIngredients.ingredients.reduce((acc: Record<string, ExtractedIngredient[]>, ing) => {
+          if (!acc[ing.category]) acc[ing.category] = [];
+          acc[ing.category].push(ing);
+          return acc;
+        }, {});
+
+        const formattedOurIngredients = Object.entries(ingredientsByCategory)
+          .map(([cat, ings]) => {
+            const categoryLabel = cat.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+            return `### ${categoryLabel} (${ings.length} ingredients):\n${ings.map((i: ExtractedIngredient) => `- ${i.name}: ${i.amount}`).join('\n')}`;
+          })
+          .join('\n\n');
 
         const userPrompt = `Analyze the ingredient formulation for: ${categoryName}
 
@@ -222,10 +301,15 @@ ${type === 'new_winners'
   ? 'These are emerging high-growth products. Focus on innovative formulation trends and growth drivers.' 
   : 'These are established market leaders. Focus on proven formulation strategies and competitive positioning.'}
 
-## Our Concept Formula Brief (RAW MARKDOWN - YOU MUST PARSE ALL INGREDIENT TABLES):
-${formulaBriefContent || 'No formula brief available'}
+## OUR CONCEPT INGREDIENTS (EXACTLY ${ourIngredients.count} total - YOU MUST CREATE EXACTLY ${ourIngredients.count} ROWS):
 
-IMPORTANT: The formula brief above contains ingredient tables for Primary Active, Secondary Active, Tertiary Active, and Functional Excipients. You MUST extract EVERY ingredient from ALL tables and include a row in ingredient_comparison_table for EACH one (expect 25-40 total ingredients).
+${formattedOurIngredients}
+
+REMINDER: The ingredient_comparison_table.rows array MUST contain EXACTLY ${ourIngredients.count} rows - one for each ingredient listed above.
+summary.total_our_ingredients MUST equal ${ourIngredients.count}.
+
+## RAW FORMULA BRIEF (for additional context only - use pre-extracted list above for row count):
+${formulaBriefContent || 'No formula brief available'}
 
 ## ${competitorLabel}:
 ${competitorData.map((c: any) => `
@@ -602,6 +686,16 @@ Provide a comprehensive analysis including SWOT, clinical dosage adequacy, custo
 
         console.log(`[analyze-ingredients] Analysis result parsed successfully for ${type} with keys:`, Object.keys(analysisResult).join(', '));
 
+        // VALIDATION: Check if AI returned correct number of rows
+        const returnedRowCount = analysisResult.ingredient_comparison_table?.rows?.length || 0;
+        const expectedCount = ourIngredients.count;
+        
+        if (returnedRowCount !== expectedCount) {
+          console.warn(`[analyze-ingredients] WARNING: Expected ${expectedCount} rows but AI returned ${returnedRowCount} rows for ${type}`);
+        } else {
+          console.log(`[analyze-ingredients] VALIDATED: Row count matches expected (${expectedCount}) for ${type}`);
+        }
+
         // Include raw competitor data alongside AI analysis - this is the EXACT data sent to AI
         const completeAnalysis = {
           ...analysisResult,
@@ -625,7 +719,12 @@ Provide a comprehensive analysis including SWOT, clinical dosage adequacy, custo
             competitor_count: competitorData.length,
             analysis_type: type,
             competitor_label: competitorLabel,
-            formula_brief_included: !!formulaBriefContent
+            formula_brief_included: !!formulaBriefContent,
+            // Pre-extraction tracking for debugging consistency
+            our_ingredients_extracted: ourIngredients.count,
+            our_ingredients_list: ourIngredients.ingredients,
+            rows_returned_by_ai: returnedRowCount,
+            count_matches: returnedRowCount === expectedCount
           }
         };
 

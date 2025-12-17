@@ -14,7 +14,9 @@ import {
   Pencil,
   ChevronDown,
   ChevronUp,
-  RotateCcw
+  RotateCcw,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import {
@@ -98,6 +100,144 @@ const packagingFormatOptions = [
   { value: "tin container", label: "Tin Container" },
 ];
 
+// CSS-based label preview component
+function LabelPreview({
+  text,
+  primaryColor,
+  secondaryColor,
+  accentColor,
+  packagingFormat,
+}: {
+  text: string;
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
+  packagingFormat: string;
+}) {
+  // Parse the text into structured elements
+  const lines = text.split('\n').filter(line => line.trim());
+  
+  // Extract headline (first line), and categorize other lines
+  const headline = lines[0] || 'PRODUCT NAME';
+  const checkmarkLines = lines.filter(line => line.startsWith('✓') || line.startsWith('•'));
+  const otherLines = lines.slice(1).filter(line => !line.startsWith('✓') && !line.startsWith('•'));
+  
+  // Find subtitle and quantity info
+  const subtitle = otherLines.find(l => 
+    l.toLowerCase().includes('formula') || 
+    l.toLowerCase().includes('support') ||
+    l.toLowerCase().includes('defense') ||
+    l.toLowerCase().includes('complex')
+  ) || otherLines[0] || '';
+  
+  const quantityLine = otherLines.find(l => 
+    l.toLowerCase().includes('chew') || 
+    l.toLowerCase().includes('capsule') ||
+    l.toLowerCase().includes('serving') ||
+    l.toLowerCase().includes('ct') ||
+    l.toLowerCase().includes('net wt')
+  ) || '';
+  
+  const flavorLine = otherLines.find(l => 
+    l.toLowerCase().includes('flavor')
+  ) || '';
+  
+  // Determine container shape based on format
+  const isPouch = packagingFormat.includes('pouch');
+  const isJar = packagingFormat.includes('jar');
+  const isBottle = packagingFormat.includes('bottle');
+  
+  return (
+    <div className="relative">
+      <Badge 
+        variant="outline" 
+        className="absolute -top-2 left-2 z-10 text-[9px] bg-background border-border/50"
+      >
+        Text Preview
+      </Badge>
+      <div 
+        className={cn(
+          "rounded-xl overflow-hidden shadow-lg border border-border/30",
+          isPouch && "rounded-t-3xl",
+          isJar && "rounded-t-lg",
+          isBottle && "rounded-t-sm"
+        )}
+        style={{
+          background: `linear-gradient(135deg, ${primaryColor} 0%, ${primaryColor}dd 100%)`,
+          minHeight: '240px',
+        }}
+      >
+        {/* Label content */}
+        <div 
+          className="p-4 flex flex-col h-full"
+          style={{ color: secondaryColor }}
+        >
+          {/* Brand/Headline */}
+          <div className="text-center mb-2">
+            <h3 
+              className="font-bold text-lg tracking-tight leading-tight"
+              style={{ textShadow: '0 1px 2px rgba(0,0,0,0.2)' }}
+            >
+              {headline}
+            </h3>
+          </div>
+          
+          {/* Subtitle/Claim */}
+          {subtitle && (
+            <div 
+              className="text-center mb-3 px-2 py-1 rounded-md text-xs font-semibold"
+              style={{ 
+                backgroundColor: `${accentColor}33`,
+                border: `1px solid ${accentColor}66`
+              }}
+            >
+              {subtitle}
+            </div>
+          )}
+          
+          {/* Benefits checkmarks */}
+          {checkmarkLines.length > 0 && (
+            <div className="space-y-1 mb-3">
+              {checkmarkLines.slice(0, 4).map((line, i) => (
+                <div 
+                  key={i} 
+                  className="flex items-start gap-1.5 text-[10px] leading-tight"
+                  style={{ color: secondaryColor }}
+                >
+                  <span style={{ color: accentColor }}>✓</span>
+                  <span className="opacity-90">{line.replace(/^[✓•]\s*/, '')}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {/* Flavor */}
+          {flavorLine && (
+            <div 
+              className="text-center text-[10px] font-medium mb-2 opacity-80"
+            >
+              {flavorLine}
+            </div>
+          )}
+          
+          {/* Quantity/Net Wt */}
+          {quantityLine && (
+            <div 
+              className="mt-auto text-center text-[9px] opacity-70 pt-2 border-t"
+              style={{ borderColor: `${secondaryColor}33` }}
+            >
+              {quantityLine}
+            </div>
+          )}
+        </div>
+      </div>
+      <p className="text-[9px] text-muted-foreground text-center mt-1.5">
+        Live preview • Edit text above to update
+      </p>
+    </div>
+  );
+}
+
 function MockupCard({
   strategy,
   strategyType,
@@ -114,6 +254,7 @@ function MockupCard({
   const [generatedMockup, setGeneratedMockup] = useState<string | null>(mockupUrl);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [isEditingContent, setIsEditingContent] = useState(false);
+  const [showPreview, setShowPreview] = useState(true); // Show preview by default
   
   // Editable mock content
   const originalFrontPanelText = strategy.mock_content?.front_panel_text || '';
@@ -324,7 +465,29 @@ function MockupCard({
         )}
       </Button>
 
-      {/* Mockup Display */}
+      {/* Preview Toggle */}
+      {!generatedMockup && !isGenerating && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setShowPreview(!showPreview)}
+          className="w-full h-7 text-xs text-muted-foreground hover:text-foreground gap-1.5"
+        >
+          {showPreview ? (
+            <>
+              <EyeOff className="w-3 h-3" />
+              Hide Preview
+            </>
+          ) : (
+            <>
+              <Eye className="w-3 h-3" />
+              Show Preview
+            </>
+          )}
+        </Button>
+      )}
+
+      {/* Mockup Display or Preview */}
       {generatedMockup ? (
         <div className="relative group">
           <img 
@@ -356,6 +519,14 @@ function MockupCard({
             </Button>
           </div>
         </div>
+      ) : !isGenerating && showPreview ? (
+        <LabelPreview 
+          text={editedFrontPanelText}
+          primaryColor={strategy.design_brief?.primary_color?.hex || '#1e3a5f'}
+          secondaryColor={strategy.design_brief?.secondary_color?.hex || '#ffffff'}
+          accentColor={strategy.design_brief?.accent_color?.hex || '#0ea5e9'}
+          packagingFormat={selectedFormat}
+        />
       ) : !isGenerating ? (
         <div className="h-[200px] rounded-lg border-2 border-dashed border-border/50 flex flex-col items-center justify-center text-muted-foreground bg-muted/20">
           <ImageIcon className="w-10 h-10 mb-2 opacity-30" />

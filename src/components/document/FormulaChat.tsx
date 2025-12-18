@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Bot, User, Loader2, Sparkles, X, Trash2, Wand2, Eye, EyeOff } from "lucide-react";
+import { Send, Bot, User, Loader2, Sparkles, X, Trash2, Wand2, Eye, EyeOff, MessageSquare, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -16,6 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 
 interface FormulaChatProps {
   categoryId: string;
@@ -27,6 +28,49 @@ interface FormulaChatProps {
 interface GeneratedFormula {
   change_summary: string;
   new_formula_content: string;
+}
+
+// Component for expandable messages
+function ExpandableMessage({ content, isUser }: { content: string; isUser: boolean }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const shouldTruncate = content.length > 600;
+  const displayContent = shouldTruncate && !isExpanded 
+    ? content.slice(0, 600) + '...' 
+    : content;
+
+  if (isUser) {
+    return <p className="text-sm whitespace-pre-wrap">{content}</p>;
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="prose prose-sm max-w-none dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-li:my-0.5">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          {displayContent}
+        </ReactMarkdown>
+      </div>
+      {shouldTruncate && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          {isExpanded ? (
+            <>
+              <ChevronUp className="w-3 h-3 mr-1" />
+              Show less
+            </>
+          ) : (
+            <>
+              <ChevronDown className="w-3 h-3 mr-1" />
+              Show more
+            </>
+          )}
+        </Button>
+      )}
+    </div>
+  );
 }
 
 export function FormulaChat({ 
@@ -283,7 +327,13 @@ export function FormulaChat({
               <p className="text-xs text-muted-foreground">Modify your formula</p>
             </div>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2">
+            {messages.length > 0 && (
+              <Badge variant="secondary" className="text-xs gap-1">
+                <MessageSquare className="w-3 h-3" />
+                {messages.length} messages
+              </Badge>
+            )}
             {messages.length > 0 && (
               <Button 
                 variant="ghost" 
@@ -320,7 +370,7 @@ export function FormulaChat({
                 className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 {message.role === 'assistant' && (
-                  <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-1">
                     <Bot className="w-4 h-4 text-primary" />
                   </div>
                 )}
@@ -331,12 +381,10 @@ export function FormulaChat({
                       : 'bg-muted'
                   }`}
                 >
-                  <p className="text-sm whitespace-pre-wrap">
-                    {message.content}
-                  </p>
+                  <ExpandableMessage content={message.content} isUser={message.role === 'user'} />
                 </div>
                 {message.role === 'user' && (
-                  <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                  <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center flex-shrink-0 mt-1">
                     <User className="w-4 h-4" />
                   </div>
                 )}
@@ -346,13 +394,15 @@ export function FormulaChat({
             {/* Streaming message */}
             {isStreaming && streamingContent && (
               <div className="flex gap-3 justify-start">
-                <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-1">
                   <Bot className="w-4 h-4 text-primary" />
                 </div>
                 <div className="rounded-lg px-3 py-2 max-w-[85%] bg-muted">
-                  <p className="text-sm whitespace-pre-wrap">
-                    {streamingContent}
-                  </p>
+                  <div className="prose prose-sm max-w-none dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-li:my-0.5">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {streamingContent}
+                    </ReactMarkdown>
+                  </div>
                 </div>
               </div>
             )}

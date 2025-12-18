@@ -807,11 +807,16 @@ export function FormulaChat({
                     }
                   }
                 }}
+                disabled={isSettingActive}
               >
-                <SelectTrigger className="h-7 w-auto gap-1 px-2 text-xs border-primary/30 bg-transparent hover:bg-muted/50">
-                  <History className="w-3 h-3" />
+                <SelectTrigger className="h-7 w-auto gap-1 px-2 text-xs border-primary/30 bg-transparent hover:bg-muted/50 disabled:opacity-50">
+                  {isSettingActive ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <History className="w-3 h-3" />
+                  )}
                   <SelectValue>
-                    {activeVersion ? `v${activeVersion.version_number}` : "Original"}
+                    {isSettingActive ? "Switching..." : activeVersion ? `v${activeVersion.version_number}` : "Original"}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent className="bg-popover">

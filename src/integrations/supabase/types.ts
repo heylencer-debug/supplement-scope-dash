@@ -400,6 +400,64 @@ export type Database = {
           },
         ]
       }
+      formula_brief_versions: {
+        Row: {
+          category_id: string
+          change_summary: string | null
+          created_at: string
+          created_from_message_id: string | null
+          formula_brief_content: string
+          id: string
+          is_active: boolean
+          parent_version_id: string | null
+          version_number: number
+        }
+        Insert: {
+          category_id: string
+          change_summary?: string | null
+          created_at?: string
+          created_from_message_id?: string | null
+          formula_brief_content: string
+          id?: string
+          is_active?: boolean
+          parent_version_id?: string | null
+          version_number?: number
+        }
+        Update: {
+          category_id?: string
+          change_summary?: string | null
+          created_at?: string
+          created_from_message_id?: string | null
+          formula_brief_content?: string
+          id?: string
+          is_active?: boolean
+          parent_version_id?: string | null
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "formula_brief_versions_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "formula_brief_versions_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "v_category_dashboard"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "formula_brief_versions_parent_version_id_fkey"
+            columns: ["parent_version_id"]
+            isOneToOne: false
+            referencedRelation: "formula_brief_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       formula_briefs: {
         Row: {
           category_id: string | null
@@ -504,6 +562,45 @@ export type Database = {
           },
           {
             foreignKeyName: "formula_briefs_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "v_category_dashboard"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      formula_conversations: {
+        Row: {
+          category_id: string
+          created_at: string
+          id: string
+          messages: Json
+          updated_at: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          id?: string
+          messages?: Json
+          updated_at?: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          id?: string
+          messages?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "formula_conversations_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "formula_conversations_category_id_fkey"
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "v_category_dashboard"

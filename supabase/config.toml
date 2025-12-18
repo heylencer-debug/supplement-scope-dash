@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.analyze-packaging-images]
 verify_jwt = false
+
+[functions.modify-formula]
+verify_jwt = false

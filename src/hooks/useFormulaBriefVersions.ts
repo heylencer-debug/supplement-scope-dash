@@ -106,6 +106,10 @@ export function useFormulaBriefVersions(categoryId?: string) {
       queryClient.invalidateQueries({ queryKey: ["formula_brief_versions", categoryId] });
       queryClient.invalidateQueries({ queryKey: ["formula_brief_active_version", categoryId] });
       queryClient.invalidateQueries({ queryKey: ["category_analysis"] });
+      // Reset analysis caches for this category to force re-analysis with new formula version
+      queryClient.invalidateQueries({ queryKey: ["ingredient_analysis", categoryId] });
+      queryClient.invalidateQueries({ queryKey: ["packaging_analysis", categoryId] });
+      queryClient.invalidateQueries({ queryKey: ["competitive_analysis", categoryId] });
     }
   });
 

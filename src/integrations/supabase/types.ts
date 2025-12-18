@@ -298,6 +298,7 @@ export type Database = {
           analysis: Json
           category_id: string
           created_at: string | null
+          formula_version_id: string | null
           id: string
           updated_at: string | null
         }
@@ -305,6 +306,7 @@ export type Database = {
           analysis: Json
           category_id: string
           created_at?: string | null
+          formula_version_id?: string | null
           id?: string
           updated_at?: string | null
         }
@@ -312,6 +314,7 @@ export type Database = {
           analysis?: Json
           category_id?: string
           created_at?: string | null
+          formula_version_id?: string | null
           id?: string
           updated_at?: string | null
         }
@@ -328,6 +331,13 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: true
             referencedRelation: "v_category_dashboard"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "competitive_analyses_formula_version_id_fkey"
+            columns: ["formula_version_id"]
+            isOneToOne: false
+            referencedRelation: "formula_brief_versions"
             referencedColumns: ["id"]
           },
         ]
@@ -613,6 +623,7 @@ export type Database = {
           analysis: Json
           category_id: string
           created_at: string
+          formula_version_id: string | null
           id: string
           type: string
           updated_at: string
@@ -621,6 +632,7 @@ export type Database = {
           analysis: Json
           category_id: string
           created_at?: string
+          formula_version_id?: string | null
           id?: string
           type?: string
           updated_at?: string
@@ -629,6 +641,7 @@ export type Database = {
           analysis?: Json
           category_id?: string
           created_at?: string
+          formula_version_id?: string | null
           id?: string
           type?: string
           updated_at?: string
@@ -646,6 +659,13 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "v_category_dashboard"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ingredient_analyses_formula_version_id_fkey"
+            columns: ["formula_version_id"]
+            isOneToOne: false
+            referencedRelation: "formula_brief_versions"
             referencedColumns: ["id"]
           },
         ]
@@ -693,6 +713,7 @@ export type Database = {
           analysis: Json
           category_id: string
           created_at: string
+          formula_version_id: string | null
           id: string
           image_analysis: Json | null
           mockup_image_url: string | null
@@ -702,6 +723,7 @@ export type Database = {
           analysis: Json
           category_id: string
           created_at?: string
+          formula_version_id?: string | null
           id?: string
           image_analysis?: Json | null
           mockup_image_url?: string | null
@@ -711,6 +733,7 @@ export type Database = {
           analysis?: Json
           category_id?: string
           created_at?: string
+          formula_version_id?: string | null
           id?: string
           image_analysis?: Json | null
           mockup_image_url?: string | null
@@ -729,6 +752,13 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: true
             referencedRelation: "v_category_dashboard"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "packaging_analyses_formula_version_id_fkey"
+            columns: ["formula_version_id"]
+            isOneToOne: false
+            referencedRelation: "formula_brief_versions"
             referencedColumns: ["id"]
           },
         ]

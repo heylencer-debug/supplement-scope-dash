@@ -48,6 +48,7 @@ interface PackagingIntelligenceProps {
   productsData?: ProductData[];
   isLoading?: boolean;
   categoryId?: string;
+  formulaVersionId?: string | null;
 }
 
 // Progress indicator component for AI analysis

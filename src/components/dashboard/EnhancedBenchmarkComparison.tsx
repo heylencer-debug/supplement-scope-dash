@@ -109,6 +109,7 @@ interface EnhancedBenchmarkComparisonProps {
     } | null;
   } | null;
   isLoading?: boolean;
+  formulaVersionId?: string | null;
 }
 
 const MAX_COMPETITORS = 15;

@@ -45,7 +45,7 @@ function ExpandableMessage({ content, isUser }: { content: string; isUser: boole
 
   return (
     <div className="space-y-2">
-      <div className="prose prose-sm max-w-none dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-li:my-0.5">
+      <div className="prose prose-sm max-w-none dark:prose-invert prose-p:my-3 prose-p:leading-relaxed prose-ul:my-3 prose-ul:pl-4 prose-ol:my-3 prose-ol:pl-4 prose-li:my-1.5 prose-headings:mt-4 prose-headings:mb-2 prose-hr:my-4 prose-table:my-3 prose-pre:my-3 prose-blockquote:my-3">
         <ReactMarkdown remarkPlugins={[remarkGfm]}>
           {displayContent}
         </ReactMarkdown>
@@ -446,7 +446,7 @@ export function FormulaChat({
                   <Bot className="w-4 h-4 text-primary" />
                 </div>
                 <div className="rounded-lg px-3 py-2 max-w-[85%] bg-muted">
-                  <div className="prose prose-sm max-w-none dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-li:my-0.5">
+                  <div className="prose prose-sm max-w-none dark:prose-invert prose-p:my-3 prose-p:leading-relaxed prose-ul:my-3 prose-ul:pl-4 prose-ol:my-3 prose-ol:pl-4 prose-li:my-1.5 prose-headings:mt-4 prose-headings:mb-2 prose-hr:my-4 prose-table:my-3 prose-pre:my-3 prose-blockquote:my-3">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>
                       {streamingContent}
                     </ReactMarkdown>

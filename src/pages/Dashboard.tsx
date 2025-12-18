@@ -6,7 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { ScrollAnimate, ScrollSection, ScrollCounter } from "@/components/ui/scroll-animate";
 import { 
   Loader2, RefreshCw, CheckCircle2, Circle, Clock,
-  Building2, Package, Eye, MessageSquare, BarChart3, Sparkles, GitBranch
+  Building2, Package, Eye, MessageSquare, BarChart3, Sparkles, GitBranch, AlertTriangle
 } from "lucide-react";
 
 // Dashboard components
@@ -422,6 +422,32 @@ export default function Dashboard() {
             <Badge variant="secondary" className="text-xs">
               {versions.find(v => v.id === selectedVersionId)?.change_summary}
             </Badge>
+          )}
+        </div>
+      )}
+
+      {/* Outdated Version Warning Banner */}
+      {selectedVersion && !selectedVersion.is_active && (
+        <div className="flex items-center gap-3 p-4 bg-warning/10 rounded-lg border border-warning/30">
+          <AlertTriangle className="h-5 w-5 text-warning shrink-0" />
+          <div className="flex-1">
+            <p className="font-medium text-foreground text-sm">
+              Viewing Outdated Formula Version
+            </p>
+            <p className="text-xs text-muted-foreground">
+              You are viewing analyses for Version {selectedVersion.version_number}, which is no longer active. 
+              {activeVersion && (
+                <> The current active version is Version {activeVersion.version_number}.</>
+              )}
+            </p>
+          </div>
+          {activeVersion && (
+            <button
+              onClick={() => setSelectedVersionId(activeVersion.id)}
+              className="text-xs font-medium text-primary hover:underline shrink-0"
+            >
+              Switch to Active
+            </button>
           )}
         </div>
       )}

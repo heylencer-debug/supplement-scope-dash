@@ -15,7 +15,8 @@ import {
   ChevronUp, 
   Copy, 
   Check,
-  RotateCcw
+  RotateCcw,
+  Pencil
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -263,6 +264,8 @@ export function FormulaChat({
   const [generatedFormula, setGeneratedFormula] = useState<GeneratedFormula | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [showPreview, setShowPreview] = useState(true);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -645,6 +648,123 @@ export function FormulaChat({
     }
   };
 
+  const handleStartEdit = (message: Message) => {
+    setEditingMessageId(message.id);
+    setEditContent(message.content);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMessageId(null);
+    setEditContent("");
+  };
+
+  const handleSaveEdit = async (messageIndex: number) => {
+    if (!conversation?.id || !editContent.trim() || isStreaming || isGenerating) return;
+    
+    // Keep messages up to and including the edited message, but update its content
+    const editedMessages = messages.slice(0, messageIndex + 1).map((m, i) => 
+      i === messageIndex ? { ...m, content: editContent.trim() } : m
+    );
+    
+    // Update the conversation in DB (removes all messages after the edited one)
+    await updateMessages({ 
+      conversationId: conversation.id, 
+      messages: editedMessages 
+    });
+    
+    setEditingMessageId(null);
+    setEditContent("");
+    setStreamingContent("");
+    setIsStreaming(true);
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/modify-formula`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`
+          },
+          body: JSON.stringify({
+            categoryId,
+            userMessage: editContent.trim(),
+            conversationHistory: editedMessages.slice(0, -1), // Exclude the edited user message
+            currentFormula,
+            generateFormula: false
+          })
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to get AI response');
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('No response body');
+
+      const decoder = new TextDecoder();
+      let fullContent = "";
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          const trimmedLine = line.trim();
+          if (!trimmedLine || trimmedLine.startsWith(':')) continue;
+
+          if (trimmedLine.startsWith('data: ')) {
+            const data = trimmedLine.slice(6).trim();
+            if (data === '[DONE]') continue;
+
+            try {
+              const parsed = JSON.parse(data);
+              const content = parsed.choices?.[0]?.delta?.content;
+              if (content) {
+                fullContent += content;
+                setStreamingContent(fullContent);
+              }
+            } catch {
+              // Ignore parse errors
+            }
+          }
+        }
+      }
+
+      // Save assistant message
+      const assistantMessage: Message = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: fullContent,
+        timestamp: new Date().toISOString()
+      };
+
+      await addMessage({ categoryId, message: assistantMessage });
+      setStreamingContent("");
+
+      toast({
+        title: "Message updated",
+        description: "AI has provided a new response."
+      });
+
+    } catch (error) {
+      console.error('Edit error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to get AI response. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsStreaming(false);
+    }
+  };
+
   return (
     <>
       <div className="flex flex-col h-full bg-background border-l border-border">
@@ -710,34 +830,78 @@ export function FormulaChat({
                       <Bot className="w-4 h-4 text-primary" />
                     </div>
                   )}
-                  <div className={`relative group ${message.role === 'assistant' ? 'max-w-[85%]' : ''}`}>
-                    <div
-                      className={`rounded-lg px-3 py-2 ${
-                        message.role === 'user'
-                          ? 'bg-primary text-primary-foreground max-w-[85%]'
-                          : 'bg-muted'
-                      }`}
-                    >
-                      <ExpandableMessage content={message.content} isUser={message.role === 'user'} />
-                    </div>
-                    {message.role === 'assistant' && (
-                      <div className="absolute -bottom-1 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <CopyMessageButton content={message.content} />
-                        {isLastAssistantMessage && !isStreaming && (
-                          <button
-                            onClick={handleRegenerate}
-                            disabled={isStreaming || isGenerating}
-                            className="p-1 rounded-md bg-background/90 border border-border hover:bg-muted text-xs flex items-center gap-1"
-                            title="Regenerate response"
+                  <div className={`relative group ${message.role === 'assistant' ? 'max-w-[85%]' : 'max-w-[85%]'}`}>
+                    {editingMessageId === message.id ? (
+                      <div className="bg-muted rounded-lg p-2 space-y-2">
+                        <Textarea
+                          value={editContent}
+                          onChange={(e) => setEditContent(e.target.value)}
+                          className="min-h-[60px] text-sm resize-none"
+                          autoFocus
+                        />
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleCancelEdit}
+                            className="h-7 text-xs"
                           >
-                            <RotateCcw className="w-3 h-3 text-muted-foreground" />
-                            <span className="text-muted-foreground">Retry</span>
-                          </button>
-                        )}
+                            Cancel
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => handleSaveEdit(index)}
+                            disabled={!editContent.trim() || isStreaming || isGenerating}
+                            className="h-7 text-xs"
+                          >
+                            <Send className="w-3 h-3 mr-1" />
+                            Send
+                          </Button>
+                        </div>
                       </div>
+                    ) : (
+                      <>
+                        <div
+                          className={`rounded-lg px-3 py-2 ${
+                            message.role === 'user'
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-muted'
+                          }`}
+                        >
+                          <ExpandableMessage content={message.content} isUser={message.role === 'user'} />
+                        </div>
+                        {message.role === 'assistant' && (
+                          <div className="absolute -bottom-1 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <CopyMessageButton content={message.content} />
+                            {isLastAssistantMessage && !isStreaming && (
+                              <button
+                                onClick={handleRegenerate}
+                                disabled={isStreaming || isGenerating}
+                                className="p-1 rounded-md bg-background/90 border border-border hover:bg-muted text-xs flex items-center gap-1"
+                                title="Regenerate response"
+                              >
+                                <RotateCcw className="w-3 h-3 text-muted-foreground" />
+                                <span className="text-muted-foreground">Retry</span>
+                              </button>
+                            )}
+                          </div>
+                        )}
+                        {message.role === 'user' && !isStreaming && !editingMessageId && (
+                          <div className="absolute -bottom-1 left-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => handleStartEdit(message)}
+                              className="p-1 rounded-md bg-background/90 border border-border hover:bg-muted text-xs flex items-center gap-1"
+                              title="Edit message"
+                            >
+                              <Pencil className="w-3 h-3 text-muted-foreground" />
+                              <span className="text-muted-foreground">Edit</span>
+                            </button>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
-                  {message.role === 'user' && (
+                  {message.role === 'user' && !editingMessageId && (
                     <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center flex-shrink-0 mt-1">
                       <User className="w-4 h-4" />
                     </div>

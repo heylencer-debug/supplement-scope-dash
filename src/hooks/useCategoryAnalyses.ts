@@ -23,9 +23,16 @@ export function useRecentCategories(limit: number = 20) {
 
       if (error) throw error;
       
-      // Fetch top 4 product images for each category
+      // Fetch top 4 product images and count for each category
       const categoriesWithImages = await Promise.all(
         (categories || []).map(async (cat) => {
+          // Get total product count
+          const { count } = await supabase
+            .from("products")
+            .select("*", { count: "exact", head: true })
+            .eq("category_id", cat.id);
+          
+          // Get product images (limit 4)
           const { data: products } = await supabase
             .from("products")
             .select("main_image_url")
@@ -35,6 +42,7 @@ export function useRecentCategories(limit: number = 20) {
           
           return {
             ...cat,
+            total_products: count || 0,
             product_images: products?.map(p => p.main_image_url).filter(Boolean) || []
           } as CategoryWithImages;
         })

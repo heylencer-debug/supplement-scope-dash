@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Bot, User, Loader2, Sparkles, X, Trash2, Wand2, Eye, EyeOff, MessageSquare, ChevronDown, ChevronUp } from "lucide-react";
+import { Send, Bot, User, Loader2, Sparkles, X, Trash2, Wand2, Eye, EyeOff, MessageSquare, ChevronDown, ChevronUp, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -30,7 +30,40 @@ interface GeneratedFormula {
   new_formula_content: string;
 }
 
-// Component for expandable messages
+// Code block with copy button
+function CodeBlockWithCopy({ content, children }: { content: string; children: React.ReactNode }) {
+  const [copied, setCopied] = useState(false);
+  
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+  
+  return (
+    <div className="relative group my-3">
+      <pre className="p-3 pr-10 rounded-lg bg-muted/80 border border-border overflow-x-auto text-xs leading-relaxed">
+        {children}
+      </pre>
+      <button
+        onClick={handleCopy}
+        className="absolute top-2 right-2 p-1.5 rounded-md bg-background/80 border border-border opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted"
+        title="Copy code"
+      >
+        {copied ? (
+          <Check className="w-3.5 h-3.5 text-green-500" />
+        ) : (
+          <Copy className="w-3.5 h-3.5 text-muted-foreground" />
+        )}
+      </button>
+    </div>
+  );
+}
+
 function ExpandableMessage({ content, isUser }: { content: string; isUser: boolean }) {
   const [isExpanded, setIsExpanded] = useState(false);
   // Only truncate very long messages - markdown renders compactly
@@ -116,11 +149,20 @@ function ExpandableMessage({ content, isUser }: { content: string; isUser: boole
         </code>
       );
     },
-    pre: ({ children }: { children?: React.ReactNode }) => (
-      <pre className="my-3 p-3 rounded-lg bg-muted/80 border border-border overflow-x-auto text-xs leading-relaxed">
-        {children}
-      </pre>
-    ),
+    pre: ({ children }: { children?: React.ReactNode }) => {
+      // Extract text content from children for copying
+      const extractText = (node: React.ReactNode): string => {
+        if (typeof node === 'string') return node;
+        if (Array.isArray(node)) return node.map(extractText).join('');
+        if (node && typeof node === 'object' && 'props' in node) {
+          return extractText((node as React.ReactElement).props.children);
+        }
+        return '';
+      };
+      const textContent = extractText(children);
+      
+      return <CodeBlockWithCopy content={textContent}>{children}</CodeBlockWithCopy>;
+    },
   };
 
   return (
@@ -559,9 +601,18 @@ export function FormulaChat({
                           }
                           return <code className="block text-xs font-mono">{children}</code>;
                         },
-                        pre: ({ children }) => (
-                          <pre className="my-3 p-3 rounded-lg bg-muted/80 border border-border overflow-x-auto text-xs leading-relaxed">{children}</pre>
-                        ),
+                        pre: ({ children }) => {
+                          const extractText = (node: React.ReactNode): string => {
+                            if (typeof node === 'string') return node;
+                            if (Array.isArray(node)) return node.map(extractText).join('');
+                            if (node && typeof node === 'object' && 'props' in node) {
+                              return extractText((node as React.ReactElement).props.children);
+                            }
+                            return '';
+                          };
+                          const textContent = extractText(children);
+                          return <CodeBlockWithCopy content={textContent}>{children}</CodeBlockWithCopy>;
+                        },
                       }}
                     >
                       {streamingContent}

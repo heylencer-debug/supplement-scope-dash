@@ -79,7 +79,7 @@ export interface MockupImages {
   match_disruptors: string | null;
 }
 
-export function usePackagingAnalysis(categoryId?: string) {
+export function usePackagingAnalysis(categoryId?: string, formulaVersionId?: string | null) {
   const [analysis, setAnalysis] = useState<PackagingDesignAnalysis | null>(null);
   const [mockupImageUrl, setMockupImageUrl] = useState<string | null>(null);
   // Dual mockup URLs for Match Leaders and Match Disruptors
@@ -100,7 +100,7 @@ export function usePackagingAnalysis(categoryId?: string) {
   }>({ isPolling: false, attempt: 0, maxAttempts: 60, startedAt: null });
   const { toast } = useToast();
 
-  // Reset state when categoryId changes
+  // Reset state when categoryId or formulaVersionId changes
   useEffect(() => {
     setAnalysis(null);
     setMockupImageUrl(null);
@@ -109,7 +109,7 @@ export function usePackagingAnalysis(categoryId?: string) {
     setIsLoadingFromDb(true);
     setWasRestoredFromDb(false);
     setError(null);
-  }, [categoryId]);
+  }, [categoryId, formulaVersionId]);
 
   // Load from database on mount/when categoryId changes
   useEffect(() => {
@@ -120,11 +120,19 @@ export function usePackagingAnalysis(categoryId?: string) {
       }
 
       try {
-        const { data, error: dbError } = await supabase
+        let query = supabase
           .from('packaging_analyses')
           .select('analysis, mockup_image_url, updated_at')
-          .eq('category_id', categoryId)
-          .maybeSingle();
+          .eq('category_id', categoryId);
+        
+        // Filter by formula version - null means original analysis
+        if (formulaVersionId) {
+          query = query.eq('formula_version_id', formulaVersionId);
+        } else {
+          query = query.is('formula_version_id', null);
+        }
+
+        const { data, error: dbError } = await query.maybeSingle();
 
         if (dbError) {
           console.error('Error loading packaging analysis from DB:', dbError);
@@ -168,7 +176,7 @@ export function usePackagingAnalysis(categoryId?: string) {
     }
 
     loadFromDb();
-  }, [categoryId]);
+  }, [categoryId, formulaVersionId]);
 
   // Save mockup image to database - now supports strategy type
   const saveMockupImage = useCallback(async (imageUrl: string, strategyType?: 'match_leaders' | 'match_disruptors') => {
@@ -228,19 +236,27 @@ export function usePackagingAnalysis(categoryId?: string) {
     setError(null);
 
     try {
-      // Clear only the analysis column, preserve image_analysis from Step 1
+      // Clear only the analysis column for this version, preserve image_analysis from Step 1
       console.log('Clearing Step 2 analysis before regeneration (preserving Step 1 image_analysis)...');
-      await supabase
+      let updateQuery = supabase
         .from('packaging_analyses')
         .update({ analysis: null, mockup_image_url: null })
         .eq('category_id', categoryId);
+      
+      if (formulaVersionId) {
+        updateQuery = updateQuery.eq('formula_version_id', formulaVersionId);
+      } else {
+        updateQuery = updateQuery.is('formula_version_id', null);
+      }
+      
+      await updateQuery;
       
       setAnalysis(null);
       setMockupImages({ match_leaders: null, match_disruptors: null });
 
       console.log('Calling analyze-packaging edge function with style:', copyStyle);
       const { data, error: fnError } = await supabase.functions.invoke('analyze-packaging', {
-        body: { categoryId, copyStyle }
+        body: { categoryId, copyStyle, formulaVersionId }
       });
 
       if (fnError) {
@@ -275,11 +291,18 @@ export function usePackagingAnalysis(categoryId?: string) {
             console.log(`Polling for packaging results... attempt ${attempts}/${maxAttempts}`);
             
             // Check database FIRST, then wait
-            const { data: dbData, error: dbError } = await supabase
+            let pollQuery = supabase
               .from('packaging_analyses')
               .select('analysis, updated_at')
-              .eq('category_id', categoryId)
-              .maybeSingle();
+              .eq('category_id', categoryId);
+            
+            if (formulaVersionId) {
+              pollQuery = pollQuery.eq('formula_version_id', formulaVersionId);
+            } else {
+              pollQuery = pollQuery.is('formula_version_id', null);
+            }
+
+            const { data: dbData, error: dbError } = await pollQuery.maybeSingle();
 
             if (dbError) {
               console.error('Error polling for results:', dbError);
@@ -333,7 +356,7 @@ export function usePackagingAnalysis(categoryId?: string) {
     } finally {
       setIsLoading(false);
     }
-  }, [categoryId, toast]);
+  }, [categoryId, formulaVersionId, toast]);
 
   const clearAnalysis = useCallback(async () => {
     setAnalysis(null);
@@ -343,18 +366,26 @@ export function usePackagingAnalysis(categoryId?: string) {
     setWasRestoredFromDb(false);
     setError(null);
     
-    // Delete from database
+    // Delete from database for this version
     if (categoryId) {
       try {
-        await supabase
+        let deleteQuery = supabase
           .from('packaging_analyses')
           .delete()
           .eq('category_id', categoryId);
+        
+        if (formulaVersionId) {
+          deleteQuery = deleteQuery.eq('formula_version_id', formulaVersionId);
+        } else {
+          deleteQuery = deleteQuery.is('formula_version_id', null);
+        }
+        
+        await deleteQuery;
       } catch (e) {
         console.error('Error clearing packaging analysis from DB:', e);
       }
     }
-  }, [categoryId]);
+  }, [categoryId, formulaVersionId]);
 
   return {
     analysis,

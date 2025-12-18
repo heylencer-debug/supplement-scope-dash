@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -6,7 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { ScrollAnimate, ScrollSection, ScrollCounter } from "@/components/ui/scroll-animate";
 import { 
   Loader2, RefreshCw, CheckCircle2, Circle, Clock,
-  Building2, Package, Eye, MessageSquare, BarChart3, Sparkles
+  Building2, Package, Eye, MessageSquare, BarChart3, Sparkles, GitBranch
 } from "lucide-react";
 
 // Dashboard components
@@ -36,10 +36,18 @@ import { useCategoryScores } from "@/hooks/useCategoryScores";
 import { useCategorySales } from "@/hooks/useCategorySales";
 import { useFormulaBrief } from "@/hooks/useFormulaBrief";
 import { useAnalysisProgress } from "@/hooks/useAnalysisProgress";
+import { useFormulaBriefVersions } from "@/hooks/useFormulaBriefVersions";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { Target } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface CriteriaBreakdown {
   name?: string;
@@ -75,10 +83,23 @@ export default function Dashboard() {
   const urlCategoryName = rawUrlCategoryName ? rawUrlCategoryName.replace(/^=+/, "").trim() : null;
   const { setCategoryContext, categoryName: contextCategoryName } = useCategoryContext();
   const queryClient = useQueryClient();
+  
+  // Formula version state
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
 
   const categoryName = urlCategoryName || contextCategoryName;
 
   const { data: category, isLoading: categoryLoading } = useCategoryByName(categoryName || undefined);
+  
+  // Formula brief versions
+  const { versions, activeVersion, isLoading: versionsLoading } = useFormulaBriefVersions(category?.id);
+
+  // Set selected version to active version when loaded
+  useEffect(() => {
+    if (activeVersion && !selectedVersionId) {
+      setSelectedVersionId(activeVersion.id);
+    }
+  }, [activeVersion, selectedVersionId]);
 
   useEffect(() => {
     if (category) {
@@ -117,6 +138,10 @@ export default function Dashboard() {
   const { data: categoryScores } = useCategoryScores(category?.id);
   const { data: categorySales } = useCategorySales(categoryName || undefined);
   const { data: formulaBrief } = useFormulaBrief(category?.id);
+  
+  // Get the formula version ID to pass to analysis components
+  // null means "original analysis" (no version), otherwise use the selected version
+  const formulaVersionId = selectedVersionId || null;
 
   const hasCategory = !!category;
   const hasAnalysis = !!analysis;
@@ -366,6 +391,35 @@ export default function Dashboard() {
         />
       </div>
 
+      {/* Formula Version Selector */}
+      {versions.length > 0 && (
+        <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-lg border border-border">
+          <GitBranch className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm font-medium text-foreground">Formula Version:</span>
+          <Select
+            value={selectedVersionId || "original"}
+            onValueChange={(value) => setSelectedVersionId(value === "original" ? null : value)}
+          >
+            <SelectTrigger className="w-[200px] bg-background">
+              <SelectValue placeholder="Select version" />
+            </SelectTrigger>
+            <SelectContent className="bg-popover border border-border">
+              <SelectItem value="original">Original Analysis</SelectItem>
+              {versions.map((v) => (
+                <SelectItem key={v.id} value={v.id}>
+                  Version {v.version_number} {v.is_active && "(Active)"}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {selectedVersionId && versions.find(v => v.id === selectedVersionId)?.change_summary && (
+            <Badge variant="secondary" className="text-xs">
+              {versions.find(v => v.id === selectedVersionId)?.change_summary}
+            </Badge>
+          )}
+        </div>
+      )}
+
       {/* Progress Banner */}
       {!progress.isComplete && (
         <Card className="border-primary/30 bg-primary/5">
@@ -469,6 +523,7 @@ export default function Dashboard() {
         categoryId={category?.id}
         analysisData={dashboardData.benchmarkData}
         isLoading={productsLoading}
+        formulaVersionId={formulaVersionId}
         />
       </ScrollAnimate>
 
@@ -582,6 +637,7 @@ export default function Dashboard() {
           })) || []}
           isLoading={analysisLoading && !hasAnalysis}
           categoryId={category?.id}
+          formulaVersionId={formulaVersionId}
         />
       </ScrollAnimate>
 

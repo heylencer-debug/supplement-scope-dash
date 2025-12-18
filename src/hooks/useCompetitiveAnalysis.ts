@@ -55,7 +55,7 @@ interface UseCompetitiveAnalysisResult {
 const MAX_POLLING_ATTEMPTS = 30; // 5 minutes with 10s intervals
 const POLLING_INTERVAL = 10000; // 10 seconds
 
-export function useCompetitiveAnalysis(categoryId: string | undefined): UseCompetitiveAnalysisResult {
+export function useCompetitiveAnalysis(categoryId: string | undefined, formulaVersionId?: string | null): UseCompetitiveAnalysisResult {
   const [analysis, setAnalysis] = useState<CompetitiveAnalysis | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isPolling, setIsPolling] = useState(false);
@@ -68,11 +68,19 @@ export function useCompetitiveAnalysis(categoryId: string | undefined): UseCompe
     if (!categoryId) return;
 
     try {
-      const { data, error: fetchError } = await supabase
+      let query = supabase
         .from("competitive_analyses")
         .select("analysis")
-        .eq("category_id", categoryId)
-        .maybeSingle();
+        .eq("category_id", categoryId);
+      
+      // Filter by formula version - null means original analysis
+      if (formulaVersionId) {
+        query = query.eq("formula_version_id", formulaVersionId);
+      } else {
+        query = query.is("formula_version_id", null);
+      }
+
+      const { data, error: fetchError } = await query.maybeSingle();
 
       if (fetchError) {
         console.error("Error loading competitive analysis:", fetchError);
@@ -85,7 +93,7 @@ export function useCompetitiveAnalysis(categoryId: string | undefined): UseCompe
     } catch (err) {
       console.error("Error loading competitive analysis:", err);
     }
-  }, [categoryId]);
+  }, [categoryId, formulaVersionId]);
 
   useEffect(() => {
     loadExistingAnalysis();
@@ -95,11 +103,18 @@ export function useCompetitiveAnalysis(categoryId: string | undefined): UseCompe
   const pollForResults = useCallback(async () => {
     if (!categoryId) return false;
 
-    const { data, error: fetchError } = await supabase
+    let query = supabase
       .from("competitive_analyses")
       .select("analysis, updated_at")
-      .eq("category_id", categoryId)
-      .maybeSingle();
+      .eq("category_id", categoryId);
+    
+    if (formulaVersionId) {
+      query = query.eq("formula_version_id", formulaVersionId);
+    } else {
+      query = query.is("formula_version_id", null);
+    }
+
+    const { data, error: fetchError } = await query.maybeSingle();
 
     if (fetchError) {
       console.error("Polling error:", fetchError);
@@ -112,7 +127,7 @@ export function useCompetitiveAnalysis(categoryId: string | undefined): UseCompe
     }
 
     return false;
-  }, [categoryId]);
+  }, [categoryId, formulaVersionId]);
 
   // Run analysis
   const runAnalysis = useCallback(async () => {
@@ -139,7 +154,7 @@ export function useCompetitiveAnalysis(categoryId: string | undefined): UseCompe
             "Content-Type": "application/json",
             Authorization: `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp3a2l0a2Z1ZmlnbGRwbGRxdGJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwNDU2NDUsImV4cCI6MjA3NjYyMTY0NX0.VziSAuTdqcteRERIPCdrMy4vqQuHjeC3tvazE0E8nMM`,
           },
-          body: JSON.stringify({ categoryId }),
+          body: JSON.stringify({ categoryId, formulaVersionId }),
         }
       );
 
@@ -185,17 +200,25 @@ export function useCompetitiveAnalysis(categoryId: string | undefined): UseCompe
         variant: "destructive",
       });
     }
-  }, [categoryId, pollForResults, toast]);
+  }, [categoryId, formulaVersionId, pollForResults, toast]);
 
   // Clear analysis
   const clearAnalysis = useCallback(async () => {
     if (!categoryId) return;
 
     try {
-      await supabase
+      let deleteQuery = supabase
         .from("competitive_analyses")
         .delete()
         .eq("category_id", categoryId);
+      
+      if (formulaVersionId) {
+        deleteQuery = deleteQuery.eq("formula_version_id", formulaVersionId);
+      } else {
+        deleteQuery = deleteQuery.is("formula_version_id", null);
+      }
+
+      await deleteQuery;
 
       setAnalysis(null);
       toast({
@@ -205,7 +228,7 @@ export function useCompetitiveAnalysis(categoryId: string | undefined): UseCompe
     } catch (err) {
       console.error("Error clearing analysis:", err);
     }
-  }, [categoryId, toast]);
+  }, [categoryId, formulaVersionId, toast]);
 
   return {
     analysis,

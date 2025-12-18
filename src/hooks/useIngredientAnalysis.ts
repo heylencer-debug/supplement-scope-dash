@@ -184,7 +184,7 @@ export interface IngredientAnalysis {
   message?: string;
 }
 
-export function useIngredientAnalysis(categoryId?: string, type: IngredientAnalysisType = 'top_performers') {
+export function useIngredientAnalysis(categoryId?: string, type: IngredientAnalysisType = 'top_performers', formulaVersionId?: string | null) {
   const [analysis, setAnalysis] = useState<IngredientAnalysis | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingFromDb, setIsLoadingFromDb] = useState(true);
@@ -216,12 +216,20 @@ export function useIngredientAnalysis(categoryId?: string, type: IngredientAnaly
       }
 
       try {
-        const { data, error: dbError } = await supabase
+        let query = supabase
           .from('ingredient_analyses')
           .select('analysis')
           .eq('category_id', categoryId)
-          .eq('type', type)
-          .maybeSingle();
+          .eq('type', type);
+        
+        // Filter by formula version - null means original analysis
+        if (formulaVersionId) {
+          query = query.eq('formula_version_id', formulaVersionId);
+        } else {
+          query = query.is('formula_version_id', null);
+        }
+
+        const { data, error: dbError } = await query.maybeSingle();
 
         if (dbError) {
           console.error(`[useIngredientAnalysis:${type}] DB load error:`, dbError);
@@ -239,7 +247,7 @@ export function useIngredientAnalysis(categoryId?: string, type: IngredientAnaly
     }
 
     loadFromDb();
-  }, [categoryId, type]);
+  }, [categoryId, type, formulaVersionId]);
 
   const runAnalysis = useCallback(async () => {
     if (!categoryId) {
@@ -261,20 +269,27 @@ export function useIngredientAnalysis(categoryId?: string, type: IngredientAnaly
     pollingRef.current = true;
 
     try {
-      // Clear existing analysis for this type
+      // Clear existing analysis for this type and version
       console.log(`[useIngredientAnalysis:${type}] Clearing existing analysis...`);
-      await supabase
+      let deleteQuery = supabase
         .from('ingredient_analyses')
         .delete()
         .eq('category_id', categoryId)
         .eq('type', type);
       
+      if (formulaVersionId) {
+        deleteQuery = deleteQuery.eq('formula_version_id', formulaVersionId);
+      } else {
+        deleteQuery = deleteQuery.is('formula_version_id', null);
+      }
+      
+      await deleteQuery;
       setAnalysis(null);
 
-      // Call edge function with type parameter
+      // Call edge function with type parameter and formula version
       console.log(`[useIngredientAnalysis:${type}] Invoking edge function...`);
       const { data, error: fnError } = await supabase.functions.invoke('analyze-ingredients', {
-        body: { categoryId, type }
+        body: { categoryId, type, formulaVersionId }
       });
 
       if (fnError) {
@@ -328,12 +343,19 @@ export function useIngredientAnalysis(categoryId?: string, type: IngredientAnaly
         
         await new Promise(resolve => setTimeout(resolve, 5000)); // 5 second intervals
         
-        const { data: dbData, error: dbError } = await supabase
+        let pollQuery = supabase
           .from('ingredient_analyses')
           .select('analysis, updated_at')
           .eq('category_id', categoryId)
-          .eq('type', type)
-          .maybeSingle();
+          .eq('type', type);
+        
+        if (formulaVersionId) {
+          pollQuery = pollQuery.eq('formula_version_id', formulaVersionId);
+        } else {
+          pollQuery = pollQuery.is('formula_version_id', null);
+        }
+        
+        const { data: dbData, error: dbError } = await pollQuery.maybeSingle();
 
         if (dbError) {
           console.error(`[useIngredientAnalysis:${type}] Polling error:`, dbError);
@@ -391,7 +413,7 @@ export function useIngredientAnalysis(categoryId?: string, type: IngredientAnaly
       setIsLoading(false);
       pollingRef.current = false;
     }
-  }, [categoryId, type, toast]);
+  }, [categoryId, type, formulaVersionId, toast]);
 
   const clearAnalysis = useCallback(async () => {
     setAnalysis(null);
@@ -401,16 +423,24 @@ export function useIngredientAnalysis(categoryId?: string, type: IngredientAnaly
     
     if (categoryId) {
       try {
-        await supabase
+        let deleteQuery = supabase
           .from('ingredient_analyses')
           .delete()
           .eq('category_id', categoryId)
           .eq('type', type);
+        
+        if (formulaVersionId) {
+          deleteQuery = deleteQuery.eq('formula_version_id', formulaVersionId);
+        } else {
+          deleteQuery = deleteQuery.is('formula_version_id', null);
+        }
+        
+        await deleteQuery;
       } catch (e) {
         console.error(`[useIngredientAnalysis:${type}] Error clearing analysis:`, e);
       }
     }
-  }, [categoryId, type]);
+  }, [categoryId, type, formulaVersionId]);
 
   return {
     analysis,

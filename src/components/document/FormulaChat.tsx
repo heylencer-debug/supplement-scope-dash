@@ -80,6 +80,42 @@ function CodeBlockWithCopy({ content, children }: { content: string; children: R
   );
 }
 
+// Copy button for entire message
+function CopyMessageButton({ content }: { content: string }) {
+  const [copied, setCopied] = useState(false);
+  
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+  
+  return (
+    <button
+      onClick={handleCopy}
+      className="absolute -bottom-1 right-2 p-1 rounded-md bg-background/90 border border-border opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted text-xs flex items-center gap-1"
+      title="Copy message"
+    >
+      {copied ? (
+        <>
+          <Check className="w-3 h-3 text-green-500" />
+          <span className="text-green-500">Copied</span>
+        </>
+      ) : (
+        <>
+          <Copy className="w-3 h-3 text-muted-foreground" />
+          <span className="text-muted-foreground">Copy</span>
+        </>
+      )}
+    </button>
+  );
+}
+
+// Component for expandable messages
 function ExpandableMessage({ content, isUser }: { content: string; isUser: boolean }) {
   const [isExpanded, setIsExpanded] = useState(false);
   // Only truncate very long messages - markdown renders compactly
@@ -560,14 +596,19 @@ export function FormulaChat({
                     <Bot className="w-4 h-4 text-primary" />
                   </div>
                 )}
-                <div
-                  className={`rounded-lg px-3 py-2 max-w-[85%] ${
-                    message.role === 'user'
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted'
-                  }`}
-                >
-                  <ExpandableMessage content={message.content} isUser={message.role === 'user'} />
+                <div className={`relative group ${message.role === 'assistant' ? 'max-w-[85%]' : ''}`}>
+                  <div
+                    className={`rounded-lg px-3 py-2 ${
+                      message.role === 'user'
+                        ? 'bg-primary text-primary-foreground max-w-[85%]'
+                        : 'bg-muted'
+                    }`}
+                  >
+                    <ExpandableMessage content={message.content} isUser={message.role === 'user'} />
+                  </div>
+                  {message.role === 'assistant' && (
+                    <CopyMessageButton content={message.content} />
+                  )}
                 </div>
                 {message.role === 'user' && (
                   <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center flex-shrink-0 mt-1">

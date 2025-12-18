@@ -92,7 +92,7 @@ If you're still discussing and not ready to apply, don't include this JSON block
         'X-Title': 'Noodle Search Formula Modifier'
       },
       body: JSON.stringify({
-        model: 'anthropic/claude-sonnet-4-5',
+        model: 'anthropic/claude-sonnet-4-20250514',
         messages,
         stream: true,
         max_tokens: 16000

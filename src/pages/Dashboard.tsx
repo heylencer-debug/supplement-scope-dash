@@ -20,6 +20,7 @@ import { LaunchPlanSection } from "@/components/dashboard/LaunchPlanSection";
 import CustomerIntelligence from "@/components/dashboard/CustomerIntelligence";
 import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
 import { PackagingIntelligence } from "@/components/dashboard/PackagingIntelligence";
+import { VersionBadge } from "@/components/dashboard/VersionBadge";
 
 import {
   ResponsiveContainer,
@@ -142,6 +143,11 @@ export default function Dashboard() {
   // Get the formula version ID to pass to analysis components
   // null means "original analysis" (no version), otherwise use the selected version
   const formulaVersionId = selectedVersionId || null;
+  
+  // Get current selected version info for display
+  const selectedVersion = selectedVersionId 
+    ? versions.find(v => v.id === selectedVersionId) 
+    : null;
 
   const hasCategory = !!category;
   const hasAnalysis = !!analysis;
@@ -524,6 +530,11 @@ export default function Dashboard() {
         analysisData={dashboardData.benchmarkData}
         isLoading={productsLoading}
         formulaVersionId={formulaVersionId}
+        versionInfo={selectedVersion ? {
+          versionNumber: selectedVersion.version_number,
+          isActive: selectedVersion.is_active,
+          changeSummary: selectedVersion.change_summary
+        } : undefined}
         />
       </ScrollAnimate>
 
@@ -638,6 +649,11 @@ export default function Dashboard() {
           isLoading={analysisLoading && !hasAnalysis}
           categoryId={category?.id}
           formulaVersionId={formulaVersionId}
+          versionInfo={selectedVersion ? {
+            versionNumber: selectedVersion.version_number,
+            isActive: selectedVersion.is_active,
+            changeSummary: selectedVersion.change_summary
+          } : undefined}
         />
       </ScrollAnimate>
 

@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Package, CheckCircle2, Award, Tag, Shield, DollarSign, Hash, Eye, Zap, Sparkles, Loader2, RefreshCw, Trash2, Clock, Camera, History } from "lucide-react";
+import { Package, CheckCircle2, Award, Tag, Shield, DollarSign, Hash, Eye, Zap, Sparkles, Loader2, RefreshCw, Trash2, Clock, Camera, History, GitBranch } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { usePackagingAnalysis } from "@/hooks/usePackagingAnalysis";
 import { usePackagingImageAnalysis } from "@/hooks/usePackagingImageAnalysis";
@@ -42,6 +42,12 @@ interface ProductData {
   } | null;
 }
 
+interface VersionInfo {
+  versionNumber: number;
+  isActive: boolean;
+  changeSummary?: string | null;
+}
+
 interface PackagingIntelligenceProps {
   packagingData: PackagingData | null;
   productsClaims: (string | null | undefined)[];
@@ -49,6 +55,7 @@ interface PackagingIntelligenceProps {
   isLoading?: boolean;
   categoryId?: string;
   formulaVersionId?: string | null;
+  versionInfo?: VersionInfo;
 }
 
 // Progress indicator component for AI analysis
@@ -117,7 +124,7 @@ function AnalysisProgressIndicator({
   );
 }
 
-export function PackagingIntelligence({ packagingData, productsClaims, productsData = [], isLoading, categoryId }: PackagingIntelligenceProps) {
+export function PackagingIntelligence({ packagingData, productsClaims, productsData = [], isLoading, categoryId, formulaVersionId, versionInfo }: PackagingIntelligenceProps) {
   const {
     analysis: aiAnalysis,
     mockupImageUrl,
@@ -410,6 +417,13 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
         <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
           <Package className="w-5 h-5 text-primary" />
           Winning Packaging Strategy
+          {/* Version Indicator */}
+          {versionInfo && (
+            <Badge variant={versionInfo.isActive ? "default" : "secondary"} className="ml-2 text-[10px] font-medium">
+              <GitBranch className="w-3 h-3 mr-1" />
+              v{versionInfo.versionNumber}
+            </Badge>
+          )}
           {/* AI Analysis Status Indicator */}
           {hasAnalysis && (
             <Badge variant="secondary" className="ml-2 bg-chart-4/10 text-chart-4 border-chart-4/20 text-[10px] font-medium">

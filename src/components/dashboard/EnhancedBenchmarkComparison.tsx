@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Progress } from "@/components/ui/progress";
-import { Star, TrendingUp, TrendingDown, Pill, Target, MessageSquare, Package, Users, Megaphone, AlertTriangle, CheckCircle, XCircle, Palette, Search, Filter, X, Trophy, ThumbsUp, ThumbsDown, Check, FlaskConical, Scale, Award, Beaker, ChevronDown, ChevronUp, BarChart3, DollarSign, Eye, Layers, Shield, Tag, Sparkles, FileText, Loader2, Zap, Brain, ArrowUp, ArrowDown, Minus, Plus, RefreshCw, ArrowRight, ArrowUpDown, Calendar, Clock } from "lucide-react";
+import { Star, TrendingUp, TrendingDown, Pill, Target, MessageSquare, Package, Users, Megaphone, AlertTriangle, CheckCircle, XCircle, Palette, Search, Filter, X, Trophy, ThumbsUp, ThumbsDown, Check, FlaskConical, Scale, Award, Beaker, ChevronDown, ChevronUp, BarChart3, DollarSign, Eye, Layers, Shield, Tag, Sparkles, FileText, Loader2, Zap, Brain, ArrowUp, ArrowDown, Minus, Plus, RefreshCw, ArrowRight, ArrowUpDown, Calendar, Clock, GitBranch } from "lucide-react";
 import { useProducts, Product } from "@/hooks/useProducts";
 import ProductDetailModal from "@/components/ProductDetailModal";
 import { useToast } from "@/hooks/use-toast";
@@ -24,6 +24,12 @@ import { useIngredientAnalysis, IngredientAnalysis } from "@/hooks/useIngredient
 import AIAnalysisResults from "@/components/dashboard/AIAnalysisResults";
 import { useCompetitiveAnalysis } from "@/hooks/useCompetitiveAnalysis";
 import { CompetitiveAnalysisResults } from "@/components/dashboard/CompetitiveAnalysisResults";
+interface VersionInfo {
+  versionNumber: number;
+  isActive: boolean;
+  changeSummary?: string | null;
+}
+
 interface EnhancedBenchmarkComparisonProps {
   categoryId?: string;
   analysisData?: {
@@ -110,6 +116,7 @@ interface EnhancedBenchmarkComparisonProps {
   } | null;
   isLoading?: boolean;
   formulaVersionId?: string | null;
+  versionInfo?: VersionInfo;
 }
 
 const MAX_COMPETITORS = 15;
@@ -1185,6 +1192,8 @@ export function EnhancedBenchmarkComparison({
   categoryId,
   analysisData,
   isLoading = false,
+  formulaVersionId,
+  versionInfo,
 }: EnhancedBenchmarkComparisonProps) {
   const { data: products, isLoading: productsLoading } = useProducts(categoryId);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -2187,6 +2196,12 @@ export function EnhancedBenchmarkComparison({
               <CardTitle className="flex items-center gap-2 text-sm sm:text-base md:text-lg">
                 <Package className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5 text-primary" />
                 Benchmark Comparison
+                {versionInfo && (
+                  <Badge variant={versionInfo.isActive ? "default" : "secondary"} className="ml-1 text-[9px] sm:text-[10px] font-medium">
+                    <GitBranch className="w-2.5 h-2.5 sm:w-3 sm:h-3 mr-0.5 sm:mr-1" />
+                    v{versionInfo.versionNumber}
+                  </Badge>
+                )}
               </CardTitle>
               <CardDescription className="text-[10px] sm:text-xs md:text-sm">
                 Compare your concept against competitors • Click any product for details

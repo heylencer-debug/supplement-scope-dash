@@ -262,6 +262,11 @@ interface IngredientComparisonProps {
   ourServings?: number;
   labelClaims?: LabelClaim[];
   categoryId?: string;
+  versionInfo?: {
+    versionNumber?: number;
+    isActive?: boolean;
+    changeSummary?: string | null;
+  };
 }
 
 // AIAnalysisResults is now imported from @/components/dashboard/AIAnalysisResults
@@ -557,7 +562,7 @@ function PackagingComparisonSection({ ourPackaging, competitors, getCompetitorPa
   );
 }
 
-function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNutrients, getCompetitorIngredientsList, ourPrice, ourServings, labelClaims = [], categoryId }: IngredientComparisonProps) {
+function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNutrients, getCompetitorIngredientsList, ourPrice, ourServings, labelClaims = [], categoryId, versionInfo }: IngredientComparisonProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [viewMode, setViewMode] = useState<'chart' | 'table' | 'gaps'>('chart');
   const [activeTab, setActiveTab] = useState<'new_winners' | 'top_performers'>('new_winners');
@@ -923,6 +928,12 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                   <Badge variant="secondary" className="ml-2 text-[9px] sm:text-[10px]">
                     {stats.total} total
                   </Badge>
+                  {versionInfo && (
+                    <Badge variant={versionInfo.isActive ? "default" : "outline"} className="ml-1 text-[9px] sm:text-[10px]">
+                      <GitBranch className="w-2.5 h-2.5 mr-1" />
+                      {versionInfo.versionNumber ? `v${versionInfo.versionNumber}` : 'Original'}
+                    </Badge>
+                  )}
                 </CardTitle>
                 <CardDescription className="text-[10px] sm:text-xs">
                   {stats.nutrients} active nutrients • {stats.otherIngredients} other ingredients
@@ -3553,6 +3564,7 @@ export function EnhancedBenchmarkComparison({
         ourServings={getOurFormulationSpecs().servingsPerContainer || undefined}
         labelClaims={analysisData?.formula_brief_content ? parseFinishedProductSpecifications(analysisData.formula_brief_content as string) : []}
         categoryId={categoryId}
+        versionInfo={versionInfo}
       />
 
       {/* Product Detail Modal */}

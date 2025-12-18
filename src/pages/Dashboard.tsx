@@ -21,6 +21,7 @@ import CustomerIntelligence from "@/components/dashboard/CustomerIntelligence";
 import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
 import { PackagingIntelligence } from "@/components/dashboard/PackagingIntelligence";
 import { VersionBadge } from "@/components/dashboard/VersionBadge";
+import { VersionHistoryTimeline } from "@/components/dashboard/VersionHistoryTimeline";
 
 import {
   ResponsiveContainer,
@@ -424,6 +425,15 @@ export default function Dashboard() {
             </Badge>
           )}
         </div>
+      )}
+
+      {/* Version History Timeline */}
+      {versions.length > 0 && (
+        <VersionHistoryTimeline
+          versions={versions}
+          selectedVersionId={selectedVersionId}
+          onSelectVersion={setSelectedVersionId}
+        />
       )}
 
       {/* Outdated Version Warning Banner */}

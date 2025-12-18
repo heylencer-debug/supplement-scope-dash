@@ -168,7 +168,7 @@ export default function StrategyBrief() {
 
       {/* AI Chat Panel */}
       <Sheet open={chatOpen} onOpenChange={setChatOpen}>
-        <SheetContent side="right" className="w-[400px] sm:w-[540px] p-0">
+        <SheetContent side="right" className="w-full sm:w-[50vw] sm:max-w-[50vw] p-0">
           {effectiveCategoryId && formulaBriefContent && (
             <FormulaChat
               categoryId={effectiveCategoryId}

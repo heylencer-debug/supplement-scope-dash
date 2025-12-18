@@ -6,7 +6,7 @@ import {
   Brain, RefreshCw, CheckCircle, AlertTriangle, XCircle, Sparkles,
   ArrowUp, ArrowDown, Minus, Plus, Check, Target, Shield, TrendingUp,
   Clock, Zap, Users, FlaskConical, Link2, AlertCircle, Lightbulb,
-  ChevronRight, Beaker, Table2, Package, FileText, Info, DollarSign
+  ChevronRight, Beaker, Table2, Package, FileText, Info, DollarSign, GitBranch
 } from "lucide-react";
 import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, Radar, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell } from "recharts";
 import { IngredientAnalysis } from "@/hooks/useIngredientAnalysis";
@@ -16,9 +16,14 @@ interface AIAnalysisResultsProps {
   analysis: IngredientAnalysis;
   onRefresh: () => void;
   isLoading: boolean;
+  versionInfo?: {
+    versionNumber?: number;
+    isActive?: boolean;
+    changeSummary?: string | null;
+  };
 }
 
-export function AIAnalysisResults({ analysis, onRefresh, isLoading }: AIAnalysisResultsProps) {
+export function AIAnalysisResults({ analysis, onRefresh, isLoading, versionInfo }: AIAnalysisResultsProps) {
   const [activeTab, setActiveTab] = useState<'ingredients' | 'formulation' | 'summary' | 'clinical' | 'customer' | 'competitive' | 'roadmap'>('ingredients');
 
   // Guard against incomplete/error analysis data
@@ -123,6 +128,12 @@ export function AIAnalysisResults({ analysis, onRefresh, isLoading }: AIAnalysis
               <Badge className={`${getAssessmentColor(analysis.summary.overall_assessment)} text-[10px]`}>
                 {analysis.summary.overall_assessment}
               </Badge>
+              {versionInfo && (
+                <Badge variant={versionInfo.isActive ? "default" : "outline"} className="text-[10px]">
+                  <GitBranch className="w-2.5 h-2.5 mr-1" />
+                  {versionInfo.versionNumber ? `v${versionInfo.versionNumber}` : 'Original'}
+                </Badge>
+              )}
             </h3>
             <p className="text-xs text-muted-foreground">
               {analysis.ingredients.length} ingredients • {analysis.clinical_analysis?.synergy_pairs?.length || 0} synergies • {analysis.priority_roadmap?.length || 0} actions

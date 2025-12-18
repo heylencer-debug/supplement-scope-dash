@@ -1087,7 +1087,8 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                 <AIAnalysisResults 
                   analysis={activeAnalysisData.analysis} 
                   onRefresh={activeAnalysisData.runAnalysis} 
-                  isLoading={activeAnalysisData.isLoading} 
+                  isLoading={activeAnalysisData.isLoading}
+                  versionInfo={versionInfo}
                 />
               ) : activeAnalysisData.pollingStatus.isPolling ? (
                 /* Polling Progress Indicator */

@@ -100,6 +100,27 @@ function ExpandableMessage({ content, isUser }: { content: string; isUser: boole
       <strong className="font-semibold text-foreground">{children}</strong>
     ),
     hr: () => <hr className="my-4 border-border" />,
+    code: ({ className, children }: { className?: string; children?: React.ReactNode }) => {
+      const isInline = !className;
+      if (isInline) {
+        return (
+          <code className="px-1.5 py-0.5 rounded bg-muted text-primary font-mono text-xs">
+            {children}
+          </code>
+        );
+      }
+      const language = className?.replace('language-', '') || '';
+      return (
+        <code className={`block text-xs font-mono ${language ? `language-${language}` : ''}`}>
+          {children}
+        </code>
+      );
+    },
+    pre: ({ children }: { children?: React.ReactNode }) => (
+      <pre className="my-3 p-3 rounded-lg bg-muted/80 border border-border overflow-x-auto text-xs leading-relaxed">
+        {children}
+      </pre>
+    ),
   };
 
   return (
@@ -531,6 +552,16 @@ export function FormulaChat({
                         h4: ({ children }) => <h4 className="font-medium text-sm text-foreground mt-3 mb-1.5">{children}</h4>,
                         strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
                         hr: () => <hr className="my-4 border-border" />,
+                        code: ({ className, children }) => {
+                          const isInline = !className;
+                          if (isInline) {
+                            return <code className="px-1.5 py-0.5 rounded bg-muted text-primary font-mono text-xs">{children}</code>;
+                          }
+                          return <code className="block text-xs font-mono">{children}</code>;
+                        },
+                        pre: ({ children }) => (
+                          <pre className="my-3 p-3 rounded-lg bg-muted/80 border border-border overflow-x-auto text-xs leading-relaxed">{children}</pre>
+                        ),
                       }}
                     >
                       {streamingContent}

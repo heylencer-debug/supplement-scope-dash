@@ -453,7 +453,12 @@ export function FormulaChat({
       }
 
       const data = await response.json();
-      const content = data.content;
+      let content = data.content;
+
+      // Strip markdown code blocks if present (```json ... ```)
+      if (content.startsWith('```')) {
+        content = content.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '');
+      }
 
       // Parse the JSON response
       try {

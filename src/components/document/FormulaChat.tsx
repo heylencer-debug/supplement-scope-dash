@@ -817,6 +817,19 @@ export function FormulaChat({
           </div>
         </div>
 
+        {/* Version Change Summary Banner */}
+        {activeVersion?.change_summary && (
+          <div className="px-4 py-2 bg-primary/5 border-b border-primary/10">
+            <div className="flex items-start gap-2">
+              <Sparkles className="w-3.5 h-3.5 text-primary mt-0.5 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-primary mb-0.5">Version {activeVersion.version_number} Changes</p>
+                <p className="text-xs text-muted-foreground line-clamp-2">{activeVersion.change_summary}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Messages */}
         <ScrollArea className="flex-1 p-4" ref={scrollRef}>
           <div className="space-y-4">
@@ -825,7 +838,10 @@ export function FormulaChat({
                 <Bot className="w-12 h-12 mx-auto text-muted-foreground/50 mb-3" />
                 <h4 className="font-medium text-foreground mb-1">Formula AI Assistant</h4>
                 <p className="text-sm text-muted-foreground max-w-[280px] mx-auto">
-                  Discuss modifications to your formula. When ready, click "Modify Formula Now" to generate the updated version.
+                  {activeVersion 
+                    ? `Continue refining Version ${activeVersion.version_number}. Discuss changes and generate new versions.`
+                    : "Discuss modifications to your formula. When ready, click \"Modify Formula Now\" to generate the updated version."
+                  }
                 </p>
               </div>
             )}

@@ -269,8 +269,8 @@ export function FormulaChat({
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const { conversation, addMessage, updateMessages, clearConversation, isLoading } = useFormulaConversation(categoryId);
   const { createVersion, activeVersion, isCreatingVersion } = useFormulaBriefVersions(categoryId);
+  const { conversation, addMessage, updateMessages, clearConversation, isLoading } = useFormulaConversation(categoryId, activeVersion?.id);
 
   const messages = conversation?.messages || [];
 
@@ -295,7 +295,7 @@ export function FormulaChat({
     setStreamingContent("");
 
     // Add user message to conversation
-    await addMessage({ categoryId, message: userMessage });
+    await addMessage({ categoryId, message: userMessage, versionId: activeVersion?.id });
 
     setIsStreaming(true);
 
@@ -409,7 +409,7 @@ export function FormulaChat({
         timestamp: new Date().toISOString()
       };
 
-      await addMessage({ categoryId, message: assistantMessage });
+      await addMessage({ categoryId, message: assistantMessage, versionId: activeVersion?.id });
       setStreamingContent("");
 
     } catch (error) {

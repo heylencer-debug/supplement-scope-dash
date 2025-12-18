@@ -1,5 +1,21 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Bot, User, Loader2, Sparkles, X, Trash2, Wand2, Eye, EyeOff, MessageSquare, ChevronDown, ChevronUp, Copy, Check } from "lucide-react";
+import { 
+  Send, 
+  Bot, 
+  User, 
+  Loader2, 
+  Sparkles, 
+  X, 
+  Trash2, 
+  Wand2, 
+  Eye, 
+  EyeOff, 
+  MessageSquare, 
+  ChevronDown, 
+  ChevronUp, 
+  Copy, 
+  Check 
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";

@@ -43,10 +43,69 @@ function ExpandableMessage({ content, isUser }: { content: string; isUser: boole
     return <p className="text-sm whitespace-pre-wrap">{content}</p>;
   }
 
+  const markdownComponents = {
+    table: ({ children }: { children?: React.ReactNode }) => (
+      <div className="overflow-x-auto my-4 rounded-lg border border-border">
+        <table className="w-full text-sm">{children}</table>
+      </div>
+    ),
+    thead: ({ children }: { children?: React.ReactNode }) => (
+      <thead className="bg-primary/10">{children}</thead>
+    ),
+    th: ({ children }: { children?: React.ReactNode }) => (
+      <th className="px-3 py-2 text-left font-semibold text-foreground border-b border-border text-xs">
+        {children}
+      </th>
+    ),
+    tbody: ({ children }: { children?: React.ReactNode }) => (
+      <tbody className="divide-y divide-border">{children}</tbody>
+    ),
+    tr: ({ children }: { children?: React.ReactNode }) => (
+      <tr className="even:bg-muted/30">{children}</tr>
+    ),
+    td: ({ children }: { children?: React.ReactNode }) => (
+      <td className="px-3 py-2 text-muted-foreground text-xs">{children}</td>
+    ),
+    p: ({ children }: { children?: React.ReactNode }) => (
+      <p className="text-sm text-muted-foreground leading-relaxed mb-3 last:mb-0">
+        {children}
+      </p>
+    ),
+    ul: ({ children }: { children?: React.ReactNode }) => (
+      <ul className="list-disc list-outside ml-5 space-y-1.5 text-sm text-muted-foreground mb-3">
+        {children}
+      </ul>
+    ),
+    ol: ({ children }: { children?: React.ReactNode }) => (
+      <ol className="list-decimal list-outside ml-5 space-y-1.5 text-sm text-muted-foreground mb-3">
+        {children}
+      </ol>
+    ),
+    li: ({ children }: { children?: React.ReactNode }) => (
+      <li className="leading-relaxed">{children}</li>
+    ),
+    h1: ({ children }: { children?: React.ReactNode }) => (
+      <h1 className="font-bold text-base text-foreground mt-4 mb-2">{children}</h1>
+    ),
+    h2: ({ children }: { children?: React.ReactNode }) => (
+      <h2 className="font-semibold text-sm text-foreground mt-4 mb-2">{children}</h2>
+    ),
+    h3: ({ children }: { children?: React.ReactNode }) => (
+      <h3 className="font-semibold text-sm text-foreground mt-3 mb-2">{children}</h3>
+    ),
+    h4: ({ children }: { children?: React.ReactNode }) => (
+      <h4 className="font-medium text-sm text-foreground mt-3 mb-1.5">{children}</h4>
+    ),
+    strong: ({ children }: { children?: React.ReactNode }) => (
+      <strong className="font-semibold text-foreground">{children}</strong>
+    ),
+    hr: () => <hr className="my-4 border-border" />,
+  };
+
   return (
     <div className="space-y-2">
-      <div className="prose prose-sm max-w-none dark:prose-invert prose-p:my-3 prose-p:leading-relaxed prose-ul:my-3 prose-ul:pl-4 prose-ol:my-3 prose-ol:pl-4 prose-li:my-1.5 prose-headings:mt-4 prose-headings:mb-2 prose-hr:my-4 prose-table:my-3 prose-pre:my-3 prose-blockquote:my-3">
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+      <div className="max-w-none">
+        <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
           {displayContent}
         </ReactMarkdown>
       </div>
@@ -446,8 +505,34 @@ export function FormulaChat({
                   <Bot className="w-4 h-4 text-primary" />
                 </div>
                 <div className="rounded-lg px-3 py-2 max-w-[85%] bg-muted">
-                  <div className="prose prose-sm max-w-none dark:prose-invert prose-p:my-3 prose-p:leading-relaxed prose-ul:my-3 prose-ul:pl-4 prose-ol:my-3 prose-ol:pl-4 prose-li:my-1.5 prose-headings:mt-4 prose-headings:mb-2 prose-hr:my-4 prose-table:my-3 prose-pre:my-3 prose-blockquote:my-3">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  <div className="max-w-none">
+                    <ReactMarkdown 
+                      remarkPlugins={[remarkGfm]} 
+                      components={{
+                        table: ({ children }) => (
+                          <div className="overflow-x-auto my-4 rounded-lg border border-border">
+                            <table className="w-full text-sm">{children}</table>
+                          </div>
+                        ),
+                        thead: ({ children }) => <thead className="bg-primary/10">{children}</thead>,
+                        th: ({ children }) => (
+                          <th className="px-3 py-2 text-left font-semibold text-foreground border-b border-border text-xs">{children}</th>
+                        ),
+                        tbody: ({ children }) => <tbody className="divide-y divide-border">{children}</tbody>,
+                        tr: ({ children }) => <tr className="even:bg-muted/30">{children}</tr>,
+                        td: ({ children }) => <td className="px-3 py-2 text-muted-foreground text-xs">{children}</td>,
+                        p: ({ children }) => <p className="text-sm text-muted-foreground leading-relaxed mb-3 last:mb-0">{children}</p>,
+                        ul: ({ children }) => <ul className="list-disc list-outside ml-5 space-y-1.5 text-sm text-muted-foreground mb-3">{children}</ul>,
+                        ol: ({ children }) => <ol className="list-decimal list-outside ml-5 space-y-1.5 text-sm text-muted-foreground mb-3">{children}</ol>,
+                        li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                        h1: ({ children }) => <h1 className="font-bold text-base text-foreground mt-4 mb-2">{children}</h1>,
+                        h2: ({ children }) => <h2 className="font-semibold text-sm text-foreground mt-4 mb-2">{children}</h2>,
+                        h3: ({ children }) => <h3 className="font-semibold text-sm text-foreground mt-3 mb-2">{children}</h3>,
+                        h4: ({ children }) => <h4 className="font-medium text-sm text-foreground mt-3 mb-1.5">{children}</h4>,
+                        strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
+                        hr: () => <hr className="my-4 border-border" />,
+                      }}
+                    >
                       {streamingContent}
                     </ReactMarkdown>
                   </div>

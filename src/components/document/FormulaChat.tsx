@@ -16,7 +16,8 @@ import {
   Copy, 
   Check,
   RotateCcw,
-  Pencil
+  Pencil,
+  History
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -35,6 +36,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface FormulaChatProps {
   categoryId: string;
@@ -269,7 +277,7 @@ export function FormulaChat({
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const { createVersion, activeVersion, isCreatingVersion } = useFormulaBriefVersions(categoryId);
+  const { createVersion, activeVersion, versions, setActiveVersion, isCreatingVersion, isSettingActive } = useFormulaBriefVersions(categoryId);
   const { conversation, addMessage, updateMessages, clearConversation, isLoading } = useFormulaConversation(categoryId, activeVersion?.id);
 
   const messages = conversation?.messages || [];
@@ -783,10 +791,45 @@ export function FormulaChat({
               <h3 className="text-sm font-semibold">Formula AI</h3>
               <p className="text-xs text-muted-foreground">Modify your formula</p>
             </div>
-            {activeVersion ? (
-              <Badge variant="outline" className="text-xs ml-2 border-primary/30 text-primary">
-                v{activeVersion.version_number}
-              </Badge>
+            {versions.length > 0 ? (
+              <Select
+                value={activeVersion?.id || "original"}
+                onValueChange={(value) => {
+                  if (value !== "original" && value !== activeVersion?.id) {
+                    setActiveVersion(value);
+                  }
+                }}
+              >
+                <SelectTrigger className="h-7 w-auto gap-1 px-2 text-xs border-primary/30 bg-transparent hover:bg-muted/50">
+                  <History className="w-3 h-3" />
+                  <SelectValue>
+                    {activeVersion ? `v${activeVersion.version_number}` : "Original"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent className="bg-popover">
+                  {versions.map((version) => (
+                    <SelectItem 
+                      key={version.id} 
+                      value={version.id}
+                      className="text-xs"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">v{version.version_number}</span>
+                        {version.change_summary && (
+                          <span className="text-muted-foreground truncate max-w-[150px]">
+                            – {version.change_summary}
+                          </span>
+                        )}
+                        {version.is_active && (
+                          <Badge variant="secondary" className="text-[10px] px-1 py-0">
+                            Active
+                          </Badge>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             ) : (
               <Badge variant="outline" className="text-xs ml-2 border-muted-foreground/30 text-muted-foreground">
                 Original

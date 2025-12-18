@@ -17,18 +17,30 @@ export interface FormulaConversation {
   updated_at: string;
 }
 
-export function useFormulaConversation(categoryId?: string) {
+export function useFormulaConversation(categoryId?: string, versionId?: string) {
   const queryClient = useQueryClient();
 
   const query = useQuery({
-    queryKey: ["formula_conversation", categoryId],
+    queryKey: ["formula_conversation", categoryId, versionId],
     queryFn: async () => {
       if (!categoryId) return null;
 
-      const { data, error } = await supabase
+      // Build query based on whether we have a versionId
+      let queryBuilder = supabase
         .from("formula_conversations")
-        .select("*")
-        .eq("category_id", categoryId)
+        .select("*");
+      
+      if (versionId) {
+        // Query by specific version
+        queryBuilder = queryBuilder.eq("formula_version_id", versionId);
+      } else {
+        // Query by category for original (no version)
+        queryBuilder = queryBuilder
+          .eq("category_id", categoryId)
+          .is("formula_version_id", null);
+      }
+      
+      const { data, error } = await queryBuilder
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -50,17 +62,27 @@ export function useFormulaConversation(categoryId?: string) {
   const addMessageMutation = useMutation({
     mutationFn: async ({ 
       categoryId, 
-      message 
+      message,
+      versionId 
     }: { 
       categoryId: string; 
       message: Message;
+      versionId?: string;
     }) => {
-      // Check if conversation exists
-      const { data: existing } = await supabase
+      // Build query to check if conversation exists
+      let queryBuilder = supabase
         .from("formula_conversations")
-        .select("id, messages")
-        .eq("category_id", categoryId)
-        .maybeSingle();
+        .select("id, messages");
+      
+      if (versionId) {
+        queryBuilder = queryBuilder.eq("formula_version_id", versionId);
+      } else {
+        queryBuilder = queryBuilder
+          .eq("category_id", categoryId)
+          .is("formula_version_id", null);
+      }
+      
+      const { data: existing } = await queryBuilder.maybeSingle();
 
       if (existing) {
         // Update existing conversation
@@ -80,12 +102,22 @@ export function useFormulaConversation(categoryId?: string) {
         // Create new conversation
         const messagesJson = [message] as unknown as Json;
         
+        const insertData: {
+          category_id: string;
+          messages: Json;
+          formula_version_id?: string;
+        } = {
+          category_id: categoryId,
+          messages: messagesJson
+        };
+        
+        if (versionId) {
+          insertData.formula_version_id = versionId;
+        }
+        
         const { data, error } = await supabase
           .from("formula_conversations")
-          .insert({
-            category_id: categoryId,
-            messages: messagesJson
-          })
+          .insert(insertData)
           .select()
           .single();
 
@@ -94,7 +126,7 @@ export function useFormulaConversation(categoryId?: string) {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["formula_conversation", categoryId] });
+      queryClient.invalidateQueries({ queryKey: ["formula_conversation", categoryId, versionId] });
     }
   });
 
@@ -117,7 +149,7 @@ export function useFormulaConversation(categoryId?: string) {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["formula_conversation", categoryId] });
+      queryClient.invalidateQueries({ queryKey: ["formula_conversation", categoryId, versionId] });
     }
   });
 
@@ -131,7 +163,7 @@ export function useFormulaConversation(categoryId?: string) {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["formula_conversation", categoryId] });
+      queryClient.invalidateQueries({ queryKey: ["formula_conversation", categoryId, versionId] });
     }
   });
 

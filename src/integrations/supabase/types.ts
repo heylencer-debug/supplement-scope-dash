@@ -583,6 +583,7 @@ export type Database = {
         Row: {
           category_id: string
           created_at: string
+          formula_version_id: string | null
           id: string
           messages: Json
           updated_at: string
@@ -590,6 +591,7 @@ export type Database = {
         Insert: {
           category_id: string
           created_at?: string
+          formula_version_id?: string | null
           id?: string
           messages?: Json
           updated_at?: string
@@ -597,6 +599,7 @@ export type Database = {
         Update: {
           category_id?: string
           created_at?: string
+          formula_version_id?: string | null
           id?: string
           messages?: Json
           updated_at?: string
@@ -614,6 +617,13 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "v_category_dashboard"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "formula_conversations_formula_version_id_fkey"
+            columns: ["formula_version_id"]
+            isOneToOne: false
+            referencedRelation: "formula_brief_versions"
             referencedColumns: ["id"]
           },
         ]

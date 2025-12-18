@@ -783,12 +783,21 @@ export function FormulaChat({
               <h3 className="text-sm font-semibold">Formula AI</h3>
               <p className="text-xs text-muted-foreground">Modify your formula</p>
             </div>
+            {activeVersion ? (
+              <Badge variant="outline" className="text-xs ml-2 border-primary/30 text-primary">
+                v{activeVersion.version_number}
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="text-xs ml-2 border-muted-foreground/30 text-muted-foreground">
+                Original
+              </Badge>
+            )}
           </div>
           <div className="flex items-center gap-2">
             {messages.length > 0 && (
               <Badge variant="secondary" className="text-xs gap-1">
                 <MessageSquare className="w-3 h-3" />
-                {messages.length} messages
+                {messages.length}
               </Badge>
             )}
             {messages.length > 0 && (

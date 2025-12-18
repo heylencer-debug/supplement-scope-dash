@@ -22,6 +22,7 @@ import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
 import { PackagingIntelligence } from "@/components/dashboard/PackagingIntelligence";
 import { VersionBadge } from "@/components/dashboard/VersionBadge";
 import { VersionHistoryTimeline } from "@/components/dashboard/VersionHistoryTimeline";
+import { VersionComparisonView } from "@/components/dashboard/VersionComparisonView";
 
 import {
   ResponsiveContainer,
@@ -88,6 +89,7 @@ export default function Dashboard() {
   
   // Formula version state
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
+  const [showComparison, setShowComparison] = useState(false);
 
   const categoryName = urlCategoryName || contextCategoryName;
 
@@ -400,35 +402,59 @@ export default function Dashboard() {
 
       {/* Formula Version Selector */}
       {versions.length > 0 && (
-        <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-lg border border-border">
-          <GitBranch className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-medium text-foreground">Formula Version:</span>
-          <Select
-            value={selectedVersionId || "original"}
-            onValueChange={(value) => setSelectedVersionId(value === "original" ? null : value)}
+        <div className="flex items-center justify-between gap-3 p-4 bg-muted/50 rounded-lg border border-border">
+          <div className="flex items-center gap-3">
+            <GitBranch className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium text-foreground">Formula Version:</span>
+            <Select
+              value={selectedVersionId || "original"}
+              onValueChange={(value) => setSelectedVersionId(value === "original" ? null : value)}
+            >
+              <SelectTrigger className="w-[200px] bg-background">
+                <SelectValue placeholder="Select version" />
+              </SelectTrigger>
+              <SelectContent className="bg-popover border border-border">
+                <SelectItem value="original">Original Analysis</SelectItem>
+                {versions.map((v) => (
+                  <SelectItem key={v.id} value={v.id}>
+                    Version {v.version_number} {v.is_active && "(Active)"}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selectedVersionId && versions.find(v => v.id === selectedVersionId)?.change_summary && (
+              <Badge variant="secondary" className="text-xs max-w-[200px] truncate">
+                {versions.find(v => v.id === selectedVersionId)?.change_summary}
+              </Badge>
+            )}
+          </div>
+          <button
+            onClick={() => setShowComparison(!showComparison)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+              showComparison 
+                ? 'bg-primary text-primary-foreground' 
+                : 'bg-background border border-border hover:bg-muted'
+            }`}
           >
-            <SelectTrigger className="w-[200px] bg-background">
-              <SelectValue placeholder="Select version" />
-            </SelectTrigger>
-            <SelectContent className="bg-popover border border-border">
-              <SelectItem value="original">Original Analysis</SelectItem>
-              {versions.map((v) => (
-                <SelectItem key={v.id} value={v.id}>
-                  Version {v.version_number} {v.is_active && "(Active)"}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {selectedVersionId && versions.find(v => v.id === selectedVersionId)?.change_summary && (
-            <Badge variant="secondary" className="text-xs">
-              {versions.find(v => v.id === selectedVersionId)?.change_summary}
-            </Badge>
-          )}
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M16 3h5v5M8 3H3v5M3 16v5h5M21 16v5h-5M21 3l-7 7M3 21l7-7" />
+            </svg>
+            {showComparison ? 'Hide Comparison' : 'Compare Versions'}
+          </button>
         </div>
       )}
 
+      {/* Version Comparison View */}
+      {showComparison && versions.length > 0 && category?.id && (
+        <VersionComparisonView
+          categoryId={category.id}
+          versions={versions}
+          onClose={() => setShowComparison(false)}
+        />
+      )}
+
       {/* Version History Timeline */}
-      {versions.length > 0 && (
+      {versions.length > 0 && !showComparison && (
         <VersionHistoryTimeline
           versions={versions}
           selectedVersionId={selectedVersionId}

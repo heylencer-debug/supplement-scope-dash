@@ -33,9 +33,10 @@ interface GeneratedFormula {
 // Component for expandable messages
 function ExpandableMessage({ content, isUser }: { content: string; isUser: boolean }) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const shouldTruncate = content.length > 600;
+  // Only truncate very long messages - markdown renders compactly
+  const shouldTruncate = !isUser && content.length > 2000;
   const displayContent = shouldTruncate && !isExpanded 
-    ? content.slice(0, 600) + '...' 
+    ? content.slice(0, 2000) + '...' 
     : content;
 
   if (isUser) {
@@ -148,18 +149,35 @@ export function FormulaChat({
 
       const decoder = new TextDecoder();
       let fullContent = "";
+      let buffer = ""; // Buffer for incomplete SSE lines
+      let streamFinished = false;
+
+      console.log('[FormulaChat] Starting stream...');
 
       while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
+        if (done) {
+          console.log('[FormulaChat] Stream reader done');
+          break;
+        }
 
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n');
-
+        // Append new data to buffer
+        buffer += decoder.decode(value, { stream: true });
+        
+        // Only process complete lines (ending with \n)
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ""; // Keep incomplete last line in buffer
+        
         for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6);
-            if (data === '[DONE]') continue;
+          const trimmedLine = line.trim();
+          if (!trimmedLine || trimmedLine.startsWith(':')) continue; // Skip empty lines and comments
+          
+          if (trimmedLine.startsWith('data: ')) {
+            const data = trimmedLine.slice(6).trim();
+            if (data === '[DONE]') {
+              streamFinished = true;
+              continue;
+            }
 
             try {
               const parsed = JSON.parse(data);
@@ -168,11 +186,41 @@ export function FormulaChat({
                 fullContent += content;
                 setStreamingContent(fullContent);
               }
-            } catch {
-              // Skip invalid JSON
+              // Check for finish reason
+              const finishReason = parsed.choices?.[0]?.finish_reason;
+              if (finishReason) {
+                streamFinished = true;
+                console.log('[FormulaChat] Stream finished with reason:', finishReason);
+              }
+            } catch (e) {
+              console.warn('[FormulaChat] Failed to parse SSE chunk:', data.substring(0, 100));
             }
           }
         }
+      }
+
+      // Process any remaining buffer after stream ends
+      if (buffer.trim()) {
+        const trimmedBuffer = buffer.trim();
+        if (trimmedBuffer.startsWith('data: ')) {
+          const data = trimmedBuffer.slice(6).trim();
+          if (data && data !== '[DONE]') {
+            try {
+              const parsed = JSON.parse(data);
+              const content = parsed.choices?.[0]?.delta?.content;
+              if (content) {
+                fullContent += content;
+              }
+            } catch {
+              // Ignore incomplete final chunk
+            }
+          }
+        }
+      }
+
+      console.log('[FormulaChat] Final content length:', fullContent.length);
+      if (!streamFinished) {
+        console.warn('[FormulaChat] Stream ended without finish_reason - may have been truncated');
       }
 
       // Save assistant message

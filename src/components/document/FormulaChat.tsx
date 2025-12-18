@@ -271,6 +271,8 @@ export function FormulaChat({
   const [streamingContent, setStreamingContent] = useState("");
   const [generatedFormula, setGeneratedFormula] = useState<GeneratedFormula | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [showVersionSwitchDialog, setShowVersionSwitchDialog] = useState(false);
+  const [pendingVersionId, setPendingVersionId] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(true);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
@@ -796,7 +798,13 @@ export function FormulaChat({
                 value={activeVersion?.id || "original"}
                 onValueChange={(value) => {
                   if (value !== "original" && value !== activeVersion?.id) {
-                    setActiveVersion(value);
+                    if (input.trim()) {
+                      // Has unsent content, show confirmation
+                      setPendingVersionId(value);
+                      setShowVersionSwitchDialog(true);
+                    } else {
+                      setActiveVersion(value);
+                    }
                   }
                 }}
               >
@@ -1186,6 +1194,41 @@ export function FormulaChat({
                   Save Version
                 </>
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Version Switch Confirmation Dialog */}
+      <Dialog open={showVersionSwitchDialog} onOpenChange={setShowVersionSwitchDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Switch Version?</DialogTitle>
+            <DialogDescription>
+              You have unsent content in your message. Switching versions will clear your current input.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setPendingVersionId(null);
+                setShowVersionSwitchDialog(false);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => {
+                if (pendingVersionId) {
+                  setInput("");
+                  setActiveVersion(pendingVersionId);
+                }
+                setPendingVersionId(null);
+                setShowVersionSwitchDialog(false);
+              }}
+            >
+              Switch Version
             </Button>
           </DialogFooter>
         </DialogContent>

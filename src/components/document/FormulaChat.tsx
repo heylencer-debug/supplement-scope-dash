@@ -1,21 +1,21 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Bot, User, Loader2, Sparkles, X, Trash2, Wand2 } from "lucide-react";
+import { Send, Bot, User, Loader2, Sparkles, X, Trash2, Wand2, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { useFormulaConversation, Message } from "@/hooks/useFormulaConversation";
 import { useFormulaBriefVersions } from "@/hooks/useFormulaBriefVersions";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface FormulaChatProps {
   categoryId: string;
@@ -42,6 +42,7 @@ export function FormulaChat({
   const [streamingContent, setStreamingContent] = useState("");
   const [generatedFormula, setGeneratedFormula] = useState<GeneratedFormula | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [showPreview, setShowPreview] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -421,24 +422,69 @@ export function FormulaChat({
         </div>
       </div>
 
-      {/* Confirmation Dialog */}
-      <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Save New Formula Version?</AlertDialogTitle>
-            <AlertDialogDescription className="space-y-2">
-              <p>The AI has generated an updated formula with the following changes:</p>
-              <p className="font-medium text-foreground bg-muted p-3 rounded-lg">
+      {/* Confirmation Dialog with Preview */}
+      <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Save New Formula Version?</DialogTitle>
+            <DialogDescription>
+              The AI has generated an updated formula with the following changes:
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 flex-1 min-h-0">
+            {/* Change Summary */}
+            <div className="bg-primary/10 border border-primary/20 rounded-lg p-3">
+              <p className="text-sm font-medium text-foreground">
                 {generatedFormula?.change_summary}
               </p>
-              <p>This will create a new version of your formula brief.</p>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setGeneratedFormula(null)}>
+            </div>
+
+            {/* Preview Toggle & Content */}
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-muted-foreground">Formula Preview</span>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setShowPreview(!showPreview)}
+                className="text-xs"
+              >
+                {showPreview ? (
+                  <>
+                    <EyeOff className="w-3 h-3 mr-1" />
+                    Hide Preview
+                  </>
+                ) : (
+                  <>
+                    <Eye className="w-3 h-3 mr-1" />
+                    Show Preview
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {showPreview && generatedFormula?.new_formula_content && (
+              <ScrollArea className="h-[400px] border rounded-lg bg-card">
+                <div className="p-6 prose prose-sm max-w-none dark:prose-invert">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {generatedFormula.new_formula_content}
+                  </ReactMarkdown>
+                </div>
+              </ScrollArea>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setGeneratedFormula(null);
+                setShowConfirmDialog(false);
+              }}
+            >
               Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction 
+            </Button>
+            <Button 
               onClick={handleConfirmSave}
               disabled={isCreatingVersion}
             >
@@ -453,10 +499,10 @@ export function FormulaChat({
                   Save Version
                 </>
               )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

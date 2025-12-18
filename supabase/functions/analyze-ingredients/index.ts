@@ -16,7 +16,7 @@ serve(async (req) => {
   }
 
   try {
-    const { categoryId, type = 'top_performers' } = await req.json();
+    const { categoryId, type = 'top_performers', formulaVersionId } = await req.json();
     
     if (!categoryId) {
       return new Response(
@@ -147,6 +147,7 @@ serve(async (req) => {
       .upsert({
         category_id: categoryId,
         type: type,
+        formula_version_id: formulaVersionId || null,
         analysis: { status: 'in_progress', started_at: new Date().toISOString() },
         updated_at: new Date().toISOString()
       }, { onConflict: 'category_id,type' });
@@ -185,6 +186,7 @@ serve(async (req) => {
           .upsert({
             category_id: categoryId,
             type: type,
+            formula_version_id: formulaVersionId || null,
             analysis: { status: 'error', error: 'OpenRouter API key not configured' },
             updated_at: new Date().toISOString()
           }, { onConflict: 'category_id,type' });
@@ -705,6 +707,7 @@ Provide a comprehensive analysis including SWOT, clinical dosage adequacy, custo
           .upsert({
             category_id: categoryId,
             type: type,
+            formula_version_id: formulaVersionId || null,
             analysis: analysisResult,
             updated_at: new Date().toISOString()
           }, { onConflict: 'category_id,type' });
@@ -725,6 +728,7 @@ Provide a comprehensive analysis including SWOT, clinical dosage adequacy, custo
           .upsert({
             category_id: categoryId,
             type: type,
+            formula_version_id: formulaVersionId || null,
             analysis: { 
               status: 'error', 
               error: true, 

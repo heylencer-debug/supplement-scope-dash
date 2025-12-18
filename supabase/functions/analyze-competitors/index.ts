@@ -26,7 +26,7 @@ serve(async (req) => {
   }
 
   try {
-    const { categoryId } = await req.json();
+    const { categoryId, formulaVersionId } = await req.json();
 
     if (!categoryId) {
       return new Response(
@@ -40,8 +40,8 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Start background task for long-running AI analysis
-    (globalThis as any).EdgeRuntime?.waitUntil?.(runCompetitiveAnalysis(supabase, categoryId)) 
-      || runCompetitiveAnalysis(supabase, categoryId);
+    (globalThis as any).EdgeRuntime?.waitUntil?.(runCompetitiveAnalysis(supabase, categoryId, formulaVersionId)) 
+      || runCompetitiveAnalysis(supabase, categoryId, formulaVersionId);
 
     return new Response(
       JSON.stringify({ status: "processing", message: "Analysis started" }),
@@ -57,7 +57,7 @@ serve(async (req) => {
   }
 });
 
-async function runCompetitiveAnalysis(supabase: any, categoryId: string) {
+async function runCompetitiveAnalysis(supabase: any, categoryId: string, formulaVersionId?: string) {
   try {
     console.log("Starting competitive analysis for category:", categoryId);
 
@@ -124,6 +124,7 @@ async function runCompetitiveAnalysis(supabase: any, categoryId: string) {
       .from("competitive_analyses")
       .upsert({
         category_id: categoryId,
+        formula_version_id: formulaVersionId || null,
         analysis: analysis,
         updated_at: new Date().toISOString(),
       }, { onConflict: "category_id" });

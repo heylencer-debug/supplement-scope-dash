@@ -18,7 +18,7 @@ serve(async (req) => {
   }
 
   try {
-    const { categoryId, copyStyle } = await req.json();
+    const { categoryId, copyStyle, formulaVersionId } = await req.json();
     
     if (!categoryId) {
       return new Response(
@@ -994,6 +994,7 @@ ${perProductImageAnalysisSummary}
                 .from('packaging_analyses')
                 .update({ 
                   analysis: analysis,
+                  formula_version_id: formulaVersionId || null,
                   updated_at: new Date().toISOString()
                 })
                 .eq('category_id', categoryId)
@@ -1014,6 +1015,7 @@ ${perProductImageAnalysisSummary}
                 .insert({
                   category_id: categoryId,
                   analysis: analysis,
+                  formula_version_id: formulaVersionId || null,
                   image_analysis: null
                 })
                 .select('id, image_analysis, analysis');

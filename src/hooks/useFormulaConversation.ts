@@ -98,6 +98,29 @@ export function useFormulaConversation(categoryId?: string) {
     }
   });
 
+  const updateMessagesMutation = useMutation({
+    mutationFn: async ({ 
+      conversationId, 
+      messages 
+    }: { 
+      conversationId: string; 
+      messages: Message[];
+    }) => {
+      const { data, error } = await supabase
+        .from("formula_conversations")
+        .update({ messages: messages as unknown as Json })
+        .eq("id", conversationId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["formula_conversation", categoryId] });
+    }
+  });
+
   const clearConversationMutation = useMutation({
     mutationFn: async (conversationId: string) => {
       const { error } = await supabase
@@ -116,6 +139,7 @@ export function useFormulaConversation(categoryId?: string) {
     conversation: query.data,
     isLoading: query.isLoading,
     addMessage: addMessageMutation.mutateAsync,
+    updateMessages: updateMessagesMutation.mutateAsync,
     clearConversation: clearConversationMutation.mutateAsync,
     isAddingMessage: addMessageMutation.isPending
   };

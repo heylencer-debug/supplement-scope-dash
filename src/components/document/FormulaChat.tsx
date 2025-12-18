@@ -14,7 +14,8 @@ import {
   ChevronDown, 
   ChevronUp, 
   Copy, 
-  Check 
+  Check,
+  RotateCcw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -97,7 +98,7 @@ function CopyMessageButton({ content }: { content: string }) {
   return (
     <button
       onClick={handleCopy}
-      className="absolute -bottom-1 right-2 p-1 rounded-md bg-background/90 border border-border opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted text-xs flex items-center gap-1"
+      className="p-1 rounded-md bg-background/90 border border-border hover:bg-muted text-xs flex items-center gap-1"
       title="Copy message"
     >
       {copied ? (
@@ -265,7 +266,7 @@ export function FormulaChat({
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const { conversation, addMessage, clearConversation, isLoading } = useFormulaConversation(categoryId);
+  const { conversation, addMessage, updateMessages, clearConversation, isLoading } = useFormulaConversation(categoryId);
   const { createVersion, activeVersion, isCreatingVersion } = useFormulaBriefVersions(categoryId);
 
   const messages = conversation?.messages || [];
@@ -535,6 +536,115 @@ export function FormulaChat({
     }
   };
 
+  const handleRegenerate = async () => {
+    if (!conversation?.id || isStreaming || isGenerating || messages.length < 2) return;
+    
+    // Find the last user message
+    const lastUserIndex = messages.map(m => m.role).lastIndexOf('user');
+    if (lastUserIndex === -1) return;
+    
+    const lastUserMessage = messages[lastUserIndex];
+    
+    // Remove the last assistant message (keep messages up to and including the last user message)
+    const messagesWithoutLastAssistant = messages.slice(0, lastUserIndex + 1);
+    
+    // Update the conversation in DB
+    await updateMessages({ 
+      conversationId: conversation.id, 
+      messages: messagesWithoutLastAssistant 
+    });
+    
+    setStreamingContent("");
+    setIsStreaming(true);
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/modify-formula`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`
+          },
+          body: JSON.stringify({
+            categoryId,
+            userMessage: lastUserMessage.content,
+            conversationHistory: messagesWithoutLastAssistant.slice(0, -1), // Exclude the last user message
+            currentFormula,
+            generateFormula: false
+          })
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to get AI response');
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('No response body');
+
+      const decoder = new TextDecoder();
+      let fullContent = "";
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          const trimmedLine = line.trim();
+          if (!trimmedLine || trimmedLine.startsWith(':')) continue;
+
+          if (trimmedLine.startsWith('data: ')) {
+            const data = trimmedLine.slice(6).trim();
+            if (data === '[DONE]') continue;
+
+            try {
+              const parsed = JSON.parse(data);
+              const content = parsed.choices?.[0]?.delta?.content;
+              if (content) {
+                fullContent += content;
+                setStreamingContent(fullContent);
+              }
+            } catch {
+              // Ignore parse errors
+            }
+          }
+        }
+      }
+
+      // Save assistant message
+      const assistantMessage: Message = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: fullContent,
+        timestamp: new Date().toISOString()
+      };
+
+      await addMessage({ categoryId, message: assistantMessage });
+      setStreamingContent("");
+
+      toast({
+        title: "Response regenerated",
+        description: "AI has provided a new response."
+      });
+
+    } catch (error) {
+      console.error('Regenerate error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to regenerate response. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsStreaming(false);
+    }
+  };
+
   return (
     <>
       <div className="flex flex-col h-full bg-background border-l border-border">
@@ -586,37 +696,55 @@ export function FormulaChat({
               </div>
             )}
 
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                {message.role === 'assistant' && (
-                  <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-1">
-                    <Bot className="w-4 h-4 text-primary" />
-                  </div>
-                )}
-                <div className={`relative group ${message.role === 'assistant' ? 'max-w-[85%]' : ''}`}>
-                  <div
-                    className={`rounded-lg px-3 py-2 ${
-                      message.role === 'user'
-                        ? 'bg-primary text-primary-foreground max-w-[85%]'
-                        : 'bg-muted'
-                    }`}
-                  >
-                    <ExpandableMessage content={message.content} isUser={message.role === 'user'} />
-                  </div>
+            {messages.map((message, index) => {
+              const isLastAssistantMessage = message.role === 'assistant' && 
+                index === messages.map(m => m.role).lastIndexOf('assistant');
+              
+              return (
+                <div
+                  key={message.id}
+                  className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
                   {message.role === 'assistant' && (
-                    <CopyMessageButton content={message.content} />
+                    <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-1">
+                      <Bot className="w-4 h-4 text-primary" />
+                    </div>
+                  )}
+                  <div className={`relative group ${message.role === 'assistant' ? 'max-w-[85%]' : ''}`}>
+                    <div
+                      className={`rounded-lg px-3 py-2 ${
+                        message.role === 'user'
+                          ? 'bg-primary text-primary-foreground max-w-[85%]'
+                          : 'bg-muted'
+                      }`}
+                    >
+                      <ExpandableMessage content={message.content} isUser={message.role === 'user'} />
+                    </div>
+                    {message.role === 'assistant' && (
+                      <div className="absolute -bottom-1 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <CopyMessageButton content={message.content} />
+                        {isLastAssistantMessage && !isStreaming && (
+                          <button
+                            onClick={handleRegenerate}
+                            disabled={isStreaming || isGenerating}
+                            className="p-1 rounded-md bg-background/90 border border-border hover:bg-muted text-xs flex items-center gap-1"
+                            title="Regenerate response"
+                          >
+                            <RotateCcw className="w-3 h-3 text-muted-foreground" />
+                            <span className="text-muted-foreground">Retry</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  {message.role === 'user' && (
+                    <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center flex-shrink-0 mt-1">
+                      <User className="w-4 h-4" />
+                    </div>
                   )}
                 </div>
-                {message.role === 'user' && (
-                  <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center flex-shrink-0 mt-1">
-                    <User className="w-4 h-4" />
-                  </div>
-                )}
-              </div>
-            ))}
+              );
+            })}
 
             {/* Streaming message */}
             {isStreaming && streamingContent && (

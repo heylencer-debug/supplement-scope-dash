@@ -284,6 +284,24 @@ export function FormulaChat({
 
   const messages = conversation?.messages || [];
 
+  // Restore last selected version from localStorage on mount
+  useEffect(() => {
+    const savedVersionId = localStorage.getItem(`formula-version-${categoryId}`);
+    if (savedVersionId && versions.length > 0) {
+      const versionExists = versions.some(v => v.id === savedVersionId);
+      if (versionExists && savedVersionId !== activeVersion?.id) {
+        setActiveVersion(savedVersionId);
+      }
+    }
+  }, [categoryId, versions.length]);
+
+  // Save selected version to localStorage when it changes
+  useEffect(() => {
+    if (activeVersion?.id) {
+      localStorage.setItem(`formula-version-${categoryId}`, activeVersion.id);
+    }
+  }, [activeVersion?.id, categoryId]);
+
   // Auto-scroll to bottom when messages change
   useEffect(() => {
     if (scrollRef.current) {

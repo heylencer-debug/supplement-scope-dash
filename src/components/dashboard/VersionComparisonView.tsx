@@ -13,11 +13,86 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   GitBranch, ArrowLeftRight, FlaskConical, Package, Shield, 
-  CheckCircle2, XCircle, ArrowUp, ArrowDown, Minus, X
+  CheckCircle2, XCircle, ArrowUp, ArrowDown, Minus, X, FileText,
+  Plus, MinusCircle
 } from "lucide-react";
 import { useIngredientAnalysis } from "@/hooks/useIngredientAnalysis";
 import { usePackagingAnalysis } from "@/hooks/usePackagingAnalysis";
 import { useCompetitiveAnalysis } from "@/hooks/useCompetitiveAnalysis";
+
+// Simple diff algorithm for line-by-line comparison
+type DiffLine = {
+  type: 'unchanged' | 'added' | 'removed';
+  content: string;
+  lineNumber?: number;
+};
+
+function computeLineDiff(oldText: string, newText: string): DiffLine[] {
+  const oldLines = oldText.split('\n');
+  const newLines = newText.split('\n');
+  const result: DiffLine[] = [];
+  
+  // Simple LCS-based diff
+  const lcs = computeLCS(oldLines, newLines);
+  
+  let oldIdx = 0;
+  let newIdx = 0;
+  let lcsIdx = 0;
+  
+  while (oldIdx < oldLines.length || newIdx < newLines.length) {
+    if (lcsIdx < lcs.length && oldIdx < oldLines.length && oldLines[oldIdx] === lcs[lcsIdx]) {
+      if (newIdx < newLines.length && newLines[newIdx] === lcs[lcsIdx]) {
+        result.push({ type: 'unchanged', content: lcs[lcsIdx], lineNumber: newIdx + 1 });
+        oldIdx++;
+        newIdx++;
+        lcsIdx++;
+      } else if (newIdx < newLines.length) {
+        result.push({ type: 'added', content: newLines[newIdx], lineNumber: newIdx + 1 });
+        newIdx++;
+      }
+    } else if (oldIdx < oldLines.length && (lcsIdx >= lcs.length || oldLines[oldIdx] !== lcs[lcsIdx])) {
+      result.push({ type: 'removed', content: oldLines[oldIdx] });
+      oldIdx++;
+    } else if (newIdx < newLines.length) {
+      result.push({ type: 'added', content: newLines[newIdx], lineNumber: newIdx + 1 });
+      newIdx++;
+    }
+  }
+  
+  return result;
+}
+
+function computeLCS(a: string[], b: string[]): string[] {
+  const m = a.length;
+  const n = b.length;
+  const dp: number[][] = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
+  
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (a[i - 1] === b[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1] + 1;
+      } else {
+        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+      }
+    }
+  }
+  
+  const lcs: string[] = [];
+  let i = m, j = n;
+  while (i > 0 && j > 0) {
+    if (a[i - 1] === b[j - 1]) {
+      lcs.unshift(a[i - 1]);
+      i--;
+      j--;
+    } else if (dp[i - 1][j] > dp[i][j - 1]) {
+      i--;
+    } else {
+      j--;
+    }
+  }
+  
+  return lcs;
+}
 
 interface FormulaBriefVersion {
   id: string;
@@ -45,7 +120,31 @@ export function VersionComparisonView({
   const [rightVersionId, setRightVersionId] = useState<string | null>(
     versions.find(v => v.is_active)?.id || null
   );
-  const [activeTab, setActiveTab] = useState<'ingredients' | 'packaging' | 'competitive'>('ingredients');
+  const [activeTab, setActiveTab] = useState<'diff' | 'ingredients' | 'packaging' | 'competitive'>('diff');
+
+  // Get formula content for diff
+  const leftVersion = leftVersionId ? versions.find(v => v.id === leftVersionId) : null;
+  const rightVersion = rightVersionId ? versions.find(v => v.id === rightVersionId) : null;
+  
+  // Compute diff between formula versions
+  const formulaDiff = useMemo(() => {
+    const leftContent = leftVersion?.formula_brief_content || '';
+    const rightContent = rightVersion?.formula_brief_content || '';
+    
+    if (!leftContent && !rightContent) return [];
+    if (!leftContent) return rightContent.split('\n').map((line, i) => ({ type: 'added' as const, content: line, lineNumber: i + 1 }));
+    if (!rightContent) return leftContent.split('\n').map(line => ({ type: 'removed' as const, content: line }));
+    
+    return computeLineDiff(leftContent, rightContent);
+  }, [leftVersion?.formula_brief_content, rightVersion?.formula_brief_content]);
+
+  // Calculate diff stats
+  const diffStats = useMemo(() => {
+    const added = formulaDiff.filter(l => l.type === 'added').length;
+    const removed = formulaDiff.filter(l => l.type === 'removed').length;
+    const unchanged = formulaDiff.filter(l => l.type === 'unchanged').length;
+    return { added, removed, unchanged, total: formulaDiff.length };
+  }, [formulaDiff]);
 
   // Get analyses for both versions
   const leftIngredients = useIngredientAnalysis(categoryId, 'new_winners', leftVersionId || undefined);
@@ -137,6 +236,15 @@ export function VersionComparisonView({
         {/* Comparison Tabs */}
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
           <TabsList className="w-full">
+            <TabsTrigger value="diff" className="flex-1 text-xs gap-1">
+              <FileText className="h-3 w-3" />
+              Formula Diff
+              {diffStats.added + diffStats.removed > 0 && (
+                <Badge variant="secondary" className="ml-1 text-[9px] h-4 px-1">
+                  {diffStats.added + diffStats.removed}
+                </Badge>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="ingredients" className="flex-1 text-xs gap-1">
               <FlaskConical className="h-3 w-3" />
               Ingredients
@@ -150,6 +258,15 @@ export function VersionComparisonView({
               Competitive
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="diff" className="mt-4">
+            <FormulaDiffView 
+              diff={formulaDiff}
+              stats={diffStats}
+              leftLabel={getVersionLabel(leftVersionId)}
+              rightLabel={getVersionLabel(rightVersionId)}
+            />
+          </TabsContent>
 
           <TabsContent value="ingredients" className="mt-4">
             <ComparisonPanel
@@ -195,6 +312,116 @@ export function VersionComparisonView({
         </Tabs>
       </CardContent>
     </Card>
+  );
+}
+
+// Formula Diff View component
+function FormulaDiffView({ 
+  diff, 
+  stats,
+  leftLabel,
+  rightLabel
+}: { 
+  diff: DiffLine[]; 
+  stats: { added: number; removed: number; unchanged: number; total: number };
+  leftLabel: string;
+  rightLabel: string;
+}) {
+  if (diff.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-center">
+        <FileText className="h-8 w-8 text-muted-foreground mb-3 opacity-50" />
+        <p className="text-sm text-muted-foreground">Select two versions to compare</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          Choose different versions from the dropdowns above
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* Diff Stats Header */}
+      <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+        <div className="flex items-center gap-2 text-xs">
+          <span className="text-muted-foreground">Comparing</span>
+          <Badge variant="outline" className="font-mono">{leftLabel}</Badge>
+          <ArrowLeftRight className="h-3 w-3 text-muted-foreground" />
+          <Badge variant="outline" className="font-mono">{rightLabel}</Badge>
+        </div>
+        <div className="flex items-center gap-3 text-xs">
+          <span className="flex items-center gap-1 text-chart-4">
+            <Plus className="h-3 w-3" />
+            {stats.added} added
+          </span>
+          <span className="flex items-center gap-1 text-destructive">
+            <MinusCircle className="h-3 w-3" />
+            {stats.removed} removed
+          </span>
+          <span className="text-muted-foreground">
+            {stats.unchanged} unchanged
+          </span>
+        </div>
+      </div>
+
+      {/* Diff Content */}
+      <ScrollArea className="h-[450px] border border-border rounded-lg">
+        <div className="font-mono text-xs">
+          {diff.map((line, index) => (
+            <div
+              key={index}
+              className={`flex items-stretch border-b border-border/50 last:border-b-0 ${
+                line.type === 'added' 
+                  ? 'bg-chart-4/10' 
+                  : line.type === 'removed' 
+                    ? 'bg-destructive/10' 
+                    : ''
+              }`}
+            >
+              {/* Line indicator */}
+              <div className={`w-8 shrink-0 flex items-center justify-center border-r border-border/50 ${
+                line.type === 'added' 
+                  ? 'bg-chart-4/20 text-chart-4' 
+                  : line.type === 'removed' 
+                    ? 'bg-destructive/20 text-destructive' 
+                    : 'text-muted-foreground'
+              }`}>
+                {line.type === 'added' ? (
+                  <Plus className="h-3 w-3" />
+                ) : line.type === 'removed' ? (
+                  <Minus className="h-3 w-3" />
+                ) : (
+                  <span className="text-[10px]">{line.lineNumber}</span>
+                )}
+              </div>
+              
+              {/* Line content */}
+              <div className={`flex-1 px-3 py-1.5 whitespace-pre-wrap break-all ${
+                line.type === 'added' 
+                  ? 'text-chart-4' 
+                  : line.type === 'removed' 
+                    ? 'text-destructive line-through opacity-70' 
+                    : 'text-foreground'
+              }`}>
+                {line.content || '\u00A0'}
+              </div>
+            </div>
+          ))}
+        </div>
+      </ScrollArea>
+
+      {/* Legend */}
+      <div className="flex items-center justify-center gap-4 text-[10px] text-muted-foreground">
+        <span className="flex items-center gap-1">
+          <div className="w-3 h-3 rounded bg-chart-4/20 border border-chart-4/30" />
+          Added in {rightLabel}
+        </span>
+        <span className="flex items-center gap-1">
+          <div className="w-3 h-3 rounded bg-destructive/20 border border-destructive/30" />
+          Removed from {leftLabel}
+        </span>
+      </div>
+    </div>
   );
 }
 

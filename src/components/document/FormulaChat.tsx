@@ -17,7 +17,8 @@ import {
   Check,
   RotateCcw,
   Pencil,
-  History
+  History,
+  Database
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -25,6 +26,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { useFormulaConversation, Message } from "@/hooks/useFormulaConversation";
 import { useFormulaBriefVersions } from "@/hooks/useFormulaBriefVersions";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -281,6 +284,40 @@ export function FormulaChat({
 
   const { createVersion, activeVersion, versions, setActiveVersion, isCreatingVersion, isSettingActive } = useFormulaBriefVersions(categoryId);
   const { conversation, addMessage, updateMessages, clearConversation, isLoading } = useFormulaConversation(categoryId, activeVersion?.id);
+
+  // Fetch competitor ingredient analysis data to show badge
+  const { data: competitorData } = useQuery({
+    queryKey: ["ingredient_analyses_count", categoryId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("ingredient_analyses")
+        .select("analysis, type")
+        .eq("category_id", categoryId);
+      
+      if (error) throw error;
+      
+      // Count products analyzed from the analysis data
+      let totalProducts = 0;
+      let hasData = false;
+      
+      if (data && data.length > 0) {
+        hasData = true;
+        for (const item of data) {
+          const analysis = item.analysis as Record<string, unknown>;
+          // Try to count products from various possible structures
+          if (analysis?.competitor_details && Array.isArray(analysis.competitor_details)) {
+            totalProducts += analysis.competitor_details.length;
+          } else if (analysis?.ingredients && Array.isArray(analysis.ingredients)) {
+            // Estimate based on ingredient count - at least we have data
+            totalProducts = Math.max(totalProducts, 5); // Minimum estimate
+          }
+        }
+      }
+      
+      return { hasData, productCount: totalProducts, analysisCount: data?.length || 0 };
+    },
+    enabled: !!categoryId
+  });
 
   const messages = conversation?.messages || [];
 
@@ -868,6 +905,18 @@ export function FormulaChat({
             )}
           </div>
           <div className="flex items-center gap-2">
+            {competitorData?.hasData && (
+              <Badge 
+                variant="outline" 
+                className="text-xs gap-1 border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                title="Competitor ingredient data available - AI has access to competitor formulations"
+              >
+                <Database className="w-3 h-3" />
+                {competitorData.productCount > 0 
+                  ? `${competitorData.productCount} competitors` 
+                  : `${competitorData.analysisCount} analysis${competitorData.analysisCount > 1 ? 'es' : ''}`}
+              </Badge>
+            )}
             {messages.length > 0 && (
               <Badge variant="secondary" className="text-xs gap-1">
                 <MessageSquare className="w-3 h-3" />

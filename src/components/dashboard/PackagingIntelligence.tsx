@@ -13,6 +13,7 @@ import { AIPackagingResults } from "./AIPackagingResults";
 import { DualPackagingStrategies, isDualStrategyAnalysis } from "./DualPackagingStrategies";
 import { DualMockupGenerator } from "./DualMockupGenerator";
 import { CompetitorPackagingTable } from "./CompetitorPackagingTable";
+import { ClaimPatternChart } from "./ClaimPatternChart";
 import { formatDistanceToNow } from "date-fns";
 
 interface PackagingData {
@@ -656,7 +657,10 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
 
           {/* Image Analysis Results Table */}
           {hasImageAnalysis && imageAnalysis?.competitor_analyses && (
-            <CompetitorPackagingTable analyses={imageAnalysis.competitor_analyses} />
+            <div className="space-y-4">
+              <CompetitorPackagingTable analyses={imageAnalysis.competitor_analyses} />
+              <ClaimPatternChart analyses={imageAnalysis.competitor_analyses} />
+            </div>
           )}
 
           {/* Empty State */}

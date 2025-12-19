@@ -38,6 +38,78 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
+    // Fetch competitor ingredient analysis data
+    console.log('Fetching ingredient analysis for category:', categoryId);
+    const { data: ingredientAnalysis, error: ingredientError } = await supabase
+      .from('ingredient_analyses')
+      .select('analysis, type')
+      .eq('category_id', categoryId);
+
+    if (ingredientError) {
+      console.error('Error fetching ingredient analysis:', ingredientError);
+    }
+
+    // Build competitor context from ingredient analysis
+    let competitorContext = '';
+    if (ingredientAnalysis && ingredientAnalysis.length > 0) {
+      competitorContext = '\n\n=== COMPETITOR INGREDIENT INTELLIGENCE ===\n';
+      
+      for (const analysis of ingredientAnalysis) {
+        const data = analysis.analysis as Record<string, unknown>;
+        const analysisType = analysis.type === 'new_winners' ? 'NEW WINNERS (Fast-Growing Products)' : 'TOP PERFORMERS (Best Sellers)';
+        
+        competitorContext += `\n### ${analysisType}:\n`;
+        
+        // Extract key ingredient data
+        if (data?.ingredients && Array.isArray(data.ingredients)) {
+          competitorContext += '\n**Key Ingredients Found in Competitors:**\n';
+          for (const ing of data.ingredients.slice(0, 15)) {
+            const ingredient = ing as Record<string, unknown>;
+            const name = ingredient.name || ingredient.ingredient || 'Unknown';
+            const prevalence = ingredient.prevalence || ingredient.frequency || '';
+            const avgDosage = ingredient.avg_dosage || ingredient.dosage || '';
+            const trend = ingredient.trend || '';
+            competitorContext += `- ${name}${prevalence ? ` (${prevalence}% of products)` : ''}${avgDosage ? ` - typical dose: ${avgDosage}` : ''}${trend ? ` - trend: ${trend}` : ''}\n`;
+          }
+        }
+        
+        // Extract summary insights
+        if (data?.summary) {
+          competitorContext += `\n**Summary:** ${data.summary}\n`;
+        }
+        
+        // Extract actionable insights
+        if (data?.actionable_insights && Array.isArray(data.actionable_insights)) {
+          competitorContext += '\n**Key Insights:**\n';
+          for (const insight of data.actionable_insights.slice(0, 5)) {
+            const insightObj = insight as Record<string, unknown>;
+            const text = insightObj.insight || insightObj.text || insightObj.recommendation || String(insight);
+            if (typeof text === 'string') {
+              competitorContext += `- ${text}\n`;
+            }
+          }
+        }
+        
+        // Extract competitor details if available
+        if (data?.competitor_details && Array.isArray(data.competitor_details)) {
+          competitorContext += '\n**Top Competitor Formulations:**\n';
+          for (const comp of data.competitor_details.slice(0, 5)) {
+            const competitor = comp as Record<string, unknown>;
+            const brand = competitor.brand || competitor.name || 'Unknown Brand';
+            const keyIngredients = competitor.key_ingredients || competitor.ingredients;
+            if (keyIngredients) {
+              competitorContext += `- ${brand}: ${Array.isArray(keyIngredients) ? keyIngredients.join(', ') : keyIngredients}\n`;
+            }
+          }
+        }
+      }
+      
+      competitorContext += '\n=== END COMPETITOR INTELLIGENCE ===\n';
+      console.log('Added competitor context, length:', competitorContext.length);
+    } else {
+      console.log('No ingredient analysis data found for category');
+    }
+
     // Different system prompts based on mode
     let systemPrompt: string;
 
@@ -52,9 +124,15 @@ serve(async (req) => {
 
 CURRENT FORMULA BRIEF:
 ${currentFormula}
+${competitorContext}
 ${conversationSummary}
 
 CRITICAL TASK: You must carefully review the ENTIRE conversation history above and identify EVERY single change, modification, or adjustment that was discussed. Then generate a COMPLETE updated formula brief that incorporates ALL of these changes.
+
+Use the COMPETITOR INGREDIENT INTELLIGENCE above to:
+- Validate suggested ingredient choices against what's working for competitors
+- Ensure dosages are competitive with successful products
+- Reference specific competitor data when incorporating changes
 
 BEFORE GENERATING, mentally list all changes discussed:
 - Review each user message for requested modifications
@@ -79,10 +157,11 @@ CRITICAL RULES:
 6. Double-check: Did you include ALL changes from ALL messages?`;
     } else {
       // CONVERSATION MODE: Be helpful and discuss, no JSON output
-      systemPrompt = `You are a Formula Development Specialist helping to discuss and plan modifications to a product formula. You have access to the complete formula brief document below.
+      systemPrompt = `You are a Formula Development Specialist helping to discuss and plan modifications to a product formula. You have access to the complete formula brief document AND competitive intelligence about what ingredients competitors are using.
 
 CURRENT FORMULA BRIEF:
 ${currentFormula}
+${competitorContext}
 ${conversationSummary}
 
 YOUR ROLE:
@@ -91,6 +170,14 @@ YOUR ROLE:
 3. Discuss potential ingredient interactions and synergies
 4. Help the user think through modifications before finalizing
 5. Be conversational, helpful, and informative
+6. Reference COMPETITOR INTELLIGENCE when relevant - tell the user what competitors are using and at what dosages
+
+USING COMPETITOR DATA:
+- When discussing ingredients, reference what competitors are using successfully
+- Compare proposed changes against competitor formulations
+- Highlight opportunities where the user's formula can outperform competitors
+- Point out any gaps where competitors have ingredients the user doesn't
+- Suggest dosages based on what's working in the market
 
 CONVERSATION CONTINUITY - CRITICAL:
 - You MUST maintain awareness of ALL previous messages in this conversation

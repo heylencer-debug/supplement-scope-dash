@@ -18,7 +18,8 @@ import {
   RotateCcw,
   Pencil,
   History,
-  Database
+  Database,
+  FlaskConical
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -46,6 +47,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 interface FormulaChatProps {
   categoryId: string;
@@ -279,15 +285,16 @@ export function FormulaChat({
   const [showPreview, setShowPreview] = useState(true);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
+  const [showCompetitorData, setShowCompetitorData] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const { createVersion, activeVersion, versions, setActiveVersion, isCreatingVersion, isSettingActive } = useFormulaBriefVersions(categoryId);
   const { conversation, addMessage, updateMessages, clearConversation, isLoading } = useFormulaConversation(categoryId, activeVersion?.id);
 
-  // Fetch competitor ingredient analysis data to show badge
+  // Fetch competitor ingredient analysis data
   const { data: competitorData } = useQuery({
-    queryKey: ["ingredient_analyses_count", categoryId],
+    queryKey: ["ingredient_analyses_full", categoryId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("ingredient_analyses")
@@ -296,25 +303,67 @@ export function FormulaChat({
       
       if (error) throw error;
       
-      // Count products analyzed from the analysis data
+      // Parse and extract useful data
       let totalProducts = 0;
       let hasData = false;
+      const ingredientsList: Array<{
+        name: string;
+        prevalence?: string;
+        dosage?: string;
+        trend?: string;
+        source: 'new_winners' | 'top_performers';
+      }> = [];
+      const competitorDetails: Array<{
+        brand: string;
+        ingredients: string[];
+        source: 'new_winners' | 'top_performers';
+      }> = [];
       
       if (data && data.length > 0) {
         hasData = true;
         for (const item of data) {
           const analysis = item.analysis as Record<string, unknown>;
-          // Try to count products from various possible structures
+          const source = item.type as 'new_winners' | 'top_performers';
+          
+          // Extract ingredients
+          if (analysis?.ingredients && Array.isArray(analysis.ingredients)) {
+            for (const ing of analysis.ingredients.slice(0, 10)) {
+              const ingredient = ing as Record<string, unknown>;
+              ingredientsList.push({
+                name: String(ingredient.name || ingredient.ingredient || 'Unknown'),
+                prevalence: ingredient.prevalence ? String(ingredient.prevalence) : undefined,
+                dosage: ingredient.avg_dosage || ingredient.dosage ? String(ingredient.avg_dosage || ingredient.dosage) : undefined,
+                trend: ingredient.trend ? String(ingredient.trend) : undefined,
+                source
+              });
+            }
+          }
+          
+          // Extract competitor details
           if (analysis?.competitor_details && Array.isArray(analysis.competitor_details)) {
             totalProducts += analysis.competitor_details.length;
-          } else if (analysis?.ingredients && Array.isArray(analysis.ingredients)) {
-            // Estimate based on ingredient count - at least we have data
-            totalProducts = Math.max(totalProducts, 5); // Minimum estimate
+            for (const comp of analysis.competitor_details.slice(0, 5)) {
+              const competitor = comp as Record<string, unknown>;
+              const keyIngredients = competitor.key_ingredients || competitor.ingredients;
+              competitorDetails.push({
+                brand: String(competitor.brand || competitor.name || 'Unknown'),
+                ingredients: Array.isArray(keyIngredients) 
+                  ? keyIngredients.map(i => String(i)) 
+                  : keyIngredients ? [String(keyIngredients)] : [],
+                source
+              });
+            }
           }
         }
       }
       
-      return { hasData, productCount: totalProducts, analysisCount: data?.length || 0 };
+      return { 
+        hasData, 
+        productCount: totalProducts, 
+        analysisCount: data?.length || 0,
+        ingredients: ingredientsList,
+        competitors: competitorDetails
+      };
     },
     enabled: !!categoryId
   });
@@ -951,6 +1000,80 @@ export function FormulaChat({
               </div>
             </div>
           </div>
+        )}
+
+        {/* Competitor Ingredients Collapsible */}
+        {competitorData?.hasData && (
+          <Collapsible open={showCompetitorData} onOpenChange={setShowCompetitorData}>
+            <CollapsibleTrigger asChild>
+              <button className="w-full px-4 py-2 flex items-center justify-between bg-emerald-500/5 border-b border-emerald-500/20 hover:bg-emerald-500/10 transition-colors">
+                <div className="flex items-center gap-2">
+                  <FlaskConical className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                    Competitor Ingredients
+                  </span>
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-emerald-500/30 text-emerald-600 dark:text-emerald-400">
+                    {competitorData.ingredients?.length || 0} ingredients
+                  </Badge>
+                </div>
+                <ChevronDown className={`w-4 h-4 text-emerald-600 dark:text-emerald-400 transition-transform ${showCompetitorData ? 'rotate-180' : ''}`} />
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="px-4 py-3 bg-emerald-500/5 border-b border-emerald-500/20 max-h-[200px] overflow-y-auto">
+                {/* Top Ingredients */}
+                {competitorData.ingredients && competitorData.ingredients.length > 0 && (
+                  <div className="mb-3">
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5 font-medium">
+                      Key Ingredients Found
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {competitorData.ingredients.slice(0, 12).map((ing, idx) => (
+                        <Badge 
+                          key={idx} 
+                          variant="secondary" 
+                          className="text-[10px] px-1.5 py-0.5 bg-background/80"
+                          title={`${ing.prevalence ? `${ing.prevalence}% of products` : ''}${ing.dosage ? ` • ${ing.dosage}` : ''}${ing.trend ? ` • Trend: ${ing.trend}` : ''}`}
+                        >
+                          {ing.name}
+                          {ing.prevalence && (
+                            <span className="ml-1 text-muted-foreground">({ing.prevalence}%)</span>
+                          )}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Competitor Formulations */}
+                {competitorData.competitors && competitorData.competitors.length > 0 && (
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5 font-medium">
+                      Competitor Formulations
+                    </p>
+                    <div className="space-y-1.5">
+                      {competitorData.competitors.slice(0, 4).map((comp, idx) => (
+                        <div key={idx} className="text-xs">
+                          <span className="font-medium text-foreground">{comp.brand}:</span>
+                          <span className="text-muted-foreground ml-1">
+                            {comp.ingredients.slice(0, 4).join(', ')}
+                            {comp.ingredients.length > 4 && ` +${comp.ingredients.length - 4} more`}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {(!competitorData.ingredients || competitorData.ingredients.length === 0) && 
+                 (!competitorData.competitors || competitorData.competitors.length === 0) && (
+                  <p className="text-xs text-muted-foreground">
+                    Competitor data available. Ask the AI about competitor ingredients.
+                  </p>
+                )}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
         )}
 
         {/* Messages */}

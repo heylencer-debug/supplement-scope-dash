@@ -272,7 +272,7 @@ export function AIAnalysisResults({ analysis, onRefresh, isLoading, versionInfo 
                       <React.Fragment key={category}>
                         {/* Category Header */}
                         <tr className={`${catInfo.color} border-t border-border`}>
-                          <td colSpan={7} className="p-2 font-medium">
+                          <td colSpan={4 + analysis.ingredient_comparison_table.competitors.length} className="p-2 font-medium">
                             <span className="mr-1">{catInfo.icon}</span>
                             {catInfo.label} ({categoryRows.length})
                           </td>
@@ -342,9 +342,14 @@ export function AIAnalysisResults({ analysis, onRefresh, isLoading, versionInfo 
                                   <span className="text-muted-foreground">—</span>
                                 )}
                               </td>
-                              <td className="p-2 text-center">{renderCompetitorCell(row.competitor_1)}</td>
-                              <td className="p-2 text-center">{renderCompetitorCell(row.competitor_2)}</td>
-                              <td className="p-2 text-center">{renderCompetitorCell(row.competitor_3)}</td>
+                              {analysis.ingredient_comparison_table.competitors.map((_, compIdx) => {
+                                const competitorKey = `competitor_${compIdx + 1}` as keyof typeof row;
+                                return (
+                                  <td key={compIdx} className="p-2 text-center">
+                                    {renderCompetitorCell(row[competitorKey])}
+                                  </td>
+                                );
+                              })}
                               <td className="p-2 text-center">
                                 <Badge variant="outline" className={`text-[8px] ${statusStyles[row.status] || statusStyles['partial']}`}>
                                   {statusLabels[row.status] || row.status}

@@ -569,7 +569,99 @@ ${completeVisibleText || 'No text extracted'}
         }).join('\n\n')
       : 'No per-product image analysis available - analyze packaging images first (Step 1)';
     
-    // Extract highest competitor X-in-1 claims for reference
+    // ============ DYNAMIC CLAIM STYLE ANALYSIS ============
+    // Analyze ACTUAL competitor claim patterns from Step 1 data
+    
+    interface ClaimPatternAnalysis {
+      xIn1Count: number;
+      benefitFocusedCount: number;
+      clinicalCount: number;
+      dosageCount: number;
+      naturalCleanCount: number;
+      simpleDirectCount: number;
+    }
+    
+    const claimPatterns: ClaimPatternAnalysis = {
+      xIn1Count: 0,
+      benefitFocusedCount: 0,
+      clinicalCount: 0,
+      dosageCount: 0,
+      naturalCleanCount: 0,
+      simpleDirectCount: 0
+    };
+    
+    // Analyze each competitor's claim style
+    extractedCompetitorClaims.forEach(comp => {
+      const allClaims = [...(comp.benefitClaims || [])];
+      const claimsText = allClaims.join(' ').toLowerCase();
+      
+      // X-in-1 pattern detection
+      if (comp.xIn1Claim) {
+        claimPatterns.xIn1Count++;
+      }
+      
+      // Benefit-focused pattern (e.g., "Complete Joint Support", "Total Wellness")
+      if (/complete|total|full|comprehensive|ultimate|advanced/i.test(claimsText)) {
+        claimPatterns.benefitFocusedCount++;
+      }
+      
+      // Clinical/Scientific pattern (e.g., "Clinically Proven", "Lab-Tested")
+      if (/clinic|proven|study|research|doctor|pharma|lab|tested|verified|science/i.test(claimsText)) {
+        claimPatterns.clinicalCount++;
+      }
+      
+      // Dosage-focused pattern (e.g., "Maximum Strength 500mg", "High Potency")
+      if (/\d+\s*(mg|mcg|iu|billion)/i.test(claimsText) || /strength|potency|dose|powerful/i.test(claimsText)) {
+        claimPatterns.dosageCount++;
+      }
+      
+      // Natural/Clean pattern (e.g., "Pure & Natural", "Organic")
+      if (/natural|organic|pure|clean|plant|vegan|non-gmo|wholesome/i.test(claimsText)) {
+        claimPatterns.naturalCleanCount++;
+      }
+      
+      // Simple/Direct pattern (short, direct claims without elaborate descriptors)
+      if (allClaims.length <= 3 && allClaims.every(c => c.length < 30)) {
+        claimPatterns.simpleDirectCount++;
+      }
+    });
+    
+    // Determine dominant claim style
+    type ClaimStyle = 'x_in_1' | 'benefit_focused' | 'clinical' | 'dosage_focused' | 'natural_clean' | 'simple_direct' | 'mixed';
+    
+    const patternCounts = [
+      { style: 'x_in_1' as ClaimStyle, count: claimPatterns.xIn1Count },
+      { style: 'benefit_focused' as ClaimStyle, count: claimPatterns.benefitFocusedCount },
+      { style: 'clinical' as ClaimStyle, count: claimPatterns.clinicalCount },
+      { style: 'dosage_focused' as ClaimStyle, count: claimPatterns.dosageCount },
+      { style: 'natural_clean' as ClaimStyle, count: claimPatterns.naturalCleanCount },
+      { style: 'simple_direct' as ClaimStyle, count: claimPatterns.simpleDirectCount }
+    ].sort((a, b) => b.count - a.count);
+    
+    const totalCompetitors = extractedCompetitorClaims.length || 1;
+    const dominantStyle: ClaimStyle = patternCounts[0].count >= totalCompetitors * 0.4 
+      ? patternCounts[0].style 
+      : 'mixed';
+    
+    const secondaryStyle: ClaimStyle | null = patternCounts[1].count >= totalCompetitors * 0.3 
+      ? patternCounts[1].style 
+      : null;
+    
+    // Generate claim style guidance for the AI
+    const claimStyleGuidance: Record<ClaimStyle, string> = {
+      'x_in_1': 'Competitors primarily use X-in-1 ingredient count claims. Consider matching this pattern if our ingredient count is competitive.',
+      'benefit_focused': 'Competitors emphasize benefit categories (Complete Joint Support, Total Wellness). Focus on benefit-oriented messaging.',
+      'clinical': 'Competitors use clinical/scientific positioning (Clinically Proven, Lab-Tested). Emphasize research backing and clinical credentials.',
+      'dosage_focused': 'Competitors highlight specific dosages and potency (Maximum Strength, High Potency). Lead with our strongest dosage advantages.',
+      'natural_clean': 'Competitors position around natural/clean ingredients (Pure, Organic, Plant-Based). Emphasize purity and clean label claims.',
+      'simple_direct': 'Competitors use simple, direct claims without elaborate descriptors. Keep messaging short and impactful.',
+      'mixed': 'No single dominant claim style - competitors use varied approaches. Choose the style that best highlights our competitive advantages.'
+    };
+    
+    console.log(`Claim Pattern Analysis: X-in-1=${claimPatterns.xIn1Count}, Benefit=${claimPatterns.benefitFocusedCount}, Clinical=${claimPatterns.clinicalCount}, Dosage=${claimPatterns.dosageCount}, Natural=${claimPatterns.naturalCleanCount}, Simple=${claimPatterns.simpleDirectCount}`);
+    console.log(`Dominant claim style: ${dominantStyle}${secondaryStyle ? `, Secondary: ${secondaryStyle}` : ''}`);
+    
+    // Extract competitor X-in-1 claims for reference (still useful for context)
     const competitorXIn1Claims = extractedCompetitorClaims
       .filter(c => c.xIn1Claim)
       .map(c => ({ brand: c.brand, claim: c.xIn1Claim as string, number: parseInt(c.xIn1Claim?.match(/\d+/)?.[0] || '0') }));
@@ -578,9 +670,28 @@ ${completeVisibleText || 'No text extracted'}
       : avgTopPerformerCount;
     
     console.log(`Extracted ${competitorXIn1Claims.length} X-in-1 claims from Step 1. Highest: ${highestCompetitorXIn1}`);
-    const competitorClaimsSummary = competitorXIn1Claims.length > 0
-      ? competitorXIn1Claims.map(c => `${c.brand}: "${c.claim}"`).join(', ')
-      : 'No X-in-1 claims detected in Step 1 analysis';
+    
+    // Create comprehensive claim pattern summary for the AI
+    const claimPatternSummary = `
+## 📊 COMPETITOR CLAIM PATTERN ANALYSIS (FROM STEP 1 DATA)
+Total competitors analyzed: ${totalCompetitors}
+
+**Pattern Distribution:**
+• X-in-1 Claims: ${claimPatterns.xIn1Count} competitors (${Math.round(claimPatterns.xIn1Count / totalCompetitors * 100)}%)
+• Benefit-Focused: ${claimPatterns.benefitFocusedCount} competitors (${Math.round(claimPatterns.benefitFocusedCount / totalCompetitors * 100)}%)
+• Clinical/Scientific: ${claimPatterns.clinicalCount} competitors (${Math.round(claimPatterns.clinicalCount / totalCompetitors * 100)}%)
+• Dosage/Potency: ${claimPatterns.dosageCount} competitors (${Math.round(claimPatterns.dosageCount / totalCompetitors * 100)}%)
+• Natural/Clean: ${claimPatterns.naturalCleanCount} competitors (${Math.round(claimPatterns.naturalCleanCount / totalCompetitors * 100)}%)
+• Simple/Direct: ${claimPatterns.simpleDirectCount} competitors (${Math.round(claimPatterns.simpleDirectCount / totalCompetitors * 100)}%)
+
+**🎯 DOMINANT CLAIM STYLE: ${dominantStyle.toUpperCase().replace('_', '-')}**
+${secondaryStyle ? `Secondary Style: ${secondaryStyle.replace('_', '-')}` : 'No clear secondary style'}
+
+**Guidance:** ${claimStyleGuidance[dominantStyle]}
+
+**Specific Competitor Claims Detected:**
+${extractedCompetitorClaims.map(c => `• ${c.brand}: ${c.xIn1Claim ? `"${c.xIn1Claim}"` : 'No X-in-1'} | Benefits: ${c.benefitClaims.slice(0, 3).join(', ') || 'None detected'}`).join('\n')}
+`;
 
     // Helper function to get copy style instructions
     function getCopyStyleInstructions(style: string | undefined): string {
@@ -690,7 +801,7 @@ ${completeVisibleText || 'No text extracted'}
                               accent_color: { type: 'object', properties: { hex: { type: 'string' }, name: { type: 'string' } }, required: ['hex', 'name'] },
                               headline_font: { type: 'string' },
                               body_font: { type: 'string' },
-                              primary_claim: { type: 'string', description: 'Strategic primary claim - use quality positioning (e.g., Maximum Potency Formula) if our count is lower than competitors, or X-in-1 if competitive' },
+                              primary_claim: { type: 'string', description: 'Strategic primary claim that MATCHES the dominant claim style used by competitors in this category. Analyze their actual claims first - if they use benefit-focused claims, use benefit-focused; if X-in-1, consider X-in-1 only if competitive; if clinical, use clinical positioning.' },
                               key_differentiators: { type: 'array', items: { type: 'string' } },
                               certifications: { type: 'array', items: { type: 'string' } }
                             },
@@ -733,7 +844,7 @@ ${completeVisibleText || 'No text extracted'}
                               accent_color: { type: 'object', properties: { hex: { type: 'string' }, name: { type: 'string' } }, required: ['hex', 'name'] },
                               headline_font: { type: 'string' },
                               body_font: { type: 'string' },
-                              primary_claim: { type: 'string', description: 'Strategic attack claim - if significantly fewer ingredients, attack dust dosing (e.g., "Zero Fillers, Pure Results", "7 Powerhouse Actives") rather than weak X-in-1' },
+                              primary_claim: { type: 'string', description: 'Strategic primary claim that matches or improves upon the claim style used by new winners. Analyze their actual claims - adapt to their style while highlighting our competitive advantages.' },
                               key_differentiators: { type: 'array', items: { type: 'string' } },
                               certifications: { type: 'array', items: { type: 'string' } }
                             },
@@ -796,93 +907,59 @@ You must create TWO complete packaging strategies:
 
 Study the competitor product images I've included above VERY CAREFULLY.
 
-## ⚠️ CRITICAL COMPETITIVE REALITY:
+${claimPatternSummary}
 
-**OUR FORMULATION:**
-- **We have: ${ourIngredientCount} Active Ingredients** (${ourFormFactor || 'Standard Form'})
-- Ingredients: ${ourIngredients.join(', ') || 'See formulation'}
+## ⚠️ CRITICAL: MATCH THE DOMINANT CLAIM STYLE
 
-**TOP PERFORMERS** (established brands):
-- Average: ${avgTopPerformerCount} ingredients
-- Our Position: ${vsLeadersPosition === 'EQUAL_OR_ABOVE' ? `✅ WE MATCH OR BEAT THEM (${ourIngredientCount} vs ${avgTopPerformerCount})` : `⚠️ WE HAVE FEWER (${ourIngredientCount} vs ${avgTopPerformerCount})`}
+**DO NOT default to X-in-1 claims!** Instead:
+1. FIRST analyze the ACTUAL claim patterns above
+2. IDENTIFY what style is DOMINANT in this category
+3. CREATE claims that MATCH or IMPROVE upon that dominant style
 
-**NEW WINNERS** (disruptors):
-- Average: ${avgNewWinnerCount} ingredients
-- Our Position: ${vsDisruptorsPosition === 'CLOSE' ? `✅ WE'RE COMPETITIVE (${ourIngredientCount} vs ${avgNewWinnerCount})` : `⚠️ SIGNIFICANTLY FEWER (${ourIngredientCount} vs ${avgNewWinnerCount})`}
+**Claim Style Adaptation Guide:**
+- If competitors mostly use **BENEFIT-FOCUSED** claims (e.g., "Complete Joint Support") → Use benefit-focused messaging
+- If competitors mostly use **X-in-1** claims → Consider X-in-1 ONLY if our count is competitive
+- If competitors mostly use **CLINICAL** claims (e.g., "Clinically Proven") → Use clinical/scientific positioning
+- If competitors mostly use **DOSAGE/POTENCY** claims → Lead with our strongest dosages
+- If competitors mostly use **NATURAL/CLEAN** claims → Emphasize purity and clean label
+- If competitors use **MIXED** styles → Choose the style that best highlights OUR competitive advantages
+
+## 📊 OUR FORMULATION DATA:
+
+**We have: ${ourIngredientCount} Active Ingredients** (${ourFormFactor || 'Standard Form'})
+- Primary: ${primaryActiveCount} | Secondary: ${secondaryActiveCount} | Tertiary: ${tertiaryActiveCount}
+- Ingredients: ${ourIngredients.slice(0, 10).join(', ') || 'See formulation'}${ourIngredients.length > 10 ? '...' : ''}
+
+**Benefit Categories We Cover:** ${ourBenefitClaims.length > 0 ? ourBenefitClaims.join(', ') : 'Analyze from ingredients'}
 
 ${ourDosageHighlights.length > 0 ? `
-## 💪 OUR DOSAGE ADVANTAGES (USE THESE!):
-${ourDosageHighlights.map(d => `• ${d.ingredient}: ${d.dosage}`).join('\n')}
-
-These dosages may be HIGHER than competitors who spread their ingredients thin across ${avgNewWinnerCount}+ actives!
+## 💪 OUR DOSAGE ADVANTAGES:
+${ourDosageHighlights.slice(0, 5).map(d => `• ${d.ingredient}: ${d.dosage}`).join('\n')}
 ` : ''}
 
-## STRATEGY 1: MATCH LEADERS (vs Top Performers with ~${avgTopPerformerCount} ingredients)
+## 📈 COMPETITIVE POSITION:
 
-**🎯 MATCH OR IMPROVE - NEVER WEAKEN:**
-- Top performers use claims like: "${avgTopPerformerCount}-in-1"
-- OUR RECOMMENDED CLAIM: **"${matchOrImproveClaims.forLeaders.ourClaim}"**
-- Strategy: ${matchOrImproveClaims.forLeaders.strategy}
+**vs TOP PERFORMERS** (established brands):
+- Their Average: ${avgTopPerformerCount} ingredients
+- Our Position: ${vsLeadersPosition === 'EQUAL_OR_ABOVE' ? `✅ COMPETITIVE (${ourIngredientCount} vs ${avgTopPerformerCount})` : `⚠️ FEWER (${ourIngredientCount} vs ${avgTopPerformerCount})`}
 
-${matchOrImproveClaims.forLeaders.strategy === 'DIRECT_MATCH' 
-  ? `✅ We match or beat their count! Use "${ourIngredientCount}-in-1" confidently - it's EQUAL OR BETTER.`
-  : matchOrImproveClaims.forLeaders.strategy === 'COMBINED_CLAIM'
-    ? `✅ Use COMBINED counting: ${ourIngredientCount} active ingredients + ${totalBenefitCount} benefit areas = "${combinedClaimCount}-in-1 Complete Formula"`
-    : `✅ Position competitively: "${ourIngredientCount} Active + ${totalBenefitCount} Benefit Formula" - emphasizes comprehensive coverage`
-}
+**vs NEW WINNERS** (disruptors):
+- Their Average: ${avgNewWinnerCount} ingredients  
+- Our Position: ${vsDisruptorsPosition === 'CLOSE' ? `✅ COMPETITIVE (${ourIngredientCount} vs ${avgNewWinnerCount})` : `⚠️ FEWER (${ourIngredientCount} vs ${avgNewWinnerCount})`}
 
-**YOUR PRIMARY CLAIM MUST BE:** "${matchOrImproveClaims.forLeaders.ourClaim}"
-DO NOT use a weaker claim than top performers!
+## 🎯 STRATEGY GUIDANCE:
 
-**FRONT LABEL EXAMPLE:**
-┌─────────────────────────────────────┐
-│        [BRAND NAME]                 │
-│   ${matchOrImproveClaims.forLeaders.ourClaim.toUpperCase().padEnd(30)}│
-│                                     │
-│ ${ourBenefitClaims.slice(0, 4).join(' • ')}     │
-│                                     │
-│  ✓ Human-Grade ✓ Vet Formulated    │
-│  90 Soft Chews                      │
-└─────────────────────────────────────┘
+**For MATCH LEADERS strategy:**
+- Study TOP PERFORMER claims and visual style
+- Your primary claim should MATCH their dominant claim style
+- If they use "${dominantStyle.replace('_', '-')}" style, use that style
+- Only use X-in-1 if that's what leaders actually use AND our count is competitive
 
-## STRATEGY 2: MATCH DISRUPTORS (vs New Winners with ~${avgNewWinnerCount} ingredients)
-
-**🎯 MATCH OR IMPROVE - NEVER APPEAR WEAKER:**
-- New winners use aggressive claims like: "${avgNewWinnerCount}-in-1"
-- OUR RECOMMENDED CLAIM: **"${matchOrImproveClaims.forDisruptors.ourClaim}"**
-- Strategy: ${matchOrImproveClaims.forDisruptors.strategy}
-
-${matchOrImproveClaims.forDisruptors.strategy === 'DIRECT_MATCH' 
-  ? `✅ We match or beat their count! Use bold "${ourIngredientCount}-in-1" claim.`
-  : matchOrImproveClaims.forDisruptors.strategy === 'COMBINED_CLAIM'
-    ? `✅ Use CREATIVE counting: "Complete ${combinedClaimCount}-Point Formula" (${ourIngredientCount} actives + ${totalBenefitCount} benefits)`
-    : `✅ ATTACK their dust dosing: "${ourIngredientCount} Powerhouse Actives at Full Strength" - implies their high count = tiny doses`
-}
-
-**YOUR PRIMARY CLAIM MUST BE:** "${matchOrImproveClaims.forDisruptors.ourClaim}"
-DO NOT appear weaker than the disruptors!
-
-${matchOrImproveClaims.forDisruptors.strategy === 'QUALITY_ATTACK' ? `
-**ATTACK ANGLES (use these in your copy):**
-• "${avgNewWinnerCount} ingredients = ${avgNewWinnerCount} tiny doses. ${ourIngredientCount} Powerhouse Actives = REAL results."
-• "They count ingredients. We count results."
-• "Full clinical doses, not marketing doses"
-${ourDosageHighlights.length > 0 ? `• "Our ${ourDosageHighlights[0]?.ingredient} at ${ourDosageHighlights[0]?.dosage} - not a dust dose"` : ''}
-` : ''}
-
-**FRONT LABEL EXAMPLE:**
-┌─────────────────────────────────────┐
-│        [BRAND NAME]                 │
-│   ${matchOrImproveClaims.forDisruptors.ourClaim.toUpperCase().padEnd(30)}│
-│                                     │
-│ ${ourBenefitClaims.slice(0, 5).join(' • ')}     │
-│                                     │
-│  ✓ Maximum Value ✓ Full Spectrum   │
-│  90 Soft Chews                      │
-└─────────────────────────────────────┘
-
-## BENEFIT CATEGORIES WE CAN CLAIM:
-${ourBenefitClaims.length > 0 ? ourBenefitClaims.map(b => `✓ ${b}`).join('\n') : 'Analyze from ingredients'}
+**For MATCH DISRUPTORS strategy:**  
+- Study NEW WINNER claims and visual style
+- These tend to be more aggressive/bold
+- Match their energy while highlighting our unique advantages
+- If our ingredient count is lower, pivot to quality/potency messaging instead of count-based claims
 
 ## KEY FEATURES (convert to positive claims):
 ${ourKeyFeatures.length > 0 ? ourKeyFeatures.map(f => `• ${f}`).join('\n') : 'N/A'}
@@ -890,16 +967,10 @@ ${ourKeyFeatures.length > 0 ? ourKeyFeatures.map(f => `• ${f}`).join('\n') : '
 ## THINGS TO AVOID → POSITIVE CLAIMS:
 ${ourThingsToAvoid.length > 0 ? ourThingsToAvoid.slice(0, 4).map(a => `• No ${a} → "Free from ${a}"`).join('\n') : 'N/A'}
 
-## 📄 COMPLETE FORMULA BRIEF DOCUMENT (RAW):
+## 📄 COMPLETE FORMULA BRIEF DOCUMENT:
 ════════════════════════════════════════════════════════════════════════════════
 ${formulaBriefContent || 'No formula brief content available'}
 ════════════════════════════════════════════════════════════════════════════════
-
-**USE THE ABOVE DOCUMENT** to extract:
-- ALL ingredient tables (Primary Active, Secondary Active, Tertiary Active, Functional)
-- Exact dosages and forms for each ingredient
-- Key differentiators and positioning statements
-- Target market and competitive strategy
 
 ## COMPETITOR INTELLIGENCE:
 ${competitorPackagingSummary}
@@ -908,21 +979,22 @@ ${competitorPackagingSummary}
 ${perProductImageAnalysisSummary}
 
 ## ⚠️ CRITICAL RULES:
-1. **Match Leaders**: ${vsLeadersPosition === 'BELOW' ? `DO NOT use "${ourIngredientCount}-in-1" - it's WEAKER! Use quality positioning instead.` : `Use "${ourIngredientCount}-in-1" confidently.`}
-2. **Match Disruptors**: ${vsDisruptorsPosition === 'SIGNIFICANTLY_BELOW' ? `DO NOT compete on count! Attack their "dust dosing" weakness with quality claims.` : `Use bold "${ourIngredientCount}-in-1" claim.`}
-3. Every claim MUST be verifiable from our formulation document above
-4. Match competitor visual styles (colors, fonts, layout) while being STRATEGICALLY different on claims
-5. Count ALL active ingredients from the formula brief tables (Primary + Secondary + Tertiary) for accurate X-in-1 claims
+
+1. **MATCH THE MARKET** - Your claims must reflect what's actually working in this category (see claim pattern analysis above)
+2. **DO NOT DEFAULT TO X-in-1** - Only use X-in-1 if that's the dominant style AND we're competitive on count
+3. **ADAPT YOUR STYLE** - If competitors use benefit-focused claims, use benefit-focused claims
+4. Every claim MUST be verifiable from our formulation document
+5. Match competitor visual styles (colors, fonts, layout) while being strategically different on claims
 
 ## YOUR DELIVERABLES (FOR EACH STRATEGY):
 
-**1. DESIGN BRIEF**: Color palette, typography, PRIMARY CLAIM (based on ACTUAL ingredient count from formula brief), differentiators, certifications
+**1. DESIGN BRIEF**: Color palette, typography, PRIMARY CLAIM (that MATCHES the dominant competitor style), differentiators, certifications
 
 **2. ELEMENTS CHECKLIST**: Front panel hierarchy, 5 bullet points matching competitor style, CTA, trust signals
 
-**3. MOCK CONTENT**: Complete front panel text, back panel text, side panel suggestions
+**3. MOCK CONTENT**: Complete front panel text, back panel text, side panel suggestions - ALL matching the dominant claim style in this category
 
-**4. REASONING**: Why this strategy is COMPETITIVE based on our complete formulation
+**4. REASONING**: Explain how your claim style matches what's working for competitors
 
 **5. RECOMMENDATION**: Which strategy you recommend based on market reality`
                   }

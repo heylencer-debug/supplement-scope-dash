@@ -753,6 +753,22 @@ export function FormulaChat({
     }
   };
 
+  const handleSwitchToOriginal = async () => {
+    try {
+      await setActiveVersion(null);
+      toast({
+        title: "Switched to Original",
+        description: "Now viewing the original formula."
+      });
+    } catch {
+      toast({
+        title: "Error",
+        description: "Failed to switch to original.",
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -999,61 +1015,77 @@ export function FormulaChat({
               <h3 className="text-sm font-semibold">Formula AI</h3>
               <p className="text-xs text-muted-foreground">Modify your formula</p>
             </div>
-            {versions.length > 0 ? (
-              <Select
-                value={activeVersion?.id || "original"}
-                onValueChange={(value) => {
-                  if (value !== "original" && value !== activeVersion?.id) {
+            <Select
+              value={activeVersion?.id || "original"}
+              onValueChange={(value) => {
+                if (value === "original") {
+                  // Switching to original - deactivate all versions
+                  if (activeVersion?.id) {
                     if (input.trim()) {
-                      // Has unsent content, show confirmation
-                      setPendingVersionId(value);
+                      setPendingVersionId("original");
                       setShowVersionSwitchDialog(true);
                     } else {
-                      setActiveVersion(value);
+                      // Deactivate all versions to show original
+                      handleSwitchToOriginal();
                     }
                   }
-                }}
-                disabled={isSettingActive}
-              >
-                <SelectTrigger className="h-7 w-auto gap-1 px-2 text-xs border-primary/30 bg-transparent hover:bg-muted/50 disabled:opacity-50">
-                  {isSettingActive ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  ) : (
-                    <History className="w-3 h-3" />
-                  )}
-                  <SelectValue>
-                    {isSettingActive ? "Switching..." : activeVersion ? `v${activeVersion.version_number}` : "Original"}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent className="bg-popover">
-                  {versions.map((version) => (
-                    <SelectItem 
-                      key={version.id} 
-                      value={version.id}
-                      className="text-xs"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">v{version.version_number}</span>
-                        {version.change_summary && (
-                          <span className="text-muted-foreground truncate max-w-[150px]">
-                            – {version.change_summary}
-                          </span>
-                        )}
-                        {version.is_active && (
-                          <Badge variant="secondary" className="text-[10px] px-1 py-0">
-                            Active
-                          </Badge>
-                        )}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <Badge variant="outline" className="text-xs ml-2 border-muted-foreground/30 text-muted-foreground">
-                Original
-              </Badge>
-            )}
+                } else if (value !== activeVersion?.id) {
+                  if (input.trim()) {
+                    // Has unsent content, show confirmation
+                    setPendingVersionId(value);
+                    setShowVersionSwitchDialog(true);
+                  } else {
+                    setActiveVersion(value);
+                  }
+                }
+              }}
+              disabled={isSettingActive}
+            >
+              <SelectTrigger className="h-7 w-auto gap-1 px-2 text-xs border-primary/30 bg-transparent hover:bg-muted/50 disabled:opacity-50">
+                {isSettingActive ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <History className="w-3 h-3" />
+                )}
+                <SelectValue>
+                  {isSettingActive ? "Switching..." : activeVersion ? `v${activeVersion.version_number}` : "Original"}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent className="bg-popover">
+                <SelectItem value="original" className="text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">Original</span>
+                    <span className="text-muted-foreground">– Base formula</span>
+                    {!activeVersion && (
+                      <Badge variant="secondary" className="text-[10px] px-1 py-0">
+                        Active
+                      </Badge>
+                    )}
+                  </div>
+                </SelectItem>
+                {versions.map((version) => (
+                  <SelectItem 
+                    key={version.id} 
+                    value={version.id}
+                    className="text-xs"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">v{version.version_number}</span>
+                      {version.change_summary && (
+                        <span className="text-muted-foreground truncate max-w-[150px]">
+                          – {version.change_summary}
+                        </span>
+                      )}
+                      {version.is_active && (
+                        <Badge variant="secondary" className="text-[10px] px-1 py-0">
+                          Active
+                        </Badge>
+                      )}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="flex items-center gap-2">
             {competitorData?.hasData && (
@@ -1547,7 +1579,11 @@ export function FormulaChat({
               onClick={() => {
                 if (pendingVersionId) {
                   setInput("");
-                  setActiveVersion(pendingVersionId);
+                  if (pendingVersionId === "original") {
+                    handleSwitchToOriginal();
+                  } else {
+                    setActiveVersion(pendingVersionId);
+                  }
                 }
                 setPendingVersionId(null);
                 setShowVersionSwitchDialog(false);

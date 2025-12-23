@@ -114,20 +114,19 @@ export function useFormulaBriefVersions(categoryId?: string) {
   });
 
   const setActiveVersionMutation = useMutation({
-    mutationFn: async (versionId: string) => {
+    mutationFn: async (versionId: string | null) => {
+      if (!categoryId) throw new Error("Category ID is required");
+
       // Deactivate all versions for this category
-      const { data: version } = await supabase
-        .from("formula_brief_versions")
-        .select("category_id")
-        .eq("id", versionId)
-        .single();
-
-      if (!version) throw new Error("Version not found");
-
       await supabase
         .from("formula_brief_versions")
         .update({ is_active: false })
-        .eq("category_id", version.category_id);
+        .eq("category_id", categoryId);
+
+      // If versionId is null, we're switching to original (no active version)
+      if (!versionId) {
+        return null;
+      }
 
       // Activate the selected version
       const { data, error } = await supabase

@@ -628,6 +628,54 @@ export type Database = {
           },
         ]
       }
+      formula_generation_tasks: {
+        Row: {
+          category_id: string
+          created_at: string
+          error: string | null
+          id: string
+          request_payload: Json
+          result: Json | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          request_payload: Json
+          result?: Json | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          request_payload?: Json
+          result?: Json | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "formula_generation_tasks_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "formula_generation_tasks_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "v_category_dashboard"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ingredient_analyses: {
         Row: {
           analysis: Json

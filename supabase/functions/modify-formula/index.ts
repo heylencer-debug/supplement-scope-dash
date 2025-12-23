@@ -1,6 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.86.0";
+import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.86.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,6 +15,80 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp: string;
+}
+
+// Background task to process formula generation
+async function processGenerationTask(
+  taskId: string,
+  supabaseUrl: string,
+  supabaseKey: string,
+  messages: Array<{ role: string; content: string }>
+) {
+  console.log(`[Background Task] Starting generation for task: ${taskId}`);
+  
+  // Create a new client for the background task
+  const supabase = createClient(supabaseUrl, supabaseKey);
+  
+  try {
+    // Update status to processing
+    await supabase
+      .from('formula_generation_tasks')
+      .update({ status: 'processing', updated_at: new Date().toISOString() } as Record<string, unknown>)
+      .eq('id', taskId);
+
+    // Call OpenRouter with Claude Sonnet 4.5
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://lovable.dev',
+        'X-Title': 'Noodle Search Formula Modifier'
+      },
+      body: JSON.stringify({
+        model: 'anthropic/claude-sonnet-4.5',
+        messages,
+        stream: false,
+        max_tokens: 16000
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[Background Task] OpenRouter error: ${response.status}`, errorText);
+      throw new Error(`OpenRouter API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content || '';
+    
+    console.log(`[Background Task] Generation complete, content length: ${content.length}`);
+
+    // Update task with result
+    await supabase
+      .from('formula_generation_tasks')
+      .update({ 
+        status: 'completed', 
+        result: { content },
+        updated_at: new Date().toISOString()
+      } as Record<string, unknown>)
+      .eq('id', taskId);
+
+    console.log(`[Background Task] Task ${taskId} completed successfully`);
+
+  } catch (error) {
+    console.error(`[Background Task] Error for task ${taskId}:`, error);
+    
+    // Update task with error
+    await supabase
+      .from('formula_generation_tasks')
+      .update({ 
+        status: 'failed', 
+        error: error instanceof Error ? error.message : 'Unknown error',
+        updated_at: new Date().toISOString()
+      } as Record<string, unknown>)
+      .eq('id', taskId);
+  }
 }
 
 serve(async (req) => {
@@ -235,40 +309,73 @@ IMPORTANT RULES:
 
     console.log(`Calling OpenRouter - Mode: ${generateFormula ? 'GENERATION' : 'CONVERSATION'}`);
 
-    // Call OpenRouter with Claude Sonnet 4.5 - streaming for conversation, non-streaming for generation
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://lovable.dev',
-        'X-Title': 'Noodle Search Formula Modifier'
-      },
-      body: JSON.stringify({
-        model: 'anthropic/claude-sonnet-4.5',
-        messages,
-        stream: !generateFormula, // Stream for conversation, not for generation
-        max_tokens: 16000
-      })
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('OpenRouter error:', response.status, errorText);
-      throw new Error(`OpenRouter API error: ${response.status}`);
-    }
-
     if (generateFormula) {
-      // Non-streaming response for generation mode
-      const data = await response.json();
-      const content = data.choices?.[0]?.message?.content || '';
+      // GENERATION MODE: Use background task with polling
+      console.log('[Generation] Creating background task...');
       
-      console.log('Generation response received, length:', content.length);
-      
-      return new Response(JSON.stringify({ content }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      // Create a task record in the database
+      const { data: task, error: taskError } = await supabase
+        .from('formula_generation_tasks')
+        .insert({
+          category_id: categoryId,
+          status: 'pending',
+          request_payload: {
+            categoryId,
+            userMessage,
+            conversationHistoryLength: conversationHistory?.length || 0,
+            currentFormulaLength: currentFormula?.length || 0
+          }
+        })
+        .select()
+        .single();
+
+      if (taskError) {
+        console.error('[Generation] Failed to create task:', taskError);
+        throw new Error('Failed to create generation task');
+      }
+
+      console.log(`[Generation] Task created: ${task.id}`);
+
+      // Return task ID immediately
+      const immediateResponse = new Response(
+        JSON.stringify({ 
+          taskId: task.id, 
+          status: 'processing',
+          message: 'Generation started. Poll for status.'
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+
+      // Process generation in background using EdgeRuntime.waitUntil
+      // @ts-ignore - EdgeRuntime is available in Supabase Edge Functions
+      EdgeRuntime.waitUntil(processGenerationTask(task.id, SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!, messages));
+
+      return immediateResponse;
+
     } else {
+      // CONVERSATION MODE: Streaming response (unchanged)
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://lovable.dev',
+          'X-Title': 'Noodle Search Formula Modifier'
+        },
+        body: JSON.stringify({
+          model: 'anthropic/claude-sonnet-4.5',
+          messages,
+          stream: true,
+          max_tokens: 16000
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('OpenRouter error:', response.status, errorText);
+        throw new Error(`OpenRouter API error: ${response.status}`);
+      }
+
       // Streaming response for conversation mode
       return new Response(response.body, {
         headers: {

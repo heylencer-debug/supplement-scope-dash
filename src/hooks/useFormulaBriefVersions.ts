@@ -146,6 +146,22 @@ export function useFormulaBriefVersions(categoryId?: string) {
     }
   });
 
+  const deleteVersionMutation = useMutation({
+    mutationFn: async (versionId: string) => {
+      const { error } = await supabase
+        .from("formula_brief_versions")
+        .delete()
+        .eq("id", versionId);
+
+      if (error) throw error;
+      return versionId;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["formula_brief_versions", categoryId] });
+      queryClient.invalidateQueries({ queryKey: ["formula_brief_active_version", categoryId] });
+    }
+  });
+
   return {
     versions: versionsQuery.data || [],
     activeVersion: activeVersionQuery.data,
@@ -153,7 +169,9 @@ export function useFormulaBriefVersions(categoryId?: string) {
     isLoadingActive: activeVersionQuery.isLoading,
     createVersion: createVersionMutation.mutateAsync,
     setActiveVersion: setActiveVersionMutation.mutateAsync,
+    deleteVersion: deleteVersionMutation.mutateAsync,
     isCreatingVersion: createVersionMutation.isPending,
-    isSettingActive: setActiveVersionMutation.isPending
+    isSettingActive: setActiveVersionMutation.isPending,
+    isDeletingVersion: deleteVersionMutation.isPending
   };
 }

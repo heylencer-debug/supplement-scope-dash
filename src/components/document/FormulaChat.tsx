@@ -65,6 +65,11 @@ interface GeneratedFormula {
   new_formula_content: string;
 }
 
+interface GenerationProgress {
+  taskId: string;
+  elapsedSeconds: number;
+}
+
 // Code block with copy button
 function CodeBlockWithCopy({ content, children }: { content: string; children: React.ReactNode }) {
   const [copied, setCopied] = useState(false);
@@ -286,8 +291,10 @@ export function FormulaChat({
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
   const [showCompetitorData, setShowCompetitorData] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState<GenerationProgress | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const { createVersion, activeVersion, versions, setActiveVersion, isCreatingVersion, isSettingActive } = useFormulaBriefVersions(categoryId);
   const { conversation, addMessage, updateMessages, clearConversation, isLoading } = useFormulaConversation(categoryId, activeVersion?.id);
@@ -394,6 +401,16 @@ export function FormulaChat({
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, streamingContent]);
+
+  // Cleanup polling interval on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+    };
+  }, []);
 
   const handleSend = async () => {
     if (!input.trim() || isStreaming || isGenerating) return;
@@ -538,69 +555,135 @@ export function FormulaChat({
     }
   };
 
+  // Poll for generation status
+  const pollForStatus = async (taskId: string) => {
+    console.log('[FormulaChat] Polling for task status:', taskId);
+    
+    try {
+      const response = await supabase.functions.invoke('check-generation-status', {
+        body: { taskId }
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Failed to check status');
+      }
+
+      const data = response.data;
+      console.log('[FormulaChat] Poll response:', data.status, data.elapsedSeconds + 's');
+
+      // Update progress indicator
+      setGenerationProgress({ taskId, elapsedSeconds: data.elapsedSeconds || 0 });
+
+      if (data.status === 'completed') {
+        // Stop polling
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+        }
+        setGenerationProgress(null);
+
+        let content = data.content;
+
+        // Strip markdown code blocks if present (```json ... ```)
+        if (content && content.startsWith('```')) {
+          content = content.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '');
+        }
+
+        // Parse the JSON response
+        try {
+          const parsed = JSON.parse(content);
+          if (parsed.change_summary && parsed.new_formula_content) {
+            setGeneratedFormula(parsed);
+            setShowConfirmDialog(true);
+          } else {
+            throw new Error('Invalid response format');
+          }
+        } catch {
+          console.error('Failed to parse generation response:', content);
+          toast({
+            title: "Error",
+            description: "Failed to parse the generated formula. Please try again.",
+            variant: "destructive"
+          });
+        }
+        
+        setIsGenerating(false);
+        return;
+      }
+
+      if (data.status === 'failed') {
+        // Stop polling
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+        }
+        setGenerationProgress(null);
+        
+        toast({
+          title: "Generation Failed",
+          description: data.error || "Failed to generate formula. Please try again.",
+          variant: "destructive"
+        });
+        
+        setIsGenerating(false);
+        return;
+      }
+
+      // Still processing - continue polling
+    } catch (error) {
+      console.error('[FormulaChat] Polling error:', error);
+      // Don't stop polling on network errors - just log and continue
+    }
+  };
+
   const handleGenerateFormula = async () => {
     if (isStreaming || isGenerating || messages.length === 0) return;
 
     setIsGenerating(true);
+    setGenerationProgress(null);
 
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/modify-formula`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`
-          },
-          body: JSON.stringify({
-            categoryId,
-            userMessage: "Please generate the updated formula now with all the changes we discussed.",
-            conversationHistory: messages,
-            currentFormula,
-            generateFormula: true // Generation mode
-          })
+      // Start the generation task
+      const response = await supabase.functions.invoke('modify-formula', {
+        body: {
+          categoryId,
+          userMessage: "Please generate the updated formula now with all the changes we discussed.",
+          conversationHistory: messages,
+          currentFormula,
+          generateFormula: true
         }
-      );
+      });
 
-      if (!response.ok) {
-        throw new Error('Failed to generate formula');
+      if (response.error) {
+        throw new Error(response.error.message || 'Failed to start generation');
       }
 
-      const data = await response.json();
-      let content = data.content;
-
-      // Strip markdown code blocks if present (```json ... ```)
-      if (content.startsWith('```')) {
-        content = content.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '');
+      const data = response.data;
+      
+      if (!data.taskId) {
+        throw new Error('No task ID returned');
       }
 
-      // Parse the JSON response
-      try {
-        const parsed = JSON.parse(content);
-        if (parsed.change_summary && parsed.new_formula_content) {
-          setGeneratedFormula(parsed);
-          setShowConfirmDialog(true);
-        } else {
-          throw new Error('Invalid response format');
-        }
-      } catch {
-        console.error('Failed to parse generation response:', content);
-        toast({
-          title: "Error",
-          description: "Failed to parse the generated formula. Please try again.",
-          variant: "destructive"
-        });
-      }
+      console.log('[FormulaChat] Generation task started:', data.taskId);
+      setGenerationProgress({ taskId: data.taskId, elapsedSeconds: 0 });
+
+      // Start polling every 2 seconds
+      pollingIntervalRef.current = setInterval(() => {
+        pollForStatus(data.taskId);
+      }, 2000);
+
+      // Also poll immediately
+      pollForStatus(data.taskId);
 
     } catch (error) {
       console.error('Generation error:', error);
       toast({
         title: "Error",
-        description: "Failed to generate formula. Please try again.",
+        description: "Failed to start formula generation. Please try again.",
         variant: "destructive"
       });
-    } finally {
       setIsGenerating(false);
+      setGenerationProgress(null);
     }
   };
 

@@ -245,7 +245,7 @@ IMPORTANT RULES:
         'X-Title': 'Noodle Search Formula Modifier'
       },
       body: JSON.stringify({
-        model: 'anthropic/claude-sonnet-4-5',
+        model: 'anthropic/claude-sonnet-4.5',
         messages,
         stream: !generateFormula, // Stream for conversation, not for generation
         max_tokens: 16000

@@ -1345,7 +1345,35 @@ export function FormulaChat({
 
         {/* Modify Formula Button */}
         {messages.length > 0 && (
-          <div className="px-4 py-3 border-t border-border">
+          <div className="px-4 py-3 border-t border-border space-y-2">
+            {/* Progress indicator */}
+            {isGenerating && generationProgress && (
+              <div className="flex items-center justify-between px-3 py-2 bg-primary/10 rounded-lg border border-primary/20">
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                    <div className="absolute inset-0 w-5 h-5 rounded-full border-2 border-primary/20" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-foreground">
+                      Generating formula...
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {generationProgress.elapsedSeconds < 60
+                        ? `${generationProgress.elapsedSeconds}s elapsed`
+                        : `${Math.floor(generationProgress.elapsedSeconds / 60)}m ${generationProgress.elapsedSeconds % 60}s elapsed`}
+                    </span>
+                  </div>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {generationProgress.elapsedSeconds < 30 && "Analyzing changes..."}
+                  {generationProgress.elapsedSeconds >= 30 && generationProgress.elapsedSeconds < 60 && "Building document..."}
+                  {generationProgress.elapsedSeconds >= 60 && generationProgress.elapsedSeconds < 120 && "Almost there..."}
+                  {generationProgress.elapsedSeconds >= 120 && "Finalizing..."}
+                </div>
+              </div>
+            )}
+            
             <Button 
               className="w-full"
               onClick={handleGenerateFormula}

@@ -118,14 +118,23 @@ serve(async (req) => {
       ? `\n\nCONVERSATION CONTEXT: There are ${conversationHistory.length} previous messages in this conversation. You MUST maintain awareness of ALL previous discussions and changes mentioned.`
       : '';
 
+    // Calculate original document length for reference
+    const originalLength = currentFormula ? currentFormula.length : 0;
+    const originalWordCount = currentFormula ? currentFormula.split(/\s+/).length : 0;
+
     if (generateFormula) {
       // GENERATION MODE: Output JSON with complete new formula
       systemPrompt = `You are a Formula Development Specialist. The user has been discussing modifications to their formula and is now ready to finalize changes.
 
-CURRENT FORMULA BRIEF:
+CURRENT FORMULA BRIEF (ORIGINAL - ${originalLength} characters, ~${originalWordCount} words):
 ${currentFormula}
 ${competitorContext}
 ${conversationSummary}
+
+=== DOCUMENT DUPLICATION APPROACH ===
+Think of this task as: DUPLICATE the original document FIRST, then PATCH only the specific sections discussed.
+Do NOT rewrite or paraphrase any section that wasn't explicitly discussed in the conversation.
+Unchanged sections must be copied WORD-FOR-WORD from the original.
 
 CRITICAL TASK: You must carefully review the ENTIRE conversation history above and identify EVERY single change, modification, or adjustment that was discussed. Then generate a COMPLETE updated formula brief that incorporates ALL of these changes.
 
@@ -148,13 +157,30 @@ You MUST respond with ONLY a JSON object in this exact format (no other text bef
   "new_formula_content": "The COMPLETE updated markdown document with ALL discussed changes incorporated"
 }
 
+=== CRITICAL LENGTH & COMPLETENESS RULES ===
+1. The new_formula_content MUST be at least ${Math.floor(originalLength * 0.95)} characters (95% of original length: ${originalLength} chars)
+2. NEVER summarize, condense, shorten, or paraphrase any section
+3. Sections NOT discussed in conversation MUST remain EXACTLY as they appear in the original - copy them VERBATIM
+4. If a section wasn't mentioned in the conversation, copy it character-for-character
+5. Only modify the specific sentences/paragraphs that relate to discussed changes
+6. Preserve ALL original details, examples, bullet points, and explanations
+
+=== PRE-OUTPUT VERIFICATION CHECKLIST ===
+Before outputting, verify:
+□ Does the new document have ALL the same sections as the original?
+□ Is your new document at least ${Math.floor(originalLength * 0.95)} characters long?
+□ Have you copied unchanged sections word-for-word (not paraphrased)?
+□ Did you incorporate EVERY change from the conversation?
+□ Are all original bullet points, examples, and details preserved?
+
 CRITICAL RULES:
 1. Output ONLY the JSON object - no explanation, no markdown code blocks, just raw JSON
 2. The new_formula_content must be the COMPLETE formula brief document, not just the changes
-3. Maintain the exact same structure and formatting as the original
+3. Maintain the exact same structure, formatting, and section order as the original
 4. Incorporate EVERY SINGLE change discussed in the ENTIRE conversation - missing even one change is a failure
 5. The change_summary should list each distinct change that was made
-6. Double-check: Did you include ALL changes from ALL messages?`;
+6. COPY unchanged sections exactly - do not rewrite them in your own words
+7. Double-check: Is your output at least as long as the original document?`;
     } else {
       // CONVERSATION MODE: Be helpful and discuss, no JSON output
       systemPrompt = `You are a Formula Development Specialist helping to discuss and plan modifications to a product formula. You have access to the complete formula brief document AND competitive intelligence about what ingredients competitors are using.

@@ -235,7 +235,7 @@ IMPORTANT RULES:
 
     console.log(`Calling OpenRouter - Mode: ${generateFormula ? 'GENERATION' : 'CONVERSATION'}`);
 
-    // Call OpenRouter with Claude 3.5 Sonnet - streaming for conversation, non-streaming for generation
+    // Call OpenRouter with Claude Sonnet 4.5 - streaming for conversation, non-streaming for generation
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -245,7 +245,7 @@ IMPORTANT RULES:
         'X-Title': 'Noodle Search Formula Modifier'
       },
       body: JSON.stringify({
-        model: 'google/gemini-3-pro-preview',
+        model: 'anthropic/claude-sonnet-4-5',
         messages,
         stream: !generateFormula, // Stream for conversation, not for generation
         max_tokens: 16000

@@ -412,6 +412,25 @@ export function FormulaChat({
     };
   }, []);
 
+  // Real-time elapsed time counter
+  useEffect(() => {
+    let timerId: NodeJS.Timeout | null = null;
+    
+    if (isGenerating && generationProgress) {
+      timerId = setInterval(() => {
+        setGenerationProgress(prev => 
+          prev ? { ...prev, elapsedSeconds: prev.elapsedSeconds + 1 } : null
+        );
+      }, 1000);
+    }
+    
+    return () => {
+      if (timerId) {
+        clearInterval(timerId);
+      }
+    };
+  }, [isGenerating, generationProgress?.taskId]);
+
   const handleSend = async () => {
     if (!input.trim() || isStreaming || isGenerating) return;
 

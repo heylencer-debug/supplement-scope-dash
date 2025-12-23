@@ -286,7 +286,9 @@ export function FormulaChat({
   const [generatedFormula, setGeneratedFormula] = useState<GeneratedFormula | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [showVersionSwitchDialog, setShowVersionSwitchDialog] = useState(false);
+  const [showDeleteVersionDialog, setShowDeleteVersionDialog] = useState(false);
   const [pendingVersionId, setPendingVersionId] = useState<string | null>(null);
+  const [versionToDelete, setVersionToDelete] = useState<{ id: string; number: number } | null>(null);
   const [showPreview, setShowPreview] = useState(true);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
@@ -296,7 +298,7 @@ export function FormulaChat({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const { createVersion, activeVersion, versions, setActiveVersion, isCreatingVersion, isSettingActive } = useFormulaBriefVersions(categoryId);
+  const { createVersion, activeVersion, versions, setActiveVersion, deleteVersion, isCreatingVersion, isSettingActive, isDeletingVersion } = useFormulaBriefVersions(categoryId);
   const { conversation, addMessage, updateMessages, clearConversation, isLoading } = useFormulaConversation(categoryId, activeVersion?.id);
 
   // Fetch competitor ingredient analysis data
@@ -769,6 +771,32 @@ export function FormulaChat({
     }
   };
 
+  const handleDeleteVersion = async () => {
+    if (!versionToDelete) return;
+    
+    try {
+      // If deleting the active version, switch to original first
+      if (activeVersion?.id === versionToDelete.id) {
+        await setActiveVersion(null);
+      }
+      
+      await deleteVersion(versionToDelete.id);
+      toast({
+        title: "Version deleted",
+        description: `Version ${versionToDelete.number} has been deleted.`
+      });
+    } catch {
+      toast({
+        title: "Error",
+        description: "Failed to delete version.",
+        variant: "destructive"
+      });
+    } finally {
+      setVersionToDelete(null);
+      setShowDeleteVersionDialog(false);
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -1086,6 +1114,20 @@ export function FormulaChat({
                 ))}
               </SelectContent>
             </Select>
+            {activeVersion && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                onClick={() => {
+                  setVersionToDelete({ id: activeVersion.id, number: activeVersion.version_number });
+                  setShowDeleteVersionDialog(true);
+                }}
+                title="Delete this version"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </Button>
+            )}
           </div>
           <div className="flex items-center gap-2">
             {competitorData?.hasData && (
@@ -1590,6 +1632,46 @@ export function FormulaChat({
               }}
             >
               Switch Version
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Version Confirmation Dialog */}
+      <Dialog open={showDeleteVersionDialog} onOpenChange={setShowDeleteVersionDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Version {versionToDelete?.number}?</DialogTitle>
+            <DialogDescription>
+              This action cannot be undone. The version will be permanently deleted.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setVersionToDelete(null);
+                setShowDeleteVersionDialog(false);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={handleDeleteVersion}
+              disabled={isDeletingVersion}
+            >
+              {isDeletingVersion ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

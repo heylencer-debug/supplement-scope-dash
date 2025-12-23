@@ -46,7 +46,7 @@ async function processGenerationTask(
         'X-Title': 'Noodle Search Formula Modifier'
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-pro-preview-03-25',
+        model: 'google/gemini-3-pro-preview',
         messages,
         stream: false,
         max_tokens: 16000
@@ -363,7 +363,7 @@ IMPORTANT RULES:
           'X-Title': 'Noodle Search Formula Modifier'
         },
         body: JSON.stringify({
-          model: 'google/gemini-2.5-pro-preview-03-25',
+          model: 'google/gemini-3-pro-preview',
           messages,
           stream: true,
           max_tokens: 16000

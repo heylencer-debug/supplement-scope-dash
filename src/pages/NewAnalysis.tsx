@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, Loader2, FileText, Package } from "lucide-react";
+import { ArrowRight, Loader2, FileText, Package, Search, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useRecentCategories, CategoryWithImages } from "@/hooks/useCategoryAnalyses";
 import { formatDistanceToNow } from "date-fns";
@@ -61,6 +62,16 @@ const productFormOptions = [
   { id: "bites", label: "Bites" },
 ];
 
+type AnalysisMode = "category" | "targeted";
+
+// Parse ASINs from text input (handles comma, space, newline separators)
+const parseAsins = (input: string): string[] => {
+  return input
+    .split(/[\s,\n]+/)
+    .map((s) => s.trim().toUpperCase())
+    .filter((s) => /^B0[A-Z0-9]{8}$/i.test(s));
+};
+
 
 const getRecommendationStyle = (recommendation: string | null) => {
   if (!recommendation) return "bg-muted text-muted-foreground border-border";
@@ -76,9 +87,11 @@ export default function NewAnalysis() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
+  const [analysisMode, setAnalysisMode] = useState<AnalysisMode>("category");
   const [category, setCategory] = useState("");
   const [productForms, setProductForms] = useState<string[]>([]);
   const [amazonCategories, setAmazonCategories] = useState<string[]>([]);
+  const [asinInput, setAsinInput] = useState("");
 
   const { data: recentCategories, isLoading: categoriesLoading } = useRecentCategories();
 
@@ -89,6 +102,8 @@ export default function NewAnalysis() {
     }
     return acc;
   }, [] as CategoryWithImages[]) ?? [];
+
+  const parsedAsins = parseAsins(asinInput);
 
   const handleCategoryToggle = (categoryLabel: string, checked: boolean) => {
     if (checked) {
@@ -103,14 +118,13 @@ export default function NewAnalysis() {
     if (!category.trim()) {
       toast({
         title: "Error",
-        description: "Please enter a category to analyze.",
+        description: "Please enter a category/analysis name.",
         variant: "destructive",
       });
       return;
     }
 
-
-    if (productForms.length === 0) {
+    if (analysisMode === "category" && productForms.length === 0) {
       toast({
         title: "Error",
         description: "Please select at least one product form.",
@@ -119,16 +133,38 @@ export default function NewAnalysis() {
       return;
     }
 
+    if (analysisMode === "targeted" && parsedAsins.length === 0) {
+      toast({
+        title: "Error",
+        description: "Please enter at least one valid ASIN.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
 
-    const payload = {
-      category: category.trim(),
-      product_form: productForms,
-      amazon_categories: amazonCategories.length > 0 ? amazonCategories : null,
-    };
+    let payload: Record<string, unknown>;
+    let displayCategoryName: string;
 
-    // For display/navigation purposes
-    const displayCategoryName = `${category.trim()} ${productForms.join(" & ")}`;
+    if (analysisMode === "targeted") {
+      // Targeted Analysis payload
+      payload = {
+        category: category.trim(),
+        asins: parsedAsins,
+        amazon_categories: amazonCategories.length > 0 ? amazonCategories : null,
+        ASIN: parsedAsins[0], // First ASIN as primary
+      };
+      displayCategoryName = category.trim();
+    } else {
+      // Category Search payload (existing behavior)
+      payload = {
+        category: category.trim(),
+        product_form: productForms,
+        amazon_categories: amazonCategories.length > 0 ? amazonCategories : null,
+      };
+      displayCategoryName = `${category.trim()} ${productForms.join(" & ")}`;
+    }
 
     try {
       const response = await fetch(WEBHOOK_URL, {
@@ -193,6 +229,10 @@ export default function NewAnalysis() {
     navigate(`/dashboard?category=${encodeURIComponent(categoryName)}`);
   };
 
+  const isFormValid = analysisMode === "category" 
+    ? category.trim() && productForms.length > 0
+    : category.trim() && parsedAsins.length > 0;
+
   return (
     <div className="max-w-4xl mx-auto space-y-10">
       <div className="text-center space-y-3">
@@ -210,58 +250,118 @@ export default function NewAnalysis() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-8">
+          {/* Analysis Mode Toggle */}
+          <div className="space-y-2">
+            <Label>Analysis Mode</Label>
+            <div className="grid grid-cols-2 gap-3">
+              <div
+                onClick={() => setAnalysisMode("category")}
+                className={`flex items-center justify-center gap-2 p-4 rounded-lg border cursor-pointer transition-all duration-200 active:scale-95 hover:-translate-y-0.5 ${
+                  analysisMode === "category"
+                    ? "bg-primary text-primary-foreground border-primary shadow-[0_4px_12px_rgba(67,24,255,0.3)] scale-[1.02]"
+                    : "bg-secondary/30 hover:bg-secondary/50 border-border hover:shadow-soft"
+                }`}
+              >
+                <Search className="w-4 h-4" />
+                <span className="font-medium">Category Search</span>
+              </div>
+              <div
+                onClick={() => setAnalysisMode("targeted")}
+                className={`flex items-center justify-center gap-2 p-4 rounded-lg border cursor-pointer transition-all duration-200 active:scale-95 hover:-translate-y-0.5 ${
+                  analysisMode === "targeted"
+                    ? "bg-primary text-primary-foreground border-primary shadow-[0_4px_12px_rgba(67,24,255,0.3)] scale-[1.02]"
+                    : "bg-secondary/30 hover:bg-secondary/50 border-border hover:shadow-soft"
+                }`}
+              >
+                <Target className="w-4 h-4" />
+                <span className="font-medium">Targeted Analysis</span>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {analysisMode === "category" 
+                ? "Search by category keywords and product forms" 
+                : "Analyze specific products by entering their ASINs"}
+            </p>
+          </div>
+
           {/* Category Name Field */}
           <div className="space-y-2">
             <Label htmlFor="category">
-              Category to Analyze <span className="text-destructive">*</span>
+              {analysisMode === "targeted" ? "Analysis Name" : "Category to Analyze"} <span className="text-destructive">*</span>
             </Label>
             <Input
               id="category"
-              placeholder="e.g., Magnesium Glycinate, Lion's Mane"
+              placeholder={analysisMode === "targeted" ? "e.g., My Competitor Batch" : "e.g., Magnesium Glycinate, Lion's Mane"}
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               className="h-12"
             />
           </div>
 
-
-          {/* Product Form Field - Multi-select */}
-          <div className="space-y-4">
-            <Label>
-              Product Form <span className="text-destructive">*</span>
-              <span className="text-muted-foreground text-xs ml-2">(select one or more)</span>
-            </Label>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {productFormOptions.map((option) => {
-                const isSelected = productForms.includes(option.label);
-                return (
-                  <div
-                    key={option.id}
-                    onClick={() => {
-                      if (isSelected) {
-                        setProductForms((prev) => prev.filter((f) => f !== option.label));
-                      } else {
-                        setProductForms((prev) => [...prev, option.label]);
-                      }
-                    }}
-                    className={`flex items-center justify-center gap-2 p-3 rounded-lg border cursor-pointer transition-all duration-200 active:scale-95 hover:-translate-y-0.5 ${
-                      isSelected
-                        ? "bg-primary text-primary-foreground border-primary shadow-[0_4px_12px_rgba(67,24,255,0.3)] scale-[1.02]"
-                        : "bg-secondary/30 hover:bg-secondary/50 border-border hover:shadow-soft"
-                    }`}
-                  >
-                    {isSelected && (
-                      <svg className="w-4 h-4 animate-check-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                    )}
-                    <span className="text-sm font-medium">{option.label}</span>
-                  </div>
-                );
-              })}
+          {/* Conditional: Product Form (Category mode only) */}
+          {analysisMode === "category" && (
+            <div className="space-y-4">
+              <Label>
+                Product Form <span className="text-destructive">*</span>
+                <span className="text-muted-foreground text-xs ml-2">(select one or more)</span>
+              </Label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {productFormOptions.map((option) => {
+                  const isSelected = productForms.includes(option.label);
+                  return (
+                    <div
+                      key={option.id}
+                      onClick={() => {
+                        if (isSelected) {
+                          setProductForms((prev) => prev.filter((f) => f !== option.label));
+                        } else {
+                          setProductForms((prev) => [...prev, option.label]);
+                        }
+                      }}
+                      className={`flex items-center justify-center gap-2 p-3 rounded-lg border cursor-pointer transition-all duration-200 active:scale-95 hover:-translate-y-0.5 ${
+                        isSelected
+                          ? "bg-primary text-primary-foreground border-primary shadow-[0_4px_12px_rgba(67,24,255,0.3)] scale-[1.02]"
+                          : "bg-secondary/30 hover:bg-secondary/50 border-border hover:shadow-soft"
+                      }`}
+                    >
+                      {isSelected && (
+                        <svg className="w-4 h-4 animate-check-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                      <span className="text-sm font-medium">{option.label}</span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
 
+          {/* Conditional: ASIN Input (Targeted mode only) */}
+          {analysisMode === "targeted" && (
+            <div className="space-y-2">
+              <Label htmlFor="asins">
+                ASINs <span className="text-destructive">*</span>
+                <span className="text-muted-foreground text-xs ml-2">(one per line or comma-separated)</span>
+              </Label>
+              <Textarea
+                id="asins"
+                placeholder="B01XXXXXXX&#10;B02XXXXXXX&#10;B03XXXXXXX"
+                value={asinInput}
+                onChange={(e) => setAsinInput(e.target.value)}
+                className="min-h-[120px] font-mono text-sm"
+              />
+              {asinInput.trim() && (
+                <p className="text-xs text-muted-foreground">
+                  {parsedAsins.length > 0 ? (
+                    <span className="text-chart-4">{parsedAsins.length} valid ASIN{parsedAsins.length !== 1 ? 's' : ''} detected</span>
+                  ) : (
+                    <span className="text-destructive">No valid ASINs detected (format: B0XXXXXXXXX)</span>
+                  )}
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Amazon Categories Multi-select */}
           <div className="space-y-4">
@@ -291,11 +391,16 @@ export default function NewAnalysis() {
           </div>
 
           {/* Category Name Preview */}
-          {category.trim() && productForms.length > 0 && (
+          {category.trim() && (
+            (analysisMode === "category" && productForms.length > 0) || 
+            (analysisMode === "targeted" && parsedAsins.length > 0)
+          ) && (
             <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
               <p className="text-xs text-muted-foreground mb-1">Analysis will be created as:</p>
               <p className="font-semibold text-foreground">
-                {category.trim()} {productForms.join(" & ")}
+                {analysisMode === "targeted" 
+                  ? `${category.trim()} (${parsedAsins.length} product${parsedAsins.length !== 1 ? 's' : ''})`
+                  : `${category.trim()} ${productForms.join(" & ")}`}
               </p>
             </div>
           )}
@@ -303,7 +408,7 @@ export default function NewAnalysis() {
           <Button
             onClick={handleAnalysis}
             className="w-full h-12 text-base"
-            disabled={isLoading || !category.trim() || productForms.length === 0}
+            disabled={isLoading || !isFormValid}
           >
             {isLoading ? (
               <>

@@ -198,13 +198,19 @@ export function useIngredientAnalysis(categoryId?: string, type: IngredientAnaly
   const { toast } = useToast();
   const pollingRef = useRef<boolean>(false);
 
-  // Check if analysis data is valid (not in-progress or error)
+  // Check if analysis data is valid (not in-progress, error, or not_available)
   const isValidAnalysis = (data: any): boolean => {
     if (!data) return false;
     if (data.status === 'in_progress') return false;
+    if (data.status === 'not_available') return false;
     if (data.error === true) return false;
     if (!data.summary) return false;
     return true;
+  };
+
+  // Check if analysis is not available (no matching products)
+  const isNotAvailable = (data: any): boolean => {
+    return data?.status === 'not_available';
   };
 
   // Load from database on mount
@@ -233,6 +239,10 @@ export function useIngredientAnalysis(categoryId?: string, type: IngredientAnaly
 
         if (dbError) {
           console.error(`[useIngredientAnalysis:${type}] DB load error:`, dbError);
+        } else if (data?.analysis && isNotAvailable(data.analysis)) {
+          console.log(`[useIngredientAnalysis:${type}] Analysis not available:`, (data.analysis as any).reason);
+          // Store as analysis so UI can show the not_available message
+          setAnalysis(data.analysis as unknown as IngredientAnalysis);
         } else if (data?.analysis && isValidAnalysis(data.analysis)) {
           console.log(`[useIngredientAnalysis:${type}] Loaded valid analysis from DB`);
           setAnalysis(data.analysis as unknown as IngredientAnalysis);
@@ -451,6 +461,8 @@ export function useIngredientAnalysis(categoryId?: string, type: IngredientAnaly
     runAnalysis,
     clearAnalysis,
     hasAnalysis: !!analysis && isValidAnalysis(analysis),
+    isNotAvailable: !!analysis && isNotAvailable(analysis),
+    notAvailableReason: (analysis as any)?.reason || null,
     type,
   };
 }

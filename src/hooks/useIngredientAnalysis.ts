@@ -259,7 +259,7 @@ export function useIngredientAnalysis(categoryId?: string, type: IngredientAnaly
     loadFromDb();
   }, [categoryId, type, formulaVersionId]);
 
-  const runAnalysis = useCallback(async () => {
+  const runAnalysis = useCallback(async (manualAsins?: string[]) => {
     if (!categoryId) {
       toast({
         title: 'Error',
@@ -296,10 +296,10 @@ export function useIngredientAnalysis(categoryId?: string, type: IngredientAnaly
       await deleteQuery;
       setAnalysis(null);
 
-      // Call edge function with type parameter and formula version
-      console.log(`[useIngredientAnalysis:${type}] Invoking edge function...`);
+      // Call edge function with type parameter, formula version, and optional manual ASINs
+      console.log(`[useIngredientAnalysis:${type}] Invoking edge function...`, manualAsins ? `with ${manualAsins.length} manual ASINs` : '');
       const { data, error: fnError } = await supabase.functions.invoke('analyze-ingredients', {
-        body: { categoryId, type, formulaVersionId }
+        body: { categoryId, type, formulaVersionId, manualAsins }
       });
 
       if (fnError) {
@@ -334,9 +334,10 @@ export function useIngredientAnalysis(categoryId?: string, type: IngredientAnaly
       }
 
       const typeLabel = type === 'new_winners' ? 'New Winners' : 'Top Performers';
+      const asinInfo = manualAsins?.length ? ` (${manualAsins.length} selected products)` : '';
       toast({
         title: 'Analysis Started',
-        description: `AI analysis for ${typeLabel} running in background. This takes 2-4 minutes...`,
+        description: `AI analysis for ${typeLabel}${asinInfo} running in background. This takes 2-4 minutes...`,
       });
 
       // Poll for results

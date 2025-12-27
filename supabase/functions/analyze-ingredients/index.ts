@@ -16,7 +16,7 @@ serve(async (req) => {
   }
 
   try {
-    const { categoryId, type = 'top_performers', formulaVersionId } = await req.json();
+    const { categoryId, type = 'top_performers', formulaVersionId, manualAsins } = await req.json();
     
     if (!categoryId) {
       return new Response(
@@ -25,7 +25,7 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[analyze-ingredients] Starting analysis for category: ${categoryId}, type: ${type}`);
+    console.log(`[analyze-ingredients] Starting analysis for category: ${categoryId}, type: ${type}`, manualAsins ? `with ${manualAsins.length} manual ASINs` : '');
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -87,7 +87,51 @@ serve(async (req) => {
     let competitors;
     let competitorLabel = '';
     
-    if (type === 'new_winners') {
+    // Check for manual ASINs first - they take priority
+    if (manualAsins && Array.isArray(manualAsins) && manualAsins.length > 0) {
+      console.log(`[analyze-ingredients] Using ${manualAsins.length} manually specified ASINs:`, manualAsins);
+      
+      const { data: manualProducts, error: manualError } = await supabase
+        .from('products')
+        .select('title, brand, ingredients, other_ingredients, all_nutrients, supplement_facts_complete, important_information, specifications, price, monthly_sales, review_analysis, age_months')
+        .eq('category_id', categoryId)
+        .in('asin', manualAsins)
+        .limit(10);
+        
+      if (manualError) {
+        console.error('[analyze-ingredients] Error fetching manual ASIN products:', manualError);
+      }
+      
+      if (!manualProducts || manualProducts.length === 0) {
+        // No products found for manual ASINs - save not_available status
+        console.log('[analyze-ingredients] No products found for specified ASINs in this category');
+        await supabase
+          .from('ingredient_analyses')
+          .upsert({
+            category_id: categoryId,
+            type: type,
+            formula_version_id: formulaVersionId || null,
+            analysis: { 
+              status: 'not_available', 
+              reason: `No products found for the specified ASINs (${manualAsins.join(', ')}) in this category. Please verify the ASINs belong to this category.`,
+              updated_at: new Date().toISOString()
+            },
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'category_id,type' });
+        
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            status: 'not_available',
+            message: 'No products found for specified ASINs'
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      competitors = manualProducts;
+      competitorLabel = `Manual Selection (${competitors.length} Product${competitors.length === 1 ? '' : 's'})`;
+    } else if (type === 'new_winners') {
       // Get formula reference ASINs from category_analyses.products_snapshot.formula_references
       const formulaRefs = (categoryAnalysis.products_snapshot as any)?.formula_references || [];
       const asins = formulaRefs.map((r: any) => r.asin).filter(Boolean);

@@ -61,15 +61,38 @@ serve(async (req) => {
         console.log('[analyze-ingredients] New Winners not available - Top Performers will determine ingredient count from formula brief');
         groundTruthIngredientCount = null; // AI will determine count like New Winners does
       } else if (!newWinnersAnalysis) {
-        // New Winners not run yet - require it first to establish baseline
-        console.log('[analyze-ingredients] New Winners not run yet - requiring it first');
-        return new Response(
-          JSON.stringify({ 
-            error: 'Please run New Winners analysis first to establish ingredient count',
-            code: 'NEW_WINNERS_REQUIRED'
-          }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        // New Winners not run yet - check if there are any young products
+        // If no young products exist, New Winners would return not_available anyway, so skip requirement
+        console.log('[analyze-ingredients] New Winners not run - checking for young products...');
+        
+        const { data: youngProducts, error: youngError } = await supabase
+          .from('products')
+          .select('id')
+          .eq('category_id', categoryId)
+          .lte('age_months', 24)
+          .limit(1);
+        
+        if (youngError) {
+          console.error('[analyze-ingredients] Error checking young products:', youngError);
+        }
+        
+        const hasYoungProducts = youngProducts && youngProducts.length > 0;
+        
+        if (hasYoungProducts) {
+          // Young products exist - require New Winners first to establish baseline
+          console.log('[analyze-ingredients] Young products exist - requiring New Winners first');
+          return new Response(
+            JSON.stringify({ 
+              error: 'Please run New Winners analysis first to establish ingredient count',
+              code: 'NEW_WINNERS_REQUIRED'
+            }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        } else {
+          // No young products - Top Performers can determine count itself
+          console.log('[analyze-ingredients] No young products in category - Top Performers will determine ingredient count from formula brief');
+          groundTruthIngredientCount = null;
+        }
       } else {
         // New Winners exists but is incomplete (in_progress or error) - allow Top Performers to proceed
         console.log(`[analyze-ingredients] New Winners status: ${analysisStatus} - allowing Top Performers to determine its own count`);

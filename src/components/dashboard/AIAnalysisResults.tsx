@@ -114,6 +114,11 @@ export function AIAnalysisResults({ analysis, onRefresh, isLoading, versionInfo 
     { subject: 'Threats', value: analysis.swot.threats.length, fullMark: 5 },
   ] : [];
 
+  // Detect if this is a targeted analysis based on the competitor label
+  const isTargetedAnalysis = analysis.data_sent_to_ai?.competitor_label?.toLowerCase().includes('targeted');
+  const competitorLabel = analysis.data_sent_to_ai?.competitor_label || '';
+  const competitorCount = analysis.data_sent_to_ai?.competitor_count || 0;
+
   return (
     <div className="bg-gradient-to-br from-primary/5 via-chart-5/5 to-chart-4/5 rounded-xl border border-primary/20 p-4 space-y-4">
       {/* Header */}
@@ -123,11 +128,17 @@ export function AIAnalysisResults({ analysis, onRefresh, isLoading, versionInfo 
             <Brain className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h3 className="font-semibold text-foreground flex items-center gap-2">
+            <h3 className="font-semibold text-foreground flex items-center gap-2 flex-wrap">
               AI Formulation Intelligence
               <Badge className={`${getAssessmentColor(analysis.summary.overall_assessment)} text-[10px]`}>
                 {analysis.summary.overall_assessment}
               </Badge>
+              {isTargetedAnalysis && (
+                <Badge className="bg-chart-5/20 text-chart-5 border-chart-5/30 text-[10px]">
+                  <Target className="w-2.5 h-2.5 mr-1" />
+                  Targeted Analysis
+                </Badge>
+              )}
               {versionInfo && (
                 <Badge variant={versionInfo.isActive ? "default" : "outline"} className="text-[10px]">
                   <GitBranch className="w-2.5 h-2.5 mr-1" />
@@ -136,7 +147,10 @@ export function AIAnalysisResults({ analysis, onRefresh, isLoading, versionInfo 
               )}
             </h3>
             <p className="text-xs text-muted-foreground">
-              {analysis.ingredients.length} ingredients • {analysis.clinical_analysis?.synergy_pairs?.length || 0} synergies • {analysis.priority_roadmap?.length || 0} actions
+              {isTargetedAnalysis 
+                ? `${competitorCount} targeted product${competitorCount === 1 ? '' : 's'} • ${analysis.ingredients.length} ingredients`
+                : `${analysis.ingredients.length} ingredients • ${analysis.clinical_analysis?.synergy_pairs?.length || 0} synergies • ${analysis.priority_roadmap?.length || 0} actions`
+              }
             </p>
           </div>
         </div>

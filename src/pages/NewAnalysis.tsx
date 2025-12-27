@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, Loader2, FileText, Package, Search, Target } from "lucide-react";
+import { ArrowRight, Loader2, FileText, Package, Search, Target, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -92,6 +92,8 @@ export default function NewAnalysis() {
   const [productForms, setProductForms] = useState<string[]>([]);
   const [amazonCategories, setAmazonCategories] = useState<string[]>([]);
   const [asinInput, setAsinInput] = useState("");
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: recentCategories, isLoading: categoriesLoading } = useRecentCategories();
 
@@ -111,6 +113,64 @@ export default function NewAnalysis() {
     } else {
       setAmazonCategories((prev) => prev.filter((c) => c !== categoryLabel));
     }
+  };
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = ['text/csv', 'text/plain', 'application/vnd.ms-excel'];
+    const validExtensions = ['.csv', '.txt'];
+    const hasValidExtension = validExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
+    
+    if (!validTypes.includes(file.type) && !hasValidExtension) {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload a CSV or TXT file.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Read file contents
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const contents = e.target?.result as string;
+      if (contents) {
+        // Append to existing ASINs (or replace if empty)
+        const newAsins = parseAsins(contents);
+        if (newAsins.length === 0) {
+          toast({
+            title: "No ASINs found",
+            description: "The file didn't contain any valid ASINs.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        // Merge with existing ASINs, removing duplicates
+        const existingAsins = parseAsins(asinInput);
+        const mergedAsins = [...new Set([...existingAsins, ...newAsins])];
+        setAsinInput(mergedAsins.join('\n'));
+        setUploadedFileName(file.name);
+        
+        toast({
+          title: "ASINs imported",
+          description: `Added ${newAsins.length} ASIN${newAsins.length !== 1 ? 's' : ''} from ${file.name}`,
+        });
+      }
+    };
+    reader.readAsText(file);
+    
+    // Reset file input so the same file can be uploaded again
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const clearUploadedFile = () => {
+    setUploadedFileName(null);
   };
 
 
@@ -339,11 +399,44 @@ export default function NewAnalysis() {
 
           {/* Conditional: ASIN Input (Targeted mode only) */}
           {analysisMode === "targeted" && (
-            <div className="space-y-2">
-              <Label htmlFor="asins">
-                ASINs <span className="text-destructive">*</span>
-                <span className="text-muted-foreground text-xs ml-2">(one per line or comma-separated)</span>
-              </Label>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="asins">
+                  ASINs <span className="text-destructive">*</span>
+                  <span className="text-muted-foreground text-xs ml-2">(one per line or comma-separated)</span>
+                </Label>
+                <div className="flex items-center gap-2">
+                  {uploadedFileName && (
+                    <Badge variant="secondary" className="gap-1 text-xs">
+                      <FileText className="w-3 h-3" />
+                      {uploadedFileName}
+                      <button 
+                        onClick={clearUploadedFile}
+                        className="ml-1 hover:text-destructive transition-colors"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </Badge>
+                  )}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".csv,.txt,text/csv,text/plain"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="gap-1.5"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    Import CSV
+                  </Button>
+                </div>
+              </div>
               <Textarea
                 id="asins"
                 placeholder="B01XXXXXXX&#10;B02XXXXXXX&#10;B03XXXXXXX"

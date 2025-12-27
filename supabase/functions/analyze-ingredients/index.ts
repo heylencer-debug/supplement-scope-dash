@@ -108,20 +108,46 @@ serve(async (req) => {
         competitors = refProducts || [];
         competitorLabel = 'New Winners (Formula References)';
       } else {
-        // Fallback to young, high-growth products if no formula references
-        const { data: youngProducts, error: youngError } = await supabase
+        // Check if this is a "Targeted Analysis" (few products in category)
+        const { count: productCount } = await supabase
           .from('products')
-          .select('title, brand, ingredients, other_ingredients, all_nutrients, supplement_facts_complete, important_information, specifications, price, monthly_sales, review_analysis, age_months')
-          .eq('category_id', categoryId)
-          .lte('age_months', 24)
-          .order('monthly_sales', { ascending: false })
-          .limit(5);
-          
-        if (youngError) {
-          console.error('[analyze-ingredients] Error fetching young products:', youngError);
+          .select('*', { count: 'exact', head: true })
+          .eq('category_id', categoryId);
+        
+        const isTargetedAnalysis = productCount !== null && productCount <= 10;
+        console.log(`[analyze-ingredients] Product count: ${productCount}, isTargetedAnalysis: ${isTargetedAnalysis}`);
+        
+        if (isTargetedAnalysis) {
+          // Targeted Analysis mode: use ALL available products for this category
+          const { data: allProducts, error: allError } = await supabase
+            .from('products')
+            .select('title, brand, ingredients, other_ingredients, all_nutrients, supplement_facts_complete, important_information, specifications, price, monthly_sales, review_analysis, age_months')
+            .eq('category_id', categoryId)
+            .order('monthly_sales', { ascending: false })
+            .limit(productCount || 10);
+            
+          if (allError) {
+            console.error('[analyze-ingredients] Error fetching targeted analysis products:', allError);
+          }
+          competitors = allProducts || [];
+          competitorLabel = `Targeted Analysis (${competitors.length} Product${competitors.length === 1 ? '' : 's'})`;
+          console.log(`[analyze-ingredients] Targeted Analysis mode - using all ${competitors.length} products in category`);
+        } else {
+          // Fallback to young, high-growth products if no formula references
+          const { data: youngProducts, error: youngError } = await supabase
+            .from('products')
+            .select('title, brand, ingredients, other_ingredients, all_nutrients, supplement_facts_complete, important_information, specifications, price, monthly_sales, review_analysis, age_months')
+            .eq('category_id', categoryId)
+            .lte('age_months', 24)
+            .order('monthly_sales', { ascending: false })
+            .limit(5);
+            
+          if (youngError) {
+            console.error('[analyze-ingredients] Error fetching young products:', youngError);
+          }
+          competitors = youngProducts || [];
+          competitorLabel = 'New Winners (Young High-Growth Products)';
         }
-        competitors = youngProducts || [];
-        competitorLabel = 'New Winners (Young High-Growth Products)';
       }
     } else {
       // Top Performers - original behavior: top products by monthly sales

@@ -108,49 +108,51 @@ serve(async (req) => {
         competitors = refProducts || [];
         competitorLabel = 'New Winners (Formula References)';
       } else {
-        // Check if this is a "Targeted Analysis" (few products in category)
-        const { count: productCount } = await supabase
+        // Fallback to young, high-growth products (≤24 months) in THIS category
+        const { data: youngProducts, error: youngError } = await supabase
           .from('products')
-          .select('*', { count: 'exact', head: true })
-          .eq('category_id', categoryId);
-        
-        const isTargetedAnalysis = productCount !== null && productCount <= 10;
-        console.log(`[analyze-ingredients] Product count: ${productCount}, isTargetedAnalysis: ${isTargetedAnalysis}`);
-        
-        if (isTargetedAnalysis) {
-          // Targeted Analysis mode: use ALL available products for this category
-          const { data: allProducts, error: allError } = await supabase
-            .from('products')
-            .select('title, brand, ingredients, other_ingredients, all_nutrients, supplement_facts_complete, important_information, specifications, price, monthly_sales, review_analysis, age_months')
-            .eq('category_id', categoryId)
-            .order('monthly_sales', { ascending: false })
-            .limit(productCount || 10);
-            
-          if (allError) {
-            console.error('[analyze-ingredients] Error fetching targeted analysis products:', allError);
-          }
-          competitors = allProducts || [];
-          competitorLabel = `Targeted Analysis (${competitors.length} Product${competitors.length === 1 ? '' : 's'})`;
-          console.log(`[analyze-ingredients] Targeted Analysis mode - using all ${competitors.length} products in category`);
-        } else {
-          // Fallback to young, high-growth products if no formula references
-          const { data: youngProducts, error: youngError } = await supabase
-            .from('products')
-            .select('title, brand, ingredients, other_ingredients, all_nutrients, supplement_facts_complete, important_information, specifications, price, monthly_sales, review_analysis, age_months')
-            .eq('category_id', categoryId)
-            .lte('age_months', 24)
-            .order('monthly_sales', { ascending: false })
-            .limit(5);
-            
-          if (youngError) {
-            console.error('[analyze-ingredients] Error fetching young products:', youngError);
-          }
-          competitors = youngProducts || [];
-          competitorLabel = 'New Winners (Young High-Growth Products)';
+          .select('title, brand, ingredients, other_ingredients, all_nutrients, supplement_facts_complete, important_information, specifications, price, monthly_sales, review_analysis, age_months')
+          .eq('category_id', categoryId)
+          .lte('age_months', 24)
+          .order('monthly_sales', { ascending: false })
+          .limit(5);
+          
+        if (youngError) {
+          console.error('[analyze-ingredients] Error fetching young products:', youngError);
         }
+        
+        if (!youngProducts || youngProducts.length === 0) {
+          // No young products available - save not_available status
+          console.log('[analyze-ingredients] No young products (≤24 months) found in this category');
+          await supabase
+            .from('ingredient_analyses')
+            .upsert({
+              category_id: categoryId,
+              type: type,
+              formula_version_id: formulaVersionId || null,
+              analysis: { 
+                status: 'not_available', 
+                reason: 'No young products (≤24 months old) found in this category for New Winners analysis. This analysis requires recently launched products to identify emerging formulation trends.',
+                updated_at: new Date().toISOString()
+              },
+              updated_at: new Date().toISOString()
+            }, { onConflict: 'category_id,type' });
+          
+          return new Response(
+            JSON.stringify({ 
+              success: true, 
+              status: 'not_available',
+              message: 'No young products available for New Winners analysis'
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        competitors = youngProducts;
+        competitorLabel = 'New Winners (Young High-Growth Products)';
       }
     } else {
-      // Top Performers - original behavior: top products by monthly sales
+      // Top Performers - top products by monthly sales in THIS category
       const { data: topProducts, error: topError } = await supabase
         .from('products')
         .select('title, brand, ingredients, other_ingredients, all_nutrients, supplement_facts_complete, important_information, specifications, price, monthly_sales, review_analysis, age_months')
@@ -161,7 +163,35 @@ serve(async (req) => {
       if (topError) {
         console.error('[analyze-ingredients] Error fetching top products:', topError);
       }
-      competitors = topProducts || [];
+      
+      if (!topProducts || topProducts.length === 0) {
+        // No top products available - save not_available status
+        console.log('[analyze-ingredients] No products found in this category for Top Performers analysis');
+        await supabase
+          .from('ingredient_analyses')
+          .upsert({
+            category_id: categoryId,
+            type: type,
+            formula_version_id: formulaVersionId || null,
+            analysis: { 
+              status: 'not_available', 
+              reason: 'No products found in this category for Top Performers analysis. This analysis requires existing products with sales data.',
+              updated_at: new Date().toISOString()
+            },
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'category_id,type' });
+        
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            status: 'not_available',
+            message: 'No products available for Top Performers analysis'
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      competitors = topProducts;
       competitorLabel = 'Top Performers (Best Sellers)';
     }
 

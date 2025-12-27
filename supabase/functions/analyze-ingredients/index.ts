@@ -31,7 +31,7 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // SEQUENTIAL WORKFLOW: For top_performers, require new_winners analysis first
+    // SEQUENTIAL WORKFLOW: For top_performers, prefer new_winners analysis ingredient count
     let groundTruthIngredientCount: number | null = null;
     
     if (type === 'top_performers') {
@@ -48,11 +48,21 @@ serve(async (req) => {
         console.error('[analyze-ingredients] Error checking new_winners analysis:', nwError);
       }
       
-      // Check if new_winners analysis exists and has ingredient count
+      // Check analysis status and ingredient count
+      const analysisStatus = newWinnersAnalysis?.analysis?.status;
       const newWinnersCount = newWinnersAnalysis?.analysis?.ingredient_comparison_table?.summary?.total_our_ingredients;
       
-      if (!newWinnersCount) {
-        console.log('[analyze-ingredients] new_winners analysis not found or incomplete - rejecting top_performers request');
+      if (newWinnersCount) {
+        // New Winners completed successfully - use its ingredient count for consistency
+        groundTruthIngredientCount = newWinnersCount;
+        console.log(`[analyze-ingredients] Using ground truth from new_winners: ${groundTruthIngredientCount}`);
+      } else if (analysisStatus === 'not_available') {
+        // New Winners explicitly unavailable - Top Performers will determine count itself
+        console.log('[analyze-ingredients] New Winners not available - Top Performers will determine ingredient count from formula brief');
+        groundTruthIngredientCount = null; // AI will determine count like New Winners does
+      } else if (!newWinnersAnalysis) {
+        // New Winners not run yet - require it first to establish baseline
+        console.log('[analyze-ingredients] New Winners not run yet - requiring it first');
         return new Response(
           JSON.stringify({ 
             error: 'Please run New Winners analysis first to establish ingredient count',
@@ -60,10 +70,11 @@ serve(async (req) => {
           }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
+      } else {
+        // New Winners exists but is incomplete (in_progress or error) - allow Top Performers to proceed
+        console.log(`[analyze-ingredients] New Winners status: ${analysisStatus} - allowing Top Performers to determine its own count`);
+        groundTruthIngredientCount = null;
       }
-      
-      groundTruthIngredientCount = newWinnersCount;
-      console.log(`[analyze-ingredients] Using ground truth ingredient count from new_winners: ${groundTruthIngredientCount}`);
     }
 
     // Fetch category analysis data

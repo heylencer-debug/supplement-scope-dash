@@ -566,6 +566,8 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
   const [isOpen, setIsOpen] = useState(true);
   const [viewMode, setViewMode] = useState<'chart' | 'table' | 'gaps'>('chart');
   const [activeTab, setActiveTab] = useState<'new_winners' | 'top_performers'>('new_winners');
+  const [showAsinInput, setShowAsinInput] = useState(false);
+  const [asinInput, setAsinInput] = useState('');
   
   // AI Analysis hooks - one for each type
   const newWinnersAnalysis = useIngredientAnalysis(categoryId, 'new_winners');
@@ -573,6 +575,24 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
   
   // Get the active analysis based on selected tab
   const activeAnalysisData = activeTab === 'new_winners' ? newWinnersAnalysis : topPerformersAnalysis;
+
+  // Parse ASINs from input (comma, space, or newline separated)
+  const parseAsins = (input: string): string[] => {
+    return input
+      .split(/[,\s\n]+/)
+      .map(s => s.trim().toUpperCase())
+      .filter(s => s.length === 10 && /^[A-Z0-9]+$/.test(s));
+  };
+
+  const handleRunWithAsins = () => {
+    const asins = parseAsins(asinInput);
+    if (asins.length === 0) {
+      return;
+    }
+    activeAnalysisData.runAnalysis(asins);
+    setShowAsinInput(false);
+    setAsinInput('');
+  };
 
   // Create a map of label claims for quick lookup
   const labelClaimsMap = useMemo(() => {
@@ -1040,24 +1060,79 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                 </TooltipProvider>
               </div>
               
-              {/* AI Analysis Button for active tab */}
+              {/* AI Analysis Buttons for active tab */}
               {!activeAnalysisData.hasAnalysis && !activeAnalysisData.pollingStatus.isPolling && (
-                // Hide button for Top Performers if New Winners not done
+                // Hide buttons for Top Performers if New Winners not done
                 !(activeTab === 'top_performers' && !newWinnersAnalysis.hasAnalysis) && (
-                  <Button 
-                    variant="default"
-                    size="sm" 
-                    className="h-8 px-3 text-xs transition-all duration-300 hover:shadow-[0_0_20px_hsl(var(--primary)/0.4)] hover:scale-105"
-                    onClick={(e) => { e.stopPropagation(); activeAnalysisData.runAnalysis(); }}
-                    disabled={activeAnalysisData.isLoading || !categoryId}
-                  >
-                    {activeAnalysisData.isLoading ? (
-                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                    ) : (
-                      <Brain className="w-3.5 h-3.5 mr-1.5" />
-                    )}
-                    Analyze {activeTab === 'new_winners' ? 'New Winners' : 'Top Performers'}
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      variant="default"
+                      size="sm" 
+                      className="h-8 px-3 text-xs transition-all duration-300 hover:shadow-[0_0_20px_hsl(var(--primary)/0.4)] hover:scale-105"
+                      onClick={(e) => { e.stopPropagation(); activeAnalysisData.runAnalysis(); }}
+                      disabled={activeAnalysisData.isLoading || !categoryId}
+                    >
+                      {activeAnalysisData.isLoading ? (
+                        <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                      ) : (
+                        <Brain className="w-3.5 h-3.5 mr-1.5" />
+                      )}
+                      Analyze {activeTab === 'new_winners' ? 'New Winners' : 'Top Performers'}
+                    </Button>
+                    
+                    {/* Manual ASIN Selection Popover */}
+                    <Popover open={showAsinInput} onOpenChange={setShowAsinInput}>
+                      <PopoverTrigger asChild>
+                        <Button 
+                          variant="outline"
+                          size="sm" 
+                          className="h-8 px-2 text-xs"
+                          disabled={activeAnalysisData.isLoading || !categoryId}
+                        >
+                          <Target className="w-3.5 h-3.5" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-80" align="end">
+                        <div className="space-y-3">
+                          <div>
+                            <h4 className="font-medium text-sm mb-1">Analyze Specific Products</h4>
+                            <p className="text-xs text-muted-foreground">
+                              Enter ASINs to analyze specific products instead of automatic selection.
+                            </p>
+                          </div>
+                          <div className="space-y-2">
+                            <Input
+                              placeholder="B0123456789, B0987654321..."
+                              value={asinInput}
+                              onChange={(e) => setAsinInput(e.target.value)}
+                              className="text-xs"
+                            />
+                            <p className="text-[10px] text-muted-foreground">
+                              {parseAsins(asinInput).length} valid ASIN{parseAsins(asinInput).length !== 1 ? 's' : ''} detected
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button 
+                              size="sm" 
+                              className="flex-1 text-xs"
+                              onClick={handleRunWithAsins}
+                              disabled={parseAsins(asinInput).length === 0 || activeAnalysisData.isLoading}
+                            >
+                              <Brain className="w-3 h-3 mr-1" />
+                              Analyze ({parseAsins(asinInput).length})
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => { setShowAsinInput(false); setAsinInput(''); }}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
                 )
               )}
             </div>
@@ -1086,7 +1161,7 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
               {activeAnalysisData.analysis ? (
                 <AIAnalysisResults 
                   analysis={activeAnalysisData.analysis} 
-                  onRefresh={activeAnalysisData.runAnalysis} 
+                  onRefresh={() => activeAnalysisData.runAnalysis()} 
                   isLoading={activeAnalysisData.isLoading}
                   versionInfo={versionInfo}
                 />
@@ -1175,7 +1250,7 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                         </Badge>
                       )}
                       <Button 
-                        onClick={activeAnalysisData.runAnalysis}
+                        onClick={() => activeAnalysisData.runAnalysis()}
                         disabled={activeAnalysisData.isLoading || !categoryId || (activeTab === 'top_performers' && !newWinnersAnalysis.hasAnalysis)}
                         className={cn(
                           "gap-2 transition-all duration-300 hover:shadow-[0_0_20px_hsl(var(--primary)/0.4)] hover:scale-105"

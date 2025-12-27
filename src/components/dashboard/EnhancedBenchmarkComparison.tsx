@@ -573,6 +573,49 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
   const newWinnersAnalysis = useIngredientAnalysis(categoryId, 'new_winners');
   const topPerformersAnalysis = useIngredientAnalysis(categoryId, 'top_performers');
   
+  // Detect analysis availability based on product data
+  const analysisAvailability = useMemo(() => {
+    if (!competitors || competitors.length === 0) {
+      return {
+        newWinners: { available: false, reason: 'No products in category', youngCount: 0 },
+        topPerformers: { available: true, reason: 'Available' }
+      };
+    }
+    
+    // Check for young products (≤24 months) for New Winners
+    const youngProducts = competitors.filter(p => p.age_months && p.age_months <= 24);
+    const hasYoungProducts = youngProducts.length > 0;
+    
+    // Check for top performers (products with sales data)
+    const hasTopPerformers = competitors.some(p => p.monthly_sales && p.monthly_sales > 0);
+    
+    return {
+      newWinners: {
+        available: hasYoungProducts,
+        reason: hasYoungProducts 
+          ? `${youngProducts.length} young product(s) (≤24 months) found`
+          : 'No young products (≤24 months) in this category',
+        youngCount: youngProducts.length
+      },
+      topPerformers: {
+        available: hasTopPerformers || competitors.length > 0,
+        reason: hasTopPerformers 
+          ? `${competitors.length} product(s) with sales data`
+          : 'No products with sales data'
+      }
+    };
+  }, [competitors]);
+  
+  // Auto-select available tab if current tab is not available
+  useEffect(() => {
+    // If New Winners tab is unavailable (no young products), switch to Top Performers
+    if (!analysisAvailability.newWinners.available && activeTab === 'new_winners') {
+      if (analysisAvailability.topPerformers.available) {
+        setActiveTab('top_performers');
+      }
+    }
+  }, [analysisAvailability, activeTab]);
+  
   // Get the active analysis based on selected tab
   const activeAnalysisData = activeTab === 'new_winners' ? newWinnersAnalysis : topPerformersAnalysis;
 
@@ -981,37 +1024,59 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                     activeTab === 'new_winners' ? 'left-0.5 w-[calc(50%-2px)]' : 'left-[calc(50%+2px)] w-[calc(50%-2px)]'
                   )}
                 />
-                <Button 
-                  variant="ghost"
-                  size="sm"
-                  className={cn(
-                    "relative z-10 h-8 px-3 text-xs gap-1.5 rounded-md transition-all duration-200",
-                    activeTab === 'new_winners' 
-                      ? 'text-foreground font-medium' 
-                      : 'text-muted-foreground hover:text-foreground'
-                  )}
-                  onClick={() => setActiveTab('new_winners')}
-                >
-                  <Zap className={cn(
-                    "w-3 h-3 transition-all duration-200",
-                    activeTab === 'new_winners' && "text-amber-500 scale-110"
-                  )} />
-                  <span className={cn(
-                    "transition-transform duration-200",
-                    activeTab === 'new_winners' && "translate-x-0.5"
-                  )}>
-                    New Winners
-                  </span>
-                  {newWinnersAnalysis.hasAnalysis && (
-                    <CheckCircle className={cn(
-                      "w-3 h-3 text-green-500 transition-all duration-200",
-                      activeTab === 'new_winners' && "scale-110"
-                    )} />
-                  )}
-                  {newWinnersAnalysis.pollingStatus.isPolling && (
-                    <Loader2 className="w-3 h-3 animate-spin text-primary" />
-                  )}
-                </Button>
+                {/* New Winners Tab - with availability tooltip */}
+                <TooltipProvider>
+                  <UITooltip>
+                    <TooltipTrigger asChild>
+                      <span className="inline-block">
+                        <Button 
+                          variant="ghost"
+                          size="sm"
+                          className={cn(
+                            "relative z-10 h-8 px-3 text-xs gap-1.5 rounded-md transition-all duration-200",
+                            activeTab === 'new_winners' 
+                              ? 'text-foreground font-medium' 
+                              : 'text-muted-foreground hover:text-foreground',
+                            !analysisAvailability.newWinners.available && 'opacity-50 cursor-not-allowed'
+                          )}
+                          onClick={() => analysisAvailability.newWinners.available && setActiveTab('new_winners')}
+                          disabled={!analysisAvailability.newWinners.available}
+                        >
+                          <Zap className={cn(
+                            "w-3 h-3 transition-all duration-200",
+                            activeTab === 'new_winners' && analysisAvailability.newWinners.available && "text-amber-500 scale-110",
+                            !analysisAvailability.newWinners.available && "text-muted-foreground"
+                          )} />
+                          <span className={cn(
+                            "transition-transform duration-200",
+                            activeTab === 'new_winners' && "translate-x-0.5"
+                          )}>
+                            New Winners
+                          </span>
+                          {!analysisAvailability.newWinners.available ? (
+                            <XCircle className="w-3 h-3 text-muted-foreground" />
+                          ) : newWinnersAnalysis.hasAnalysis ? (
+                            <CheckCircle className={cn(
+                              "w-3 h-3 text-green-500 transition-all duration-200",
+                              activeTab === 'new_winners' && "scale-110"
+                            )} />
+                          ) : newWinnersAnalysis.isNotAvailable ? (
+                            <Minus className="w-3 h-3 text-muted-foreground" />
+                          ) : newWinnersAnalysis.pollingStatus.isPolling ? (
+                            <Loader2 className="w-3 h-3 animate-spin text-primary" />
+                          ) : null}
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    {!analysisAvailability.newWinners.available && (
+                      <TooltipContent>
+                        <p>{analysisAvailability.newWinners.reason}</p>
+                      </TooltipContent>
+                    )}
+                  </UITooltip>
+                </TooltipProvider>
+                
+                {/* Top Performers Tab - enabled if NW completed, not_available, or NW tab unavailable */}
                 <TooltipProvider>
                   <UITooltip>
                     <TooltipTrigger asChild>
@@ -1024,10 +1089,17 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                             activeTab === 'top_performers' 
                               ? 'text-foreground font-medium' 
                               : 'text-muted-foreground hover:text-foreground',
-                            !newWinnersAnalysis.hasAnalysis && 'opacity-50 cursor-not-allowed'
+                            // Only disabled if NW is available but hasn't been run yet
+                            (analysisAvailability.newWinners.available && !newWinnersAnalysis.hasAnalysis && !newWinnersAnalysis.isNotAvailable) && 'opacity-50 cursor-not-allowed'
                           )}
-                          onClick={() => newWinnersAnalysis.hasAnalysis && setActiveTab('top_performers')}
-                          disabled={!newWinnersAnalysis.hasAnalysis}
+                          onClick={() => {
+                            // Enable if: NW completed, NW not_available, or NW tab is unavailable (no young products)
+                            const canClick = newWinnersAnalysis.hasAnalysis || 
+                                           newWinnersAnalysis.isNotAvailable || 
+                                           !analysisAvailability.newWinners.available;
+                            if (canClick) setActiveTab('top_performers');
+                          }}
+                          disabled={analysisAvailability.newWinners.available && !newWinnersAnalysis.hasAnalysis && !newWinnersAnalysis.isNotAvailable}
                         >
                           <Trophy className={cn(
                             "w-3 h-3 transition-all duration-200",
@@ -1051,7 +1123,7 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                         </Button>
                       </span>
                     </TooltipTrigger>
-                    {!newWinnersAnalysis.hasAnalysis && (
+                    {analysisAvailability.newWinners.available && !newWinnersAnalysis.hasAnalysis && !newWinnersAnalysis.isNotAvailable && (
                       <TooltipContent>
                         <p>Run New Winners analysis first to establish ingredient count</p>
                       </TooltipContent>
@@ -1061,9 +1133,9 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
               </div>
               
               {/* AI Analysis Buttons for active tab */}
-              {!activeAnalysisData.hasAnalysis && !activeAnalysisData.pollingStatus.isPolling && (
-                // Hide buttons for Top Performers if New Winners not done
-                !(activeTab === 'top_performers' && !newWinnersAnalysis.hasAnalysis) && (
+              {!activeAnalysisData.hasAnalysis && !activeAnalysisData.pollingStatus.isPolling && !activeAnalysisData.isNotAvailable && (
+                // Hide buttons for Top Performers only if New Winners is available but not run yet
+                !(activeTab === 'top_performers' && analysisAvailability.newWinners.available && !newWinnersAnalysis.hasAnalysis && !newWinnersAnalysis.isNotAvailable) && (
                   <div className="flex items-center gap-2">
                     <Button 
                       variant="default"

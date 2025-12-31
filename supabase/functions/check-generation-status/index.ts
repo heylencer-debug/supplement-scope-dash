@@ -81,18 +81,11 @@ serve(async (req) => {
       elapsedSeconds
     };
 
+    // Don't include the full content in the response (it can be very large and may get truncated).
+    // The client will fetch the result directly from the DB when status === 'completed'.
     if (task.status === 'completed' && task.result) {
-      let content = task.result.content;
-      
-      // Handle Supabase type wrapper if present { _type: "String", value: "..." }
-      if (content && typeof content === 'object' && '_type' in content && 'value' in content) {
-        console.log('[Status Check] Unwrapping typed content from result');
-        content = (content as { _type: string; value: string }).value;
-      }
-      
-      response.content = content;
+      response.hasResult = true;
     }
-
     if (task.status === 'failed' && task.error) {
       response.error = task.error;
     }

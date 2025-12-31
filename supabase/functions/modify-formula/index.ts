@@ -21,7 +21,7 @@ interface Message {
 async function fetchWithTimeout(
   url: string, 
   options: RequestInit, 
-  timeoutMs: number = 120000
+  timeoutMs: number = 240000
 ): Promise<Response> {
   const controller = new AbortController();
   const timeout = setTimeout(() => {
@@ -50,7 +50,7 @@ async function processGenerationTask(
   console.log(`[Background Task] Starting generation for task: ${taskId}`);
   
   const MAX_RETRIES = 3;
-  const TIMEOUT_MS = 120000; // 2 minutes
+  const TIMEOUT_MS = 240000; // 4 minutes
   
   // Create a new client for the background task
   const supabase = createClient(supabaseUrl, supabaseKey);

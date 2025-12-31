@@ -17,7 +17,30 @@ interface Message {
   timestamp: string;
 }
 
-// Background task to process formula generation
+// Fetch with timeout helper
+async function fetchWithTimeout(
+  url: string, 
+  options: RequestInit, 
+  timeoutMs: number = 120000
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => {
+    console.log(`[fetchWithTimeout] Aborting request after ${timeoutMs}ms`);
+    controller.abort();
+  }, timeoutMs);
+  
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+    return response;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+// Background task to process formula generation with retry logic
 async function processGenerationTask(
   taskId: string,
   supabaseUrl: string,
@@ -26,69 +49,91 @@ async function processGenerationTask(
 ) {
   console.log(`[Background Task] Starting generation for task: ${taskId}`);
   
+  const MAX_RETRIES = 3;
+  const TIMEOUT_MS = 120000; // 2 minutes
+  
   // Create a new client for the background task
   const supabase = createClient(supabaseUrl, supabaseKey);
   
-  try {
-    // Update status to processing
-    await supabase
-      .from('formula_generation_tasks')
-      .update({ status: 'processing', updated_at: new Date().toISOString() } as Record<string, unknown>)
-      .eq('id', taskId);
+  // Update status to processing
+  await supabase
+    .from('formula_generation_tasks')
+    .update({ status: 'processing', updated_at: new Date().toISOString() } as Record<string, unknown>)
+    .eq('id', taskId);
 
-    // Call OpenRouter with Claude Sonnet 4.5
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://lovable.dev',
-        'X-Title': 'Noodle Search Formula Modifier'
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-3-pro-preview',
-        messages,
-        stream: false,
-        max_tokens: 16000
-      })
-    });
+  let lastError: Error | null = null;
+  
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      console.log(`[Background Task] Attempt ${attempt}/${MAX_RETRIES} for task: ${taskId}`);
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[Background Task] OpenRouter error: ${response.status}`, errorText);
-      throw new Error(`OpenRouter API error: ${response.status}`);
+      // Call OpenRouter with timeout
+      const response = await fetchWithTimeout(
+        'https://openrouter.ai/api/v1/chat/completions',
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': 'https://lovable.dev',
+            'X-Title': 'Noodle Search Formula Modifier'
+          },
+          body: JSON.stringify({
+            model: 'google/gemini-3-pro-preview',
+            messages,
+            stream: false,
+            max_tokens: 16000
+          })
+        },
+        TIMEOUT_MS
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`[Background Task] OpenRouter error: ${response.status}`, errorText);
+        throw new Error(`OpenRouter API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content || '';
+      
+      console.log(`[Background Task] Generation complete, content length: ${content.length}`);
+
+      // Update task with result
+      await supabase
+        .from('formula_generation_tasks')
+        .update({ 
+          status: 'completed', 
+          result: { content },
+          updated_at: new Date().toISOString()
+        } as Record<string, unknown>)
+        .eq('id', taskId);
+
+      console.log(`[Background Task] Task ${taskId} completed successfully`);
+      return; // Success - exit function
+
+    } catch (error) {
+      lastError = error as Error;
+      console.error(`[Background Task] Attempt ${attempt} failed for task ${taskId}:`, error);
+      
+      if (attempt < MAX_RETRIES) {
+        const delay = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s exponential backoff
+        console.log(`[Background Task] Waiting ${delay}ms before retry...`);
+        await new Promise(r => setTimeout(r, delay));
+      }
     }
-
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content || '';
-    
-    console.log(`[Background Task] Generation complete, content length: ${content.length}`);
-
-    // Update task with result
-    await supabase
-      .from('formula_generation_tasks')
-      .update({ 
-        status: 'completed', 
-        result: { content },
-        updated_at: new Date().toISOString()
-      } as Record<string, unknown>)
-      .eq('id', taskId);
-
-    console.log(`[Background Task] Task ${taskId} completed successfully`);
-
-  } catch (error) {
-    console.error(`[Background Task] Error for task ${taskId}:`, error);
-    
-    // Update task with error
-    await supabase
-      .from('formula_generation_tasks')
-      .update({ 
-        status: 'failed', 
-        error: error instanceof Error ? error.message : 'Unknown error',
-        updated_at: new Date().toISOString()
-      } as Record<string, unknown>)
-      .eq('id', taskId);
   }
+  
+  // All retries failed
+  console.error(`[Background Task] All ${MAX_RETRIES} attempts failed for task ${taskId}`);
+  await supabase
+    .from('formula_generation_tasks')
+    .update({ 
+      status: 'failed', 
+      error: `Failed after ${MAX_RETRIES} attempts: ${lastError?.message || 'Unknown error'}`,
+      updated_at: new Date().toISOString()
+    } as Record<string, unknown>)
+    .eq('id', taskId);
 }
 
 serve(async (req) => {

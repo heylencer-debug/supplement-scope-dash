@@ -686,8 +686,19 @@ export function FormulaChat({
         
         toast({
           title: "Generation Failed",
-          description: data.error || "Failed to generate formula. Please try again.",
-          variant: "destructive"
+          description: data.error || "Failed to generate formula. Click 'Retry' to try again.",
+          variant: "destructive",
+          action: (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => handleGenerateFormula()}
+              className="ml-2"
+            >
+              <RotateCcw className="w-3 h-3 mr-1" />
+              Retry
+            </Button>
+          )
         });
         
         setIsGenerating(false);

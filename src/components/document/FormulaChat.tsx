@@ -603,13 +603,32 @@ export function FormulaChat({
         }
         setGenerationProgress(null);
 
-        let content = data.content;
+        // IMPORTANT: don't return the full generated document via edge function response,
+        // because large payloads can be truncated and break JSON parsing.
+        // Instead, fetch the result directly from the DB once the task is completed.
+        const { data: taskRow, error: taskError } = await supabase
+          .from('formula_generation_tasks')
+          .select('result')
+          .eq('id', taskId)
+          .maybeSingle();
+
+        if (taskError || !taskRow?.result) {
+          console.error('[FormulaChat] Failed to fetch generation result from DB:', taskError);
+          toast({
+            title: "Error",
+            description: "Generation completed but result could not be loaded. Please retry.",
+            variant: "destructive"
+          });
+          setIsGenerating(false);
+          return;
+        }
+
+        let content = (taskRow.result as any).content;
 
         console.log('[FormulaChat] Raw content type:', typeof content);
         console.log('[FormulaChat] Raw content preview:', JSON.stringify(content).substring(0, 300));
 
         // Handle case where content is wrapped in a type descriptor object
-        // This can happen with Supabase JSONB columns returning typed values
         if (content && typeof content === 'object' && '_type' in content && 'value' in content) {
           console.log('[FormulaChat] Unwrapping typed content object');
           content = (content as { _type: string; value: string }).value;
@@ -622,19 +641,6 @@ export function FormulaChat({
           setShowConfirmDialog(true);
           setIsGenerating(false);
           return;
-        }
-
-        // Safety: Try to parse if content looks like a stringified type wrapper
-        if (typeof content === 'string' && content.includes('"_type"') && content.includes('"value"')) {
-          try {
-            const parsed = JSON.parse(content);
-            if (parsed._type === 'String' && parsed.value) {
-              console.log('[FormulaChat] Parsed stringified type wrapper');
-              content = parsed.value;
-            }
-          } catch {
-            // Not a type wrapper, continue with normal parsing
-          }
         }
 
         // Ensure content is a string before proceeding

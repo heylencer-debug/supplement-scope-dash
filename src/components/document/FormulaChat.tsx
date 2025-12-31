@@ -626,15 +626,29 @@ export function FormulaChat({
           return;
         }
 
-        let content = (taskRow.result as any).content;
+        const unwrapTyped = (value: any): any => {
+          if (value && typeof value === 'object' && '_type' in value && 'value' in value) {
+            return (value as { _type: string; value: any }).value;
+          }
+          return value;
+        };
+
+        const rawResult = taskRow.result as any;
+        let content = unwrapTyped(rawResult?.content ?? rawResult);
 
         console.log('[FormulaChat] Raw content type:', typeof content);
         console.log('[FormulaChat] Raw content preview:', JSON.stringify(content).substring(0, 300));
 
-        // Handle case where content is wrapped in a type descriptor object
-        if (content && typeof content === 'object' && '_type' in content && 'value' in content) {
-          console.log('[FormulaChat] Unwrapping typed content object');
-          content = (content as { _type: string; value: string }).value;
+        // If the content itself is a JSON-stringified typed wrapper, unwrap it.
+        if (typeof content === 'string') {
+          const trimmed = content.trim();
+          if (trimmed.startsWith('{') && trimmed.includes('"_type"') && trimmed.includes('"value"')) {
+            try {
+              content = unwrapTyped(JSON.parse(trimmed));
+            } catch {
+              // ignore; will be handled by JSON parse below
+            }
+          }
         }
 
         // Handle if content is already a parsed object with the expected structure
@@ -659,6 +673,7 @@ export function FormulaChat({
         }
 
         // Strip markdown code blocks if present (```json ... ```)
+        content = content.trim();
         if (content.startsWith('```')) {
           content = content.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '');
         }
@@ -666,8 +681,15 @@ export function FormulaChat({
         // Parse the JSON response
         try {
           const parsed = JSON.parse(content);
-          if (parsed.change_summary && parsed.new_formula_content) {
-            setGeneratedFormula(parsed);
+          const unwrappedParsed = unwrapTyped(parsed);
+
+          if (
+            unwrappedParsed &&
+            typeof unwrappedParsed === 'object' &&
+            'change_summary' in unwrappedParsed &&
+            'new_formula_content' in unwrappedParsed
+          ) {
+            setGeneratedFormula(unwrappedParsed as GeneratedFormula);
             setShowConfirmDialog(true);
           } else {
             throw new Error('Invalid response format');

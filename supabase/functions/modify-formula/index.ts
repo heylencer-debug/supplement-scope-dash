@@ -82,7 +82,7 @@ async function processGenerationTask(
             model: 'google/gemini-3-pro-preview',
             messages,
             stream: false,
-            max_tokens: 16000
+            max_tokens: 32000
           })
         },
         TIMEOUT_MS

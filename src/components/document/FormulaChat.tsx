@@ -605,6 +605,9 @@ export function FormulaChat({
 
         let content = data.content;
 
+        console.log('[FormulaChat] Raw content type:', typeof content);
+        console.log('[FormulaChat] Raw content preview:', JSON.stringify(content).substring(0, 300));
+
         // Handle case where content is wrapped in a type descriptor object
         // This can happen with Supabase JSONB columns returning typed values
         if (content && typeof content === 'object' && '_type' in content && 'value' in content) {
@@ -621,9 +624,22 @@ export function FormulaChat({
           return;
         }
 
+        // Safety: Try to parse if content looks like a stringified type wrapper
+        if (typeof content === 'string' && content.includes('"_type"') && content.includes('"value"')) {
+          try {
+            const parsed = JSON.parse(content);
+            if (parsed._type === 'String' && parsed.value) {
+              console.log('[FormulaChat] Parsed stringified type wrapper');
+              content = parsed.value;
+            }
+          } catch {
+            // Not a type wrapper, continue with normal parsing
+          }
+        }
+
         // Ensure content is a string before proceeding
         if (typeof content !== 'string') {
-          console.error('Unexpected content type:', typeof content, content);
+          console.error('[FormulaChat] Unexpected content type:', typeof content, content);
           toast({
             title: "Error",
             description: "Unexpected content format. Please try again.",

@@ -82,7 +82,15 @@ serve(async (req) => {
     };
 
     if (task.status === 'completed' && task.result) {
-      response.content = task.result.content;
+      let content = task.result.content;
+      
+      // Handle Supabase type wrapper if present { _type: "String", value: "..." }
+      if (content && typeof content === 'object' && '_type' in content && 'value' in content) {
+        console.log('[Status Check] Unwrapping typed content from result');
+        content = (content as { _type: string; value: string }).value;
+      }
+      
+      response.content = content;
     }
 
     if (task.status === 'failed' && task.error) {

@@ -68,6 +68,7 @@ interface GeneratedFormula {
 interface GenerationProgress {
   taskId: string;
   elapsedSeconds: number;
+  isLoadingResult?: boolean;
 }
 
 // Code block with copy button
@@ -601,7 +602,9 @@ export function FormulaChat({
           clearInterval(pollingIntervalRef.current);
           pollingIntervalRef.current = null;
         }
-        setGenerationProgress(null);
+        
+        // Show "loading result" state to user
+        setGenerationProgress(prev => prev ? { ...prev, isLoadingResult: true } : null);
 
         // IMPORTANT: don't return the full generated document via edge function response,
         // because large payloads can be truncated and break JSON parsing.
@@ -1510,7 +1513,7 @@ export function FormulaChat({
                   </div>
                   <div className="flex flex-col">
                     <span className="text-sm font-medium text-foreground">
-                      Generating formula...
+                      {generationProgress.isLoadingResult ? "Completed — loading result…" : "Generating formula..."}
                     </span>
                     <span className="text-xs text-muted-foreground">
                       {generationProgress.elapsedSeconds < 60
@@ -1520,10 +1523,16 @@ export function FormulaChat({
                   </div>
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {generationProgress.elapsedSeconds < 30 && "Analyzing changes..."}
-                  {generationProgress.elapsedSeconds >= 30 && generationProgress.elapsedSeconds < 60 && "Building document..."}
-                  {generationProgress.elapsedSeconds >= 60 && generationProgress.elapsedSeconds < 120 && "Almost there..."}
-                  {generationProgress.elapsedSeconds >= 120 && "Finalizing..."}
+                  {generationProgress.isLoadingResult 
+                    ? "Fetching from database..."
+                    : generationProgress.elapsedSeconds < 30 
+                      ? "Analyzing changes..."
+                      : generationProgress.elapsedSeconds < 60 
+                        ? "Building document..."
+                        : generationProgress.elapsedSeconds < 120 
+                          ? "Almost there..."
+                          : "Finalizing..."
+                  }
                 </div>
               </div>
             )}

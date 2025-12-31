@@ -605,8 +605,36 @@ export function FormulaChat({
 
         let content = data.content;
 
+        // Handle case where content is wrapped in a type descriptor object
+        // This can happen with Supabase JSONB columns returning typed values
+        if (content && typeof content === 'object' && '_type' in content && 'value' in content) {
+          console.log('[FormulaChat] Unwrapping typed content object');
+          content = (content as { _type: string; value: string }).value;
+        }
+
+        // Handle if content is already a parsed object with the expected structure
+        if (content && typeof content === 'object' && 'change_summary' in content && 'new_formula_content' in content) {
+          console.log('[FormulaChat] Content is already parsed object');
+          setGeneratedFormula(content as { change_summary: string; new_formula_content: string });
+          setShowConfirmDialog(true);
+          setIsGenerating(false);
+          return;
+        }
+
+        // Ensure content is a string before proceeding
+        if (typeof content !== 'string') {
+          console.error('Unexpected content type:', typeof content, content);
+          toast({
+            title: "Error",
+            description: "Unexpected content format. Please try again.",
+            variant: "destructive"
+          });
+          setIsGenerating(false);
+          return;
+        }
+
         // Strip markdown code blocks if present (```json ... ```)
-        if (content && content.startsWith('```')) {
+        if (content.startsWith('```')) {
           content = content.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '');
         }
 

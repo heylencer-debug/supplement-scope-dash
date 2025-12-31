@@ -50,8 +50,8 @@ serve(async (req) => {
     const elapsedMs = Date.now() - createdAt.getTime();
     const elapsedSeconds = Math.floor(elapsedMs / 1000);
 
-    // Check for timeout (3 minutes = 180 seconds)
-    const TIMEOUT_SECONDS = 180;
+    // Check for timeout (7 minutes = 420 seconds)
+    const TIMEOUT_SECONDS = 420;
     if (task.status === 'pending' || task.status === 'processing') {
       if (elapsedSeconds > TIMEOUT_SECONDS) {
         // Mark as failed due to timeout

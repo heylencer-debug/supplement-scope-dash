@@ -45,7 +45,8 @@ async function processGenerationTask(
   taskId: string,
   supabaseUrl: string,
   supabaseKey: string,
-  messages: Array<{ role: string; content: string }>
+  messages: Array<{ role: string; content: string }>,
+  originalLength: number // Length of original formula for validation
 ) {
   console.log(`[Background Task] Starting generation for task: ${taskId}`);
   
@@ -82,7 +83,7 @@ async function processGenerationTask(
             model: 'google/gemini-3-pro-preview',
             messages,
             stream: false,
-            max_tokens: 32000
+            max_tokens: 64000
           })
         },
         TIMEOUT_MS
@@ -99,12 +100,21 @@ async function processGenerationTask(
       
       console.log(`[Background Task] Generation complete, content length: ${content.length}`);
 
+      // Validate output length - warn if too short
+      const minExpectedLength = Math.floor(originalLength * 0.85);
+      if (content.length < minExpectedLength && originalLength > 0) {
+        console.warn(`[Background Task] OUTPUT TOO SHORT! Generated: ${content.length} chars, Expected min: ${minExpectedLength} chars (85% of original ${originalLength})`);
+        console.warn(`[Background Task] Ratio: ${Math.round((content.length / originalLength) * 100)}% of original length`);
+      } else {
+        console.log(`[Background Task] Length validation passed: ${content.length} >= ${minExpectedLength} (${Math.round((content.length / originalLength) * 100)}% of original)`);
+      }
+
       // Update task with result
       await supabase
         .from('formula_generation_tasks')
         .update({ 
           status: 'completed', 
-          result: { content },
+          result: { content, originalLength, generatedLength: content.length },
           updated_at: new Date().toISOString()
         } as Record<string, unknown>)
         .eq('id', taskId);
@@ -243,63 +253,72 @@ serve(async (req) => {
 
     if (generateFormula) {
       // GENERATION MODE: Output JSON with complete new formula
-      systemPrompt = `You are a Formula Development Specialist. The user has been discussing modifications to their formula and is now ready to finalize changes.
+      systemPrompt = `You are a Formula Development Specialist performing a SURGICAL EDIT operation on a formula brief document.
 
-CURRENT FORMULA BRIEF (ORIGINAL - ${originalLength} characters, ~${originalWordCount} words):
+=== ABSOLUTE RULE: THIS IS A COPY-THEN-PATCH OPERATION ===
+You will COPY the ENTIRE original document, then ONLY change the specific sentences/paragraphs related to the conversation.
+This is NOT a rewrite. This is NOT a summarization. You are a TEXT EDITOR performing find-and-replace.
+
+CURRENT FORMULA BRIEF (ORIGINAL DOCUMENT - ${originalLength} characters, ~${originalWordCount} words):
+---BEGIN ORIGINAL DOCUMENT---
 ${currentFormula}
+---END ORIGINAL DOCUMENT---
 ${competitorContext}
 ${conversationSummary}
 
-=== DOCUMENT DUPLICATION APPROACH ===
-Think of this task as: DUPLICATE the original document FIRST, then PATCH only the specific sections discussed.
-Do NOT rewrite or paraphrase any section that wasn't explicitly discussed in the conversation.
-Unchanged sections must be copied WORD-FOR-WORD from the original.
+=== MANDATORY APPROACH: COPY-PASTE FIRST ===
+Step 1: Start by mentally copying the ENTIRE original document above (all ${originalLength} characters)
+Step 2: Identify ONLY the specific sentences/paragraphs that relate to changes discussed in conversation
+Step 3: Replace ONLY those specific sentences/paragraphs with updated versions
+Step 4: Everything else remains EXACTLY as it was - character for character
 
-CRITICAL TASK: You must carefully review the ENTIRE conversation history above and identify EVERY single change, modification, or adjustment that was discussed. Then generate a COMPLETE updated formula brief that incorporates ALL of these changes.
+=== FAILURE CONDITIONS (Your output will be REJECTED if): ===
+❌ Output is less than ${Math.floor(originalLength * 0.90)} characters (must be ≥90% of ${originalLength})
+❌ Any section is summarized or condensed
+❌ Any unchanged section is rewritten in different words
+❌ Any bullet points, examples, or details are removed
+❌ The document structure or section order is changed
 
-Use the COMPETITOR INGREDIENT INTELLIGENCE above to:
+=== SUCCESS CONDITIONS: ===
+✓ Output is ${originalLength}+ characters (same length or longer than original)
+✓ Unchanged sections are IDENTICAL to original (copy-pasted verbatim)
+✓ Only the discussed changes are modified
+✓ All original formatting, bullet points, and structure preserved
+
+CRITICAL TASK: Review the ENTIRE conversation history and identify EVERY change discussed. Then:
+1. COPY the entire original document
+2. PATCH only the specific parts that need to change
+3. The result should be the same document with surgical edits
+
+Use the COMPETITOR INGREDIENT INTELLIGENCE to:
 - Validate suggested ingredient choices against what's working for competitors
 - Ensure dosages are competitive with successful products
-- Reference specific competitor data when incorporating changes
 
-BEFORE GENERATING, mentally list all changes discussed:
-- Review each user message for requested modifications
-- Review your own responses for suggested changes the user agreed to
-- Include ALL ingredient changes (additions, removals, dosage adjustments)
-- Include ALL cost/pricing adjustments
-- Include ALL packaging or formulation changes
-- Include ALL targeting or positioning changes
+CHANGES TO INCORPORATE (review conversation for):
+- All ingredient changes (additions, removals, dosage adjustments)
+- All cost/pricing adjustments
+- All packaging or formulation changes
+- All targeting or positioning changes
 
-You MUST respond with ONLY a JSON object in this exact format (no other text before or after):
+You MUST respond with ONLY a JSON object (no markdown code blocks, no explanation):
 {
-  "change_summary": "Comprehensive summary of ALL changes made (list each change)",
-  "new_formula_content": "The COMPLETE updated markdown document with ALL discussed changes incorporated"
+  "change_summary": "List each specific change made",
+  "new_formula_content": "The COMPLETE document (${originalLength}+ chars) with surgical edits applied"
 }
 
-=== CRITICAL LENGTH & COMPLETENESS RULES ===
-1. The new_formula_content MUST be at least ${Math.floor(originalLength * 0.95)} characters (95% of original length: ${originalLength} chars)
-2. NEVER summarize, condense, shorten, or paraphrase any section
-3. Sections NOT discussed in conversation MUST remain EXACTLY as they appear in the original - copy them VERBATIM
-4. If a section wasn't mentioned in the conversation, copy it character-for-character
-5. Only modify the specific sentences/paragraphs that relate to discussed changes
-6. Preserve ALL original details, examples, bullet points, and explanations
-
-=== PRE-OUTPUT VERIFICATION CHECKLIST ===
-Before outputting, verify:
-□ Does the new document have ALL the same sections as the original?
-□ Is your new document at least ${Math.floor(originalLength * 0.95)} characters long?
-□ Have you copied unchanged sections word-for-word (not paraphrased)?
+=== FINAL VERIFICATION BEFORE OUTPUT ===
+□ Count your output length - is it at least ${Math.floor(originalLength * 0.90)} characters?
+□ Did you copy unchanged sections word-for-word (not paraphrase)?
+□ Did you preserve ALL bullet points, examples, and details?
 □ Did you incorporate EVERY change from the conversation?
-□ Are all original bullet points, examples, and details preserved?
+□ Is the structure and section order identical to the original?
 
 CRITICAL RULES:
-1. Output ONLY the JSON object - no explanation, no markdown code blocks, just raw JSON
-2. The new_formula_content must be the COMPLETE formula brief document, not just the changes
-3. Maintain the exact same structure, formatting, and section order as the original
-4. Incorporate EVERY SINGLE change discussed in the ENTIRE conversation - missing even one change is a failure
-5. The change_summary should list each distinct change that was made
-6. COPY unchanged sections exactly - do not rewrite them in your own words
-7. Double-check: Is your output at least as long as the original document?`;
+1. Output ONLY raw JSON - no code blocks, no explanation
+2. new_formula_content MUST be the COMPLETE document, not just changes
+3. COPY unchanged sections EXACTLY - do not rewrite them
+4. Your output MUST be at least ${Math.floor(originalLength * 0.90)} characters
+5. If unsure whether to include something from original, INCLUDE IT`;
     } else {
       // CONVERSATION MODE: Be helpful and discuss, no JSON output
       systemPrompt = `You are a Formula Development Specialist helping to discuss and plan modifications to a product formula. You have access to the complete formula brief document AND competitive intelligence about what ingredients competitors are using.
@@ -392,8 +411,9 @@ IMPORTANT RULES:
       );
 
       // Process generation in background using EdgeRuntime.waitUntil
+      // Pass original formula length for validation
       // @ts-ignore - EdgeRuntime is available in Supabase Edge Functions
-      EdgeRuntime.waitUntil(processGenerationTask(task.id, SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!, messages));
+      EdgeRuntime.waitUntil(processGenerationTask(task.id, SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!, messages, originalLength));
 
       return immediateResponse;
 

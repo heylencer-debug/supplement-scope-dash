@@ -6,27 +6,54 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// n8n-compatible interface structures
 interface ExtractedNutrient {
   name: string;
-  amount: number | string | null;
+  amount: number | null;
   unit: string | null;
-  daily_value: string | null;
+  per_serving: boolean;
+  daily_value_percent: number | null;
+}
+
+interface ActiveIngredient {
+  name: string;
+  amount: number | null;
+  unit: string | null;
+}
+
+interface ProprietaryBlend {
+  name: string;
+  total_amount: number | null;
+  unit: string | null;
+  ingredients: string[];
+}
+
+interface ExtractionCompleteness {
+  notes: string;
+  image_quality: string;
+  panel_fully_visible: boolean;
+  total_nutrients_found: number;
 }
 
 interface ExtractionResult {
+  found: boolean;
+  confidence: "high" | "medium" | "low";
+  panel_type: string;
   serving_size: string | null;
   servings_per_container: number | null;
-  nutrients: ExtractedNutrient[];
-  proprietary_blends: Array<{
-    name: string;
-    total_amount: string | null;
-    ingredients: string[];
-  }>;
+  calories: number | null;
+  all_nutrients: ExtractedNutrient[];
+  active_ingredients: ActiveIngredient[];
+  proprietary_blends: ProprietaryBlend[];
   other_ingredients: string | null;
+  inactive_ingredients: string | null;
   warnings: string | null;
   directions: string | null;
-  confidence: "high" | "medium" | "low";
-  extraction_notes: string;
+  claims_on_label: string[];
+  manufacturer: string | null;
+  found_in_image: number | null;
+  extraction_completeness: ExtractionCompleteness;
+  guaranteed_analysis: Record<string, unknown>;
 }
 
 serve(async (req) => {
@@ -86,7 +113,7 @@ serve(async (req) => {
 
     console.log(`[analyze-supplement-facts] Analyzing ${allImages.length} images for product ${product.asin}`);
 
-    // Build image content for GPT-4o vision
+    // Build image content for vision model
     const imageContent = allImages.slice(0, 10).map((url) => ({
       type: "image_url" as const,
       image_url: { url, detail: "high" as const }
@@ -99,28 +126,20 @@ Find the Supplement Facts or Nutrition Facts panel in these images and extract E
 
 ## CRITICAL INSTRUCTIONS:
 1. **Find the panel**: Look through ALL images for the Supplement Facts or Nutrition Facts panel
-2. **Extract EXACT amounts**: For each nutrient, extract the EXACT numeric amount shown (e.g., "500" not just the unit)
-3. **Include units**: mg, mcg, g, IU, etc.
-4. **Daily Values**: Extract % Daily Value where shown
-5. **Proprietary Blends**: If present, list the blend name, total amount, and all ingredients
-6. **Be thorough**: Don't skip any nutrients, vitamins, minerals, or ingredients
+2. **Extract EXACT amounts**: For each nutrient, extract the EXACT numeric amount shown as a NUMBER (e.g., 500 not "500mg")
+3. **Include units SEPARATELY**: mg, mcg, g, IU, etc. in the unit field
+4. **Daily Values**: Extract % Daily Value as a NUMBER (e.g., 125 not "125%")
+5. **Proprietary Blends**: If present, list the blend name, total amount as NUMBER, unit, and all ingredients
+6. **Active Ingredients**: List nutrients that are the main active ingredients
+7. **Claims on Label**: Extract all marketing claims visible on the product
+8. **Be thorough**: Don't skip any nutrients, vitamins, minerals, or ingredients
 
-## EXPECTED OUTPUT FORMAT:
-- serving_size: The serving size as written (e.g., "2 Soft Chews")
-- servings_per_container: Number of servings
-- nutrients: Array with name, amount (NUMBER or string), unit, daily_value
-- proprietary_blends: Array with name, total_amount, ingredients array
-- other_ingredients: Full list of other/inactive ingredients
-- warnings: Any warning statements
-- directions: Usage directions if visible
-- confidence: "high" if panel clearly visible, "medium" if partially visible, "low" if extracted from partial/unclear images
-- extraction_notes: Any notes about the extraction quality
-
-## IMPORTANT:
-- If you can see "Vitamin D 25mcg (1000 IU)", extract as: { name: "Vitamin D", amount: "25", unit: "mcg", daily_value: "125%" }
-- For blends like "Joint Support Complex 500mg", extract the total amount
-- Extract ALL nutrients you can see, even if the panel is partially visible
-- If amount is unclear but unit is visible, still include what you can see
+## OUTPUT FORMAT REQUIREMENTS (IMPORTANT):
+- amount: Must be a NUMBER or null (e.g., 500, 1000.5, 25) - NOT a string
+- daily_value_percent: Must be a NUMBER or null (e.g., 125, 50, 100) - NOT "125%"
+- per_serving: Always true for nutrients listed per serving
+- panel_type: "supplement_facts" or "nutrition_facts"
+- found_in_image: The image number (1-indexed) where the panel was found
 
 Use the extract_supplement_facts tool to return your analysis.`;
 
@@ -142,29 +161,41 @@ Use the extract_supplement_facts tool to return your analysis.`;
           type: "function",
           function: {
             name: "extract_supplement_facts",
-            description: "Extract complete supplement facts panel data from product images",
+            description: "Extract complete supplement facts panel data from product images in n8n-compatible format",
             parameters: {
               type: "object",
               properties: {
+                found: { type: "boolean", description: "Whether a supplement/nutrition facts panel was found" },
+                confidence: { type: "string", enum: ["high", "medium", "low"] },
+                panel_type: { type: "string", description: "supplement_facts or nutrition_facts" },
                 serving_size: { type: "string", nullable: true, description: "Serving size as written on label" },
-                servings_per_container: { type: "number", nullable: true, description: "Number of servings per container" },
-                nutrients: {
+                servings_per_container: { type: "number", nullable: true },
+                calories: { type: "number", nullable: true, description: "Calories per serving" },
+                all_nutrients: {
                   type: "array",
                   items: {
                     type: "object",
                     properties: {
-                      name: { type: "string", description: "Nutrient name" },
-                      amount: { 
-                        oneOf: [{ type: "number" }, { type: "string" }],
-                        nullable: true, 
-                        description: "Numeric amount (e.g., 500, 1000, 25)" 
-                      },
-                      unit: { type: "string", nullable: true, description: "Unit (mg, mcg, g, IU, etc.)" },
-                      daily_value: { type: "string", nullable: true, description: "% Daily Value" }
+                      name: { type: "string" },
+                      amount: { type: "number", nullable: true, description: "Numeric amount only" },
+                      unit: { type: "string", nullable: true },
+                      per_serving: { type: "boolean", description: "Always true for per-serving values" },
+                      daily_value_percent: { type: "number", nullable: true, description: "Daily value as number (e.g., 125 not 125%)" }
+                    },
+                    required: ["name", "per_serving"]
+                  }
+                },
+                active_ingredients: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      name: { type: "string" },
+                      amount: { type: "number", nullable: true },
+                      unit: { type: "string", nullable: true }
                     },
                     required: ["name"]
-                  },
-                  description: "All nutrients with their amounts"
+                  }
                 },
                 proprietary_blends: {
                   type: "array",
@@ -172,19 +203,33 @@ Use the extract_supplement_facts tool to return your analysis.`;
                     type: "object",
                     properties: {
                       name: { type: "string" },
-                      total_amount: { type: "string", nullable: true },
+                      total_amount: { type: "number", nullable: true },
+                      unit: { type: "string", nullable: true },
                       ingredients: { type: "array", items: { type: "string" } }
                     },
                     required: ["name", "ingredients"]
                   }
                 },
                 other_ingredients: { type: "string", nullable: true },
+                inactive_ingredients: { type: "string", nullable: true },
                 warnings: { type: "string", nullable: true },
                 directions: { type: "string", nullable: true },
-                confidence: { type: "string", enum: ["high", "medium", "low"] },
-                extraction_notes: { type: "string", description: "Notes about extraction quality" }
+                claims_on_label: { type: "array", items: { type: "string" } },
+                manufacturer: { type: "string", nullable: true },
+                found_in_image: { type: "number", nullable: true, description: "Image number where panel was found (1-indexed)" },
+                extraction_completeness: {
+                  type: "object",
+                  properties: {
+                    notes: { type: "string" },
+                    image_quality: { type: "string", enum: ["high", "medium", "low"] },
+                    panel_fully_visible: { type: "boolean" },
+                    total_nutrients_found: { type: "number" }
+                  },
+                  required: ["notes", "image_quality", "panel_fully_visible", "total_nutrients_found"]
+                },
+                guaranteed_analysis: { type: "object", description: "For pet supplements, empty object otherwise" }
               },
-              required: ["nutrients", "confidence", "extraction_notes"]
+              required: ["found", "confidence", "panel_type", "all_nutrients", "extraction_completeness"]
             }
           }
         }],
@@ -213,37 +258,54 @@ Use the extract_supplement_facts tool to return your analysis.`;
     }
 
     const result: ExtractionResult = JSON.parse(toolCall.function.arguments);
-    console.log(`[analyze-supplement-facts] Extracted ${result.nutrients.length} nutrients with confidence: ${result.confidence}`);
+    console.log(`[analyze-supplement-facts] Extracted ${result.all_nutrients?.length || 0} nutrients with confidence: ${result.confidence}`);
 
-    // Convert nutrients to the format used in all_nutrients
-    const allNutrients = result.nutrients.map(n => ({
-      name: n.name,
-      amount: n.amount !== null ? String(n.amount) : null,
-      unit: n.unit,
-      daily_value: n.daily_value
-    }));
-
-    // Convert proprietary blends
-    const proprietaryBlends = result.proprietary_blends?.map(b => ({
-      name: b.name,
-      total_amount: b.total_amount,
-      ingredients: b.ingredients
-    })) ?? [];
+    // Build the complete n8n-compatible supplement_facts_complete structure
+    const supplementFactsComplete = {
+      found: result.found ?? true,
+      confidence: result.confidence,
+      panel_type: result.panel_type || "supplement_facts",
+      serving_size: result.serving_size,
+      servings_per_container: result.servings_per_container,
+      calories: result.calories,
+      all_nutrients: result.all_nutrients || [],
+      active_ingredients: result.active_ingredients || [],
+      proprietary_blends: result.proprietary_blends || [],
+      other_ingredients: result.other_ingredients,
+      inactive_ingredients: result.inactive_ingredients || result.other_ingredients,
+      warnings: result.warnings,
+      directions: result.directions,
+      claims_on_label: result.claims_on_label || [],
+      manufacturer: result.manufacturer,
+      found_in_image: result.found_in_image,
+      extraction_completeness: result.extraction_completeness || {
+        notes: "Extracted via AI analysis",
+        image_quality: result.confidence,
+        panel_fully_visible: result.confidence === "high",
+        total_nutrients_found: result.all_nutrients?.length || 0
+      },
+      guaranteed_analysis: result.guaranteed_analysis || {}
+    };
 
     // Update the product in the database
     const updateData: Record<string, unknown> = {
-      all_nutrients: allNutrients,
+      // Store complete n8n-compatible structure
+      supplement_facts_complete: supplementFactsComplete,
+      // Also update individual columns for backward compatibility
+      all_nutrients: result.all_nutrients,
       ocr_confidence: result.confidence,
       ocr_extracted: true,
-      extraction_notes: result.extraction_notes,
-      nutrients_count: allNutrients.length,
+      extraction_notes: result.extraction_completeness?.notes,
+      nutrients_count: result.all_nutrients?.length || 0,
+      calories_per_serving: result.calories,
+      claims_on_label: result.claims_on_label,
       updated_at: new Date().toISOString()
     };
 
     if (result.serving_size) updateData.serving_size = result.serving_size;
     if (result.servings_per_container) updateData.servings_per_container = result.servings_per_container;
-    if (proprietaryBlends.length > 0) {
-      updateData.proprietary_blends = proprietaryBlends;
+    if (result.proprietary_blends && result.proprietary_blends.length > 0) {
+      updateData.proprietary_blends = result.proprietary_blends;
       updateData.has_proprietary_blends = true;
     }
     if (result.other_ingredients) updateData.other_ingredients = result.other_ingredients;
@@ -268,9 +330,9 @@ Use the extract_supplement_facts tool to return your analysis.`;
     return new Response(
       JSON.stringify({ 
         success: true, 
-        nutrients_count: allNutrients.length,
+        nutrients_count: result.all_nutrients?.length || 0,
         confidence: result.confidence,
-        extraction_notes: result.extraction_notes
+        extraction_notes: result.extraction_completeness?.notes
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

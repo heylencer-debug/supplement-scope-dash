@@ -33,6 +33,7 @@ import { useCategoryContext } from "@/contexts/CategoryContext";
 import { useCategoryByName } from "@/hooks/useCategoryByName";
 import { useCategoryAnalysis } from "@/hooks/useCategoryAnalyses";
 import { useBulkSupplementAnalysis } from "@/hooks/useBulkSupplementAnalysis";
+import { BulkAnalysisProgress } from "@/components/BulkAnalysisProgress";
 import ProductDetailModal from "@/components/ProductDetailModal";
 import BenchmarkComparison from "@/components/dashboard/BenchmarkComparison";
 import ProductAnalysisPanel from "@/components/product/ProductAnalysisPanel";
@@ -99,7 +100,8 @@ export default function ProductExplorer() {
   const { data: products, isLoading: productsLoading } = useProducts(effectiveCategoryId);
   const { data: categories, isLoading: categoriesLoading } = useCategories();
   const { data: categoryAnalysis } = useCategoryAnalysis(currentCategoryId || categoryFromName?.id);
-  const { startBulkAnalysis, isAnalyzing: isBulkAnalyzing } = useBulkSupplementAnalysis();
+  const effectiveCategoryIdForAnalysis = currentCategoryId || categoryFromName?.id;
+  const { startBulkAnalysis, isAnalyzing: isBulkAnalyzing, progress: bulkProgress, resetProgress } = useBulkSupplementAnalysis(effectiveCategoryIdForAnalysis);
 
   const isLoading = productsLoading || categoriesLoading;
 
@@ -314,6 +316,14 @@ export default function ProductExplorer() {
 
   return (
     <div className="space-y-8">
+      {/* Bulk Analysis Progress Banner */}
+      {bulkProgress.status !== "idle" && (
+        <BulkAnalysisProgress 
+          progress={bulkProgress} 
+          onDismiss={resetProgress} 
+        />
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Product Explorer</h1>

@@ -614,7 +614,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="flex flex-col md:flex-row items-center gap-6">
-                <div className="w-full md:w-1/2">
+                <div className="w-full md:w-1/2" onTouchStart={(e) => e.stopPropagation()}>
                   <ResponsiveContainer width="100%" height={220}>
                     <PieChart>
                       <Pie

@@ -154,6 +154,7 @@ export function Layout({ children }: LayoutProps) {
   // Swipe gesture handlers for mobile tab navigation
   const handleTouchStart = (e: TouchEvent<HTMLDivElement>) => {
     touchStartX.current = e.touches[0].clientX;
+    touchEndX.current = e.touches[0].clientX; // Initialize to same position
   };
 
   const handleTouchMove = (e: TouchEvent<HTMLDivElement>) => {
@@ -161,8 +162,17 @@ export function Layout({ children }: LayoutProps) {
   };
 
   const handleTouchEnd = () => {
+    // Skip if no actual movement occurred (prevents ghost navigations)
+    if (touchStartX.current === touchEndX.current) {
+      return;
+    }
+    
     const swipeThreshold = 50;
     const diff = touchStartX.current - touchEndX.current;
+    
+    // Reset touch values
+    touchStartX.current = 0;
+    touchEndX.current = 0;
     
     if (Math.abs(diff) < swipeThreshold) return;
     

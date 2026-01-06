@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.auto-reanalyze-supplement-facts]
 verify_jwt = false
+
+[functions.delete-category]
+verify_jwt = false

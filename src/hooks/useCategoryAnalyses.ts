@@ -14,10 +14,10 @@ export function useRecentCategories(limit: number = 20) {
   return useQuery({
     queryKey: ["recent_categories", limit],
     queryFn: async () => {
-      // Fetch categories
+      // Fetch categories with analysis metadata
       const { data: categories, error } = await supabase
         .from("categories")
-        .select("id, name, search_term, total_products, created_at, last_scanned")
+        .select("id, name, search_term, total_products, created_at, last_scanned, analysis_type, product_forms")
         .order("created_at", { ascending: false })
         .limit(limit);
 

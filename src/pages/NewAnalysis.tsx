@@ -243,12 +243,17 @@ export default function NewAnalysis() {
       displayCategoryName = category.trim();
     } else {
       // Category Search payload (existing behavior)
+      // Convert IDs to labels for display name
+      const formLabels = productForms.map(id => {
+        const form = productFormOptions.find(f => f.id === id);
+        return form ? form.label : id;
+      });
       payload = {
         category: category.trim(),
-        product_form: productForms,
+        product_form: productForms, // IDs like "gummy", "powder"
         amazon_categories: amazonCategories.length > 0 ? amazonCategories : null,
       };
-      displayCategoryName = `${category.trim()} ${productForms.join(" & ")}`;
+      displayCategoryName = `${category.trim()} ${formLabels.join(" & ")}`;
     }
 
     try {
@@ -333,36 +338,6 @@ export default function NewAnalysis() {
   const handleDuplicateClick = async (e: React.MouseEvent, cat: CategoryWithImages) => {
     e.stopPropagation();
     
-    // Detect if this was a Category Search by checking if name ends with known product forms
-    const productFormLabels = productFormOptions.map(p => p.label);
-    const nameWords = cat.name.split(' ');
-    const detectedForms: string[] = [];
-    
-    // Check for product forms at the end of the name (e.g., "Magnesium Glycinate Gummy & Capsule")
-    // Handle patterns like "Form1 & Form2" or just "Form1"
-    let baseCategoryName = cat.name;
-    
-    // Try to extract product forms from the end of the name
-    const formPattern = productFormLabels.join('|');
-    const multiFormRegex = new RegExp(`\\s+((?:${formPattern})(?:\\s*&\\s*(?:${formPattern}))*)$`, 'i');
-    const formMatch = cat.name.match(multiFormRegex);
-    
-    if (formMatch) {
-      const formPart = formMatch[1];
-      baseCategoryName = cat.name.replace(multiFormRegex, '').trim();
-      
-      // Parse individual forms from "Form1 & Form2 & Form3"
-      const formParts = formPart.split(/\s*&\s*/);
-      formParts.forEach(f => {
-        const matchedForm = productFormLabels.find(pf => pf.toLowerCase() === f.toLowerCase());
-        if (matchedForm) {
-          detectedForms.push(matchedForm);
-        }
-      });
-    }
-    
-    const isCategorySearch = detectedForms.length > 0;
-    
     // Create a copy name based on the full original name
     const originalName = cat.name;
     const copyBaseName = originalName.replace(/ \(Copy( \d+)?\)$/, '');
@@ -370,6 +345,7 @@ export default function NewAnalysis() {
     const existingCopies = uniqueCategories.filter(c => 
       copyPattern.test(c.name) || c.name === `${copyBaseName} (Copy)`
     );
+    const copySuffix = existingCopies.length === 0 ? ' (Copy)' : ` (Copy ${existingCopies.length + 1})`;
     
     setIsLoading(true);
     
@@ -377,17 +353,55 @@ export default function NewAnalysis() {
       let payload: Record<string, unknown>;
       let displayCategoryName: string;
       
-      if (isCategorySearch) {
-        // Category Search mode - use detected product forms
-        const newBaseName = baseCategoryName.replace(/ \(Copy( \d+)?\)$/, '');
-        const copySuffix = existingCopies.length === 0 ? ' (Copy)' : ` (Copy ${existingCopies.length + 1})`;
+      // Use stored analysis_type if available, otherwise detect from product forms in name
+      const storedAnalysisType = cat.analysis_type;
+      const storedProductForms = cat.product_forms;
+      
+      // Determine if this is a Category Search
+      let isCategorySearch = storedAnalysisType === 'category';
+      let productFormIds: string[] = storedProductForms || [];
+      
+      // Fallback detection if no stored analysis_type
+      if (!storedAnalysisType) {
+        // Try to detect from product forms in the category name
+        const productFormLabels = productFormOptions.map(p => p.label);
+        const formPattern = productFormLabels.join('|');
+        const multiFormRegex = new RegExp(`\\s+((?:${formPattern})(?:\\s*&\\s*(?:${formPattern}))*)$`, 'i');
+        const formMatch = cat.name.match(multiFormRegex);
+        
+        if (formMatch) {
+          isCategorySearch = true;
+          const formPart = formMatch[1];
+          const formParts = formPart.split(/\s*&\s*/);
+          formParts.forEach(f => {
+            const matchedForm = productFormOptions.find(pf => pf.label.toLowerCase() === f.toLowerCase());
+            if (matchedForm) {
+              productFormIds.push(matchedForm.id); // Use ID, not label
+            }
+          });
+        }
+      }
+      
+      if (isCategorySearch && productFormIds.length > 0) {
+        // Category Search mode
+        // Extract base category name without product forms
+        const productFormLabels = productFormOptions.map(p => p.label);
+        const formPattern = productFormLabels.join('|');
+        const multiFormRegex = new RegExp(`\\s+((?:${formPattern})(?:\\s*&\\s*(?:${formPattern}))*)$`, 'i');
+        const baseCategoryName = cat.name.replace(multiFormRegex, '').trim().replace(/ \(Copy( \d+)?\)$/, '');
+        
+        const newCategoryName = baseCategoryName + copySuffix;
+        const productFormLabelsForDisplay = productFormIds.map(id => {
+          const form = productFormOptions.find(f => f.id === id);
+          return form ? form.label : id;
+        });
         
         payload = {
-          category: newBaseName + copySuffix,
-          product_form: detectedForms,
+          category: newCategoryName,
+          product_form: productFormIds, // Use IDs (lowercase) as expected by webhook
           amazon_categories: cat.amazon_categories || null,
         };
-        displayCategoryName = `${newBaseName}${copySuffix} ${detectedForms.join(" & ")}`;
+        displayCategoryName = `${newCategoryName} ${productFormLabelsForDisplay.join(" & ")}`;
       } else {
         // Targeted Analysis mode - fetch ASINs from products table
         const { data: products } = await supabase
@@ -408,7 +422,6 @@ export default function NewAnalysis() {
           return;
         }
         
-        const copySuffix = existingCopies.length === 0 ? ' (Copy)' : ` (Copy ${existingCopies.length + 1})`;
         const newName = copyBaseName + copySuffix;
         
         payload = {
@@ -538,15 +551,15 @@ export default function NewAnalysis() {
               </Label>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {productFormOptions.map((option) => {
-                  const isSelected = productForms.includes(option.label);
+                  const isSelected = productForms.includes(option.id);
                   return (
                     <div
                       key={option.id}
                       onClick={() => {
                         if (isSelected) {
-                          setProductForms((prev) => prev.filter((f) => f !== option.label));
+                          setProductForms((prev) => prev.filter((f) => f !== option.id));
                         } else {
-                          setProductForms((prev) => [...prev, option.label]);
+                          setProductForms((prev) => [...prev, option.id]);
                         }
                       }}
                       className={`flex items-center justify-center gap-2 p-3 rounded-lg border cursor-pointer transition-all duration-200 active:scale-95 hover:-translate-y-0.5 ${

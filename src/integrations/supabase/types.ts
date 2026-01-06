@@ -17,11 +17,13 @@ export type Database = {
       categories: {
         Row: {
           amazon_categories: string[] | null
+          analysis_type: string | null
           category_id: string | null
           created_at: string | null
           id: string
           last_scanned: string | null
           name: string
+          product_forms: string[] | null
           run_number: number | null
           run_timestamp: string | null
           search_term: string | null
@@ -31,11 +33,13 @@ export type Database = {
         }
         Insert: {
           amazon_categories?: string[] | null
+          analysis_type?: string | null
           category_id?: string | null
           created_at?: string | null
           id?: string
           last_scanned?: string | null
           name: string
+          product_forms?: string[] | null
           run_number?: number | null
           run_timestamp?: string | null
           search_term?: string | null
@@ -45,11 +49,13 @@ export type Database = {
         }
         Update: {
           amazon_categories?: string[] | null
+          analysis_type?: string | null
           category_id?: string | null
           created_at?: string | null
           id?: string
           last_scanned?: string | null
           name?: string
+          product_forms?: string[] | null
           run_number?: number | null
           run_timestamp?: string | null
           search_term?: string | null

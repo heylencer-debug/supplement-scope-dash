@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.check-generation-status]
 verify_jwt = false
+
+[functions.analyze-supplement-facts]
+verify_jwt = false

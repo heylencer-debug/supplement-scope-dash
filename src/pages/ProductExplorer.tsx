@@ -1,6 +1,8 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { Search, Filter, Download, Star, TrendingUp, Loader2, Eye, ChevronDown, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Beaker } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -71,6 +73,8 @@ export default function ProductExplorer() {
   const [itemsPerPage, setItemsPerPage] = useState(25);
 
   const { currentCategoryId, categoryName: contextCategoryName, setCategoryContext } = useCategoryContext();
+  const queryClient = useQueryClient();
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
   
   // Use URL param or context as fallback
   const categoryName = urlCategoryName || contextCategoryName;
@@ -104,6 +108,34 @@ export default function ProductExplorer() {
   const { startBulkAnalysis, isAnalyzing: isBulkAnalyzing, progress: bulkProgress, resetProgress } = useBulkSupplementAnalysis(effectiveCategoryIdForAnalysis);
 
   const isLoading = productsLoading || categoriesLoading;
+
+  // Real-time subscription for product updates during bulk analysis
+  useEffect(() => {
+    const categoryIdForRealtime = currentCategoryId || categoryFromName?.id;
+    if (!categoryIdForRealtime) return;
+
+    const channel = supabase
+      .channel('product-explorer-realtime')
+      .on('postgres_changes', 
+        { event: 'UPDATE', schema: 'public', table: 'products' }, 
+        (payload) => {
+          // Only invalidate if the updated product belongs to current category
+          if ((payload.new as any).category_id === categoryIdForRealtime) {
+            // Debounce invalidation to prevent excessive refetches
+            if (debounceRef.current) clearTimeout(debounceRef.current);
+            debounceRef.current = setTimeout(() => {
+              queryClient.invalidateQueries({ queryKey: ['products', categoryIdForRealtime] });
+            }, 1000);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      supabase.removeChannel(channel);
+    };
+  }, [currentCategoryId, categoryFromName?.id, queryClient]);
 
   // Count products with low OCR confidence or missing amounts
   const lowConfidenceCount = useMemo(() => {

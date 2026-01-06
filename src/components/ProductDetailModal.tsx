@@ -1332,40 +1332,46 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
               )}
 
               {product.serving_size && <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Serving Size</CardTitle></CardHeader><CardContent><p className="text-sm">{product.serving_size}</p></CardContent></Card>}
-              {/* Low Confidence Warning Banner */}
-              {needsReanalysis && (
-                <Card className="border-yellow-500/30 bg-yellow-500/10">
-                  <CardContent className="pt-3 pb-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <AlertCircle className="w-4 h-4 text-yellow-600" />
-                        <span className="text-sm text-yellow-700">
-                          Some ingredient amounts may be missing due to incomplete label extraction.
+              {/* OCR Analysis Card - always show re-analyze button */}
+              <Card className={needsReanalysis ? "border-yellow-500/30 bg-yellow-500/10" : ""}>
+                <CardContent className="pt-3 pb-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {needsReanalysis ? (
+                        <>
+                          <AlertCircle className="w-4 h-4 text-yellow-600" />
+                          <span className="text-sm text-yellow-700">
+                            Some ingredient amounts may be missing due to incomplete label extraction.
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">
+                          OCR Confidence: <span className="font-medium text-foreground capitalize">{product.ocr_confidence || 'Unknown'}</span>
                         </span>
-                      </div>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={handleReanalyze}
-                        disabled={isAnalyzing}
-                        className="border-yellow-500/50 hover:bg-yellow-500/20"
-                      >
-                        {isAnalyzing ? (
-                          <>
-                            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                            Analyzing...
-                          </>
-                        ) : (
-                          <>
-                            <RefreshCw className="w-3 h-3 mr-1" />
-                            Re-analyze
-                          </>
-                        )}
-                      </Button>
+                      )}
                     </div>
-                  </CardContent>
-                </Card>
-              )}
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={handleReanalyze}
+                      disabled={isAnalyzing}
+                      className={needsReanalysis ? "border-yellow-500/50 hover:bg-yellow-500/20" : ""}
+                    >
+                      {isAnalyzing ? (
+                        <>
+                          <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                          Analyzing...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="w-3 h-3 mr-1" />
+                          Re-analyze
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
 
               {allNutrients && allNutrients.length > 0 && (() => {
                 const isGuaranteedAnalysis = supplementFacts?.panel_type === 'guaranteed_analysis';

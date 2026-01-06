@@ -90,9 +90,10 @@ interface ReviewAnalysis {
 
 interface Nutrient {
   name: string;
-  amount?: string;
-  daily_value?: string;
+  amount?: number | string;
+  daily_value_percent?: number | null;
   unit?: string;
+  per_serving?: boolean;
 }
 
 interface ProprietaryBlend {
@@ -1382,7 +1383,7 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                                 : (nutrient.unit ? `(${nutrient.unit})` : '—')
                               }
                             </td>
-                            <td className="text-right px-3 py-2 text-muted-foreground">{nutrient.daily_value ?? "-"}</td>
+                            <td className="text-right px-3 py-2 text-muted-foreground">{nutrient.daily_value_percent != null ? `${nutrient.daily_value_percent}%` : "—"}</td>
                           </tr>
                         ))}</tbody>
                       </table>

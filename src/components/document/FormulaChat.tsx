@@ -40,6 +40,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -328,6 +329,7 @@ export function FormulaChat({
   const [editContent, setEditContent] = useState("");
   const [showCompetitorData, setShowCompetitorData] = useState(false);
   const [generationProgress, setGenerationProgress] = useState<GenerationProgress | null>(null);
+  const [expandedPromptId, setExpandedPromptId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -1405,31 +1407,70 @@ export function FormulaChat({
                         <span>Generating tailored prompts...</span>
                       </div>
                     ) : (
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         {formulaPrompts.map((prompt) => {
                           const IconComponent = getPromptIcon(prompt.icon);
+                          const isExpanded = expandedPromptId === prompt.id;
+                          
+                          // Parse the prompt content to extract list items
+                          const lines = prompt.prompt_content.split('\n').filter(line => line.trim());
+                          const listItems = lines.filter(line => 
+                            line.trim().startsWith('-') || 
+                            line.trim().startsWith('•') ||
+                            /^\d+[\.\)]/.test(line.trim())
+                          ).map(line => line.replace(/^[-•\d\.\)]\s*/, '').trim());
+                          
                           return (
-                            <button
-                              key={prompt.id}
-                              className="w-full p-3 rounded-lg border border-border bg-card hover:bg-accent/50 transition-colors text-left group"
-                              onClick={() => {
-                                setInput(prompt.prompt_content);
-                                setTimeout(() => textareaRef.current?.focus(), 100);
-                              }}
-                            >
-                              <div className="flex items-start gap-3">
-                                <div className="p-2 rounded-md bg-primary/10 text-primary shrink-0">
-                                  <IconComponent className="w-4 h-4" />
+                            <div key={prompt.id} className="rounded-lg border border-border bg-card overflow-hidden">
+                              <button
+                                className="w-full p-3 hover:bg-accent/50 transition-colors text-left"
+                                onClick={() => setExpandedPromptId(isExpanded ? null : prompt.id)}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className="p-2 rounded-md bg-primary/10 text-primary shrink-0">
+                                    <IconComponent className="w-4 h-4" />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-medium text-sm text-foreground">{prompt.title}</p>
+                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                      {prompt.short_label}
+                                    </p>
+                                  </div>
+                                  <ChevronDown className={cn(
+                                    "w-4 h-4 text-muted-foreground transition-transform shrink-0",
+                                    isExpanded && "rotate-180"
+                                  )} />
                                 </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-medium text-sm text-foreground">{prompt.title}</p>
-                                  <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                                    {prompt.short_label}
-                                  </p>
+                              </button>
+                              
+                              {isExpanded && listItems.length > 0 && (
+                                <div className="border-t border-border bg-muted/30">
+                                  <div className="p-2 space-y-1">
+                                    {listItems.map((item, idx) => (
+                                      <button
+                                        key={idx}
+                                        className="w-full text-left px-3 py-2 rounded-md text-sm text-foreground hover:bg-accent transition-colors"
+                                        onClick={() => {
+                                          setInput(item);
+                                          setTimeout(() => textareaRef.current?.focus(), 100);
+                                        }}
+                                      >
+                                        {item}
+                                      </button>
+                                    ))}
+                                    <button
+                                      className="w-full text-left px-3 py-2 rounded-md text-sm text-primary hover:bg-accent transition-colors font-medium"
+                                      onClick={() => {
+                                        setInput(prompt.prompt_content);
+                                        setTimeout(() => textareaRef.current?.focus(), 100);
+                                      }}
+                                    >
+                                      Use full prompt →
+                                    </button>
+                                  </div>
                                 </div>
-                                <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-1" />
-                              </div>
-                            </button>
+                              )}
+                            </div>
                           );
                         })}
                       </div>

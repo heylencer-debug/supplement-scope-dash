@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface BulkAnalysisResult {
   success: boolean;
@@ -29,6 +30,7 @@ export function useBulkSupplementAnalysis(categoryId?: string) {
     currentProduct: null
   });
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Subscribe to progress updates
   useEffect(() => {
@@ -50,6 +52,8 @@ export function useBulkSupplementAnalysis(categoryId?: string) {
 
         if (data.status === "complete") {
           setIsAnalyzing(false);
+          // Invalidate products query to refresh data
+          queryClient.invalidateQueries({ queryKey: ["products", categoryId] });
           toast({
             title: "Bulk Analysis Complete",
             description: `Successfully analyzed ${data.success} products. ${data.failed} failed.`,
@@ -74,7 +78,7 @@ export function useBulkSupplementAnalysis(categoryId?: string) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [categoryId, toast]);
+  }, [categoryId, toast, queryClient]);
 
   const startBulkAnalysis = useCallback(async (targetCategoryId: string): Promise<BulkAnalysisResult | null> => {
     setIsAnalyzing(true);

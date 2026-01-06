@@ -1367,30 +1367,54 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                 </Card>
               )}
 
-              {allNutrients && allNutrients.length > 0 && (
-                <Card>
-                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Supplement Facts</CardTitle></CardHeader>
-                  <CardContent>
-                    <div className="border rounded-md overflow-hidden">
-                      <table className="w-full text-sm">
-                        <thead className="bg-muted"><tr><th className="text-left px-3 py-2 font-medium">Nutrient</th><th className="text-right px-3 py-2 font-medium">Amount</th><th className="text-right px-3 py-2 font-medium">% DV</th></tr></thead>
-                        <tbody>{allNutrients.map((nutrient, idx) => (
-                          <tr key={idx} className="border-t border-border">
-                            <td className="px-3 py-2">{nutrient.name}</td>
-                            <td className="text-right px-3 py-2 text-muted-foreground">
-                              {nutrient.amount != null && nutrient.amount !== '' 
-                                ? `${nutrient.amount}${nutrient.unit ?? ''}` 
-                                : (nutrient.unit ? `(${nutrient.unit})` : '—')
-                              }
-                            </td>
-                            <td className="text-right px-3 py-2 text-muted-foreground">{nutrient.daily_value_percent != null ? `${nutrient.daily_value_percent}%` : "—"}</td>
-                          </tr>
-                        ))}</tbody>
-                      </table>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+              {allNutrients && allNutrients.length > 0 && (() => {
+                const isGuaranteedAnalysis = supplementFacts?.panel_type === 'guaranteed_analysis';
+                return (
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium">
+                        {isGuaranteedAnalysis ? 'Guaranteed Analysis' : 'Supplement Facts'}
+                      </CardTitle>
+                      {isGuaranteedAnalysis && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Pet supplements use Guaranteed Analysis instead of % Daily Value.
+                        </p>
+                      )}
+                    </CardHeader>
+                    <CardContent>
+                      <div className="border rounded-md overflow-hidden">
+                        <table className="w-full text-sm">
+                          <thead className="bg-muted">
+                            <tr>
+                              <th className="text-left px-3 py-2 font-medium">Nutrient</th>
+                              <th className="text-right px-3 py-2 font-medium">Amount</th>
+                              {!isGuaranteedAnalysis && (
+                                <th className="text-right px-3 py-2 font-medium">% DV</th>
+                              )}
+                            </tr>
+                          </thead>
+                          <tbody>{allNutrients.map((nutrient, idx) => (
+                            <tr key={idx} className="border-t border-border">
+                              <td className="px-3 py-2">{nutrient.name}</td>
+                              <td className="text-right px-3 py-2 text-muted-foreground">
+                                {nutrient.amount != null && nutrient.amount !== '' 
+                                  ? `${nutrient.amount}${nutrient.unit ?? ''}` 
+                                  : (nutrient.unit ? `(${nutrient.unit})` : '—')
+                                }
+                              </td>
+                              {!isGuaranteedAnalysis && (
+                                <td className="text-right px-3 py-2 text-muted-foreground">
+                                  {nutrient.daily_value_percent != null ? `${nutrient.daily_value_percent}%` : "—"}
+                                </td>
+                              )}
+                            </tr>
+                          ))}</tbody>
+                        </table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })()}
               {proprietaryBlends && proprietaryBlends.length > 0 && (
                 <Card>
                   <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><AlertCircle className="w-4 h-4 text-yellow-500" />Proprietary Blends</CardTitle></CardHeader>

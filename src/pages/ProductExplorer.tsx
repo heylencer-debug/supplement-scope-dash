@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Search, Filter, Download, Star, TrendingUp, Loader2, Eye, ChevronDown, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Search, Filter, Download, Star, TrendingUp, Loader2, Eye, ChevronDown, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Beaker } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -21,11 +21,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useProducts, Product } from "@/hooks/useProducts";
 import { useCategories } from "@/hooks/useCategories";
 import { useCategoryContext } from "@/contexts/CategoryContext";
 import { useCategoryByName } from "@/hooks/useCategoryByName";
 import { useCategoryAnalysis } from "@/hooks/useCategoryAnalyses";
+import { useBulkSupplementAnalysis } from "@/hooks/useBulkSupplementAnalysis";
 import ProductDetailModal from "@/components/ProductDetailModal";
 import BenchmarkComparison from "@/components/dashboard/BenchmarkComparison";
 import ProductAnalysisPanel from "@/components/product/ProductAnalysisPanel";
@@ -92,8 +99,34 @@ export default function ProductExplorer() {
   const { data: products, isLoading: productsLoading } = useProducts(effectiveCategoryId);
   const { data: categories, isLoading: categoriesLoading } = useCategories();
   const { data: categoryAnalysis } = useCategoryAnalysis(currentCategoryId || categoryFromName?.id);
+  const { startBulkAnalysis, isAnalyzing: isBulkAnalyzing } = useBulkSupplementAnalysis();
 
   const isLoading = productsLoading || categoriesLoading;
+
+  // Count products with low OCR confidence or missing amounts
+  const lowConfidenceCount = useMemo(() => {
+    if (!products) return 0;
+    return products.filter(p => {
+      if (p.ocr_confidence === 'low') return true;
+      const nutrients = p.all_nutrients as Array<{ amount?: string | null }> | null;
+      if (nutrients && nutrients.some(n => n.amount == null || n.amount === '')) return true;
+      if (!nutrients || nutrients.length === 0) return true;
+      return false;
+    }).length;
+  }, [products]);
+
+  const handleBulkReanalyze = async () => {
+    const categoryIdToUse = currentCategoryId || categoryFromName?.id;
+    if (!categoryIdToUse) {
+      toast({
+        title: "No category selected",
+        description: "Please select a category first.",
+        variant: "destructive",
+      });
+      return;
+    }
+    await startBulkAnalysis(categoryIdToUse);
+  };
 
   // Sorting handler
   const handleSort = (field: SortField) => {
@@ -290,10 +323,33 @@ export default function ProductExplorer() {
               : "Browse and analyze products in detail"}
           </p>
         </div>
-        <Button variant="outline" className="gap-2">
-          <Download className="w-4 h-4" />
-          Export
-        </Button>
+        <div className="flex gap-2">
+          {(currentCategoryId || categoryFromName?.id) && lowConfidenceCount > 0 && (
+            <Button 
+              variant="outline" 
+              className="gap-2"
+              onClick={handleBulkReanalyze}
+              disabled={isBulkAnalyzing}
+            >
+              {isBulkAnalyzing ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Analyzing...
+                </>
+              ) : (
+                <>
+                  <Beaker className="w-4 h-4" />
+                  Re-analyze Formulas
+                  <Badge variant="secondary" className="ml-1">{lowConfidenceCount}</Badge>
+                </>
+              )}
+            </Button>
+          )}
+          <Button variant="outline" className="gap-2">
+            <Download className="w-4 h-4" />
+            Export
+          </Button>
+        </div>
       </div>
 
       <Card>

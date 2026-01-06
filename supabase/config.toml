@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.analyze-supplement-facts]
 verify_jwt = false
+
+[functions.bulk-analyze-supplement-facts]
+verify_jwt = false

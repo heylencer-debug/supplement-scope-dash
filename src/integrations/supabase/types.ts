@@ -682,6 +682,70 @@ export type Database = {
           },
         ]
       }
+      formula_prompts: {
+        Row: {
+          category_id: string
+          created_at: string | null
+          display_order: number | null
+          formula_version_id: string | null
+          icon: string | null
+          id: string
+          prompt_content: string
+          prompt_type: string
+          short_label: string
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          category_id: string
+          created_at?: string | null
+          display_order?: number | null
+          formula_version_id?: string | null
+          icon?: string | null
+          id?: string
+          prompt_content: string
+          prompt_type: string
+          short_label: string
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          category_id?: string
+          created_at?: string | null
+          display_order?: number | null
+          formula_version_id?: string | null
+          icon?: string | null
+          id?: string
+          prompt_content?: string
+          prompt_type?: string
+          short_label?: string
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "formula_prompts_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "formula_prompts_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "v_category_dashboard"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "formula_prompts_formula_version_id_fkey"
+            columns: ["formula_version_id"]
+            isOneToOne: false
+            referencedRelation: "formula_brief_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ingredient_analyses: {
         Row: {
           analysis: Json

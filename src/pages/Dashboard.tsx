@@ -23,6 +23,7 @@ import { PackagingIntelligence } from "@/components/dashboard/PackagingIntellige
 import { VersionBadge } from "@/components/dashboard/VersionBadge";
 import { VersionHistoryTimeline } from "@/components/dashboard/VersionHistoryTimeline";
 import { VersionComparisonView } from "@/components/dashboard/VersionComparisonView";
+import { LowConfidenceProducts } from "@/components/dashboard/LowConfidenceProducts";
 
 import {
   ResponsiveContainer,
@@ -680,7 +681,24 @@ export default function Dashboard() {
         </ScrollAnimate>
       ) : null}
 
-      {/* SECTION 5: Packaging Intelligence */}
+      {/* SECTION 5: Low Confidence Products */}
+      <ScrollAnimate delay={100} variant="fade-up" duration={500}>
+        <LowConfidenceProducts
+          products={products?.map(p => ({
+            id: p.id,
+            asin: p.asin,
+            title: p.title,
+            brand: p.brand,
+            main_image_url: p.main_image_url,
+            ocr_confidence: p.ocr_confidence,
+            nutrients_count: p.nutrients_count
+          }))}
+          categoryId={category?.id}
+          isLoading={productsLoading}
+        />
+      </ScrollAnimate>
+
+      {/* SECTION 6: Packaging Intelligence */}
       <ScrollAnimate delay={100} variant="fade-right" duration={600}>
         <PackagingIntelligence
           packagingData={(() => {

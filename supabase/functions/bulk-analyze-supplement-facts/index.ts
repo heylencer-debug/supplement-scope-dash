@@ -196,28 +196,35 @@ async function processBulkAnalysis(
 
   if (error || !products) {
     console.error("[bulk-analyze] Error fetching products:", error);
+    await broadcastProgress(supabase, categoryId, { status: "error", error: "Failed to fetch products" });
     return;
   }
 
   // Filter to only products needing re-analysis
   const productsToAnalyze = products.filter(p => {
-    // Low confidence
     if (p.ocr_confidence === 'low') return true;
-    
-    // Check for missing amounts in nutrients
     const nutrients = p.all_nutrients as Array<{ amount?: string | null }> | null;
     if (nutrients && nutrients.some(n => n.amount == null || n.amount === '')) return true;
-    
-    // No nutrients at all
     if (!nutrients || nutrients.length === 0) return true;
-    
     return false;
   });
 
-  console.log(`[bulk-analyze] Found ${productsToAnalyze.length} products needing analysis`);
+  const total = productsToAnalyze.length;
+  console.log(`[bulk-analyze] Found ${total} products needing analysis`);
 
+  let completed = 0;
   let successCount = 0;
   let failCount = 0;
+
+  // Broadcast initial status
+  await broadcastProgress(supabase, categoryId, {
+    status: "running",
+    total,
+    completed: 0,
+    success: 0,
+    failed: 0,
+    currentProduct: null
+  });
 
   for (const product of productsToAnalyze) {
     const allImages = [
@@ -227,12 +234,24 @@ async function processBulkAnalysis(
 
     if (allImages.length === 0) {
       console.log(`[bulk-analyze] Skipping ${product.asin}: no images`);
+      completed++;
       continue;
     }
+
+    // Broadcast current product being analyzed
+    await broadcastProgress(supabase, categoryId, {
+      status: "running",
+      total,
+      completed,
+      success: successCount,
+      failed: failCount,
+      currentProduct: product.title?.slice(0, 50) || product.asin
+    });
 
     console.log(`[bulk-analyze] Analyzing ${product.asin}...`);
     
     const result = await analyzeProduct(supabase, openrouterApiKey, product.id, allImages);
+    completed++;
     
     if (result.success) {
       successCount++;
@@ -242,11 +261,52 @@ async function processBulkAnalysis(
       console.error(`[bulk-analyze] ❌ ${product.asin}: ${result.error}`);
     }
 
+    // Broadcast progress update
+    await broadcastProgress(supabase, categoryId, {
+      status: "running",
+      total,
+      completed,
+      success: successCount,
+      failed: failCount,
+      currentProduct: null
+    });
+
     // Add delay between requests to avoid rate limiting
     await new Promise(resolve => setTimeout(resolve, 1000));
   }
 
+  // Broadcast completion
+  await broadcastProgress(supabase, categoryId, {
+    status: "complete",
+    total,
+    completed,
+    success: successCount,
+    failed: failCount,
+    currentProduct: null
+  });
+
   console.log(`[bulk-analyze] Complete: ${successCount} success, ${failCount} failed`);
+}
+
+async function broadcastProgress(supabase: any, categoryId: string, progress: {
+  status: "running" | "complete" | "error";
+  total?: number;
+  completed?: number;
+  success?: number;
+  failed?: number;
+  currentProduct?: string | null;
+  error?: string;
+}) {
+  try {
+    const channel = supabase.channel(`bulk-analysis-${categoryId}`);
+    await channel.send({
+      type: "broadcast",
+      event: "progress",
+      payload: { ...progress, categoryId, timestamp: Date.now() }
+    });
+  } catch (e) {
+    console.error("[bulk-analyze] Broadcast error:", e);
+  }
 }
 
 serve(async (req) => {

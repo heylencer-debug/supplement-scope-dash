@@ -69,7 +69,7 @@ Use the extract_supplement_facts tool to return your analysis.`;
         "X-Title": "Bulk Supplement Facts Extraction"
       },
       body: JSON.stringify({
-        model: "openai/gpt-4o",
+        model: "google/gemini-3-pro-preview",
         messages: [{ 
           role: "user", 
           content: [{ type: "text", text: prompt }, ...imageContent] 

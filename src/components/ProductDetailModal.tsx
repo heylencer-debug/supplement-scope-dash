@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -9,8 +10,9 @@ import {
   Star, TrendingUp, TrendingDown, AlertCircle, CheckCircle, Target, Users, Beaker, 
   Lightbulb, ShoppingCart, Package, Image, BarChart3, DollarSign, Calendar, 
   ExternalLink, Play, Award, Info, ChevronDown, Truck, FileText, Box, Link2, Tag,
-  Palette, Type, LayoutGrid, Sparkles
+  Palette, Type, LayoutGrid, Sparkles, RefreshCw, Loader2
 } from "lucide-react";
+import { useSupplementFactsAnalysis } from "@/hooks/useSupplementFactsAnalysis";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis } from "recharts";
 import type { Product } from "@/hooks/useProducts";
 
@@ -145,8 +147,27 @@ const SENTIMENT_COLORS = {
 
 export default function ProductDetailModal({ product, open, onOpenChange }: ProductDetailModalProps) {
   const [selectedImage, setSelectedImage] = useState(0);
+  const { analyzeProduct, isAnalyzing } = useSupplementFactsAnalysis();
 
   if (!product) return null;
+
+  // Check if amounts are missing (shows "-mg" pattern)
+  const hasMissingAmounts = (allNutrients: Nutrient[] | null) => {
+    if (!allNutrients || allNutrients.length === 0) return false;
+    return allNutrients.some(n => n.amount == null || n.amount === '');
+  };
+
+  const needsReanalysis = product.ocr_confidence === 'low' || 
+    product.extraction_notes?.toLowerCase().includes('truncated') ||
+    hasMissingAmounts(product.all_nutrients as unknown as Nutrient[] | null);
+
+  const handleReanalyze = async () => {
+    const result = await analyzeProduct(product.id);
+    if (result) {
+      // Close and reopen to refresh data (parent should refetch)
+      onOpenChange(false);
+    }
+  };
 
   const marketingAnalysis = product.marketing_analysis as MarketingAnalysis | null;
   const reviewAnalysis = product.review_analysis as ReviewAnalysis | null;
@@ -1310,6 +1331,41 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
               )}
 
               {product.serving_size && <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Serving Size</CardTitle></CardHeader><CardContent><p className="text-sm">{product.serving_size}</p></CardContent></Card>}
+              {/* Low Confidence Warning Banner */}
+              {needsReanalysis && (
+                <Card className="border-yellow-500/30 bg-yellow-500/10">
+                  <CardContent className="pt-3 pb-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 text-yellow-600" />
+                        <span className="text-sm text-yellow-700">
+                          Some ingredient amounts may be missing due to incomplete label extraction.
+                        </span>
+                      </div>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={handleReanalyze}
+                        disabled={isAnalyzing}
+                        className="border-yellow-500/50 hover:bg-yellow-500/20"
+                      >
+                        {isAnalyzing ? (
+                          <>
+                            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                            Analyzing...
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="w-3 h-3 mr-1" />
+                            Re-analyze
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {allNutrients && allNutrients.length > 0 && (
                 <Card>
                   <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Supplement Facts</CardTitle></CardHeader>
@@ -1317,7 +1373,18 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                     <div className="border rounded-md overflow-hidden">
                       <table className="w-full text-sm">
                         <thead className="bg-muted"><tr><th className="text-left px-3 py-2 font-medium">Nutrient</th><th className="text-right px-3 py-2 font-medium">Amount</th><th className="text-right px-3 py-2 font-medium">% DV</th></tr></thead>
-                        <tbody>{allNutrients.map((nutrient, idx) => <tr key={idx} className="border-t border-border"><td className="px-3 py-2">{nutrient.name}</td><td className="text-right px-3 py-2 text-muted-foreground">{nutrient.amount ?? "-"}{nutrient.unit ?? ""}</td><td className="text-right px-3 py-2 text-muted-foreground">{nutrient.daily_value ?? "-"}</td></tr>)}</tbody>
+                        <tbody>{allNutrients.map((nutrient, idx) => (
+                          <tr key={idx} className="border-t border-border">
+                            <td className="px-3 py-2">{nutrient.name}</td>
+                            <td className="text-right px-3 py-2 text-muted-foreground">
+                              {nutrient.amount != null && nutrient.amount !== '' 
+                                ? `${nutrient.amount}${nutrient.unit ?? ''}` 
+                                : (nutrient.unit ? `(${nutrient.unit})` : '—')
+                              }
+                            </td>
+                            <td className="text-right px-3 py-2 text-muted-foreground">{nutrient.daily_value ?? "-"}</td>
+                          </tr>
+                        ))}</tbody>
                       </table>
                     </div>
                   </CardContent>

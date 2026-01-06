@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, Loader2, FileText, Package, Search, Target, Upload, X, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowRight, Loader2, FileText, Package, Search, Target, Upload, X, Trash2, ChevronLeft, ChevronRight, ClipboardCopy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -335,6 +335,46 @@ export default function NewAnalysis() {
     }
   };
 
+  const handleCopyAsins = async (e: React.MouseEvent, categoryId: string) => {
+    e.stopPropagation();
+    
+    try {
+      const { data, error } = await supabase
+        .from("products")
+        .select("asin")
+        .eq("category_id", categoryId);
+      
+      if (error) throw error;
+      
+      const asins = data
+        .map(p => p.asin)
+        .filter((asin): asin is string => !!asin);
+      
+      if (asins.length === 0) {
+        toast({
+          title: "No ASINs found",
+          description: "This category has no products with ASINs.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      await navigator.clipboard.writeText(asins.join(", "));
+      
+      toast({
+        title: "ASINs copied!",
+        description: `${asins.length} ASIN${asins.length !== 1 ? 's' : ''} copied to clipboard.`,
+      });
+    } catch (error) {
+      console.error("Failed to copy ASINs:", error);
+      toast({
+        title: "Error",
+        description: "Failed to copy ASINs.",
+        variant: "destructive",
+      });
+    }
+  };
+
 
   const isFormValid = analysisMode === "category" 
     ? category.trim() && productForms.length > 0
@@ -598,6 +638,15 @@ export default function NewAnalysis() {
                   >
                     {/* Action Buttons */}
                     <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        className="h-7 w-7 bg-background/80 backdrop-blur-sm hover:bg-primary hover:text-primary-foreground"
+                        onClick={(e) => handleCopyAsins(e, cat.id)}
+                        title="Copy ASINs"
+                      >
+                        <ClipboardCopy className="h-3.5 w-3.5" />
+                      </Button>
                       <Button
                         variant="secondary"
                         size="icon"

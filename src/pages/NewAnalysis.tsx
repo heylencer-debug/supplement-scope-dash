@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, Loader2, FileText, Package, Search, Target, Upload, X, Trash2, Copy, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowRight, Loader2, FileText, Package, Search, Target, Upload, X, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -335,143 +335,6 @@ export default function NewAnalysis() {
     }
   };
 
-  const handleDuplicateClick = async (e: React.MouseEvent, cat: CategoryWithImages) => {
-    e.stopPropagation();
-    
-    // Create a copy name based on the full original name
-    const originalName = cat.name;
-    const copyBaseName = originalName.replace(/ \(Copy( \d+)?\)$/, '');
-    const copyPattern = new RegExp(`^${copyBaseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\(Copy( \\d+)?\\)$`);
-    const existingCopies = uniqueCategories.filter(c => 
-      copyPattern.test(c.name) || c.name === `${copyBaseName} (Copy)`
-    );
-    const copySuffix = existingCopies.length === 0 ? ' (Copy)' : ` (Copy ${existingCopies.length + 1})`;
-    
-    setIsLoading(true);
-    
-    try {
-      let payload: Record<string, unknown>;
-      let displayCategoryName: string;
-      
-      // Use stored analysis_type if available, otherwise detect from product forms in name
-      const storedAnalysisType = cat.analysis_type;
-      const storedProductForms = cat.product_forms;
-      
-      // Determine if this is a Category Search
-      let isCategorySearch = storedAnalysisType === 'category';
-      let productFormIds: string[] = storedProductForms || [];
-      
-      // Fallback detection if no stored analysis_type
-      if (!storedAnalysisType) {
-        // Try to detect from product forms in the category name
-        const productFormLabels = productFormOptions.map(p => p.label);
-        const formPattern = productFormLabels.join('|');
-        const multiFormRegex = new RegExp(`\\s+((?:${formPattern})(?:\\s*&\\s*(?:${formPattern}))*)$`, 'i');
-        const formMatch = cat.name.match(multiFormRegex);
-        
-        if (formMatch) {
-          isCategorySearch = true;
-          const formPart = formMatch[1];
-          const formParts = formPart.split(/\s*&\s*/);
-          formParts.forEach(f => {
-            const matchedForm = productFormOptions.find(pf => pf.label.toLowerCase() === f.toLowerCase());
-            if (matchedForm) {
-              productFormIds.push(matchedForm.id); // Use ID, not label
-            }
-          });
-        }
-      }
-      
-      if (isCategorySearch && productFormIds.length > 0) {
-        // Category Search mode
-        // Extract base category name without product forms
-        const productFormLabels = productFormOptions.map(p => p.label);
-        const formPattern = productFormLabels.join('|');
-        const multiFormRegex = new RegExp(`\\s+((?:${formPattern})(?:\\s*&\\s*(?:${formPattern}))*)$`, 'i');
-        const baseCategoryName = cat.name.replace(multiFormRegex, '').trim().replace(/ \(Copy( \d+)?\)$/, '');
-        
-        const newCategoryName = baseCategoryName + copySuffix;
-        const productFormLabelsForDisplay = productFormIds.map(id => {
-          const form = productFormOptions.find(f => f.id === id);
-          return form ? form.label : id;
-        });
-        
-        payload = {
-          category: newCategoryName,
-          product_form: productFormIds, // Use IDs (lowercase) as expected by webhook
-          amazon_categories: cat.amazon_categories || null,
-        };
-        displayCategoryName = `${newCategoryName} ${productFormLabelsForDisplay.join(" & ")}`;
-      } else {
-        // Targeted Analysis mode - fetch ASINs from products table
-        const { data: products } = await supabase
-          .from("products")
-          .select("asin")
-          .eq("category_id", cat.id)
-          .limit(100);
-        
-        const asins = products?.map(p => p.asin).filter(Boolean) || [];
-        
-        if (asins.length === 0) {
-          toast({
-            title: "Cannot duplicate",
-            description: "No products found for this category.",
-            variant: "destructive",
-          });
-          setIsLoading(false);
-          return;
-        }
-        
-        const newName = copyBaseName + copySuffix;
-        
-        payload = {
-          category: newName,
-          asins: asins,
-          amazon_categories: cat.amazon_categories || null,
-          ASIN: asins[0],
-        };
-        displayCategoryName = newName;
-      }
-
-      const response = await fetch(WEBHOOK_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Request failed with status ${response.status}`);
-      }
-
-      // Add to pending analyses
-      const pending = JSON.parse(localStorage.getItem(PENDING_ANALYSES_KEY) || '[]');
-      pending.push({ 
-        categoryName: displayCategoryName, 
-        startedAt: new Date().toISOString() 
-      });
-      localStorage.setItem(PENDING_ANALYSES_KEY, JSON.stringify(pending));
-      window.dispatchEvent(new Event('newAnalysisAdded'));
-
-      queryClient.invalidateQueries({ queryKey: ['category_analyses'] });
-      queryClient.invalidateQueries({ queryKey: ['recent_categories'] });
-
-      toast({
-        title: "Analysis started!",
-        description: `Duplicating "${cat.name}" as "${displayCategoryName}"`,
-      });
-
-      navigate(`/dashboard?category=${encodeURIComponent(displayCategoryName)}`);
-    } catch (error) {
-      console.error("Duplicate analysis failed:", error);
-      toast({
-        title: "Error",
-        description: "Failed to duplicate analysis. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const isFormValid = analysisMode === "category" 
     ? category.trim() && productForms.length > 0
@@ -735,16 +598,6 @@ export default function NewAnalysis() {
                   >
                     {/* Action Buttons */}
                     <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button
-                        variant="secondary"
-                        size="icon"
-                        className="h-7 w-7 bg-background/80 backdrop-blur-sm hover:bg-background"
-                        onClick={(e) => handleDuplicateClick(e, cat)}
-                        disabled={isLoading || deleteCategory.isPending}
-                        title="Duplicate analysis"
-                      >
-                        <Copy className="h-3.5 w-3.5" />
-                      </Button>
                       <Button
                         variant="secondary"
                         size="icon"

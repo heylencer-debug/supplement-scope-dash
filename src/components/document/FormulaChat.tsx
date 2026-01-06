@@ -60,6 +60,7 @@ import {
   OPTIMIZATION_CATEGORY,
   HARD_PROMPTS_CATEGORY,
 } from "@/constants/formulaPromptTemplates";
+import { usePromptHistory } from "@/hooks/usePromptHistory";
 
 interface FormulaChatProps {
   categoryId: string;
@@ -311,8 +312,9 @@ export function FormulaChat({
 
   const { createVersion, activeVersion, versions, setActiveVersion, deleteVersion, isCreatingVersion, isSettingActive, isDeletingVersion } = useFormulaBriefVersions(categoryId);
   const { conversation, addMessage, updateMessages, clearConversation, isLoading } = useFormulaConversation(categoryId, activeVersion?.id);
-
-  // Fetch competitor ingredient analysis data
+  const { history: promptHistory, savePromptUsage, updateResponseSummary } = usePromptHistory(categoryId);
+  const [showHistory, setShowHistory] = useState(false);
+  const lastPromptHistoryIdRef = useRef<string | null>(null);
   const { data: competitorData } = useQuery({
     queryKey: ["ingredient_analyses_full", categoryId],
     queryFn: async () => {
@@ -574,6 +576,16 @@ export function FormulaChat({
 
       await addMessage({ categoryId, message: assistantMessage, versionId: activeVersion?.id });
       setStreamingContent("");
+
+      // Update prompt history with response summary if we tracked a prompt usage
+      if (lastPromptHistoryIdRef.current && fullContent.length > 0) {
+        const summary = fullContent.slice(0, 150).replace(/\n/g, ' ').trim() + (fullContent.length > 150 ? '...' : '');
+        await updateResponseSummary({
+          historyId: lastPromptHistoryIdRef.current,
+          responseSummary: summary,
+        });
+        lastPromptHistoryIdRef.current = null;
+      }
 
     } catch (error) {
       console.error('Chat error:', error);
@@ -1405,9 +1417,18 @@ export function FormulaChat({
                           ))}
                           <button
                             className="w-full text-left px-3 py-2 rounded-md text-sm text-primary hover:bg-accent transition-colors font-medium mt-2 border-t border-border pt-3"
-                            onClick={() => {
+                            onClick={async () => {
                               setInput(FULL_OPTIMIZATION_PROMPT);
                               setExpandedOptimization(false);
+                              // Save to history when prompt is used
+                              const result = await savePromptUsage({
+                                categoryId,
+                                versionId: activeVersion?.id,
+                                promptId: "optimization",
+                                promptTitle: OPTIMIZATION_CATEGORY.title,
+                                promptContent: FULL_OPTIMIZATION_PROMPT,
+                              });
+                              lastPromptHistoryIdRef.current = result?.id || null;
                               setTimeout(() => textareaRef.current?.focus(), 100);
                             }}
                           >
@@ -1450,9 +1471,18 @@ export function FormulaChat({
                               <button
                                 key={prompt.id}
                                 className="w-full text-left px-3 py-2 rounded-md hover:bg-accent transition-colors flex items-start gap-2"
-                                onClick={() => {
+                                onClick={async () => {
                                   setInput(prompt.prompt);
                                   setExpandedHardPrompts(false);
+                                  // Save to history when prompt is used
+                                  const result = await savePromptUsage({
+                                    categoryId,
+                                    versionId: activeVersion?.id,
+                                    promptId: prompt.id,
+                                    promptTitle: prompt.title,
+                                    promptContent: prompt.prompt,
+                                  });
+                                  lastPromptHistoryIdRef.current = result?.id || null;
                                   setTimeout(() => textareaRef.current?.focus(), 100);
                                 }}
                               >
@@ -1468,6 +1498,62 @@ export function FormulaChat({
                       </div>
                     )}
                   </div>
+
+                  {/* Prompt History */}
+                  {promptHistory.length > 0 && (
+                    <div className="rounded-lg border border-border bg-card overflow-hidden mt-3">
+                      <button
+                        className="w-full p-3 hover:bg-accent/50 transition-colors text-left"
+                        onClick={() => setShowHistory(!showHistory)}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-md bg-muted text-muted-foreground shrink-0">
+                            <History className="w-4 h-4" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm text-foreground">Previous Evaluations</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {promptHistory.length} prompt{promptHistory.length !== 1 ? 's' : ''} used
+                            </p>
+                          </div>
+                          <ChevronDown className={cn(
+                            "w-4 h-4 text-muted-foreground transition-transform shrink-0",
+                            showHistory && "rotate-180"
+                          )} />
+                        </div>
+                      </button>
+                      
+                      {showHistory && (
+                        <div className="border-t border-border bg-muted/30 max-h-[200px] overflow-y-auto">
+                          <div className="p-2 space-y-1">
+                            {promptHistory.slice(0, 10).map((entry) => (
+                              <button
+                                key={entry.id}
+                                className="w-full text-left px-3 py-2 rounded-md hover:bg-accent transition-colors"
+                                onClick={() => {
+                                  setInput(entry.prompt_content);
+                                  setShowHistory(false);
+                                  setTimeout(() => textareaRef.current?.focus(), 100);
+                                }}
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <p className="text-sm font-medium text-foreground truncate">{entry.prompt_title}</p>
+                                  <span className="text-[10px] text-muted-foreground shrink-0">
+                                    {new Date(entry.created_at).toLocaleDateString()}
+                                  </span>
+                                </div>
+                                {entry.response_summary && (
+                                  <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                                    {entry.response_summary}
+                                  </p>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

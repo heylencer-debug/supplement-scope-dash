@@ -14,6 +14,7 @@ import { useRecentCategories, CategoryWithImages } from "@/hooks/useCategoryAnal
 import { useDeleteCategory } from "@/hooks/useDeleteCategory";
 import { formatDistanceToNow } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -332,25 +333,92 @@ export default function NewAnalysis() {
   const handleDuplicateClick = async (e: React.MouseEvent, cat: CategoryWithImages) => {
     e.stopPropagation();
     
-    // Create a copy name
-    const baseName = cat.name.replace(/ \(Copy( \d+)?\)$/, '');
-    const copyPattern = new RegExp(`^${baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\(Copy( \\d+)?\\)$`);
-    const existingCopies = uniqueCategories.filter(c => 
-      copyPattern.test(c.name) || c.name === `${baseName} (Copy)`
-    );
+    // Detect if this was a Category Search by checking if name ends with known product forms
+    const productFormLabels = productFormOptions.map(p => p.label);
+    const nameWords = cat.name.split(' ');
+    const detectedForms: string[] = [];
     
-    const newName = existingCopies.length === 0 
-      ? `${baseName} (Copy)` 
-      : `${baseName} (Copy ${existingCopies.length + 1})`;
+    // Check for product forms at the end of the name (e.g., "Magnesium Glycinate Gummy & Capsule")
+    // Handle patterns like "Form1 & Form2" or just "Form1"
+    let baseCategoryName = cat.name;
+    
+    // Try to extract product forms from the end of the name
+    const formPattern = productFormLabels.join('|');
+    const multiFormRegex = new RegExp(`\\s+((?:${formPattern})(?:\\s*&\\s*(?:${formPattern}))*)$`, 'i');
+    const formMatch = cat.name.match(multiFormRegex);
+    
+    if (formMatch) {
+      const formPart = formMatch[1];
+      baseCategoryName = cat.name.replace(multiFormRegex, '').trim();
+      
+      // Parse individual forms from "Form1 & Form2 & Form3"
+      const formParts = formPart.split(/\s*&\s*/);
+      formParts.forEach(f => {
+        const matchedForm = productFormLabels.find(pf => pf.toLowerCase() === f.toLowerCase());
+        if (matchedForm) {
+          detectedForms.push(matchedForm);
+        }
+      });
+    }
+    
+    const isCategorySearch = detectedForms.length > 0;
+    
+    // Create a copy name based on the full original name
+    const originalName = cat.name;
+    const copyBaseName = originalName.replace(/ \(Copy( \d+)?\)$/, '');
+    const copyPattern = new RegExp(`^${copyBaseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\(Copy( \\d+)?\\)$`);
+    const existingCopies = uniqueCategories.filter(c => 
+      copyPattern.test(c.name) || c.name === `${copyBaseName} (Copy)`
+    );
     
     setIsLoading(true);
     
     try {
-      const payload = {
-        category: newName,
-        amazon_categories: cat.amazon_categories || null,
-        search_term: cat.search_term || cat.name,
-      };
+      let payload: Record<string, unknown>;
+      let displayCategoryName: string;
+      
+      if (isCategorySearch) {
+        // Category Search mode - use detected product forms
+        const newBaseName = baseCategoryName.replace(/ \(Copy( \d+)?\)$/, '');
+        const copySuffix = existingCopies.length === 0 ? ' (Copy)' : ` (Copy ${existingCopies.length + 1})`;
+        
+        payload = {
+          category: newBaseName + copySuffix,
+          product_form: detectedForms,
+          amazon_categories: cat.amazon_categories || null,
+        };
+        displayCategoryName = `${newBaseName}${copySuffix} ${detectedForms.join(" & ")}`;
+      } else {
+        // Targeted Analysis mode - fetch ASINs from products table
+        const { data: products } = await supabase
+          .from("products")
+          .select("asin")
+          .eq("category_id", cat.id)
+          .limit(100);
+        
+        const asins = products?.map(p => p.asin).filter(Boolean) || [];
+        
+        if (asins.length === 0) {
+          toast({
+            title: "Cannot duplicate",
+            description: "No products found for this category.",
+            variant: "destructive",
+          });
+          setIsLoading(false);
+          return;
+        }
+        
+        const copySuffix = existingCopies.length === 0 ? ' (Copy)' : ` (Copy ${existingCopies.length + 1})`;
+        const newName = copyBaseName + copySuffix;
+        
+        payload = {
+          category: newName,
+          asins: asins,
+          amazon_categories: cat.amazon_categories || null,
+          ASIN: asins[0],
+        };
+        displayCategoryName = newName;
+      }
 
       const response = await fetch(WEBHOOK_URL, {
         method: "POST",
@@ -365,7 +433,7 @@ export default function NewAnalysis() {
       // Add to pending analyses
       const pending = JSON.parse(localStorage.getItem(PENDING_ANALYSES_KEY) || '[]');
       pending.push({ 
-        categoryName: newName, 
+        categoryName: displayCategoryName, 
         startedAt: new Date().toISOString() 
       });
       localStorage.setItem(PENDING_ANALYSES_KEY, JSON.stringify(pending));
@@ -376,10 +444,10 @@ export default function NewAnalysis() {
 
       toast({
         title: "Analysis started!",
-        description: `Duplicating "${cat.name}" as "${newName}"`,
+        description: `Duplicating "${cat.name}" as "${displayCategoryName}"`,
       });
 
-      navigate(`/dashboard?category=${encodeURIComponent(newName)}`);
+      navigate(`/dashboard?category=${encodeURIComponent(displayCategoryName)}`);
     } catch (error) {
       console.error("Duplicate analysis failed:", error);
       toast({

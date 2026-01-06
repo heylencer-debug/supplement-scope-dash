@@ -11,7 +11,8 @@ import {
   Eye, 
   EyeOff, 
   MessageSquare, 
-  ChevronDown, 
+  ChevronDown,
+  ChevronRight,
   ChevronUp, 
   Copy, 
   Check,
@@ -1404,24 +1405,31 @@ export function FormulaChat({
                         <span>Generating tailored prompts...</span>
                       </div>
                     ) : (
-                      <div className="flex flex-wrap gap-2 justify-center">
+                      <div className="space-y-2">
                         {formulaPrompts.map((prompt) => {
                           const IconComponent = getPromptIcon(prompt.icon);
                           return (
-                            <Button
+                            <button
                               key={prompt.id}
-                              variant="outline"
-                              size="sm"
-                              className="gap-2 text-xs h-8"
+                              className="w-full p-3 rounded-lg border border-border bg-card hover:bg-accent/50 transition-colors text-left group"
                               onClick={() => {
                                 setInput(prompt.prompt_content);
-                                // Focus the textarea
                                 setTimeout(() => textareaRef.current?.focus(), 100);
                               }}
                             >
-                              <IconComponent className="w-3.5 h-3.5" />
-                              {prompt.short_label}
-                            </Button>
+                              <div className="flex items-start gap-3">
+                                <div className="p-2 rounded-md bg-primary/10 text-primary shrink-0">
+                                  <IconComponent className="w-4 h-4" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-sm text-foreground">{prompt.title}</p>
+                                  <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                                    {prompt.short_label}
+                                  </p>
+                                </div>
+                                <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-1" />
+                              </div>
+                            </button>
                           );
                         })}
                       </div>

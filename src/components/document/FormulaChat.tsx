@@ -19,7 +19,14 @@ import {
   Pencil,
   History,
   Database,
-  FlaskConical
+  FlaskConical,
+  ShieldAlert,
+  Stethoscope,
+  DollarSign,
+  Clock,
+  Star,
+  Minimize2,
+  Zap
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -27,6 +34,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { useFormulaConversation, Message } from "@/hooks/useFormulaConversation";
 import { useFormulaBriefVersions } from "@/hooks/useFormulaBriefVersions";
+import { useFormulaPrompts, FormulaPrompt } from "@/hooks/useFormulaPrompts";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import ReactMarkdown from "react-markdown";
@@ -52,6 +60,30 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+
+// Helper function to get icon component for formula prompts
+function getPromptIcon(iconName: string | null) {
+  switch (iconName) {
+    case "flask":
+      return FlaskConical;
+    case "shield-alert":
+      return ShieldAlert;
+    case "stethoscope":
+      return Stethoscope;
+    case "dollar-sign":
+      return DollarSign;
+    case "clock":
+      return Clock;
+    case "star":
+      return Star;
+    case "minimize-2":
+      return Minimize2;
+    case "zap":
+      return Zap;
+    default:
+      return Sparkles;
+  }
+}
 
 interface FormulaChatProps {
   categoryId: string;
@@ -301,6 +333,14 @@ export function FormulaChat({
 
   const { createVersion, activeVersion, versions, setActiveVersion, deleteVersion, isCreatingVersion, isSettingActive, isDeletingVersion } = useFormulaBriefVersions(categoryId);
   const { conversation, addMessage, updateMessages, clearConversation, isLoading } = useFormulaConversation(categoryId, activeVersion?.id);
+  const { prompts: formulaPrompts, isLoading: isLoadingPrompts, isGenerating: isGeneratingPrompts, generatePrompts } = useFormulaPrompts(categoryId, activeVersion?.id);
+
+  // Generate prompts on first chat open if none exist
+  useEffect(() => {
+    if (categoryId && currentFormula && !isLoadingPrompts && formulaPrompts.length === 0 && !isGeneratingPrompts) {
+      generatePrompts(currentFormula);
+    }
+  }, [categoryId, currentFormula, isLoadingPrompts, formulaPrompts.length, isGeneratingPrompts]);
 
   // Fetch competitor ingredient analysis data
   const { data: competitorData } = useQuery({
@@ -1342,15 +1382,52 @@ export function FormulaChat({
         <ScrollArea className="flex-1 p-4" ref={scrollRef}>
           <div className="space-y-4">
             {messages.length === 0 && !isStreaming && (
-              <div className="text-center py-8">
+              <div className="text-center py-6">
                 <Bot className="w-12 h-12 mx-auto text-muted-foreground/50 mb-3" />
                 <h4 className="font-medium text-foreground mb-1">Formula AI Assistant</h4>
-                <p className="text-sm text-muted-foreground max-w-[280px] mx-auto">
+                <p className="text-sm text-muted-foreground max-w-[280px] mx-auto mb-4">
                   {activeVersion 
                     ? `Continue refining Version ${activeVersion.version_number}. Discuss changes and generate new versions.`
                     : "Discuss modifications to your formula. When ready, click \"Modify Formula Now\" to generate the updated version."
                   }
                 </p>
+                
+                {/* Quick Evaluation Prompts */}
+                {(isGeneratingPrompts || formulaPrompts.length > 0) && (
+                  <div className="border-t border-border pt-4 mt-2">
+                    <p className="text-xs text-muted-foreground mb-3 uppercase tracking-wider font-medium">
+                      Quick Evaluations
+                    </p>
+                    {isGeneratingPrompts ? (
+                      <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Generating tailored prompts...</span>
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-2 justify-center">
+                        {formulaPrompts.map((prompt) => {
+                          const IconComponent = getPromptIcon(prompt.icon);
+                          return (
+                            <Button
+                              key={prompt.id}
+                              variant="outline"
+                              size="sm"
+                              className="gap-2 text-xs h-8"
+                              onClick={() => {
+                                setInput(prompt.prompt_content);
+                                // Focus the textarea
+                                setTimeout(() => textareaRef.current?.focus(), 100);
+                              }}
+                            >
+                              <IconComponent className="w-3.5 h-3.5" />
+                              {prompt.short_label}
+                            </Button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 

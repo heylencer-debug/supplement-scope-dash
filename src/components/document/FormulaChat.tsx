@@ -2,17 +2,16 @@ import { useState, useRef, useEffect } from "react";
 import { 
   Send, 
   Bot, 
-  User, 
+  User,
   Loader2, 
   Sparkles, 
-  X, 
+  X,
   Trash2, 
   Wand2, 
   Eye, 
   EyeOff, 
-  MessageSquare, 
+  MessageSquare,
   ChevronDown,
-  ChevronRight,
   ChevronUp, 
   Copy, 
   Check,
@@ -20,14 +19,7 @@ import {
   Pencil,
   History,
   Database,
-  FlaskConical,
-  ShieldAlert,
-  Stethoscope,
-  DollarSign,
-  Clock,
-  Star,
-  Minimize2,
-  Zap
+  FlaskConical
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -35,7 +27,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { useFormulaConversation, Message } from "@/hooks/useFormulaConversation";
 import { useFormulaBriefVersions } from "@/hooks/useFormulaBriefVersions";
-import { useFormulaPrompts, FormulaPrompt } from "@/hooks/useFormulaPrompts";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import ReactMarkdown from "react-markdown";
@@ -62,30 +53,13 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-
-// Helper function to get icon component for formula prompts
-function getPromptIcon(iconName: string | null) {
-  switch (iconName) {
-    case "flask":
-      return FlaskConical;
-    case "shield-alert":
-      return ShieldAlert;
-    case "stethoscope":
-      return Stethoscope;
-    case "dollar-sign":
-      return DollarSign;
-    case "clock":
-      return Clock;
-    case "star":
-      return Star;
-    case "minimize-2":
-      return Minimize2;
-    case "zap":
-      return Zap;
-    default:
-      return Sparkles;
-  }
-}
+import {
+  OPTIMIZATION_STEPS,
+  FULL_OPTIMIZATION_PROMPT,
+  HARD_PROMPTS,
+  OPTIMIZATION_CATEGORY,
+  HARD_PROMPTS_CATEGORY,
+} from "@/constants/formulaPromptTemplates";
 
 interface FormulaChatProps {
   categoryId: string;
@@ -329,21 +303,14 @@ export function FormulaChat({
   const [editContent, setEditContent] = useState("");
   const [showCompetitorData, setShowCompetitorData] = useState(false);
   const [generationProgress, setGenerationProgress] = useState<GenerationProgress | null>(null);
-  const [expandedPromptId, setExpandedPromptId] = useState<string | null>(null);
+  const [expandedOptimization, setExpandedOptimization] = useState(false);
+  const [expandedHardPrompts, setExpandedHardPrompts] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const { createVersion, activeVersion, versions, setActiveVersion, deleteVersion, isCreatingVersion, isSettingActive, isDeletingVersion } = useFormulaBriefVersions(categoryId);
   const { conversation, addMessage, updateMessages, clearConversation, isLoading } = useFormulaConversation(categoryId, activeVersion?.id);
-  const { prompts: formulaPrompts, isLoading: isLoadingPrompts, isGenerating: isGeneratingPrompts, generatePrompts } = useFormulaPrompts(categoryId, activeVersion?.id);
-
-  // Generate prompts on first chat open if none exist
-  useEffect(() => {
-    if (categoryId && currentFormula && !isLoadingPrompts && formulaPrompts.length === 0 && !isGeneratingPrompts) {
-      generatePrompts(currentFormula);
-    }
-  }, [categoryId, currentFormula, isLoadingPrompts, formulaPrompts.length, isGeneratingPrompts]);
 
   // Fetch competitor ingredient analysis data
   const { data: competitorData } = useQuery({
@@ -1395,88 +1362,113 @@ export function FormulaChat({
                   }
                 </p>
                 
-                {/* Quick Evaluation Prompts */}
-                {(isGeneratingPrompts || formulaPrompts.length > 0) && (
-                  <div className="border-t border-border pt-4 mt-2">
-                    <p className="text-xs text-muted-foreground mb-3 uppercase tracking-wider font-medium">
-                      Quick Evaluations
-                    </p>
-                    {isGeneratingPrompts ? (
-                      <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Generating tailored prompts...</span>
+                {/* Predefined Evaluation Prompts */}
+                <div className="border-t border-border pt-4 mt-2 space-y-3">
+                  <p className="text-xs text-muted-foreground mb-3 uppercase tracking-wider font-medium">
+                    Quick Evaluations
+                  </p>
+                  
+                  {/* Optimization Category */}
+                  <div className="rounded-lg border border-border bg-card overflow-hidden">
+                    <button
+                      className="w-full p-3 hover:bg-accent/50 transition-colors text-left"
+                      onClick={() => setExpandedOptimization(!expandedOptimization)}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-md bg-primary/10 text-primary shrink-0">
+                          <FlaskConical className="w-4 h-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm text-foreground">{OPTIMIZATION_CATEGORY.title}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {OPTIMIZATION_CATEGORY.description}
+                          </p>
+                        </div>
+                        <ChevronDown className={cn(
+                          "w-4 h-4 text-muted-foreground transition-transform shrink-0",
+                          expandedOptimization && "rotate-180"
+                        )} />
                       </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {formulaPrompts.map((prompt) => {
-                          const IconComponent = getPromptIcon(prompt.icon);
-                          const isExpanded = expandedPromptId === prompt.id;
-                          
-                          // Parse the prompt content to extract list items
-                          const lines = prompt.prompt_content.split('\n').filter(line => line.trim());
-                          const listItems = lines.filter(line => 
-                            line.trim().startsWith('-') || 
-                            line.trim().startsWith('•') ||
-                            /^\d+[\.\)]/.test(line.trim())
-                          ).map(line => line.replace(/^[-•\d\.\)]\s*/, '').trim());
-                          
-                          return (
-                            <div key={prompt.id} className="rounded-lg border border-border bg-card overflow-hidden">
-                              <button
-                                className="w-full p-3 hover:bg-accent/50 transition-colors text-left"
-                                onClick={() => setExpandedPromptId(isExpanded ? null : prompt.id)}
-                              >
-                                <div className="flex items-center gap-3">
-                                  <div className="p-2 rounded-md bg-primary/10 text-primary shrink-0">
-                                    <IconComponent className="w-4 h-4" />
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <p className="font-medium text-sm text-foreground">{prompt.title}</p>
-                                    <p className="text-xs text-muted-foreground mt-0.5">
-                                      {prompt.short_label}
-                                    </p>
-                                  </div>
-                                  <ChevronDown className={cn(
-                                    "w-4 h-4 text-muted-foreground transition-transform shrink-0",
-                                    isExpanded && "rotate-180"
-                                  )} />
-                                </div>
-                              </button>
-                              
-                              {isExpanded && listItems.length > 0 && (
-                                <div className="border-t border-border bg-muted/30">
-                                  <div className="p-2 space-y-1">
-                                    {listItems.map((item, idx) => (
-                                      <button
-                                        key={idx}
-                                        className="w-full text-left px-3 py-2 rounded-md text-sm text-foreground hover:bg-accent transition-colors"
-                                        onClick={() => {
-                                          setInput(item);
-                                          setTimeout(() => textareaRef.current?.focus(), 100);
-                                        }}
-                                      >
-                                        {item}
-                                      </button>
-                                    ))}
-                                    <button
-                                      className="w-full text-left px-3 py-2 rounded-md text-sm text-primary hover:bg-accent transition-colors font-medium"
-                                      onClick={() => {
-                                        setInput(prompt.prompt_content);
-                                        setTimeout(() => textareaRef.current?.focus(), 100);
-                                      }}
-                                    >
-                                      Use full prompt →
-                                    </button>
-                                  </div>
-                                </div>
-                              )}
+                    </button>
+                    
+                    {expandedOptimization && (
+                      <div className="border-t border-border bg-muted/30">
+                        <div className="p-2 space-y-1">
+                          {OPTIMIZATION_STEPS.map((step) => (
+                            <div
+                              key={step.id}
+                              className="px-3 py-2 rounded-md text-sm"
+                            >
+                              <span className="font-medium text-foreground">{step.title}</span>
+                              <p className="text-xs text-muted-foreground mt-0.5">{step.description}</p>
                             </div>
-                          );
-                        })}
+                          ))}
+                          <button
+                            className="w-full text-left px-3 py-2 rounded-md text-sm text-primary hover:bg-accent transition-colors font-medium mt-2 border-t border-border pt-3"
+                            onClick={() => {
+                              setInput(FULL_OPTIMIZATION_PROMPT);
+                              setExpandedOptimization(false);
+                              setTimeout(() => textareaRef.current?.focus(), 100);
+                            }}
+                          >
+                            ✨ Run Full Optimization Analysis →
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
-                )}
+
+                  {/* Hard Prompts Category */}
+                  <div className="rounded-lg border border-border bg-card overflow-hidden">
+                    <button
+                      className="w-full p-3 hover:bg-accent/50 transition-colors text-left"
+                      onClick={() => setExpandedHardPrompts(!expandedHardPrompts)}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-md bg-destructive/10 text-destructive shrink-0">
+                          <HARD_PROMPTS_CATEGORY.icon className="w-4 h-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm text-foreground">{HARD_PROMPTS_CATEGORY.title}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {HARD_PROMPTS_CATEGORY.description}
+                          </p>
+                        </div>
+                        <ChevronDown className={cn(
+                          "w-4 h-4 text-muted-foreground transition-transform shrink-0",
+                          expandedHardPrompts && "rotate-180"
+                        )} />
+                      </div>
+                    </button>
+                    
+                    {expandedHardPrompts && (
+                      <div className="border-t border-border bg-muted/30">
+                        <div className="p-2 space-y-1">
+                          {HARD_PROMPTS.map((prompt) => {
+                            const IconComponent = prompt.icon;
+                            return (
+                              <button
+                                key={prompt.id}
+                                className="w-full text-left px-3 py-2 rounded-md hover:bg-accent transition-colors flex items-start gap-2"
+                                onClick={() => {
+                                  setInput(prompt.prompt);
+                                  setExpandedHardPrompts(false);
+                                  setTimeout(() => textareaRef.current?.focus(), 100);
+                                }}
+                              >
+                                <IconComponent className="w-4 h-4 mt-0.5 text-destructive shrink-0" />
+                                <div>
+                                  <p className="text-sm font-medium text-foreground">{prompt.title}</p>
+                                  <p className="text-xs text-muted-foreground">{prompt.description}</p>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
 

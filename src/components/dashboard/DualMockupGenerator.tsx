@@ -47,7 +47,10 @@ import {
 } from "@/components/ui/collapsible";
 import { MockupImages } from "@/hooks/usePackagingAnalysis";
 import { useMockupHistory } from "@/hooks/useMockupHistory";
+import { useFlatLayoutHistory } from "@/hooks/useFlatLayoutHistory";
 import { MockupHistoryGallery } from "@/components/dashboard/MockupHistoryGallery";
+import { FlatLayoutHistoryGallery } from "@/components/dashboard/FlatLayoutHistoryGallery";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface SuggestedTone {
   primary_tone: string;
@@ -324,6 +327,18 @@ function MockupCard({
     formulaVersionId 
   });
   
+  // Flat layout history
+  const {
+    history: flatHistory,
+    isLoading: isFlatHistoryLoading,
+    saveFlatLayoutToHistory,
+    deleteFlatLayoutFromHistory
+  } = useFlatLayoutHistory({
+    categoryId,
+    strategyType,
+    formulaVersionId
+  });
+  
   // Handler for restoring mockup from history
   const handleRestoreMockup = async (imageUrl: string) => {
     setGeneratedMockup(imageUrl);
@@ -331,6 +346,16 @@ function MockupCard({
     toast({
       title: 'Mockup Restored',
       description: 'Previous mockup has been restored as the current one.',
+    });
+  };
+  
+  // Handler for restoring flat layout from history
+  const handleRestoreFlatLayout = (imageUrl: string) => {
+    setFlatLayoutUrl(imageUrl);
+    setIsFlatModalOpen(true);
+    toast({
+      title: 'Flat Layout Restored',
+      description: 'Previous flat layout has been restored.',
     });
   };
   
@@ -544,6 +569,19 @@ function MockupCard({
       if (data?.imageUrl) {
         setFlatLayoutUrl(data.imageUrl);
         setIsFlatModalOpen(true);
+        
+        // Save to history
+        if (categoryId) {
+          await saveFlatLayoutToHistory(
+            data.imageUrl,
+            selectedFormat,
+            {
+              colors: { primary: editedPrimaryColor, secondary: editedSecondaryColor, accent: editedAccentColor },
+              layout_mode: flatLayoutMode
+            }
+          );
+        }
+        
         toast({
           title: 'Flat Layout Generated!',
           description: 'Print-ready layout is ready for download.',
@@ -952,6 +990,16 @@ function MockupCard({
           onDelete={deleteMockupFromHistory}
         />
       )}
+      
+      {/* Flat Layout History Gallery */}
+      {categoryId && (
+        <FlatLayoutHistoryGallery
+          history={flatHistory}
+          isLoading={isFlatHistoryLoading}
+          onRestore={handleRestoreFlatLayout}
+          onDelete={deleteFlatLayoutFromHistory}
+        />
+      )}
 
       {/* Full Image Modal */}
       <Dialog open={isImageModalOpen} onOpenChange={setIsImageModalOpen}>
@@ -982,35 +1030,101 @@ function MockupCard({
         </DialogContent>
       </Dialog>
 
-      {/* Flat Layout Modal */}
+      {/* Flat Layout Modal with Tabs */}
       <Dialog open={isFlatModalOpen} onOpenChange={setIsFlatModalOpen}>
-        <DialogContent className="max-w-5xl w-full p-0 overflow-hidden">
+        <DialogContent className="max-w-5xl w-full p-0 overflow-hidden max-h-[90vh]">
           <DialogHeader className="p-4 pb-2">
             <DialogTitle className="flex items-center gap-2">
               <LayoutGrid className={cn("w-5 h-5", isLeaders ? "text-blue-600" : "text-orange-600")} />
-              {title} Flat Layout - Print Ready
+              {title} Flat Layout
             </DialogTitle>
           </DialogHeader>
-          <div className="p-4 pt-0">
-            {flatLayoutUrl && (
-              <div className="relative">
-                <img 
-                  src={flatLayoutUrl} 
-                  alt={`${title} Flat Layout - Print Ready`}
-                  className="w-full h-auto rounded-lg shadow-lg bg-muted"
-                />
-                <div className="absolute bottom-4 right-4 flex gap-2">
-                  <Button size="sm" variant="secondary" onClick={downloadFlatLayout} className="gap-1.5 shadow-lg">
-                    <Download className="w-4 h-4" />
-                    Download for Photoshop
-                  </Button>
+          
+          <Tabs defaultValue="preview" className="w-full">
+            <div className="px-4">
+              <TabsList className="grid w-full grid-cols-2 h-9">
+                <TabsTrigger value="preview" className="text-xs">Preview</TabsTrigger>
+                <TabsTrigger value="history" className="text-xs">
+                  History ({flatHistory.length})
+                </TabsTrigger>
+              </TabsList>
+            </div>
+            
+            <TabsContent value="preview" className="p-4 pt-3 mt-0">
+              {flatLayoutUrl ? (
+                <div className="relative">
+                  <img 
+                    src={flatLayoutUrl} 
+                    alt={`${title} Flat Layout - Print Ready`}
+                    className="w-full h-auto rounded-lg shadow-lg bg-muted max-h-[60vh] object-contain"
+                  />
+                  <div className="absolute bottom-4 right-4 flex gap-2">
+                    <Button size="sm" variant="secondary" onClick={downloadFlatLayout} className="gap-1.5 shadow-lg">
+                      <Download className="w-4 h-4" />
+                      Download for Photoshop
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            )}
-            <p className="text-xs text-muted-foreground text-center mt-3">
-              This flat layout shows all panels unwrapped and ready for print production or editing in Photoshop.
-            </p>
-          </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                  <LayoutGrid className="w-10 h-10 mb-2 opacity-30" />
+                  <p className="text-sm">No flat layout generated yet</p>
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground text-center mt-3">
+                {flatLayoutMode === 'front_only' 
+                  ? 'This shows the front panel only, ready for print production.'
+                  : 'This flat layout shows all panels unwrapped and ready for print production or editing in Photoshop.'}
+              </p>
+            </TabsContent>
+            
+            <TabsContent value="history" className="p-4 pt-3 mt-0">
+              {flatHistory.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-[60vh] overflow-y-auto">
+                  {flatHistory.map((item) => (
+                    <div 
+                      key={item.id} 
+                      className="group relative rounded-lg border border-border overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary transition-all bg-muted"
+                      onClick={() => handleRestoreFlatLayout(item.image_url)}
+                    >
+                      <img 
+                        src={item.image_url} 
+                        alt="Flat layout"
+                        className="w-full aspect-square object-cover"
+                      />
+                      <div className="absolute inset-0 bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                        <Button size="sm" variant="secondary" className="gap-1 text-xs">
+                          <Eye className="w-3 h-3" />
+                          View
+                        </Button>
+                      </div>
+                      <div className="absolute bottom-0 left-0 right-0 bg-background/90 text-[10px] text-center py-1 px-1">
+                        <div className="font-medium">
+                          {new Date(item.created_at).toLocaleDateString()}
+                        </div>
+                        {item.design_settings?.layout_mode === 'front_only' && (
+                          <Badge variant="secondary" className="text-[8px] h-3 px-1 mt-0.5">
+                            Front Only
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : isFlatHistoryLoading ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground mt-2">Loading history...</p>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                  <LayoutGrid className="w-10 h-10 mb-2 opacity-30" />
+                  <p className="text-sm">No flat layouts in history yet</p>
+                  <p className="text-xs mt-1">Generate a flat layout to start building history</p>
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
         </DialogContent>
       </Dialog>
     </div>

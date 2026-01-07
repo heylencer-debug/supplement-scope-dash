@@ -14,6 +14,18 @@ serve(async (req) => {
     const { designBrief, mode = 'mockup', referenceImageUrl } = await req.json();
     const isFlat = mode === 'flat_layout';
     
+    // Debug logging for flat layout reference image
+    console.log(`Mode: ${mode}, isFlat: ${isFlat}`);
+    console.log(`Reference image received: ${referenceImageUrl ? 'YES (length: ' + referenceImageUrl.length + ', starts with: ' + referenceImageUrl.substring(0, 50) + '...)' : 'NO'}`);
+    
+    // Validate reference image format
+    const hasValidReferenceImage = isFlat && referenceImageUrl && 
+      (referenceImageUrl.startsWith('data:image') || referenceImageUrl.startsWith('http'));
+    
+    if (isFlat) {
+      console.log(`Has valid reference image for flat layout: ${hasValidReferenceImage}`);
+    }
+    
     const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
     if (!OPENROUTER_API_KEY) {
       throw new Error("OPENROUTER_API_KEY is not configured");
@@ -627,37 +639,40 @@ serve(async (req) => {
 
     // Build message content - include reference image for flat layout if available
     let messageContent: any;
-    if (isFlat && referenceImageUrl) {
+    if (hasValidReferenceImage) {
+      console.log("Creating multi-modal message with reference image for flat layout");
+      
       // Multi-modal message with reference image for flat layout
-      const referenceImagePrompt = `=== REFERENCE IMAGE PROVIDED ===
-You are provided with a 3D product mockup image. Your task is to create a FLAT, UNWRAPPED 2D dieline layout that EXACTLY MATCHES the design shown in this image.
+      const referenceImagePrompt = `=== CRITICAL: REFERENCE IMAGE PROVIDED ===
+LOOK AT THE ATTACHED 3D PRODUCT MOCKUP IMAGE. You MUST create a FLAT, UNWRAPPED 2D dieline layout that EXACTLY COPIES the design from this image.
 
-CRITICAL: Replicate the EXACT:
-- Color scheme, gradients, and color blocking
-- Typography, fonts, and text styling
-- Graphic elements, icons, patterns, and decorative elements
-- Layout hierarchy and positioning of all elements
-- All badges, certifications, seals, and trust indicators
-- Product imagery style and placement
+DO NOT GENERATE A NEW DESIGN. COPY THE EXISTING DESIGN FROM THE IMAGE:
+- EXACT same color scheme, gradients, and color blocking as shown
+- EXACT same typography, fonts, and text content as shown
+- EXACT same graphic elements, icons, patterns as shown
+- EXACT same layout hierarchy and positioning as shown
+- EXACT same badges, certifications, seals as shown
+- EXACT same product imagery style as shown
 
-The flat layout must look like it would fold/wrap into the 3D mockup shown. Every visual detail from the mockup should appear in the flat layout.
+The flat layout is simply the 3D mockup "unwrapped" into a 2D template. Every visual element from the mockup image MUST appear in the flat layout.
 === END REFERENCE ===
 
 ${prompt}`;
       
       messageContent = [
         {
-          type: "text",
-          text: referenceImagePrompt
-        },
-        {
           type: "image_url",
           image_url: {
             url: referenceImageUrl
           }
+        },
+        {
+          type: "text",
+          text: referenceImagePrompt
         }
       ];
     } else {
+      console.log("Creating text-only message (no valid reference image)");
       messageContent = prompt;
     }
 

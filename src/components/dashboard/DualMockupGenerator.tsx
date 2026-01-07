@@ -491,6 +491,11 @@ function MockupCard({
       return;
     }
     
+    // Debug logging
+    console.log("Generating flat layout with reference image");
+    console.log("Reference image type:", generatedMockup.startsWith('data:image') ? 'base64' : generatedMockup.startsWith('http') ? 'URL' : 'unknown');
+    console.log("Reference image length:", generatedMockup.length);
+    
     setIsGeneratingFlat(true);
     try {
       const designBrief = strategy.design_brief;

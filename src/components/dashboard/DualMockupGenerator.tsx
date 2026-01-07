@@ -48,6 +48,13 @@ import { MockupImages } from "@/hooks/usePackagingAnalysis";
 import { useMockupHistory } from "@/hooks/useMockupHistory";
 import { MockupHistoryGallery } from "@/components/dashboard/MockupHistoryGallery";
 
+interface SuggestedTone {
+  primary_tone: string;
+  tone_descriptors: string[];
+  emotional_appeal: string;
+  copy_voice: string;
+}
+
 interface PackagingStrategy {
   target_competitors: string[];
   strategy_summary: string;
@@ -61,6 +68,7 @@ interface PackagingStrategy {
     key_differentiators: string[];
     certifications: string[];
     packaging_format?: string;
+    suggested_tone?: SuggestedTone;
   };
   elements_checklist: {
     front_panel_hierarchy: string[];
@@ -374,6 +382,7 @@ function MockupCard({
             trustSignals: elements?.trust_signals || [],
             packagingFormat: selectedFormat,
             flavorText: detectedFlavor, // Include detected flavor
+            suggestedTone: designBrief.suggested_tone, // Include suggested tone from analysis
           }
         }
       });
@@ -452,6 +461,38 @@ function MockupCard({
             <div>
               <p className="text-xs font-medium text-amber-700">Detected Flavor</p>
               <p className="text-xs text-amber-600">{detectedFlavor}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Suggested Tone */}
+      {strategy.design_brief?.suggested_tone && (
+        <div className="p-2.5 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+          <div className="flex items-start gap-2">
+            <Sparkles className="w-3.5 h-3.5 text-purple-600 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-purple-700">Suggested Tone</p>
+              <p className="text-xs text-purple-600 capitalize">
+                {strategy.design_brief.suggested_tone.primary_tone}
+                {strategy.design_brief.suggested_tone.emotional_appeal && (
+                  <span className="text-purple-500"> • {strategy.design_brief.suggested_tone.emotional_appeal}</span>
+                )}
+              </p>
+              {strategy.design_brief.suggested_tone.tone_descriptors && 
+               strategy.design_brief.suggested_tone.tone_descriptors.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {strategy.design_brief.suggested_tone.tone_descriptors.slice(0, 3).map((desc, i) => (
+                    <Badge 
+                      key={i} 
+                      variant="secondary" 
+                      className="text-[9px] h-4 px-1.5 bg-purple-500/20 text-purple-700 border-purple-500/30"
+                    >
+                      {desc}
+                    </Badge>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

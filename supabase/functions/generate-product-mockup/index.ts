@@ -67,6 +67,74 @@ serve(async (req) => {
       'pork': { colors: 'pink, light brown', description: 'pink-tinted pork-colored chews' },
     };
     
+    // Packaging format to shape/proportion details for accurate container rendering
+    const packagingFormatDetails: Record<string, { shape: string; proportions: string; style: string }> = {
+      'narrow-mouth glass jar': {
+        shape: 'tall, slim cylindrical glass jar with narrow threaded opening',
+        proportions: 'HEIGHT-TO-WIDTH RATIO OF 3:1 (three times taller than wide). TALL and NARROW like a vitamin pill bottle or apothecary jar. NOT wide or squat.',
+        style: 'elegant pharmaceutical glass, clear or amber, slim profile'
+      },
+      'narrow-mouth plastic jar': {
+        shape: 'tall, slim cylindrical plastic jar with narrow threaded cap',
+        proportions: 'HEIGHT-TO-WIDTH RATIO OF 3:1 (three times taller than wide). TALL and NARROW like a supplement bottle. NOT wide or squat.',
+        style: 'modern HDPE plastic, sleek pharmaceutical style, slim profile'
+      },
+      'wide-mouth plastic jar': {
+        shape: 'wide, shorter cylindrical plastic jar with large opening',
+        proportions: 'HEIGHT-TO-WIDTH RATIO OF 1:1.2 (wider than tall). Like a peanut butter jar or protein powder tub.',
+        style: 'sturdy HDPE plastic, easy-scoop design'
+      },
+      'wide-mouth glass jar': {
+        shape: 'wide, shorter cylindrical glass jar with large opening',
+        proportions: 'HEIGHT-TO-WIDTH RATIO OF 1:1.2 (wider than tall). Mason jar style.',
+        style: 'classic glass jar, wide opening'
+      },
+      'glass jar with screw cap': {
+        shape: 'standard glass jar with metal screw cap',
+        proportions: 'HEIGHT-TO-WIDTH RATIO OF 1.5:1. Balanced proportions.',
+        style: 'traditional glass supplement jar'
+      },
+      'resealable stand-up pouch': {
+        shape: 'flexible stand-up pouch with zip-lock top',
+        proportions: 'Tall pouch format, stands upright, approximately 2:1 height to width',
+        style: 'modern matte or glossy pouch, premium pet food aesthetic'
+      },
+      'flat-bottom pouch': {
+        shape: 'flexible pouch with flat bottom gusset for stability',
+        proportions: 'Square-ish base, taller than wide',
+        style: 'premium coffee bag style, matte finish'
+      },
+      'bottle': {
+        shape: 'cylindrical bottle with flip-top or screw cap',
+        proportions: 'HEIGHT-TO-WIDTH RATIO OF 2.5:1. Tall and slim.',
+        style: 'modern supplement bottle, HDPE or PET plastic'
+      }
+    };
+    
+    // Get container shape details for the selected format
+    const formatLower = packagingFormat.toLowerCase();
+    let containerDetails = packagingFormatDetails['bottle']; // default
+    for (const [format, details] of Object.entries(packagingFormatDetails)) {
+      if (formatLower.includes(format) || format.includes(formatLower)) {
+        containerDetails = details;
+        break;
+      }
+    }
+    // Specific checks for narrow-mouth
+    if (formatLower.includes('narrow') && formatLower.includes('glass')) {
+      containerDetails = packagingFormatDetails['narrow-mouth glass jar'];
+    } else if (formatLower.includes('narrow') && formatLower.includes('plastic')) {
+      containerDetails = packagingFormatDetails['narrow-mouth plastic jar'];
+    } else if (formatLower.includes('wide') && formatLower.includes('glass')) {
+      containerDetails = packagingFormatDetails['wide-mouth glass jar'];
+    } else if (formatLower.includes('wide') && formatLower.includes('plastic')) {
+      containerDetails = packagingFormatDetails['wide-mouth plastic jar'];
+    } else if (formatLower.includes('pouch') && formatLower.includes('flat')) {
+      containerDetails = packagingFormatDetails['flat-bottom pouch'];
+    } else if (formatLower.includes('pouch') || formatLower.includes('bag')) {
+      containerDetails = packagingFormatDetails['resealable stand-up pouch'];
+    }
+    
     // Detect flavor for product appearance
     let productAppearance: { colors: string; description: string } | null = null;
     if (flavorText) {
@@ -257,6 +325,19 @@ serve(async (req) => {
     promptParts.push("- Native Pet: Bold claims, playful colors, friendly but premium");
     promptParts.push("- Ollie/Open Farm: Nature-inspired but modern, premium pet aesthetic");
     promptParts.push("- Think 2024 D2C supplement brand, not 2010 GNC shelf product");
+
+    promptParts.push("");
+    promptParts.push("=== CONTAINER SHAPE (CRITICAL - FOLLOW EXACTLY) ===");
+    promptParts.push(`- Container Type: ${containerDetails.shape}`);
+    promptParts.push(`- PROPORTIONS: ${containerDetails.proportions}`);
+    promptParts.push(`- Style: ${containerDetails.style}`);
+    if (formatLower.includes('narrow')) {
+      promptParts.push("- IMPORTANT: This is a TALL, SLIM jar - significantly taller than it is wide");
+      promptParts.push("- Think pharmacy vitamin bottle or elegant apothecary jar shape");
+      promptParts.push("- The jar should be at least 3x taller than its width");
+      promptParts.push("- DO NOT make it wide or squat like a peanut butter jar");
+    }
+    promptParts.push("=== END CONTAINER SHAPE ===");
 
     promptParts.push("");
     promptParts.push("PREMIUM PACKAGING REQUIREMENTS:");

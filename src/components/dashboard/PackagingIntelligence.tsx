@@ -866,6 +866,7 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
               analysis={aiAnalysis}
               mockupImages={mockupImages}
               onSaveMockup={saveMockupImage}
+              categoryId={categoryId}
             />
           ) : aiAnalysis ? (
             // Fallback for legacy single-strategy analysis

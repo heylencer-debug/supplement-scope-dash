@@ -17,7 +17,8 @@ import {
   RotateCcw,
   Eye,
   EyeOff,
-  Palette
+  Palette,
+  UtensilsCrossed
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -44,6 +45,8 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { MockupImages } from "@/hooks/usePackagingAnalysis";
+import { useMockupHistory } from "@/hooks/useMockupHistory";
+import { MockupHistoryGallery } from "@/components/dashboard/MockupHistoryGallery";
 
 interface PackagingStrategy {
   target_competitors: string[];
@@ -86,6 +89,9 @@ interface DualMockupGeneratorProps {
   analysis: DualPackagingAnalysis;
   mockupImages: MockupImages;
   onSaveMockup: (imageUrl: string, strategyType: 'match_leaders' | 'match_disruptors') => Promise<void>;
+  categoryId?: string;
+  formulaVersionId?: string | null;
+  detectedFlavor?: string | null;
 }
 
 const packagingFormatOptions = [
@@ -248,11 +254,17 @@ function MockupCard({
   strategyType,
   mockupUrl,
   onSaveMockup,
+  categoryId,
+  formulaVersionId,
+  detectedFlavor,
 }: {
   strategy: PackagingStrategy;
   strategyType: 'match_leaders' | 'match_disruptors';
   mockupUrl: string | null;
   onSaveMockup: (imageUrl: string) => Promise<void>;
+  categoryId?: string;
+  formulaVersionId?: string | null;
+  detectedFlavor?: string | null;
 }) {
   const { toast } = useToast();
   const [isGenerating, setIsGenerating] = useState(false);
@@ -261,6 +273,28 @@ function MockupCard({
   const [isEditingContent, setIsEditingContent] = useState(false);
   const [isEditingColors, setIsEditingColors] = useState(false);
   const [showPreview, setShowPreview] = useState(true); // Show preview by default
+  
+  // Mockup history
+  const { 
+    history, 
+    isLoading: isHistoryLoading, 
+    saveMockupToHistory, 
+    deleteMockupFromHistory 
+  } = useMockupHistory({ 
+    categoryId, 
+    strategyType,
+    formulaVersionId 
+  });
+  
+  // Handler for restoring mockup from history
+  const handleRestoreMockup = async (imageUrl: string) => {
+    setGeneratedMockup(imageUrl);
+    await onSaveMockup(imageUrl);
+    toast({
+      title: 'Mockup Restored',
+      description: 'Previous mockup has been restored as the current one.',
+    });
+  };
   
   // Editable mock content
   const originalFrontPanelText = strategy.mock_content?.front_panel_text || '';
@@ -339,6 +373,7 @@ function MockupCard({
             keyDifferentiators: designBrief.key_differentiators,
             trustSignals: elements?.trust_signals || [],
             packagingFormat: selectedFormat,
+            flavorText: detectedFlavor, // Include detected flavor
           }
         }
       });
@@ -349,6 +384,24 @@ function MockupCard({
       if (data?.imageUrl) {
         setGeneratedMockup(data.imageUrl);
         await onSaveMockup(data.imageUrl);
+        
+        // Save to history
+        await saveMockupToHistory(
+          data.imageUrl,
+          strategyType,
+          selectedFormat,
+          {
+            colors: {
+              primary: editedPrimaryColor,
+              accent: editedAccentColor,
+              background: editedSecondaryColor
+            },
+            text: {
+              headline: designBrief.primary_claim
+            }
+          }
+        );
+        
         toast({
           title: 'Mockup Generated!',
           description: `${title} packaging mockup saved successfully.`,
@@ -390,6 +443,19 @@ function MockupCard({
           </p>
         </div>
       </div>
+
+      {/* Detected Flavor */}
+      {detectedFlavor && (
+        <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+          <div className="flex items-center gap-2">
+            <UtensilsCrossed className="w-3.5 h-3.5 text-amber-600" />
+            <div>
+              <p className="text-xs font-medium text-amber-700">Detected Flavor</p>
+              <p className="text-xs text-amber-600">{detectedFlavor}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Primary Claim Preview */}
       <div className="p-2.5 bg-muted/50 rounded-lg text-center">
@@ -666,6 +732,16 @@ function MockupCard({
         </div>
       ) : null}
 
+      {/* Mockup History Gallery */}
+      {categoryId && (
+        <MockupHistoryGallery
+          history={history}
+          isLoading={isHistoryLoading}
+          onRestore={handleRestoreMockup}
+          onDelete={deleteMockupFromHistory}
+        />
+      )}
+
       {/* Full Image Modal */}
       <Dialog open={isImageModalOpen} onOpenChange={setIsImageModalOpen}>
         <DialogContent className="max-w-4xl w-full p-0 overflow-hidden">
@@ -698,7 +774,7 @@ function MockupCard({
   );
 }
 
-export function DualMockupGenerator({ analysis, mockupImages, onSaveMockup }: DualMockupGeneratorProps) {
+export function DualMockupGenerator({ analysis, mockupImages, onSaveMockup, categoryId, formulaVersionId, detectedFlavor }: DualMockupGeneratorProps) {
   if (!analysis?.match_leaders || !analysis?.match_disruptors) {
     return null;
   }
@@ -716,12 +792,18 @@ export function DualMockupGenerator({ analysis, mockupImages, onSaveMockup }: Du
           strategyType="match_leaders"
           mockupUrl={mockupImages.match_leaders}
           onSaveMockup={(url) => onSaveMockup(url, 'match_leaders')}
+          categoryId={categoryId}
+          formulaVersionId={formulaVersionId}
+          detectedFlavor={detectedFlavor}
         />
         <MockupCard
           strategy={analysis.match_disruptors}
           strategyType="match_disruptors"
           mockupUrl={mockupImages.match_disruptors}
           onSaveMockup={(url) => onSaveMockup(url, 'match_disruptors')}
+          categoryId={categoryId}
+          formulaVersionId={formulaVersionId}
+          detectedFlavor={detectedFlavor}
         />
       </div>
 

@@ -1082,6 +1082,30 @@ ${perProductImageAnalysisSummary}
 4. Every claim MUST be verifiable from our formulation document
 5. Match competitor visual styles (colors, fonts, layout) while being strategically different on claims
 
+## 🎨 COLOR MATCHING RULES (CRITICAL - READ CAREFULLY)
+
+Your design_brief colors MUST be extracted DIRECTLY from competitor packaging images analyzed above.
+
+**For MATCH LEADERS Strategy:**
+- Your primary_color MUST be the EXACT dominant color from the #1 best-seller's packaging
+- Your secondary_color MUST be the EXACT secondary color from top performers
+- Extract these DIRECTLY from the competitor images - DO NOT interpret or "improve" them
+- If the #1 seller uses WHITE as primary, use WHITE (#FFFFFF or similar)
+- If the #1 seller uses DARK BLUE, use DARK BLUE with the exact hex they use
+- Look at the image analysis above and match the SPECIFIC hex codes from top performers
+
+**For MATCH DISRUPTORS Strategy:**
+- Extract colors DIRECTLY from the new winner/disruptor with highest momentum
+- Match their bold/aggressive palette EXACTLY as seen in their packaging
+- These are often more vibrant or unexpected colors - use EXACTLY what you see
+
+**COLOR EXTRACTION RULES:**
+- DO NOT invent new colors that look "better" or "more premium"
+- DO NOT use opposite colors to "differentiate" - that defeats the purpose of matching
+- DO NOT default to clinical white if competitors use bold colors
+- DO NOT use your own aesthetic preferences - MATCH what works
+- LOOK at the hex codes extracted in the image analysis section above and USE THOSE
+
 ## 🎨 HERO IMAGERY DECISION (CRITICAL FOR MOCKUP GENERATION)
 
 For EACH strategy, you MUST decide what HERO VISUAL IMAGERY should appear on the packaging.

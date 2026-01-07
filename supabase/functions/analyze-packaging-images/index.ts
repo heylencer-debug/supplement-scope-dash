@@ -171,7 +171,7 @@ Use the extract_packaging_analysis tool.`;
         "X-Title": "Noodle Search Packaging Analysis"
       },
       body: JSON.stringify({
-        model: "openai/gpt-4o",
+        model: "google/gemini-3-pro-preview",
         messages: [{ role: "user", content: [{ type: "text", text: prompt }, ...imageContent] }],
         tools: [{
           type: "function",

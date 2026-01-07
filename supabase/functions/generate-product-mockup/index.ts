@@ -63,6 +63,9 @@ serve(async (req) => {
     // NEW: Get suggested tone for design aesthetic
     const suggestedTone = designBrief.suggestedTone;
     
+    // NEW: Get AI-decided hero imagery from packaging analysis
+    const heroImagery = designBrief.heroImagery || designBrief.hero_imagery;
+    
     // Get recommended packaging format (e.g., "Resealable Stand-Up Pouch", "Wide-Mouth Jar", "Bottle")
     const packagingFormat = designBrief.packagingFormat || "supplement bottle";
     
@@ -392,19 +395,83 @@ serve(async (req) => {
       promptParts.push("=== END TONE ===");
     }
 
-    // TARGET MARKET IMAGERY
+    // =================================================================
+    // HERO IMAGERY SECTION - AI-decided OR fallback to hardcoded
+    // =================================================================
     promptParts.push("");
-    promptParts.push("IMAGERY ON PACKAGING (important!):");
-    if (isDogProduct) {
+    
+    // Check if AI provided hero_imagery in packaging analysis
+    if (heroImagery && heroImagery.primary_visual) {
+      promptParts.push("=== HERO VISUAL IMAGERY (AI-RECOMMENDED - FOLLOW THIS) ===");
+      promptParts.push(`Imagery Type: ${heroImagery.imagery_type || heroImagery.imageryType || 'ingredient'}`);
+      promptParts.push(`Primary Visual: ${heroImagery.primary_visual || heroImagery.primaryVisual}`);
+      promptParts.push(`Style: ${heroImagery.visual_style || heroImagery.visualStyle || 'photorealistic'}`);
+      promptParts.push(`Prominence: ${heroImagery.prominence || 'hero'}`);
+      promptParts.push(`Placement: ${heroImagery.placement || 'front panel'}`);
+      
+      const prominence = heroImagery.prominence || 'hero';
+      if (prominence === 'hero') {
+        promptParts.push("");
+        promptParts.push("THIS IS THE MAIN VISUAL ELEMENT - MANDATORY:");
+        promptParts.push("- Feature PROMINENTLY on the front panel - this is the HERO");
+        promptParts.push("- Should be immediately eye-catching and appetizing");
+        promptParts.push("- Take up 20-30% of the front label area");
+        promptParts.push("- Use photorealistic style with natural shine and vibrancy");
+        promptParts.push("- DO NOT replace with generic abstract shapes or wellness icons");
+      } else if (prominence === 'accent') {
+        promptParts.push("");
+        promptParts.push("- Feature as a supporting visual element");
+        promptParts.push("- Should complement the main design without overpowering");
+      } else if (prominence === 'subtle') {
+        promptParts.push("");
+        promptParts.push("- Use as background or subtle decorative element");
+      }
+      
+      if (heroImagery.color_palette || heroImagery.colorPalette) {
+        promptParts.push("");
+        promptParts.push(`Color palette to incorporate: ${heroImagery.color_palette || heroImagery.colorPalette}`);
+      }
+      promptParts.push("=== END HERO IMAGERY ===");
+      
+    } else if (flavorImagery) {
+      // FALLBACK: Use hardcoded flavorToImagery mapping if AI didn't provide hero_imagery
+      promptParts.push("=== FLAVOR IMAGERY (VIBRANT & LIVELY) ===");
+      promptParts.push(`Flavor: "${flavorText}"`);
+      promptParts.push(`- Feature: ${flavorImagery.fruit}`);
+      promptParts.push(`- Colors: ${flavorImagery.colors}`);
+      promptParts.push("");
+      promptParts.push("FRUIT/INGREDIENT STYLING (make it POP):");
+      promptParts.push("- Fresh, vibrant, photorealistic with natural shine");
+      promptParts.push("- Bright, saturated colors - should look JUICY and APPETIZING");
+      promptParts.push("- Natural lighting with subtle highlights");
+      promptParts.push("- Position as a HERO element - prominent but balanced");
+      promptParts.push("- Can use a few scattered pieces or one beautiful arrangement");
+      promptParts.push("");
+      promptParts.push("KEEP IT PROFESSIONAL:");
+      promptParts.push("- NO cartoon/illustrated style - use photorealistic");
+      promptParts.push("- NO excessive splashes or explosions");
+      promptParts.push("- Clean composition - imagery enhances, doesn't overwhelm");
+      promptParts.push("=== END FLAVOR IMAGERY ===");
+      
+    } else if (isDogProduct) {
+      // FALLBACK: Pet product imagery
+      promptParts.push("IMAGERY ON PACKAGING:");
       promptParts.push("- Include a beautiful, happy, healthy dog image/illustration on the label");
       promptParts.push("- Dog should look vibrant, active, and healthy (golden retriever, lab, or friendly breed)");
       promptParts.push("- Can be a photo or elegant line illustration style");
+      
     } else if (isCatProduct) {
+      // FALLBACK: Cat product imagery
+      promptParts.push("IMAGERY ON PACKAGING:");
       promptParts.push("- Include an elegant cat image/illustration on the label");
       promptParts.push("- Cat should look healthy and content");
+      
     } else {
-      promptParts.push("- Include lifestyle imagery suggesting health, vitality, and wellness");
-      promptParts.push("- Could be abstract shapes, nature elements, or subtle human silhouettes");
+      // FALLBACK: Minimal generic imagery for non-flavored, non-pet products
+      promptParts.push("IMAGERY ON PACKAGING:");
+      promptParts.push("- Use minimal, clean visual elements");
+      promptParts.push("- Focus on premium typography and color rather than busy graphics");
+      promptParts.push("- Subtle abstract shapes or gradients if needed");
     }
 
     // BENEFIT BULLET POINTS - Key selling points visible on front label
@@ -424,28 +491,6 @@ serve(async (req) => {
       promptParts.push("- Position prominently below the main headline");
     }
 
-    // Add FLAVOR IMAGERY if detected - make it LIVELY and VIBRANT
-    if (flavorImagery) {
-      promptParts.push("");
-      promptParts.push("=== FLAVOR IMAGERY (VIBRANT & LIVELY) ===");
-      promptParts.push(`Flavor: "${flavorText}"`);
-      promptParts.push(`- Feature: ${flavorImagery.fruit}`);
-      promptParts.push(`- Colors: ${flavorImagery.colors}`);
-      promptParts.push("");
-      promptParts.push("FRUIT STYLING (make it POP):");
-      promptParts.push("- Fresh, vibrant, photorealistic fruit with natural shine");
-      promptParts.push("- Bright, saturated colors - fruits should look JUICY and APPETIZING");
-      promptParts.push("- Natural lighting with subtle highlights");
-      promptParts.push("- Position fruit as a HERO element - prominent but balanced");
-      promptParts.push("- Can use a few scattered pieces or one beautiful arrangement");
-      promptParts.push("");
-      promptParts.push("KEEP IT PROFESSIONAL:");
-      promptParts.push("- NO cartoon/illustrated fruit - use photorealistic style");
-      promptParts.push("- NO excessive splashes or explosions");
-      promptParts.push("- Clean composition - fruit enhances, doesn't overwhelm");
-      promptParts.push("=== END FLAVOR IMAGERY ===");
-    }
-
     // DISTINCTIVE, PREMIUM DESIGN - Not generic
     promptParts.push("");
     promptParts.push("=== DESIGN PHILOSOPHY: DISTINCTIVE & PREMIUM ===");
@@ -462,11 +507,16 @@ serve(async (req) => {
     promptParts.push("- Maximum 2-3 colors total in design");
     promptParts.push("- Generous breathing room around text");
     promptParts.push("");
-    promptParts.push("AVOID GENERIC TRAPS:");
+    promptParts.push("AVOID GENERIC TRAPS & UNNECESSARY ELEMENTS:");
     promptParts.push("- NO busy patterns or multiple decorative elements");
     promptParts.push("- NO default-looking layouts");
     promptParts.push("- NO unnecessary icons, badges, or filler graphics");
     promptParts.push("- NO confetti, starbursts, or scattered shapes");
+    promptParts.push("- NO decorative borders or frames");
+    promptParts.push("- NO generic wellness icons (leaves, hearts, DNA strands) unless specifically part of hero imagery");
+    promptParts.push("- NO gradient overlays or lens flares");
+    promptParts.push("- NO abstract swooshes or wave patterns as filler");
+    promptParts.push("- ONLY essential elements: brand, product name, hero imagery (if specified), key claims");
     promptParts.push("- LESS elements = MORE impact");
     promptParts.push("");
     promptParts.push("REFERENCE: Ritual, AG1, Seed - clean but DISTINCTIVE");
@@ -617,20 +667,32 @@ serve(async (req) => {
         frontOnlyPromptParts.push("- Flavor/variant indicators");
         frontOnlyPromptParts.push("- Quantity/count information");
         
-        // Add VIBRANT flavor imagery to front-only mode
-        if (flavorImagery) {
+        // Add HERO IMAGERY to front-only mode (AI-decided OR fallback)
+        if (heroImagery && heroImagery.primary_visual) {
+          frontOnlyPromptParts.push("");
+          frontOnlyPromptParts.push("=== HERO VISUAL IMAGERY (AI-RECOMMENDED) ===");
+          frontOnlyPromptParts.push(`Imagery Type: ${heroImagery.imagery_type || heroImagery.imageryType || 'ingredient'}`);
+          frontOnlyPromptParts.push(`Primary Visual: ${heroImagery.primary_visual || heroImagery.primaryVisual}`);
+          frontOnlyPromptParts.push(`Style: ${heroImagery.visual_style || heroImagery.visualStyle || 'photorealistic'}`);
+          frontOnlyPromptParts.push(`Prominence: ${heroImagery.prominence || 'hero'}`);
+          frontOnlyPromptParts.push("");
+          if ((heroImagery.prominence || 'hero') === 'hero') {
+            frontOnlyPromptParts.push("THIS IS THE MAIN VISUAL - Feature prominently on front panel");
+            frontOnlyPromptParts.push("- 20-30% of label area, photorealistic style");
+          }
+          frontOnlyPromptParts.push("=== END HERO IMAGERY ===");
+        } else if (flavorImagery) {
+          // FALLBACK: Use hardcoded flavor imagery
           frontOnlyPromptParts.push("");
           frontOnlyPromptParts.push("=== FLAVOR IMAGERY (VIBRANT & LIVELY) ===");
           frontOnlyPromptParts.push(`Flavor: "${flavorText}"`);
           frontOnlyPromptParts.push(`- Feature: ${flavorImagery.fruit}`);
           frontOnlyPromptParts.push(`- Colors: ${flavorImagery.colors}`);
           frontOnlyPromptParts.push("");
-          frontOnlyPromptParts.push("FRUIT STYLING (make it POP):");
-          frontOnlyPromptParts.push("- Fresh, vibrant, photorealistic fruit with natural shine");
-          frontOnlyPromptParts.push("- Bright, saturated colors - fruits should look JUICY and APPETIZING");
-          frontOnlyPromptParts.push("- Position fruit as a HERO element - prominent but balanced");
-          frontOnlyPromptParts.push("- NO cartoon fruit - use photorealistic style");
-          frontOnlyPromptParts.push("- Clean composition - fruit enhances, doesn't overwhelm");
+          frontOnlyPromptParts.push("STYLING:");
+          frontOnlyPromptParts.push("- Fresh, vibrant, photorealistic with natural shine");
+          frontOnlyPromptParts.push("- Position as HERO element - prominent but balanced");
+          frontOnlyPromptParts.push("- NO cartoon style - photorealistic only");
           frontOnlyPromptParts.push("=== END FLAVOR IMAGERY ===");
         }
         
@@ -728,19 +790,32 @@ serve(async (req) => {
         flatPromptParts.push(`FLAVOR CALLOUT: "${flavorText}" - display prominently below headline`);
       }
       
-      // Add VIBRANT flavor imagery to full dieline mode
-      if (flavorImagery) {
+      // Add HERO IMAGERY to full dieline mode (AI-decided OR fallback)
+      if (heroImagery && heroImagery.primary_visual) {
+        flatPromptParts.push("");
+        flatPromptParts.push("=== HERO VISUAL IMAGERY (AI-RECOMMENDED) ===");
+        flatPromptParts.push(`Imagery Type: ${heroImagery.imagery_type || heroImagery.imageryType || 'ingredient'}`);
+        flatPromptParts.push(`Primary Visual: ${heroImagery.primary_visual || heroImagery.primaryVisual}`);
+        flatPromptParts.push(`Style: ${heroImagery.visual_style || heroImagery.visualStyle || 'photorealistic'}`);
+        flatPromptParts.push(`Prominence: ${heroImagery.prominence || 'hero'}`);
+        flatPromptParts.push(`Placement: ${heroImagery.placement || 'front panel'}`);
+        flatPromptParts.push("");
+        if ((heroImagery.prominence || 'hero') === 'hero') {
+          flatPromptParts.push("THIS IS THE MAIN VISUAL - Feature prominently on FRONT PANEL");
+          flatPromptParts.push("- 20-30% of front panel area, photorealistic style");
+        }
+        flatPromptParts.push("=== END HERO IMAGERY ===");
+      } else if (flavorImagery) {
+        // FALLBACK: Use hardcoded flavor imagery
         flatPromptParts.push("");
         flatPromptParts.push("=== FLAVOR IMAGERY (VIBRANT & LIVELY) ===");
         flatPromptParts.push(`- Feature: ${flavorImagery.fruit}`);
         flatPromptParts.push(`- Colors: ${flavorImagery.colors}`);
         flatPromptParts.push("");
-        flatPromptParts.push("FRUIT STYLING (make it POP):");
-        flatPromptParts.push("- Fresh, vibrant, photorealistic fruit with natural shine");
-        flatPromptParts.push("- Bright, saturated colors - fruits should look JUICY and APPETIZING");
-        flatPromptParts.push("- Position fruit as a HERO element on FRONT PANEL");
-        flatPromptParts.push("- NO cartoon fruit - use photorealistic style");
-        flatPromptParts.push("- Clean composition - fruit enhances, doesn't overwhelm");
+        flatPromptParts.push("STYLING:");
+        flatPromptParts.push("- Fresh, vibrant, photorealistic with natural shine");
+        flatPromptParts.push("- Position as HERO element on FRONT PANEL");
+        flatPromptParts.push("- NO cartoon style - photorealistic only");
         flatPromptParts.push("=== END FLAVOR IMAGERY ===");
       }
       

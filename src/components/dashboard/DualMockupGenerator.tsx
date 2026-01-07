@@ -446,13 +446,14 @@ function MockupCard({
             callToAction: elements?.call_to_action,
             headlineFont: designBrief.headline_font,
             bodyFont: designBrief.body_font,
-            frontPanelText: editedFrontPanelText, // Use edited text
+            frontPanelText: editedFrontPanelText,
             backPanelText: mockContent?.back_panel_text,
             keyDifferentiators: designBrief.key_differentiators,
             trustSignals: elements?.trust_signals || [],
             packagingFormat: selectedFormat,
-            flavorText: detectedFlavor, // Include detected flavor
-            suggestedTone: effectiveTone, // Use effective tone (user-selected or AI)
+            flavorText: detectedFlavor,
+            suggestedTone: effectiveTone,
+            heroImagery: (designBrief as any).hero_imagery, // AI-decided hero imagery
           }
         }
       });
@@ -561,6 +562,7 @@ function MockupCard({
             packagingFormat: selectedFormat,
             flavorText: detectedFlavor,
             suggestedTone: effectiveTone,
+            heroImagery: (designBrief as any).hero_imagery, // AI-decided hero imagery
           }
         }
       });

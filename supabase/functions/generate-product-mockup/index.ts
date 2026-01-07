@@ -410,80 +410,211 @@ serve(async (req) => {
     promptParts.push("- Sharp focus, high resolution, photorealistic rendering");
     promptParts.push("- Would look premium on Amazon, Chewy, or brand DTC website");
 
+    // Packaging-type-specific flat layout structures
+    const flatLayoutStructures: Record<string, { 
+      panels: string[]; 
+      arrangement: string; 
+      description: string;
+      dimensions: string;
+    }> = {
+      'jar': {
+        panels: ['Front Label (cylindrical wrap)', 'Back Label (continuous wrap)', 'Lid Top Circle', 'Neck Band Strip (optional)'],
+        arrangement: 'Horizontal rectangular strip for wrap-around label + separate circular lid artwork',
+        description: 'Cylindrical wrap-around label that covers the full circumference of the jar, plus circular lid design',
+        dimensions: 'Label width = jar circumference, Label height = jar body height. Lid = circular to match jar diameter'
+      },
+      'pouch': {
+        panels: ['Front Face (full panel)', 'Back Face (with supplement facts)', 'Left Gusset', 'Right Gusset', 'Bottom Gusset', 'Top Seal/Zipper Area'],
+        arrangement: 'Laid flat showing front and back as main panels with gusset panels extending from sides and bottom',
+        description: 'Stand-up pouch dieline with all gussets expanded flat, showing how it folds into 3D shape',
+        dimensions: 'Front/Back faces are the largest panels. Gussets are narrower strips on sides and bottom'
+      },
+      'bottle': {
+        panels: ['Front Label Strip', 'Back Label Strip (continuous)', 'Cap Top Circle', 'Neck Ring Band'],
+        arrangement: 'Horizontal rectangular strip for wrap-around bottle label + circular cap artwork',
+        description: 'Cylindrical bottle wrap label as horizontal strip that wraps around bottle body',
+        dimensions: 'Label width = bottle circumference, Label height = label area on bottle'
+      },
+      'box': {
+        panels: ['Front Panel (hero)', 'Back Panel', 'Left Side Panel', 'Right Side Panel', 'Top Flap', 'Bottom Flap'],
+        arrangement: 'Cross/crucifix dieline layout with front panel in center, sides extending left/right, top/bottom extending up/down',
+        description: 'Standard box dieline showing all 6 faces connected with fold lines',
+        dimensions: 'All panels proportional to actual box dimensions'
+      },
+      'bag': {
+        panels: ['Front Face', 'Back Face', 'Bottom Gusset', 'Top Seal Area'],
+        arrangement: 'Two main rectangular faces with gusset at bottom and seal area at top',
+        description: 'Flat bag layout with front/back and bottom expansion gusset',
+        dimensions: 'Front/Back are equal size, bottom gusset is narrower strip'
+      },
+      'dropper': {
+        panels: ['Bottle Front Label', 'Bottle Back Label', 'Box Front', 'Box Back', 'Box Left Side', 'Box Right Side', 'Box Top', 'Box Bottom'],
+        arrangement: 'Small cylindrical label strip for dropper bottle + full box dieline for secondary packaging',
+        description: 'Dropper bottle label (small strip) plus outer carton box dieline',
+        dimensions: 'Bottle label is small strip. Box panels sized for dropper bottle dimensions'
+      }
+    };
+
+    // Helper function to detect packaging category from format string
+    function getPackagingCategory(format: string): string {
+      const f = format.toLowerCase();
+      if (f.includes('stand-up') || f.includes('standup') || f.includes('resealable') && f.includes('pouch')) return 'pouch';
+      if (f.includes('pouch') || f.includes('sachet')) return 'pouch';
+      if (f.includes('flat-bottom') || f.includes('flat bottom')) return 'pouch';
+      if (f.includes('kraft') || f.includes('paper bag')) return 'bag';
+      if (f.includes('dropper')) return 'dropper';
+      if (f.includes('bottle')) return 'bottle';
+      if (f.includes('jar')) return 'jar';
+      if (f.includes('box') || f.includes('carton')) return 'box';
+      if (f.includes('bag')) return 'bag';
+      return 'jar'; // default fallback
+    }
+
     // Build the flat layout prompt if mode is 'flat_layout'
     let prompt: string;
     
     if (isFlat) {
+      const packagingCategory = getPackagingCategory(packagingFormat);
+      const layoutStructure = flatLayoutStructures[packagingCategory] || flatLayoutStructures['jar'];
+      
       const flatPromptParts = [
-        "=== 2D FLAT PACKAGING LAYOUT FOR PRINT PRODUCTION ===",
+        `=== 2D FLAT DIELINE LAYOUT FOR ${packagingFormat.toUpperCase()} ===`,
         "",
-        "Create a FLAT, UNWRAPPED, 2D packaging layout suitable for printing and die-cutting. This is NOT a 3D product mockup.",
+        "Create a FLAT, UNWRAPPED, 2D packaging dieline layout suitable for printing and die-cutting.",
+        "This is a PRINT-READY layout that will be edited in Photoshop/Illustrator.",
         "",
-        "CRITICAL REQUIREMENTS:",
-        "- This is a 2D FLAT VIEW showing all panels laid out on a white background",
-        "- NO perspective, NO shadows, NO 3D effects",
+        "=== CRITICAL REQUIREMENTS ===",
+        "- This is a 2D FLAT VIEW - absolutely NO perspective, NO shadows, NO 3D effects",
         "- Show the packaging UNFOLDED as it would appear on a die-cut sheet before assembly",
-        "- All panels should be connected with visible fold/score lines (thin dotted or dashed lines)",
-        "- Include bleed area extending slightly beyond each panel edge",
+        "- All panels must be connected showing how they fold together",
+        "- Include visible fold/score lines (thin dotted or dashed lines between panels)",
+        "- Include bleed area (slight color extension beyond trim lines)",
+        "- White background surrounding the dieline",
+        "- Registration/crop marks at corners",
         "",
-        "PANEL LAYOUT (arrange as connected die-cut):",
-        `- FRONT PANEL (center, largest): Contains main product name, claims, and hero content`,
-        `- BACK PANEL: Supplement facts, ingredients, directions, warnings`,
-        `- LEFT SIDE PANEL: Brand info, key claims, barcode placeholder`,
-        `- RIGHT SIDE PANEL: Benefits, certifications, contact info`,
-        `- TOP FLAP: Brand logo, seal`,
-        `- BOTTOM FLAP: Batch info, manufacturing details`,
+        `=== PACKAGING TYPE: ${packagingFormat} ===`,
+        `Category: ${packagingCategory.toUpperCase()}`,
+        `Description: ${layoutStructure.description}`,
         "",
-        "COLOR PALETTE:",
+        "=== PANEL STRUCTURE ===",
+        `Arrangement: ${layoutStructure.arrangement}`,
+        `Dimensions: ${layoutStructure.dimensions}`,
+        "",
+        "PANELS TO INCLUDE:",
       ];
       
-      if (primaryColorHex) flatPromptParts.push(`- Primary: ${primaryColorHex}`);
-      if (secondaryColorHex) flatPromptParts.push(`- Secondary: ${secondaryColorHex}`);
-      if (accentColorHex) flatPromptParts.push(`- Accent: ${accentColorHex}`);
+      layoutStructure.panels.forEach((panel, index) => {
+        flatPromptParts.push(`${index + 1}. ${panel}`);
+      });
       
       flatPromptParts.push("");
-      flatPromptParts.push("FRONT PANEL CONTENT:");
+      flatPromptParts.push("=== DESIGN ELEMENTS (MUST MATCH 3D MOCKUP EXACTLY) ===");
+      flatPromptParts.push("");
+      flatPromptParts.push("COLOR PALETTE:");
+      if (primaryColorHex) flatPromptParts.push(`- Primary: ${primaryColorName || ''} ${primaryColorHex}`);
+      if (secondaryColorHex) flatPromptParts.push(`- Secondary: ${secondaryColorName || ''} ${secondaryColorHex}`);
+      if (accentColorHex) flatPromptParts.push(`- Accent: ${accentColorName || ''} ${accentColorHex}`);
+      
+      // Include the design tone (critical for matching the mockup)
+      if (suggestedTone) {
+        flatPromptParts.push("");
+        flatPromptParts.push("DESIGN TONE & AESTHETIC:");
+        flatPromptParts.push(`- Primary Tone: ${suggestedTone.primaryTone || suggestedTone.primary_tone || 'premium'}`);
+        if (suggestedTone.toneDescriptors || suggestedTone.tone_descriptors) {
+          const descriptors = suggestedTone.toneDescriptors || suggestedTone.tone_descriptors;
+          flatPromptParts.push(`- Style Descriptors: ${Array.isArray(descriptors) ? descriptors.join(', ') : descriptors}`);
+        }
+        flatPromptParts.push(`- Emotional Appeal: ${suggestedTone.emotionalAppeal || suggestedTone.emotional_appeal || 'trust-building'}`);
+        flatPromptParts.push(`- Copy Voice: ${suggestedTone.copyVoice || suggestedTone.copy_voice || 'authoritative'}`);
+      }
+      
+      flatPromptParts.push("");
+      flatPromptParts.push("GRAPHIC ELEMENTS (replicate from mockup):");
+      flatPromptParts.push("- Geometric shapes, wave patterns, or abstract elements as background");
+      flatPromptParts.push("- Gradient overlays or color-blocked sections");
+      flatPromptParts.push("- Icon badges (checkmarks, shields, certification seals)");
+      flatPromptParts.push("- Ribbon banners or badge shapes for key claims");
+      if (isPetProduct) {
+        flatPromptParts.push("- Pet imagery: paw prints, animal silhouettes, pet illustrations");
+      }
+      
+      flatPromptParts.push("");
+      flatPromptParts.push("TYPOGRAPHY STYLE:");
+      flatPromptParts.push("- Bold, condensed sans-serif for headlines");
+      flatPromptParts.push("- Strong size contrast between headline, subheads, and body");
+      flatPromptParts.push("- Modern grid layout with color-blocked sections");
+      if (headlineFont) flatPromptParts.push(`- Headline Font Style: ${headlineFont}`);
+      if (bodyFont) flatPromptParts.push(`- Body Font Style: ${bodyFont}`);
+      
+      flatPromptParts.push("");
+      flatPromptParts.push("=== FRONT PANEL CONTENT (EXACT TEXT) ===");
       if (frontPanelText) {
         flatPromptParts.push('"""');
         flatPromptParts.push(frontPanelText);
         flatPromptParts.push('"""');
-      }
-      
-      flatPromptParts.push("");
-      flatPromptParts.push("BACK PANEL CONTENT:");
-      flatPromptParts.push("- Supplement Facts box with structured layout");
-      flatPromptParts.push("- Directions for use");
-      flatPromptParts.push("- Ingredient list");
-      flatPromptParts.push("- Warnings and storage information");
-      flatPromptParts.push("- Manufacturer contact info");
-      
-      if (certifications?.length > 0) {
-        flatPromptParts.push("");
-        flatPromptParts.push(`CERTIFICATION SEALS TO INCLUDE: ${certifications.join(', ')}`);
+      } else if (primaryClaim) {
+        flatPromptParts.push(`Main headline: "${primaryClaim}"`);
       }
       
       if (flavorText) {
         flatPromptParts.push("");
-        flatPromptParts.push(`FLAVOR: "${flavorText}" - feature prominently on front panel`);
+        flatPromptParts.push(`FLAVOR CALLOUT: "${flavorText}" - display prominently below headline`);
+      }
+      
+      if (bulletPoints?.length > 0) {
+        flatPromptParts.push("");
+        flatPromptParts.push("BENEFIT BULLETS (with checkmarks):");
+        bulletPoints.slice(0, 5).forEach((bullet: string) => {
+          const colonIndex = bullet.indexOf(':');
+          const shortBullet = colonIndex > 0 
+            ? bullet.substring(0, colonIndex).trim()
+            : bullet.split(' ').slice(0, 8).join(' ');
+          flatPromptParts.push(`✓ ${shortBullet}`);
+        });
+      }
+      
+      if (keyDifferentiators?.length > 0) {
+        flatPromptParts.push("");
+        flatPromptParts.push(`FEATURE BADGES: ${keyDifferentiators.slice(0, 4).join(', ')}`);
       }
       
       flatPromptParts.push("");
-      flatPromptParts.push("DESIGN STYLE:");
-      if (suggestedTone) {
-        flatPromptParts.push(`- Tone: ${suggestedTone.primaryTone || suggestedTone.primary_tone || 'premium'}`);
+      flatPromptParts.push("=== BACK PANEL CONTENT ===");
+      flatPromptParts.push("- Supplement Facts box (structured table layout)");
+      flatPromptParts.push("- Directions for use section");
+      flatPromptParts.push("- Full ingredient list");
+      flatPromptParts.push("- Warnings and storage information");
+      flatPromptParts.push("- Manufacturer contact info");
+      flatPromptParts.push("- Barcode placeholder (UPC area)");
+      
+      if (certifications?.length > 0) {
+        flatPromptParts.push("");
+        flatPromptParts.push(`CERTIFICATION SEALS: ${certifications.join(', ')}`);
+        flatPromptParts.push("- Display as seal/badge graphics on front and/or back panel");
       }
-      flatPromptParts.push("- Clean, print-ready design");
-      flatPromptParts.push("- Sharp edges, high contrast");
-      flatPromptParts.push("- Text must be readable at actual print size");
-      flatPromptParts.push("- Professional packaging design aesthetic");
+      
+      if (trustSignalsList) {
+        flatPromptParts.push("");
+        flatPromptParts.push(`TRUST SIGNALS: ${trustSignalsList}`);
+      }
+      
+      // Product appearance for realistic chew/gummy imagery
+      if (productAppearance) {
+        flatPromptParts.push("");
+        flatPromptParts.push("PRODUCT IMAGERY:");
+        flatPromptParts.push(`- If showing product image: ${productAppearance.description}`);
+        flatPromptParts.push(`- Product colors: ${productAppearance.colors}`);
+      }
       
       flatPromptParts.push("");
-      flatPromptParts.push("OUTPUT FORMAT:");
-      flatPromptParts.push("- Flat 2D layout on white background");
-      flatPromptParts.push("- All panels connected showing fold lines");
-      flatPromptParts.push("- Print-ready proportions");
-      flatPromptParts.push("- No 3D perspective or shadows");
-      flatPromptParts.push("- Suitable for editing in Photoshop/Illustrator");
+      flatPromptParts.push("=== OUTPUT SPECIFICATIONS ===");
+      flatPromptParts.push("- Flat 2D dieline on clean white background");
+      flatPromptParts.push("- All panels connected with visible fold lines (dotted)");
+      flatPromptParts.push("- Print-ready proportions matching actual packaging dimensions");
+      flatPromptParts.push("- High contrast, sharp edges, readable text");
+      flatPromptParts.push("- Professional packaging design quality");
+      flatPromptParts.push("- Suitable for opening and editing in Photoshop/Illustrator");
+      flatPromptParts.push("- Include safe zone inside trim and bleed outside trim");
       
       prompt = flatPromptParts.join("\n");
     } else {

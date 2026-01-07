@@ -1098,6 +1098,29 @@ ${ourKeyFeatures.length > 0 ? ourKeyFeatures.map(f => `• ${f}`).join('\n') : '
 ## THINGS TO AVOID → POSITIVE CLAIMS:
 ${ourThingsToAvoid.length > 0 ? ourThingsToAvoid.slice(0, 4).map(a => `• No ${a} → "Free from ${a}"`).join('\n') : 'N/A'}
 
+## 🏷️ LABEL CALLOUTS EXTRACTION (CRITICAL!)
+
+Scan the COMPLETE FORMULA BRIEF DOCUMENT below and EXTRACT all consumer-facing label callouts.
+
+**LOOK FOR THESE CATEGORIES:**
+
+| Category | What to Look For | Example Callouts |
+|----------|------------------|------------------|
+| **Sugar/Sweetener** | "zero sugar", "reduced sugar", "sugar-free", "no added sugar", "low sugar", "2g sugar" | ZERO SUGAR, SUGAR FREE, LOW SUGAR (2G) |
+| **Diet/Lifestyle** | "vegan", "vegetarian", "plant-based", "keto", "paleo", "gelatin-free" | VEGAN, PLANT-BASED, KETO FRIENDLY |
+| **Allergen-Free** | "gluten-free", "dairy-free", "soy-free", "nut-free", "allergen-free", "no soy, dairy, gluten" | GLUTEN FREE, DAIRY FREE, SOY FREE |
+| **Clean Label** | "non-gmo", "organic", "natural", "no artificial", "no preservatives", "no artificial sweeteners" | NON-GMO, ORGANIC, NO ARTIFICIAL COLORS |
+| **Quality/Source** | "made in usa", "third-party tested", "gmp certified", "usp verified", "lab tested" | MADE IN USA, LAB TESTED, GMP CERTIFIED |
+| **Potency/Form** | "high potency", "maximum strength", "bioavailable", "chelated", "clinical dose" | HIGH POTENCY, MAXIMUM ABSORPTION |
+
+**HOW TO PRIORITIZE (in order):**
+
+1. **First**: Match what TOP COMPETITORS feature on their labels (from image analysis above)
+2. **Second**: Include unique differentiators from our formula that competitors DON'T have
+3. **Third**: Pick callouts that address top customer complaints (e.g., "NO ARTIFICIAL TASTE")
+
+**You MUST include 3-5 of these callouts in your front_panel_text as a dedicated row!**
+
 ## 📄 COMPLETE FORMULA BRIEF DOCUMENT:
 ════════════════════════════════════════════════════════════════════════════════
 ${formulaBriefContent || 'No formula brief content available'}
@@ -1229,9 +1252,11 @@ The mockup generator will copy this text VERBATIM onto the label. Include:
 2. Product Name (largest, center)
 3. Primary Claim or X-in-1 statement
 4. 2-3 KEY benefit points (EXTRACTED from your bullet_points - pick the MOST IMPACTFUL)
-5. Quantity/Count (e.g., "90 Gummies", "60 Softgels")
-6. Flavor text (if applicable)
-7. ONE trust signal or certification (e.g., "Lab Tested", "GMP Certified")
+5. **LABEL CALLOUTS ROW** (pick 3-5 from your extraction above):
+   - Format as badges: "VEGAN • ZERO SUGAR • NON-GMO • GLUTEN FREE"
+   - Prioritize: (1) what competitors show, (2) our unique differentiators, (3) customer complaint solutions
+6. Quantity/Count + Flavor (e.g., "90 Gummies | Natural Berry Flavor")
+7. ONE trust signal footer (e.g., "Made in USA • cGMP Certified")
 
 **FORMAT EXAMPLE (your front_panel_text should look like this):**
 \`\`\`
@@ -1245,6 +1270,8 @@ MAGNACALM SLEEP COMPLEX
 ✓ Promotes Natural Relaxation  
 ✓ Non-Habit Forming
 
+VEGAN • ZERO SUGAR • NON-GMO • GLUTEN FREE
+
 90 Gummies | Natural Berry Flavor
 
 Made in USA • cGMP Certified
@@ -1254,7 +1281,8 @@ Made in USA • cGMP Certified
 - Create front_panel_text that only has brand name and claim
 - Leave out the key selling points (include 2-3 from bullet_points)
 - Forget quantity and flavor
-- Make it too long (max 10 lines)
+- **Skip the label callouts row** (this is often what SELLS the product!)
+- Make it too long (max 12 lines)
 
 The front_panel_text IS the complete label copy. Nothing else will be added.
 

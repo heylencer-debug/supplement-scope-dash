@@ -27,9 +27,9 @@ serve(async (req) => {
       console.log(`Has valid reference image for flat layout: ${hasValidReferenceImage}`);
     }
     
-    const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
-    if (!OPENROUTER_API_KEY) {
-      throw new Error("OPENROUTER_API_KEY is not configured");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) {
+      throw new Error("LOVABLE_API_KEY is not configured");
     }
 
     // Validate required design data
@@ -425,87 +425,60 @@ serve(async (req) => {
       }
     }
     
-    // Add FLAVOR IMAGERY if detected (CRITICAL for visual appeal)
+    // Add FLAVOR IMAGERY if detected (OPTIONAL - use tastefully)
     if (flavorImagery) {
       promptParts.push("");
-      promptParts.push("=== FLAVOR IMAGERY (CRITICAL - MUST INCLUDE PROMINENTLY) ===");
-      promptParts.push(`Based on the "${flavorText}" flavor, include PROMINENT and APPETIZING fruit/ingredient imagery:`);
-      promptParts.push(`- Feature: ${flavorImagery.fruit}`);
-      promptParts.push(`- Color palette influence: ${flavorImagery.colors}`);
-      promptParts.push(`- Visual style: ${flavorImagery.style}`);
-      promptParts.push("- The fruit/ingredient should be PHOTOREALISTIC or beautifully illustrated");
-      promptParts.push("- Position PROMINENTLY - as hero image element, floating around product, or integrated into design");
-      promptParts.push("- Include juice splashes, droplets, or fresh/vibrant effects for appetite appeal");
-      promptParts.push("- Fruit should look fresh, glossy, and delicious - not flat or generic");
-      promptParts.push("- Use the fruit colors to influence accent colors and gradients on the packaging");
+      promptParts.push("=== FLAVOR IMAGERY (OPTIONAL - USE TASTEFULLY) ===");
+      promptParts.push(`Flavor detected: "${flavorText}"`);
+      promptParts.push(`- MAY include: ${flavorImagery.fruit}`);
+      promptParts.push(`- Color influence: ${flavorImagery.colors}`);
+      promptParts.push("");
+      promptParts.push("RESTRAINT GUIDELINES:");
+      promptParts.push("- Include fruit imagery ONLY if it fits naturally into a clean design");
+      promptParts.push("- Keep it SMALL and ELEGANT - NOT oversized or splashy");
+      promptParts.push("- Position as a subtle accent, not the dominant element");
+      promptParts.push("- If the design looks cleaner without fruit, leave it out entirely");
+      promptParts.push("- NO juice splashes, droplets, or 'fresh burst' effects - keep it refined");
+      promptParts.push("- Prioritize clean, professional appearance over flavor imagery");
       promptParts.push("=== END FLAVOR IMAGERY ===");
     }
 
-    // DECORATIVE PATTERN STYLE - Creative and distinctive
+    // CLEAN, PROFESSIONAL DESIGN - Less is more
     promptParts.push("");
-    promptParts.push("=== DECORATIVE PATTERN STYLE (BE CREATIVE - NOT GENERIC) ===");
-    promptParts.push("Choose ONE distinctive pattern style for background elements (pick what best matches the product tone):");
+    promptParts.push("=== DESIGN PHILOSOPHY: PROFESSIONAL RESTRAINT ===");
+    promptParts.push("Create a CLEAN, PREMIUM, UNCLUTTERED design. Less is more.");
     promptParts.push("");
-    promptParts.push("OPTION A - GEOMETRIC MODERN:");
-    promptParts.push("- Bold hexagonal grids, triangular tessellations, or diamond lattice patterns");
-    promptParts.push("- Inspired by honeycomb structures, crystal formations, or Art Deco geometry");
-    promptParts.push("- Sharp, precise lines with gradient fills in brand colors");
-    promptParts.push("- Think: scientific, structured, premium supplement aesthetic");
+    promptParts.push("BACKGROUND:");
+    promptParts.push("- Use clean color blocking OR subtle gradients - NOT busy patterns");
+    promptParts.push("- Maximum 2-3 colors in background");
+    promptParts.push("- Leave GENEROUS white/negative space for breathing room");
+    promptParts.push("- Solid colors or simple gradients work best");
     promptParts.push("");
-    promptParts.push("OPTION B - ORGANIC FLOW:");
-    promptParts.push("- Flowing liquid shapes, topographic contour lines, or wood grain patterns");
-    promptParts.push("- Organic blob shapes with soft feathered edges");
-    promptParts.push("- Nature-inspired curves, waves, and fluid dynamics");
-    promptParts.push("- Think: natural, wellness, holistic health aesthetic");
+    promptParts.push("GRAPHIC ELEMENTS (USE SPARINGLY - pick only 1-2 total):");
+    promptParts.push("- ONE simple geometric accent (subtle shape or line) OR");
+    promptParts.push("- ONE minimal botanical element (single leaf/stem, not full pattern) OR");
+    promptParts.push("- ONE subtle texture overlay (very light grain only)");
     promptParts.push("");
-    promptParts.push("OPTION C - PLAYFUL MEMPHIS:");
-    promptParts.push("- Confetti dots, squiggles, zig-zags, and abstract geometric shapes");
-    promptParts.push("- Bold outlines on shapes, fun and energetic scattered elements");
-    promptParts.push("- 80s/90s Memphis design revival, bold color blocking");
-    promptParts.push("- Think: fun, youthful, energetic pet or vitamin brand");
+    promptParts.push("AVOID (DO NOT INCLUDE):");
+    promptParts.push("- Multiple pattern styles on one package");
+    promptParts.push("- Busy backgrounds competing with text");
+    promptParts.push("- Too many decorative elements");
+    promptParts.push("- Confetti, scattered shapes, squiggles");
+    promptParts.push("- Juice splashes or 'burst' effects");
+    promptParts.push("- Overcrowded layouts");
     promptParts.push("");
-    promptParts.push("OPTION D - BOTANICAL LINE ART:");
-    promptParts.push("- Delicate leaf outlines, botanical illustrations, floral linework");
-    promptParts.push("- Hand-drawn quality with elegant thin strokes");
-    promptParts.push("- Nature and wellness aesthetic with subtle vine/leaf patterns");
-    promptParts.push("- Think: natural, organic, herbalist/apothecary aesthetic");
-    promptParts.push("");
-    promptParts.push("OPTION E - ABSTRACT BRUSHSTROKE:");
-    promptParts.push("- Watercolor splashes, paint strokes, ink brush marks");
-    promptParts.push("- Artistic, handmade quality with visible texture");
-    promptParts.push("- Dynamic movement and expressive energy");
-    promptParts.push("- Think: artisanal, craft, premium handmade aesthetic");
-    promptParts.push("");
-    promptParts.push("MAKE THE PATTERN DISTINCTIVE AND MEMORABLE - avoid generic gradients or plain backgrounds!");
-    promptParts.push("=== END PATTERN STYLE ===");
-    promptParts.push("");
-    promptParts.push("ADDITIONAL GRAPHIC ELEMENTS:");
-    promptParts.push("- Use modern flat icons for benefits (checkmarks, shields, leaf icons, medical cross)");
-    promptParts.push("- Include ribbon banners or badge shapes for key claims like 'X-in-1' or 'Vet Recommended'");
-    promptParts.push("- Add subtle texture or grain effect for premium tactile feel");
-    if (isPetProduct) {
-      promptParts.push("- Include paw print icons, bone shapes, or pet silhouettes as decorative accent elements");
-      promptParts.push("- Consider a stylized pet illustration (line art or flat design) as a hero element");
-    }
+    promptParts.push("REFERENCE BRANDS (clean, premium aesthetic):");
+    promptParts.push("- Ritual: Elegant simplicity, white space, sophisticated");
+    promptParts.push("- AG1: Clean lines, scientific credibility, minimal");
+    promptParts.push("- Seed: Ultra-minimal, premium, uncluttered");
+    promptParts.push("=== END DESIGN PHILOSOPHY ===")
 
     // MODERN LAYOUT & TYPOGRAPHY
     promptParts.push("");
-    promptParts.push("MODERN LAYOUT & TYPOGRAPHY:");
-    promptParts.push("- Use BOLD, condensed sans-serif for headlines (like Montserrat Black, Avenir Heavy, Proxima Nova Bold)");
-    promptParts.push("- Strong size contrast: headline very large, subheads medium, body small");
-    promptParts.push("- Asymmetric or modern grid layout - NOT boring centered design");
-    promptParts.push("- Color-blocked sections to organize information (header zone, benefits zone, details zone)");
-    promptParts.push("- Floating badges or callout bubbles for key claims");
-    promptParts.push("- Consider angled elements or diagonal lines for dynamic energy");
-
-    // DESIGN INSPIRATION
-    promptParts.push("");
-    promptParts.push("DESIGN INSPIRATION (match this premium aesthetic):");
-    promptParts.push("- AG1/Athletic Greens: Clean lines, scientific credibility, bold green, modern minimalism");
-    promptParts.push("- Ritual: Elegant simplicity, lots of white space, sophisticated typography");
-    promptParts.push("- Native Pet: Bold claims, playful colors, friendly but premium");
-    promptParts.push("- Ollie/Open Farm: Nature-inspired but modern, premium pet aesthetic");
-    promptParts.push("- Think 2024 D2C supplement brand, not 2010 GNC shelf product");
+    promptParts.push("TYPOGRAPHY:");
+    promptParts.push("- Bold sans-serif for headlines, clean hierarchy");
+    promptParts.push("- Strong size contrast between headline and body");
+    promptParts.push("- Clear, readable text - prioritize legibility");
 
     promptParts.push("");
     promptParts.push("=== CONTAINER SHAPE (CRITICAL - FOLLOW EXACTLY) ===");
@@ -800,7 +773,7 @@ serve(async (req) => {
       prompt = promptParts.join("\n");
     }
 
-    console.log(`Generating ${isFlat ? 'flat layout' : 'product mockup'} with Nano Banana Pro via OpenRouter`);
+    console.log(`Generating ${isFlat ? 'flat layout' : 'product mockup'} with Lovable AI Gateway`);
     console.log("Design brief received:", JSON.stringify(designBrief, null, 2));
     console.log("Generated prompt:", prompt);
 
@@ -843,22 +816,22 @@ ${prompt}`;
       messageContent = prompt;
     }
 
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    // Use Lovable AI Gateway for higher quality image generation
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://lovable.dev",
-        "X-Title": "Noodle Search"
       },
       body: JSON.stringify({
-        model: "google/gemini-3-pro-image-preview",
+        model: "google/gemini-2.5-flash-image-preview",
         messages: [
           {
             role: "user",
             content: messageContent
           }
-        ]
+        ],
+        modalities: ["image", "text"]
       })
     });
 

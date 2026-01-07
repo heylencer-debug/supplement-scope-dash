@@ -445,28 +445,37 @@ serve(async (req) => {
     promptParts.push("- The primary color should be IMMEDIATELY visible as the dominant color");
     promptParts.push("=== END MANDATORY COLORS ===");
 
-    // EXACT FRONT PANEL TEXT - This is the MOST IMPORTANT section
-    // The AI must render THIS EXACT TEXT on the front of the package
+    // EXACT FRONT PANEL TEXT - This is the MOST IMPORTANT and NON-NEGOTIABLE section
     promptParts.push("");
-    promptParts.push("=== CRITICAL: EXACT FRONT PANEL TEXT TO RENDER ===");
-    promptParts.push("The following text MUST appear on the front of the package EXACTLY as written:");
-    promptParts.push("(Render this text clearly and legibly on the label)");
-    promptParts.push("");
-    promptParts.push(`🏷️ BRAND NAME (top of label, stylized like a logo): "${brandName}"`);
-    promptParts.push(`📦 PRODUCT NAME (largest text, center focus): "${productName}"`);
+    promptParts.push("=== ⚠️ MANDATORY FRONT PANEL TEXT (NON-NEGOTIABLE) ===");
+    promptParts.push("You MUST render ALL of the following text on the front of the package.");
+    promptParts.push("This is the COMPLETE front panel copy plan - use it EXACTLY.");
+    promptParts.push("DO NOT invent, add, or modify any text. Render ONLY what's provided below.");
     promptParts.push("");
     
     if (frontPanelText) {
-      promptParts.push("ADDITIONAL FRONT PANEL TEXT:");
-      promptParts.push('"""');
+      promptParts.push("=== EXACT TEXT TO RENDER (COPY THIS VERBATIM) ===");
+      promptParts.push("```");
       promptParts.push(frontPanelText);
-      promptParts.push('"""');
-    } else if (primaryClaim) {
-      promptParts.push(`Main claim: "${primaryClaim}"`);
+      promptParts.push("```");
+      promptParts.push("");
+      promptParts.push("⚠️ CRITICAL TEXT RULES:");
+      promptParts.push("1. Render EVERY line of text above on the front label");
+      promptParts.push("2. Use the EXACT wording - do not paraphrase or change");
+      promptParts.push("3. Brand name and product name come FROM the text above");
+      promptParts.push("4. Maintain the text hierarchy (top to bottom = top to bottom on label)");
+      promptParts.push("5. DO NOT add any text that isn't in the content plan above");
+    } else {
+      // Fallback only if no front panel text provided
+      promptParts.push(`🏷️ BRAND NAME (top of label, stylized): "${brandName}"`);
+      promptParts.push(`📦 PRODUCT NAME (largest text): "${productName}"`);
+      if (primaryClaim) {
+        promptParts.push(`Main claim: "${primaryClaim}"`);
+      }
     }
     
     promptParts.push("");
-    promptParts.push("=== END EXACT TEXT ===");
+    promptParts.push("=== END MANDATORY TEXT ===");
     promptParts.push("");
     promptParts.push("ADDITIONAL LABEL ELEMENTS:");
     
@@ -533,11 +542,11 @@ serve(async (req) => {
       const prominence = heroImagery.prominence || 'hero';
       if (prominence === 'hero') {
         promptParts.push("");
-        promptParts.push("THIS IS THE MAIN VISUAL ELEMENT - MANDATORY:");
-        promptParts.push("- Feature PROMINENTLY on the front panel - this is the HERO");
-        promptParts.push("- Should be immediately eye-catching and appetizing");
-        promptParts.push("- Take up 20-30% of the front label area");
+        promptParts.push("THIS IS THE MAIN VISUAL ELEMENT - OLLY-STYLE (15-20% OF LABEL):");
+        promptParts.push("- SIZE: Take up 15-20% of the front label area minimum");
+        promptParts.push("- Should be immediately eye-catching and appetizing (Olly-style)");
         promptParts.push("- Use photorealistic style with natural shine and vibrancy");
+        promptParts.push("- Add subtle splash, droplet, or glow effects for dynamism");
         promptParts.push("- DO NOT replace with generic abstract shapes or wellness icons");
       } else if (prominence === 'accent') {
         promptParts.push("");
@@ -555,24 +564,32 @@ serve(async (req) => {
       promptParts.push("=== END HERO IMAGERY ===");
       
     } else if (flavorImagery) {
-      // FALLBACK: Use hardcoded flavorToImagery mapping if AI didn't provide hero_imagery
-      promptParts.push("=== FLAVOR IMAGERY (VIBRANT & LIVELY) ===");
+      // FALLBACK: Use hardcoded flavorToImagery mapping - OLLY STYLE
+      promptParts.push("=== 🍇 FLAVOR GRAPHICS - OLLY-STYLE (15-20% OF LABEL) ===");
       promptParts.push(`Flavor: "${flavorText}"`);
       promptParts.push(`- Feature: ${flavorImagery.fruit}`);
       promptParts.push(`- Colors: ${flavorImagery.colors}`);
       promptParts.push("");
-      promptParts.push("FRUIT/INGREDIENT STYLING (make it POP):");
-      promptParts.push("- Fresh, vibrant, photorealistic with natural shine");
-      promptParts.push("- Bright, saturated colors - should look JUICY and APPETIZING");
-      promptParts.push("- Natural lighting with subtle highlights");
-      promptParts.push("- Position as a HERO element - prominent but balanced");
-      promptParts.push("- Can use a few scattered pieces or one beautiful arrangement");
+      promptParts.push("OLLY-STYLE FLAVOR GRAPHICS (MANDATORY):");
+      promptParts.push("- SIZE: Take up 15-20% of the front label area - PROMINENT, not subtle");
+      promptParts.push("- STYLE: Bold, saturated, photorealistic fruit/ingredient imagery");
+      promptParts.push("- PLACEMENT: Position as a HERO element - either:");
+      promptParts.push("  • Top/bottom banner area with fruit arrangement");
+      promptParts.push("  • Side accent with fruits extending beyond label edge");
+      promptParts.push("  • Corner cluster with juice splash effect");
+      promptParts.push("- QUALITY: Fresh, vibrant, juicy - should look APPETIZING");
+      promptParts.push("- ENERGY: Dynamic, not static - use splashes, droplets, or movement");
       promptParts.push("");
-      promptParts.push("KEEP IT PROFESSIONAL:");
-      promptParts.push("- NO cartoon/illustrated style - use photorealistic");
-      promptParts.push("- NO excessive splashes or explosions");
-      promptParts.push("- Clean composition - imagery enhances, doesn't overwhelm");
-      promptParts.push("=== END FLAVOR IMAGERY ===");
+      promptParts.push("REFERENCE: Olly supplements - bold fruit imagery that takes real visual space");
+      promptParts.push("- NOT a tiny icon - a MAJOR design element");
+      promptParts.push("- Fruit should have shine, texture, and depth");
+      promptParts.push("- Can overlap slightly with other elements for dynamism");
+      promptParts.push("");
+      promptParts.push("⚠️ DO NOT:");
+      promptParts.push("- Use tiny fruit icons (less than 10% of label)");
+      promptParts.push("- Use flat/illustrated style - must be photorealistic");
+      promptParts.push("- Hide fruit in a corner where it's barely visible");
+      promptParts.push("=== END FLAVOR GRAPHICS ===");
       
     } else if (isDogProduct) {
       // FALLBACK: Pet product imagery

@@ -1142,12 +1142,38 @@ For EACH strategy, you MUST decide what HERO VISUAL IMAGERY should appear on the
    - What imagery do successful competitors prominently feature?
    - Match their imagery approach OR differentiate strategically
 
+## 🖼️ PROMINENCE LEVELS - UNDERSTAND THESE:
+
+**For HUMAN SUPPLEMENTS** (gummies, capsules, powders):
+- DEFAULT to 'accent' prominence (NOT 'hero')
+- Fruit/ingredient imagery should be SMALL and SUPPORTING
+- The main focus should always be product name and claims
+- Think: Olly, Ritual, HUM - subtle fruit accents, not fruit explosions
+
+**'hero' prominence** (20-30% of label): ONLY use for:
+- Pet products featuring dogs/cats
+- Products where the imagery IS the product (e.g., protein powder with athletes)
+- Lifestyle supplements with human imagery
+
+**'accent' prominence** (8-12% of label): DEFAULT for:
+- Human supplements with fruit flavors
+- Ingredient-based imagery
+- Any flavor-based imagery
+
+**'subtle' prominence** (5% or less): Use for:
+- Abstract background elements
+- Watermark-style imagery
+
+**'none'**: Use for:
+- Clinical/pharmaceutical aesthetic
+- Unflavored products
+
 **Output hero_imagery with:**
 - \`imagery_type\`: fruit/ingredient/animal/abstract/lifestyle/product_form/none
 - \`primary_visual\`: SPECIFIC description (e.g., "fresh mixed berries with natural shine and dewdrops", NOT just "berries")
 - \`visual_style\`: photorealistic/illustrated/silhouette/abstract/photography
-- \`prominence\`: hero (main element 20-30% of label), accent (supporting), subtle (background), none
-- \`placement\`: Where on packaging
+- \`prominence\`: accent (DEFAULT for human supplements), hero (pet products only), subtle, none
+- \`placement\`: Where on packaging (corner, near flavor text, bottom accent)
 - \`reasoning\`: Why you chose this based on all factors above
 
 ## YOUR DELIVERABLES (FOR EACH STRATEGY):

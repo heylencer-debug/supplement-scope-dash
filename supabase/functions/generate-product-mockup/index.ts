@@ -317,53 +317,99 @@ serve(async (req) => {
     ];
     
     // =================================================================
-    // HERO IMAGERY - PUT THIS FIRST (AI image models weight the beginning)
+    // VISUAL HIERARCHY FOR SUPPLEMENTS (ADD THIS FIRST)
+    // =================================================================
+    promptParts.push("");
+    promptParts.push("=== VISUAL HIERARCHY FOR SUPPLEMENTS (FOLLOW THIS ORDER) ===");
+    promptParts.push("1. BRAND NAME / LOGO - Top of label, prominent");
+    promptParts.push("2. PRODUCT NAME - Largest text, main focus (e.g., 'Magnesium Sleep Gummy')");
+    promptParts.push("3. PRIMARY CLAIM - Key benefit statement, second largest");
+    promptParts.push("4. BENEFIT BULLETS - Clear, readable, with checkmarks/icons");
+    promptParts.push("5. FLAVOR TEXT - Visible but not dominant (e.g., 'Natural Mixed Berry Flavor')");
+    promptParts.push("6. FLAVOR IMAGERY - Small accent only, NOT the hero element");
+    promptParts.push("7. CERTIFICATIONS/BADGES - Bottom area, small but visible");
+    promptParts.push("");
+    promptParts.push("THE PACKAGING SHOULD CLEARLY READ AS A SUPPLEMENT, NOT A FOOD/DRINK PRODUCT.");
+    promptParts.push("=== END HIERARCHY ===");
+    promptParts.push("");
+    
+    // =================================================================
+    // HERO IMAGERY - REDUCED PROMINENCE FOR SUPPLEMENTS
     // =================================================================
     if (heroImagery && (heroImagery.primary_visual || heroImagery.primaryVisual)) {
       const primaryVisual = heroImagery.primary_visual || heroImagery.primaryVisual;
       const visualStyle = heroImagery.visual_style || heroImagery.visualStyle || 'photorealistic';
-      const prominence = heroImagery.prominence || 'hero';
+      const prominence = heroImagery.prominence || 'accent'; // DEFAULT TO ACCENT, NOT HERO
       
-      promptParts.push("=== 🍇 MANDATORY HERO VISUAL IMAGERY (NON-NEGOTIABLE) ===");
-      promptParts.push("The packaging MUST prominently feature this specific imagery:");
+      promptParts.push("=== FLAVOR/INGREDIENT IMAGERY (SUPPORTING ELEMENT - NOT MAIN FOCUS) ===");
       promptParts.push("");
-      promptParts.push(`MAIN VISUAL ELEMENT: ${primaryVisual}`);
-      promptParts.push(`STYLE: ${visualStyle}, vibrant, appetizing, natural-looking`);
+      promptParts.push("THIS IS A SUPPLEMENT PRODUCT, NOT A BEVERAGE OR FOOD PRODUCT.");
+      promptParts.push("The imagery should SUPPORT the packaging design, not DOMINATE it.");
       promptParts.push("");
-      promptParts.push("PLACEMENT & SIZE:");
+      promptParts.push(`IMAGERY TO INCLUDE: ${primaryVisual}`);
+      promptParts.push(`STYLE: ${visualStyle}`);
+      promptParts.push("");
+      promptParts.push("🚨 CRITICAL SIZE & PLACEMENT RULES:");
       if (prominence === 'hero' || prominence === 'main') {
-        promptParts.push("- This is the HERO element - takes up 20-30% of the front label");
-        promptParts.push("- Position prominently on the front panel where it's immediately visible");
-      } else if (prominence === 'accent') {
-        promptParts.push("- Feature as a supporting visual element");
-        promptParts.push("- Position near the flavor text or product name");
+        // Only pet products should have hero prominence
+        promptParts.push("- Imagery takes up 15-20% of the front label (pet products only)");
+        promptParts.push("- Position prominently but product name is still the MAIN focus");
+      } else {
+        // Human supplements default to accent prominence
+        promptParts.push("- Imagery should take up 8-12% of the front label AT MOST");
+        promptParts.push("- Position as ACCENT element - corner, bottom, or alongside flavor text");
+        promptParts.push("- DO NOT make fruit/ingredients the CENTER of the design");
+        promptParts.push("- The PRODUCT NAME and CLAIMS should be the main focus");
+        promptParts.push("- Fruit imagery should be SMALLER than the headline text");
       }
       promptParts.push("");
-      promptParts.push("VISUAL QUALITY:");
-      promptParts.push("- Photorealistic quality with natural shine/texture");
-      promptParts.push("- Vibrant colors that pop and look appetizing");
-      promptParts.push("- Professional food photography style");
-      promptParts.push("- May include water droplets, natural lighting, fresh appearance");
+      promptParts.push("✅ GOOD EXAMPLES (what to do):");
+      promptParts.push("- Small cluster of berries near the 'Mixed Berry Flavor' text");
+      promptParts.push("- Subtle fruit accent in corner with main focus on product benefits");
+      promptParts.push("- Think Olly vitamins, Ritual, HUM - small fruit accents, not fruit explosions");
       promptParts.push("");
-      promptParts.push("⚠️ THIS IS NON-NEGOTIABLE - DO NOT generate a plain/minimalist label without this imagery");
-      promptParts.push("=== END MANDATORY HERO VISUAL ===");
+      promptParts.push("❌ BAD EXAMPLES (what to avoid):");
+      promptParts.push("- Large fruit taking up center of label (looks like juice/smoothie)");
+      promptParts.push("- Fruit bigger than product name");
+      promptParts.push("- Fruit splash effects covering the label");
+      promptParts.push("- Design that could be mistaken for a beverage");
+      promptParts.push("");
+      promptParts.push("THE MAIN FOCUS MUST BE: Product name → Primary claim → Benefits");
+      promptParts.push("=== END IMAGERY GUIDANCE ===");
       promptParts.push("");
     }
     
     promptParts.push("DESIGN PHILOSOPHY: Premium and professional, but informative. Think Ritual, AG1, or high-end pet brands like Open Farm or Ollie.");
     promptParts.push("");
 
-    // Colors
-    promptParts.push("COLOR PALETTE:");
+    // =================================================================
+    // MANDATORY COLOR PALETTE (EXTRACTED FROM COMPETITOR ANALYSIS)
+    // =================================================================
+    promptParts.push("");
+    promptParts.push("=== 🎨 MANDATORY COLOR PALETTE (NON-NEGOTIABLE) ===");
+    promptParts.push("These colors were extracted from TOP-PERFORMING competitor packaging.");
+    promptParts.push("You MUST use these EXACT colors - do not interpret or improve them.");
+    promptParts.push("");
     if (primaryColorHex) {
-      promptParts.push(`- Primary brand color: ${primaryColorHex}`);
+      promptParts.push(`PRIMARY COLOR: ${primaryColorHex}`);
+      promptParts.push(`- This is the DOMINANT color - use for background, main label area, or largest color blocks`);
+      promptParts.push(`- Extracted from the #1 selling competitor - MATCH IT EXACTLY`);
     }
     if (secondaryColorHex) {
-      promptParts.push(`- Secondary color: ${secondaryColorHex}`);
+      promptParts.push(`SECONDARY COLOR: ${secondaryColorHex}`);
+      promptParts.push(`- Use for headlines, accents, or secondary panels`);
     }
     if (accentColorHex) {
-      promptParts.push(`- Accent color: ${accentColorHex}`);
+      promptParts.push(`ACCENT COLOR: ${accentColorHex}`);
+      promptParts.push(`- Use for small accents, icons, or highlights`);
     }
+    promptParts.push("");
+    promptParts.push("⚠️ COLOR RULES:");
+    promptParts.push("- Use ONLY these 3 colors (plus white/black for text if needed)");
+    promptParts.push("- DO NOT add new colors that 'look better'");
+    promptParts.push("- DO NOT invert or complement these colors");
+    promptParts.push("- The primary color should be IMMEDIATELY visible as the dominant color");
+    promptParts.push("=== END MANDATORY COLORS ===");
 
     // EXACT FRONT PANEL TEXT - This is the MOST IMPORTANT section
     // The AI must render THIS EXACT TEXT on the front of the package

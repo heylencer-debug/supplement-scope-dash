@@ -65,6 +65,8 @@ serve(async (req) => {
     
     // NEW: Get AI-decided hero imagery from packaging analysis
     const heroImagery = designBrief.heroImagery || designBrief.hero_imagery;
+    console.log("Hero imagery received:", JSON.stringify(heroImagery));
+    console.log("Colors received:", { primary: primaryColorHex, secondary: secondaryColorHex, accent: accentColorHex });
     
     // Get recommended packaging format (e.g., "Resealable Stand-Up Pouch", "Wide-Mouth Jar", "Bottle")
     const packagingFormat = designBrief.packagingFormat || "supplement bottle";

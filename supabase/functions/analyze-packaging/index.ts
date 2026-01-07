@@ -519,6 +519,7 @@ ${newWinnerSummary}
           const messagingTone = analysis.messaging_tone || {};
           const productContents = analysis.product_contents || {};
           const packaging = analysis.packaging || {};
+          const designImpact = analysis.design_impact || {};
           
           // Extract X-in-1 claims for use in match-or-improve strategy
           const xIn1Claim = labelContent.x_in_1_claim || 
@@ -574,7 +575,14 @@ ${completeVisibleText || 'No text extracted'}
    • Type: ${packaging.type || 'N/A'}
    • Material: ${packaging.material || 'N/A'}
    • Color: ${packaging.color || 'N/A'}
-   • Features: ${(packaging.features as string[])?.join(', ') || 'N/A'}`;
+   • Features: ${(packaging.features as string[])?.join(', ') || 'N/A'}
+
+🎨 EXTRACTED HEX COLORS (CRITICAL - COPY THESE EXACT CODES):
+   • Primary Color HEX: ${designImpact.primary_color_hex || 'Not extracted'}
+   • Secondary Color HEX: ${designImpact.secondary_color_hex || 'Not extracted'}
+   • Accent Color HEX: ${designImpact.accent_color_hex || 'Not extracted'}
+   • Dominant Colors: ${(designImpact.dominant_colors as string[])?.join(', ') || 'N/A'}
+   • Color Psychology: ${designImpact.color_psychology || 'N/A'}`;
         }).join('\n\n')
       : 'No per-product image analysis available - analyze packaging images first (Step 1)';
     
@@ -1093,29 +1101,41 @@ ${perProductImageAnalysisSummary}
 4. Every claim MUST be verifiable from our formulation document
 5. Match competitor visual styles (colors, fonts, layout) while being strategically different on claims
 
-## 🎨 COLOR MATCHING RULES (CRITICAL - READ CAREFULLY)
+## 🎨 COLOR MATCHING RULES (CRITICAL - NON-NEGOTIABLE)
 
-Your design_brief colors MUST be extracted DIRECTLY from competitor packaging images analyzed above.
+Your design_brief colors MUST BE COPIED from the "EXTRACTED HEX COLORS" sections above.
+
+**LOOK AT THE HEX CODES ABOVE AND COPY THEM EXACTLY:**
+
+Each competitor product in the "PER-PRODUCT IMAGE ANALYSIS" section has:
+- Primary Color HEX: (e.g., #DC143C) ← COPY THIS
+- Secondary Color HEX: (e.g., #8B008B) ← COPY THIS
+- Accent Color HEX: (e.g., #FFFFFF) ← COPY THIS
 
 **For MATCH LEADERS Strategy:**
-- Your primary_color MUST be the EXACT dominant color from the #1 best-seller's packaging
-- Your secondary_color MUST be the EXACT secondary color from top performers
-- Extract these DIRECTLY from the competitor images - DO NOT interpret or "improve" them
-- If the #1 seller uses WHITE as primary, use WHITE (#FFFFFF or similar)
-- If the #1 seller uses DARK BLUE, use DARK BLUE with the exact hex they use
-- Look at the image analysis above and match the SPECIFIC hex codes from top performers
+- Find the #1 best-seller in the competitor list above
+- COPY their Primary Color HEX into your design_brief.primary_color.hex
+- COPY their Secondary Color HEX into your design_brief.secondary_color.hex
+- DO NOT MODIFY OR "IMPROVE" THESE CODES - USE THEM EXACTLY
 
 **For MATCH DISRUPTORS Strategy:**
-- Extract colors DIRECTLY from the new winner/disruptor with highest momentum
-- Match their bold/aggressive palette EXACTLY as seen in their packaging
-- These are often more vibrant or unexpected colors - use EXACTLY what you see
+- Find the highest-momentum new winner in the competitor list
+- COPY their exact hex codes the same way
 
-**COLOR EXTRACTION RULES:**
-- DO NOT invent new colors that look "better" or "more premium"
-- DO NOT use opposite colors to "differentiate" - that defeats the purpose of matching
-- DO NOT default to clinical white if competitors use bold colors
-- DO NOT use your own aesthetic preferences - MATCH what works
-- LOOK at the hex codes extracted in the image analysis section above and USE THOSE
+**FORBIDDEN (will be rejected):**
+- Inventing hex codes not listed in the competitor analysis above
+- Using "Pharmaceutical White" (#FFFFFF) if competitors use vibrant colors like red/purple
+- Using gold/premium colors unless a top competitor actually uses them
+- Defaulting to safe/neutral colors when competitors use bold colors
+- Any hex code that doesn't appear in the "EXTRACTED HEX COLORS" sections above
+
+**EXAMPLE:**
+If competitor #1 shows: "Primary Color HEX: #DC143C, Secondary Color HEX: #8B008B"
+Your MATCH LEADERS design_brief MUST have:
+- primary_color: { hex: "#DC143C", name: "Cherry Red" }
+- secondary_color: { hex: "#8B008B", name: "Violet" }
+
+DO NOT DEVIATE. COPY THE EXACT HEX CODES FROM ABOVE.
 
 ## 🎨 HERO IMAGERY DECISION (CRITICAL FOR MOCKUP GENERATION)
 

@@ -437,9 +437,14 @@ function MockupCard({
       const { data, error } = await supabase.functions.invoke('generate-product-mockup', {
         body: {
           designBrief: {
+            // Brand & Product Identity
+            brandName: (designBrief as any).brand_name || 'PREMIUM',
+            productName: (designBrief as any).product_name || designBrief.primary_claim,
+            // Colors
             primaryColor: { hex: editedPrimaryColor, name: strategy.design_brief?.primary_color?.name || 'Primary' },
             secondaryColor: { hex: editedSecondaryColor, name: strategy.design_brief?.secondary_color?.name || 'Secondary' },
             accentColor: { hex: editedAccentColor, name: strategy.design_brief?.accent_color?.name || 'Accent' },
+            // Claims & Content
             primaryClaim: designBrief.primary_claim,
             certifications: designBrief.certifications,
             bulletPoints: elements?.bullet_points || [],

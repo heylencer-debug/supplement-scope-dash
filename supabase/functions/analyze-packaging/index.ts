@@ -66,6 +66,18 @@ serve(async (req) => {
     const formulaBriefContent = analysisData?.analysis_3_formula_brief?.formula_brief_content || '';
     const categoryScores = analysisData?.analysis_1_category_scores || {};
     const categoryName = analysisData?.category_name || 'Unknown Category';
+    
+    // ============ EXTRACT PRODUCT NAME FROM FORMULA BRIEF ============
+    let productName = '';
+    const productNameMatch = formulaBriefContent.match(/\*\*Product Name:\*\*\s*([^\n]+)/i);
+    if (productNameMatch) {
+      productName = productNameMatch[1].trim();
+    }
+    // Fallback: try to extract from category name
+    if (!productName) {
+      productName = categoryName.replace(/supplements?/i, '').trim() || 'Premium Formula';
+    }
+    console.log(`Extracted product name: ${productName}`);
     const recommendedPackaging = categoryScores?.product_development?.packaging || {};
     
     console.log(`Formula brief content length: ${formulaBriefContent.length} characters`);
@@ -813,6 +825,8 @@ ${extractedCompetitorClaims.map(c => `• ${c.brand}: ${c.xIn1Claim ? `"${c.xIn1
                           design_brief: {
                             type: 'object',
                             properties: {
+                              brand_name: { type: 'string', description: 'A short, memorable brand name (1-2 words max) for this product line. Create something catchy like "VitaWell", "NaturePlus", "PureGlow", "ZenCalm". Must sound premium and professional.' },
+                              product_name: { type: 'string', description: 'The product name to display prominently on packaging (e.g., "MagnaCalm Sleep Gummies", "Hip & Joint Chews"). Should be descriptive of the main benefit.' },
                               primary_color: { type: 'object', properties: { hex: { type: 'string' }, name: { type: 'string' } }, required: ['hex', 'name'] },
                               secondary_color: { type: 'object', properties: { hex: { type: 'string' }, name: { type: 'string' } }, required: ['hex', 'name'] },
                               accent_color: { type: 'object', properties: { hex: { type: 'string' }, name: { type: 'string' } }, required: ['hex', 'name'] },
@@ -881,6 +895,8 @@ ${extractedCompetitorClaims.map(c => `• ${c.brand}: ${c.xIn1Claim ? `"${c.xIn1
                           design_brief: {
                             type: 'object',
                             properties: {
+                              brand_name: { type: 'string', description: 'A short, memorable brand name (1-2 words max) for this product line. Create something catchy like "VitaWell", "NaturePlus", "PureGlow", "ZenCalm". Must sound premium and professional.' },
+                              product_name: { type: 'string', description: 'The product name to display prominently on packaging (e.g., "MagnaCalm Sleep Gummies", "Hip & Joint Chews"). Should be descriptive of the main benefit.' },
                               primary_color: { type: 'object', properties: { hex: { type: 'string' }, name: { type: 'string' } }, required: ['hex', 'name'] },
                               secondary_color: { type: 'object', properties: { hex: { type: 'string' }, name: { type: 'string' } }, required: ['hex', 'name'] },
                               accent_color: { type: 'object', properties: { hex: { type: 'string' }, name: { type: 'string' } }, required: ['hex', 'name'] },

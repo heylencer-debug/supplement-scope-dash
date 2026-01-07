@@ -65,6 +65,10 @@ serve(async (req) => {
     
     // NEW: Get AI-decided hero imagery from packaging analysis
     const heroImagery = designBrief.heroImagery || designBrief.hero_imagery;
+    
+    // NEW: Get brand name and product name from packaging analysis
+    const brandName = designBrief.brandName || designBrief.brand_name || 'PREMIUM';
+    const productName = designBrief.productName || designBrief.product_name || primaryClaim;
     console.log("Hero imagery received:", JSON.stringify(heroImagery));
     console.log("Colors received:", { primary: primaryColorHex, secondary: secondaryColorHex, accent: accentColorHex });
     
@@ -321,8 +325,8 @@ serve(async (req) => {
     // =================================================================
     promptParts.push("");
     promptParts.push("=== VISUAL HIERARCHY FOR SUPPLEMENTS (FOLLOW THIS ORDER) ===");
-    promptParts.push("1. BRAND NAME / LOGO - Top of label, prominent");
-    promptParts.push("2. PRODUCT NAME - Largest text, main focus (e.g., 'Magnesium Sleep Gummy')");
+    promptParts.push(`1. BRAND NAME: "${brandName}" - Top of label, PROMINENT, stylized logo treatment with premium typography`);
+    promptParts.push(`2. PRODUCT NAME: "${productName}" - LARGEST text, main focus, center of label`);
     promptParts.push("3. PRIMARY CLAIM - Key benefit statement, second largest");
     promptParts.push("4. BENEFIT BULLETS - Clear, readable, with checkmarks/icons");
     promptParts.push("5. FLAVOR TEXT - Visible but not dominant (e.g., 'Natural Mixed Berry Flavor')");
@@ -383,27 +387,33 @@ serve(async (req) => {
     promptParts.push("");
     
     // =================================================================
-    // TEXTURE & PATTERN GUIDANCE (EYE-CATCHING BUT NOT CLUTTERED)
+    // DYNAMIC DESIGN ELEMENTS (EYE-CATCHING & BOLD)
     // =================================================================
-    promptParts.push("=== TEXTURE & PATTERN GUIDANCE ===");
-    promptParts.push("Subtle textures and patterns are ENCOURAGED to make the design eye-catching:");
+    promptParts.push("=== DYNAMIC DESIGN ELEMENTS (EYE-CATCHING & BOLD) ===");
     promptParts.push("");
-    promptParts.push("✅ GOOD (use sparingly):");
-    promptParts.push("- Subtle gradient overlays for depth");
-    promptParts.push("- Light geometric patterns in the background (low opacity)");
-    promptParts.push("- Soft paper/matte texture on label surface");
-    promptParts.push("- Elegant line accents or dividers");
-    promptParts.push("- Subtle emboss/deboss effects on logos");
+    promptParts.push("CREATE A VISUALLY STRIKING, SHELF-STOPPING DESIGN:");
     promptParts.push("");
-    promptParts.push("❌ BAD (avoid these):");
-    promptParts.push("- Busy patterns that compete with text");
-    promptParts.push("- Multiple overlapping decorative elements");
-    promptParts.push("- Confetti, starbursts, or scattered shapes");
-    promptParts.push("- Heavy textures that reduce readability");
-    promptParts.push("- More than 2 decorative elements total");
+    promptParts.push("✅ ENCOURAGED (make it POP):");
+    promptParts.push("- Bold gradient transitions between primary and secondary colors");
+    promptParts.push("- Dynamic diagonal lines or swooshes for energy and movement");
+    promptParts.push("- Subtle geometric patterns in background (low opacity)");
+    promptParts.push("- Elegant emboss/deboss effects on brand name/logo");
+    promptParts.push("- Color blocking with clean, crisp transitions");
+    promptParts.push("- Metallic or foil accents on brand name and key claims");
+    promptParts.push("- Subtle texture overlays (paper grain, matte/gloss contrast)");
+    promptParts.push("- Dynamic light effects or subtle glows behind key elements");
+    promptParts.push("- Curved design elements that guide the eye to the product name");
+    promptParts.push("- Drop shadows and depth for a premium 3D feel");
     promptParts.push("");
-    promptParts.push("GOAL: Clean, eye-catching, professional. ONE focal point, minimal distraction.");
-    promptParts.push("=== END TEXTURE GUIDANCE ===");
+    promptParts.push("❌ STILL AVOID:");
+    promptParts.push("- Cluttered layouts with too many competing focal points");
+    promptParts.push("- Random confetti or scattered shapes without purpose");
+    promptParts.push("- Heavy textures that reduce text readability");
+    promptParts.push("- More than 3 decorative/dynamic elements total");
+    promptParts.push("");
+    promptParts.push("GOAL: Premium, dynamic, shelf-stopping. The design should DEMAND attention while remaining professional.");
+    promptParts.push("Think: Olly, AG1, Ritual - modern, bold, but clean. STAND OUT from competitors!");
+    promptParts.push("=== END DYNAMIC DESIGN GUIDANCE ===");
     promptParts.push("");
 
     // =================================================================
@@ -442,13 +452,17 @@ serve(async (req) => {
     promptParts.push("The following text MUST appear on the front of the package EXACTLY as written:");
     promptParts.push("(Render this text clearly and legibly on the label)");
     promptParts.push("");
+    promptParts.push(`🏷️ BRAND NAME (top of label, stylized like a logo): "${brandName}"`);
+    promptParts.push(`📦 PRODUCT NAME (largest text, center focus): "${productName}"`);
+    promptParts.push("");
     
     if (frontPanelText) {
+      promptParts.push("ADDITIONAL FRONT PANEL TEXT:");
       promptParts.push('"""');
       promptParts.push(frontPanelText);
       promptParts.push('"""');
     } else if (primaryClaim) {
-      promptParts.push(`Main headline: "${primaryClaim}"`);
+      promptParts.push(`Main claim: "${primaryClaim}"`);
     }
     
     promptParts.push("");

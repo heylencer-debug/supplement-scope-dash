@@ -388,10 +388,12 @@ function MockupCard({
   // Tone selector - defaults to "auto" which uses AI suggestion
   const [selectedTone, setSelectedTone] = useState<string>("auto");
 
-  // Update when mockupUrl prop changes
+  // Update when mockupUrl prop changes, but NOT while generating (prevents race condition)
   useEffect(() => {
-    setGeneratedMockup(mockupUrl);
-  }, [mockupUrl]);
+    if (!isGenerating && !isGeneratingFlat) {
+      setGeneratedMockup(mockupUrl);
+    }
+  }, [mockupUrl, isGenerating, isGeneratingFlat]);
   
   // Reset edited text when strategy changes
   useEffect(() => {

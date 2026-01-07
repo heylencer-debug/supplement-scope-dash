@@ -310,6 +310,7 @@ function MockupCard({
   const [isGeneratingFlat, setIsGeneratingFlat] = useState(false);
   const [flatLayoutUrl, setFlatLayoutUrl] = useState<string | null>(null);
   const [isFlatModalOpen, setIsFlatModalOpen] = useState(false);
+  const [flatLayoutMode, setFlatLayoutMode] = useState<'full' | 'front_only'>('full');
   
   // Mockup history
   const { 
@@ -514,6 +515,7 @@ function MockupCard({
       const { data, error } = await supabase.functions.invoke('generate-product-mockup', {
         body: {
           mode: 'flat_layout',
+          flatLayoutMode: flatLayoutMode, // 'full' or 'front_only'
           referenceImageUrl: generatedMockup, // Pass the generated mockup as reference
           designBrief: {
             primaryColor: { hex: editedPrimaryColor, name: strategy.design_brief?.primary_color?.name || 'Primary' },
@@ -891,26 +893,39 @@ function MockupCard({
             </Button>
           </div>
           
-          {/* Flat Layout Button */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={generateFlatLayout}
-            disabled={isGeneratingFlat}
-            className="w-full mt-3 gap-1.5 text-xs"
-          >
-            {isGeneratingFlat ? (
-              <>
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                Generating Flat...
-              </>
-            ) : (
-              <>
-                <LayoutGrid className="w-3.5 h-3.5" />
-                Generate Flat Layout
-              </>
-            )}
-          </Button>
+          {/* Flat Layout Options */}
+          <div className="mt-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <Select value={flatLayoutMode} onValueChange={(v: 'full' | 'front_only') => setFlatLayoutMode(v)}>
+                <SelectTrigger className="h-8 text-xs flex-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="full">Full Dieline (All Panels)</SelectItem>
+                  <SelectItem value="front_only">Front Panel Only</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={generateFlatLayout}
+              disabled={isGeneratingFlat}
+              className="w-full gap-1.5 text-xs"
+            >
+              {isGeneratingFlat ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  Generating Flat...
+                </>
+              ) : (
+                <>
+                  <LayoutGrid className="w-3.5 h-3.5" />
+                  Generate {flatLayoutMode === 'front_only' ? 'Front Panel' : 'Flat Layout'}
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       ) : !isGenerating && showPreview ? (
         <LabelPreview 

@@ -840,9 +840,20 @@ ${extractedCompetitorClaims.map(c => `• ${c.brand}: ${c.xIn1Claim ? `"${c.xIn1
                               body_font: { type: 'string' },
                               primary_claim: { type: 'string', description: 'Strategic primary claim that MATCHES the dominant claim style used by competitors in this category. Analyze their actual claims first - if they use benefit-focused claims, use benefit-focused; if X-in-1, consider X-in-1 only if competitive; if clinical, use clinical positioning.' },
                               key_differentiators: { type: 'array', items: { type: 'string' } },
-                              certifications: { type: 'array', items: { type: 'string' } }
+                              certifications: { type: 'array', items: { type: 'string' } },
+                              suggested_tone: {
+                                type: 'object',
+                                description: 'Recommended tone for the mockup based on competitor design analysis',
+                                properties: {
+                                  primary_tone: { type: 'string', description: 'clinical/playful/premium/aggressive/wellness/natural/scientific/bold' },
+                                  tone_descriptors: { type: 'array', items: { type: 'string' }, description: '3-5 adjectives describing the design feel' },
+                                  emotional_appeal: { type: 'string', description: 'trust-building/fear-based/aspirational/nurturing/fun/urgency' },
+                                  copy_voice: { type: 'string', description: 'How copy should sound: authoritative, friendly, urgent, aspirational, scientific' }
+                                },
+                                required: ['primary_tone', 'tone_descriptors', 'emotional_appeal', 'copy_voice']
+                              }
                             },
-                            required: ['primary_color', 'secondary_color', 'accent_color', 'headline_font', 'body_font', 'primary_claim', 'key_differentiators', 'certifications']
+                            required: ['primary_color', 'secondary_color', 'accent_color', 'headline_font', 'body_font', 'primary_claim', 'key_differentiators', 'certifications', 'suggested_tone']
                           },
                           elements_checklist: {
                             type: 'object',
@@ -883,9 +894,20 @@ ${extractedCompetitorClaims.map(c => `• ${c.brand}: ${c.xIn1Claim ? `"${c.xIn1
                               body_font: { type: 'string' },
                               primary_claim: { type: 'string', description: 'Strategic primary claim that matches or improves upon the claim style used by new winners. Analyze their actual claims - adapt to their style while highlighting our competitive advantages.' },
                               key_differentiators: { type: 'array', items: { type: 'string' } },
-                              certifications: { type: 'array', items: { type: 'string' } }
+                              certifications: { type: 'array', items: { type: 'string' } },
+                              suggested_tone: {
+                                type: 'object',
+                                description: 'Recommended tone for the mockup based on competitor design analysis',
+                                properties: {
+                                  primary_tone: { type: 'string', description: 'clinical/playful/premium/aggressive/wellness/natural/scientific/bold' },
+                                  tone_descriptors: { type: 'array', items: { type: 'string' }, description: '3-5 adjectives describing the design feel' },
+                                  emotional_appeal: { type: 'string', description: 'trust-building/fear-based/aspirational/nurturing/fun/urgency' },
+                                  copy_voice: { type: 'string', description: 'How copy should sound: authoritative, friendly, urgent, aspirational, scientific' }
+                                },
+                                required: ['primary_tone', 'tone_descriptors', 'emotional_appeal', 'copy_voice']
+                              }
                             },
-                            required: ['primary_color', 'secondary_color', 'accent_color', 'headline_font', 'body_font', 'primary_claim', 'key_differentiators', 'certifications']
+                            required: ['primary_color', 'secondary_color', 'accent_color', 'headline_font', 'body_font', 'primary_claim', 'key_differentiators', 'certifications', 'suggested_tone']
                           },
                           elements_checklist: {
                             type: 'object',

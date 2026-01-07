@@ -45,8 +45,39 @@ serve(async (req) => {
     // NEW: Get flavor text for the label
     const flavorText = designBrief.flavorText;
     
+    // NEW: Get suggested tone for design aesthetic
+    const suggestedTone = designBrief.suggestedTone;
+    
     // Get recommended packaging format (e.g., "Resealable Stand-Up Pouch", "Wide-Mouth Jar", "Bottle")
     const packagingFormat = designBrief.packagingFormat || "supplement bottle";
+    
+    // Flavor to product appearance mapping for realistic chew/gummy colors
+    const flavorToProductAppearance: Record<string, { colors: string; description: string }> = {
+      'chicken': { colors: 'golden brown, tan', description: 'golden brown chicken-colored chews' },
+      'bacon': { colors: 'reddish brown, marbled', description: 'brown chews with reddish bacon marbling' },
+      'beef': { colors: 'deep brown, maroon', description: 'deep brown beef-colored chews' },
+      'salmon': { colors: 'salmon pink, coral', description: 'salmon pink/coral colored chews' },
+      'fish': { colors: 'light pink, pale', description: 'light pink fish-colored chews' },
+      'peanut butter': { colors: 'tan, creamy brown', description: 'creamy tan peanut butter colored chews' },
+      'turkey': { colors: 'light tan, beige', description: 'light tan turkey-colored chews' },
+      'liver': { colors: 'dark brown, burgundy', description: 'dark brown liver-colored chews' },
+      'duck': { colors: 'golden, amber', description: 'golden amber duck-colored chews' },
+      'lamb': { colors: 'light brown, rosy', description: 'light brown lamb-colored chews' },
+      'venison': { colors: 'deep red brown', description: 'deep reddish-brown venison-colored chews' },
+      'pork': { colors: 'pink, light brown', description: 'pink-tinted pork-colored chews' },
+    };
+    
+    // Detect flavor for product appearance
+    let productAppearance: { colors: string; description: string } | null = null;
+    if (flavorText) {
+      const flavorLower = flavorText.toLowerCase();
+      for (const [flavor, appearance] of Object.entries(flavorToProductAppearance)) {
+        if (flavorLower.includes(flavor)) {
+          productAppearance = appearance;
+          break;
+        }
+      }
+    }
 
     // Build certification string
     const certBadges = certifications?.length > 0 
@@ -134,6 +165,33 @@ serve(async (req) => {
       promptParts.push(`- "${flavorText}"`);
       promptParts.push("- Position this below the main headline or in a flavor banner");
       promptParts.push("- Use appetizing, appealing typography for the flavor name");
+    }
+    
+    // PRODUCT APPEARANCE BASED ON FLAVOR - Critical for realistic mockups
+    if (productAppearance) {
+      promptParts.push("");
+      promptParts.push("=== PRODUCT APPEARANCE (CRITICAL FOR REALISM) ===");
+      promptParts.push("The actual soft chews/gummies visible in/on the packaging should match the flavor:");
+      promptParts.push(`- Product Color: ${productAppearance.colors}`);
+      promptParts.push(`- Appearance: ${productAppearance.description}`);
+      promptParts.push("- Show some chews/treats visible (either through window or displayed near package)");
+      promptParts.push("- The product appearance should be appetizing and match the flavor profile");
+      promptParts.push("=== END PRODUCT APPEARANCE ===");
+    }
+    
+    // SUGGESTED TONE - Design aesthetic based on competitor analysis
+    if (suggestedTone) {
+      promptParts.push("");
+      promptParts.push("=== DESIGN TONE & PERSONALITY (from competitor analysis) ===");
+      promptParts.push(`- Primary Tone: ${suggestedTone.primaryTone || suggestedTone.primary_tone || 'premium'}`);
+      if (suggestedTone.toneDescriptors || suggestedTone.tone_descriptors) {
+        const descriptors = suggestedTone.toneDescriptors || suggestedTone.tone_descriptors;
+        promptParts.push(`- Feel: ${Array.isArray(descriptors) ? descriptors.join(', ') : descriptors}`);
+      }
+      promptParts.push(`- Emotional Appeal: ${suggestedTone.emotionalAppeal || suggestedTone.emotional_appeal || 'trust-building'}`);
+      promptParts.push(`- Copy Voice: ${suggestedTone.copyVoice || suggestedTone.copy_voice || 'authoritative'}`);
+      promptParts.push("- The overall packaging aesthetic, typography, and visual elements should embody this tone");
+      promptParts.push("=== END TONE ===");
     }
 
     // TARGET MARKET IMAGERY

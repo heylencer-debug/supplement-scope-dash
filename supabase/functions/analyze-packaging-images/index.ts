@@ -32,6 +32,16 @@ interface CompetitorPackagingAnalysis {
     urgency_level: "low" | "medium" | "high";
     emotional_appeal: string;
   };
+  design_impact: {
+    overall_aesthetic: string;
+    visual_strategy: string;
+    color_psychology: string;
+    shelf_impact: "low" | "medium" | "high";
+    design_strengths: string[];
+    design_weaknesses: string[];
+    standout_elements: string[];
+    dominant_colors: string[];
+  };
   product_contents: {
     type: string;
     shape: string | null;
@@ -88,7 +98,7 @@ CRITICAL: The images are provided in the EXACT same order as this list. Image 1 
 Product Image Order (match analysis by position):
 ${productList}
 
-## 🎯 YOUR MISSION: EXTRACT EVERY SINGLE PIECE OF TEXT VISIBLE ON THE FRONT OF EACH PACKAGE
+## 🎯 YOUR MISSION: EXTRACT COMPLETE PACKAGING ANALYSIS INCLUDING DESIGN IMPACT
 
 For EACH image (in order, 1 to ${products.length}), analyze and extract:
 
@@ -114,7 +124,18 @@ For EACH image (in order, 1 to ${products.length}), analyze and extract:
 - urgency_level: (low/medium/high)
 - emotional_appeal: (trust-building/fear-based/aspirational/nurturing/fun)
 
-### 3. PRODUCT CONTENTS (the actual product visible inside/on packaging):
+### 3. DESIGN IMPACT (NEW - CRITICAL FOR COMPETITIVE STRATEGY):
+Analyze the VISUAL DESIGN and AESTHETIC of the packaging:
+- **overall_aesthetic**: Premium/Playful/Clinical/Natural/Bold/Minimalist/Scientific/Rustic/Modern
+- **visual_strategy**: Minimalist/Busy-information-dense/Photo-centric/Illustration-based/Typography-driven/Icon-heavy
+- **color_psychology**: What emotions/trust the colors evoke (e.g., "trust-building blues", "energetic oranges", "natural greens", "premium golds")
+- **shelf_impact**: How much it stands out on shelf (low/medium/high)
+- **design_strengths**: What makes this design effective (e.g., "clear hierarchy", "strong contrast", "memorable brand mark")
+- **design_weaknesses**: What could be improved (e.g., "too cluttered", "weak typography", "generic look")
+- **standout_elements**: What makes it visually memorable (e.g., "unique shape", "bold color blocking", "distinctive illustration")
+- **dominant_colors**: The 2-3 main colors on the packaging (hex or color names)
+
+### 4. PRODUCT CONTENTS (the actual product visible inside/on packaging):
 - type: (gummy/treat/soft chew/powder/capsule/etc)
 - shape: (bear/bone/circle/square/heart/star/oval/irregular)
 - colors: of the actual product
@@ -122,7 +143,7 @@ For EACH image (in order, 1 to ${products.length}), analyze and extract:
 - texture_appearance: (smooth/ridged/coated/sugar-coated)
 - size_estimate: (small/medium/large)
 
-### 4. PACKAGING:
+### 5. PACKAGING:
 - type, material, color, features
 
 ## ⚠️ CRITICAL INSTRUCTIONS:
@@ -130,7 +151,8 @@ For EACH image (in order, 1 to ${products.length}), analyze and extract:
 2. If you see "15-in-1" or "8 in 1" or any X-in-1 claim, capture it EXACTLY in x_in_1_claim
 3. List ALL benefit claims separately - if it says "Hip & Joint • Skin & Coat • Immune • Digestive", list all 4
 4. The all_visible_text array should contain EVERY text element - nothing should be missed
-5. Return analyses in the SAME ORDER as the images/products listed above
+5. DESIGN IMPACT is critical - analyze what makes each design work or fail visually
+6. Return analyses in the SAME ORDER as the images/products listed above
 
 Use the extract_packaging_analysis tool.`;
 
@@ -187,6 +209,21 @@ Use the extract_packaging_analysis tool.`;
                         },
                         required: ["primary_tone", "tone_descriptors", "urgency_level", "emotional_appeal"]
                       },
+                      design_impact: {
+                        type: "object",
+                        description: "Visual design and aesthetic analysis of the packaging",
+                        properties: {
+                          overall_aesthetic: { type: "string", description: "Premium/Playful/Clinical/Natural/Bold/Minimalist/Scientific/Rustic/Modern" },
+                          visual_strategy: { type: "string", description: "Minimalist/Busy-information-dense/Photo-centric/Illustration-based/Typography-driven/Icon-heavy" },
+                          color_psychology: { type: "string", description: "What emotions/trust the colors evoke" },
+                          shelf_impact: { type: "string", enum: ["low", "medium", "high"] },
+                          design_strengths: { type: "array", items: { type: "string" }, description: "What makes this design effective" },
+                          design_weaknesses: { type: "array", items: { type: "string" }, description: "What could be improved" },
+                          standout_elements: { type: "array", items: { type: "string" }, description: "What makes it visually memorable" },
+                          dominant_colors: { type: "array", items: { type: "string" }, description: "The 2-3 main colors on the packaging" }
+                        },
+                        required: ["overall_aesthetic", "visual_strategy", "color_psychology", "shelf_impact", "design_strengths", "standout_elements", "dominant_colors"]
+                      },
                       product_contents: {
                         type: "object",
                         properties: {
@@ -210,7 +247,7 @@ Use the extract_packaging_analysis tool.`;
                         required: ["type", "material", "color", "features"]
                       }
                     },
-                    required: ["product_index", "label_content", "messaging_tone", "product_contents", "packaging"]
+                    required: ["product_index", "label_content", "messaging_tone", "design_impact", "product_contents", "packaging"]
                   }
                 }
               },
@@ -244,6 +281,7 @@ Use the extract_packaging_analysis tool.`;
           image_url: product.main_image_url,
           label_content: analysis.label_content,
           messaging_tone: analysis.messaging_tone,
+          design_impact: analysis.design_impact,
           product_contents: analysis.product_contents,
           packaging: analysis.packaging
         });
@@ -253,6 +291,7 @@ Use the extract_packaging_analysis tool.`;
           packaging_image_analysis: {
             label_content: analysis.label_content,
             messaging_tone: analysis.messaging_tone,
+            design_impact: analysis.design_impact,
             product_contents: analysis.product_contents,
             packaging: analysis.packaging,
             analyzed_at: new Date().toISOString()

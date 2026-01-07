@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { designBrief, mode = 'mockup' } = await req.json();
+    const { designBrief, mode = 'mockup', referenceImageUrl } = await req.json();
     const isFlat = mode === 'flat_layout';
     
     const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
@@ -625,6 +625,42 @@ serve(async (req) => {
     console.log("Design brief received:", JSON.stringify(designBrief, null, 2));
     console.log("Generated prompt:", prompt);
 
+    // Build message content - include reference image for flat layout if available
+    let messageContent: any;
+    if (isFlat && referenceImageUrl) {
+      // Multi-modal message with reference image for flat layout
+      const referenceImagePrompt = `=== REFERENCE IMAGE PROVIDED ===
+You are provided with a 3D product mockup image. Your task is to create a FLAT, UNWRAPPED 2D dieline layout that EXACTLY MATCHES the design shown in this image.
+
+CRITICAL: Replicate the EXACT:
+- Color scheme, gradients, and color blocking
+- Typography, fonts, and text styling
+- Graphic elements, icons, patterns, and decorative elements
+- Layout hierarchy and positioning of all elements
+- All badges, certifications, seals, and trust indicators
+- Product imagery style and placement
+
+The flat layout must look like it would fold/wrap into the 3D mockup shown. Every visual detail from the mockup should appear in the flat layout.
+=== END REFERENCE ===
+
+${prompt}`;
+      
+      messageContent = [
+        {
+          type: "text",
+          text: referenceImagePrompt
+        },
+        {
+          type: "image_url",
+          image_url: {
+            url: referenceImageUrl
+          }
+        }
+      ];
+    } else {
+      messageContent = prompt;
+    }
+
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -638,7 +674,7 @@ serve(async (req) => {
         messages: [
           {
             role: "user",
-            content: prompt
+            content: messageContent
           }
         ]
       })

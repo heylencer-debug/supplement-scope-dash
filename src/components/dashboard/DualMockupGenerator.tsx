@@ -481,6 +481,16 @@ function MockupCard({
   };
 
   const generateFlatLayout = async () => {
+    // Require a generated mockup first
+    if (!generatedMockup) {
+      toast({
+        title: 'Generate Mockup First',
+        description: 'Please generate a 3D mockup before creating the flat layout.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
     setIsGeneratingFlat(true);
     try {
       const designBrief = strategy.design_brief;
@@ -499,6 +509,7 @@ function MockupCard({
       const { data, error } = await supabase.functions.invoke('generate-product-mockup', {
         body: {
           mode: 'flat_layout',
+          referenceImageUrl: generatedMockup, // Pass the generated mockup as reference
           designBrief: {
             primaryColor: { hex: editedPrimaryColor, name: strategy.design_brief?.primary_color?.name || 'Primary' },
             secondaryColor: { hex: editedSecondaryColor, name: strategy.design_brief?.secondary_color?.name || 'Secondary' },

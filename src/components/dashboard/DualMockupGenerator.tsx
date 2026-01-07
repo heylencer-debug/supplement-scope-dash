@@ -103,20 +103,32 @@ interface DualMockupGeneratorProps {
 }
 
 const packagingFormatOptions = [
+  // Pouches
   { value: "soft chew resealable pouch", label: "Resealable Pouch (Soft Chews)" },
   { value: "resealable stand-up pouch", label: "Stand-Up Pouch" },
+  // Standard Jars
   { value: "wide-mouth plastic jar", label: "Wide-Mouth Jar (Plastic)" },
-  { value: "narrow-mouth plastic jar", label: "Narrow-Mouth Jar (Plastic)" },
+  { value: "narrow-mouth plastic jar", label: "Tall Slim Jar (Plastic)" },
   { value: "glass jar with screw cap", label: "Glass Jar" },
-  { value: "narrow-mouth glass jar", label: "Narrow-Mouth Jar (Glass)" },
+  { value: "narrow-mouth glass jar", label: "Tall Slim Jar (Glass)" },
+  // Specialty Jars
+  { value: "hexagonal glass jar", label: "Hexagonal Glass Jar" },
+  { value: "square glass jar", label: "Square Glass Jar" },
+  { value: "amber apothecary jar", label: "Amber Apothecary Jar" },
+  { value: "cobalt blue glass jar", label: "Cobalt Blue Glass Jar" },
+  { value: "mason jar", label: "Mason Jar" },
+  // Bottles
   { value: "supplement bottle with flip cap", label: "Bottle (Flip Cap)" },
   { value: "dropper bottle", label: "Dropper Bottle" },
+  { value: "amber dropper bottle", label: "Amber Dropper Bottle" },
   { value: "squeeze bottle", label: "Squeeze Bottle" },
   { value: "pump bottle", label: "Pump Bottle" },
+  // Other Formats
   { value: "tube packaging", label: "Tube" },
   { value: "sachet packet", label: "Sachet/Packet" },
   { value: "blister pack", label: "Blister Pack" },
   { value: "tin container", label: "Tin Container" },
+  { value: "kraft paper bag", label: "Kraft Paper Bag" },
 ];
 
 const toneOptions = [

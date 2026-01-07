@@ -94,6 +94,36 @@ serve(async (req) => {
         proportions: 'HEIGHT-TO-WIDTH RATIO OF 1.5:1. Balanced proportions.',
         style: 'traditional glass supplement jar'
       },
+      'hexagonal glass jar': {
+        shape: 'hexagonal (6-sided) glass jar with flat panels and screw cap',
+        proportions: 'HEIGHT-TO-WIDTH RATIO OF 1.8:1. Distinctive hexagonal cross-section.',
+        style: 'artisanal honey jar style, premium geometric design, clear glass with visible facets'
+      },
+      'square glass jar': {
+        shape: 'square/rectangular glass jar with flat sides and screw cap',
+        proportions: 'HEIGHT-TO-WIDTH RATIO OF 1.5:1. Clean square cross-section.',
+        style: 'modern minimalist design, clear glass, sharp corners, premium spice jar aesthetic'
+      },
+      'amber apothecary jar': {
+        shape: 'tall, elegant amber glass apothecary jar with wide cork or black screw cap',
+        proportions: 'HEIGHT-TO-WIDTH RATIO OF 2.5:1. Classic apothecary silhouette - tall and elegant.',
+        style: 'vintage pharmaceutical amber glass, apothecary/herbalist aesthetic, Victorian-era inspired'
+      },
+      'cobalt blue glass jar': {
+        shape: 'elegant cobalt blue glass jar with silver or black cap',
+        proportions: 'HEIGHT-TO-WIDTH RATIO OF 2:1. Premium pharmaceutical look.',
+        style: 'deep cobalt blue glass, high-end supplement aesthetic, premium medicinal appearance'
+      },
+      'mason jar': {
+        shape: 'classic mason jar with two-piece lid (flat lid + screw band)',
+        proportions: 'HEIGHT-TO-WIDTH RATIO OF 1.3:1. Iconic mason jar shape.',
+        style: 'traditional Ball/Kerr mason jar style, clear glass, embossed details, farmhouse aesthetic'
+      },
+      'amber dropper bottle': {
+        shape: 'tall amber glass bottle with dropper/pipette cap',
+        proportions: 'HEIGHT-TO-WIDTH RATIO OF 3:1. Tall and slim dropper bottle.',
+        style: 'pharmaceutical amber glass, essential oil/tincture aesthetic, black rubber dropper bulb'
+      },
       'resealable stand-up pouch': {
         shape: 'flexible stand-up pouch with zip-lock top',
         proportions: 'Tall pouch format, stands upright, approximately 2:1 height to width',
@@ -103,6 +133,11 @@ serve(async (req) => {
         shape: 'flexible pouch with flat bottom gusset for stability',
         proportions: 'Square-ish base, taller than wide',
         style: 'premium coffee bag style, matte finish'
+      },
+      'kraft paper bag': {
+        shape: 'eco-friendly kraft paper stand-up bag with resealable top',
+        proportions: 'HEIGHT-TO-WIDTH RATIO OF 1.5:1. Natural paper bag shape.',
+        style: 'brown kraft paper, eco-friendly/sustainable aesthetic, minimalist natural look'
       },
       'bottle': {
         shape: 'cylindrical bottle with flip-top or screw cap',
@@ -114,14 +149,31 @@ serve(async (req) => {
     // Get container shape details for the selected format
     const formatLower = packagingFormat.toLowerCase();
     let containerDetails = packagingFormatDetails['bottle']; // default
+    
+    // Direct match first
     for (const [format, details] of Object.entries(packagingFormatDetails)) {
       if (formatLower.includes(format) || format.includes(formatLower)) {
         containerDetails = details;
         break;
       }
     }
-    // Specific checks for narrow-mouth
-    if (formatLower.includes('narrow') && formatLower.includes('glass')) {
+    
+    // Specific format matching
+    if (formatLower.includes('hexagonal')) {
+      containerDetails = packagingFormatDetails['hexagonal glass jar'];
+    } else if (formatLower.includes('square') && formatLower.includes('glass')) {
+      containerDetails = packagingFormatDetails['square glass jar'];
+    } else if (formatLower.includes('amber') && formatLower.includes('apothecary')) {
+      containerDetails = packagingFormatDetails['amber apothecary jar'];
+    } else if (formatLower.includes('cobalt') || formatLower.includes('blue glass')) {
+      containerDetails = packagingFormatDetails['cobalt blue glass jar'];
+    } else if (formatLower.includes('mason')) {
+      containerDetails = packagingFormatDetails['mason jar'];
+    } else if (formatLower.includes('amber') && formatLower.includes('dropper')) {
+      containerDetails = packagingFormatDetails['amber dropper bottle'];
+    } else if (formatLower.includes('kraft')) {
+      containerDetails = packagingFormatDetails['kraft paper bag'];
+    } else if (formatLower.includes('narrow') && formatLower.includes('glass')) {
       containerDetails = packagingFormatDetails['narrow-mouth glass jar'];
     } else if (formatLower.includes('narrow') && formatLower.includes('plastic')) {
       containerDetails = packagingFormatDetails['narrow-mouth plastic jar'];

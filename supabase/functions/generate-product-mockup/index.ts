@@ -314,9 +314,44 @@ serve(async (req) => {
     const promptParts = [
       `Premium ${packagingFormat} product photography. Modern, professional packaging design that balances elegance with clear product information.`,
       "",
-      "DESIGN PHILOSOPHY: Premium and professional, but informative. Think Ritual, AG1, or high-end pet brands like Open Farm or Ollie.",
-      ""
     ];
+    
+    // =================================================================
+    // HERO IMAGERY - PUT THIS FIRST (AI image models weight the beginning)
+    // =================================================================
+    if (heroImagery && (heroImagery.primary_visual || heroImagery.primaryVisual)) {
+      const primaryVisual = heroImagery.primary_visual || heroImagery.primaryVisual;
+      const visualStyle = heroImagery.visual_style || heroImagery.visualStyle || 'photorealistic';
+      const prominence = heroImagery.prominence || 'hero';
+      
+      promptParts.push("=== 🍇 MANDATORY HERO VISUAL IMAGERY (NON-NEGOTIABLE) ===");
+      promptParts.push("The packaging MUST prominently feature this specific imagery:");
+      promptParts.push("");
+      promptParts.push(`MAIN VISUAL ELEMENT: ${primaryVisual}`);
+      promptParts.push(`STYLE: ${visualStyle}, vibrant, appetizing, natural-looking`);
+      promptParts.push("");
+      promptParts.push("PLACEMENT & SIZE:");
+      if (prominence === 'hero' || prominence === 'main') {
+        promptParts.push("- This is the HERO element - takes up 20-30% of the front label");
+        promptParts.push("- Position prominently on the front panel where it's immediately visible");
+      } else if (prominence === 'accent') {
+        promptParts.push("- Feature as a supporting visual element");
+        promptParts.push("- Position near the flavor text or product name");
+      }
+      promptParts.push("");
+      promptParts.push("VISUAL QUALITY:");
+      promptParts.push("- Photorealistic quality with natural shine/texture");
+      promptParts.push("- Vibrant colors that pop and look appetizing");
+      promptParts.push("- Professional food photography style");
+      promptParts.push("- May include water droplets, natural lighting, fresh appearance");
+      promptParts.push("");
+      promptParts.push("⚠️ THIS IS NON-NEGOTIABLE - DO NOT generate a plain/minimalist label without this imagery");
+      promptParts.push("=== END MANDATORY HERO VISUAL ===");
+      promptParts.push("");
+    }
+    
+    promptParts.push("DESIGN PHILOSOPHY: Premium and professional, but informative. Think Ritual, AG1, or high-end pet brands like Open Farm or Ollie.");
+    promptParts.push("");
 
     // Colors
     promptParts.push("COLOR PALETTE:");
@@ -561,6 +596,28 @@ serve(async (req) => {
     promptParts.push("- Product at slight 3/4 angle to show dimension and label detail");
     promptParts.push("- Sharp focus, high resolution, photorealistic rendering");
     promptParts.push("- Would look premium on Amazon, Chewy, or brand DTC website");
+    
+    // =================================================================
+    // FINAL REMINDER - Repeat hero imagery at end (AI models also weight the end)
+    // =================================================================
+    if (heroImagery && (heroImagery.primary_visual || heroImagery.primaryVisual)) {
+      const primaryVisual = heroImagery.primary_visual || heroImagery.primaryVisual;
+      promptParts.push("");
+      promptParts.push("=== 🍇 FINAL REMINDER: DO NOT FORGET THE HERO IMAGERY ===");
+      promptParts.push(`The packaging MUST prominently feature: ${primaryVisual}`);
+      promptParts.push("This is the HERO VISUAL - photorealistic, vibrant, 20-30% of label");
+      promptParts.push("DO NOT generate a plain/clean/minimalist label without this imagery");
+      promptParts.push("=== END REMINDER ===");
+    }
+    
+    // What NOT to generate
+    promptParts.push("");
+    promptParts.push("=== DO NOT GENERATE THESE (AVOID) ===");
+    promptParts.push("- Plain white/minimalist labels with NO imagery (unless specifically no hero_imagery was provided)");
+    promptParts.push("- Abstract geometric shapes INSTEAD of specified fruit/ingredients");
+    promptParts.push("- Generic wellness icons (random leaves, hearts) INSTEAD of the specific hero imagery");
+    promptParts.push("- Boring corporate pharmaceutical look UNLESS that matches the brand tone");
+    promptParts.push("=== END AVOID LIST ===")
 
     // Packaging-type-specific flat layout structures
     const flatLayoutStructures: Record<string, { 

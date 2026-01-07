@@ -18,7 +18,8 @@ import {
   Eye,
   EyeOff,
   Palette,
-  UtensilsCrossed
+  UtensilsCrossed,
+  LayoutGrid
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -305,6 +306,11 @@ function MockupCard({
   const [isEditingColors, setIsEditingColors] = useState(false);
   const [showPreview, setShowPreview] = useState(true); // Show preview by default
   
+  // Flat layout state
+  const [isGeneratingFlat, setIsGeneratingFlat] = useState(false);
+  const [flatLayoutUrl, setFlatLayoutUrl] = useState<string | null>(null);
+  const [isFlatModalOpen, setIsFlatModalOpen] = useState(false);
+  
   // Mockup history
   const { 
     history, 
@@ -469,6 +475,79 @@ function MockupCard({
     const link = document.createElement('a');
     link.href = generatedMockup;
     link.download = `product-mockup-${strategyType}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const generateFlatLayout = async () => {
+    setIsGeneratingFlat(true);
+    try {
+      const designBrief = strategy.design_brief;
+      const mockContent = strategy.mock_content;
+      const elements = strategy.elements_checklist;
+
+      const effectiveTone = selectedTone === "auto" 
+        ? designBrief.suggested_tone 
+        : { 
+            primary_tone: selectedTone, 
+            tone_descriptors: toneOptions.find(t => t.value === selectedTone)?.description?.split(', ') || [],
+            emotional_appeal: toneOptions.find(t => t.value === selectedTone)?.description || '',
+            copy_voice: selectedTone 
+          };
+
+      const { data, error } = await supabase.functions.invoke('generate-product-mockup', {
+        body: {
+          mode: 'flat_layout',
+          designBrief: {
+            primaryColor: { hex: editedPrimaryColor, name: strategy.design_brief?.primary_color?.name || 'Primary' },
+            secondaryColor: { hex: editedSecondaryColor, name: strategy.design_brief?.secondary_color?.name || 'Secondary' },
+            accentColor: { hex: editedAccentColor, name: strategy.design_brief?.accent_color?.name || 'Accent' },
+            primaryClaim: designBrief.primary_claim,
+            certifications: designBrief.certifications,
+            bulletPoints: elements?.bullet_points || [],
+            callToAction: elements?.call_to_action,
+            headlineFont: designBrief.headline_font,
+            bodyFont: designBrief.body_font,
+            frontPanelText: editedFrontPanelText,
+            backPanelText: mockContent?.back_panel_text,
+            keyDifferentiators: designBrief.key_differentiators,
+            trustSignals: elements?.trust_signals || [],
+            packagingFormat: selectedFormat,
+            flavorText: detectedFlavor,
+            suggestedTone: effectiveTone,
+          }
+        }
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      if (data?.imageUrl) {
+        setFlatLayoutUrl(data.imageUrl);
+        setIsFlatModalOpen(true);
+        toast({
+          title: 'Flat Layout Generated!',
+          description: 'Print-ready layout is ready for download.',
+        });
+      }
+    } catch (err) {
+      console.error('Flat layout generation error:', err);
+      toast({
+        title: 'Generation Failed',
+        description: err instanceof Error ? err.message : 'Failed to generate flat layout',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGeneratingFlat(false);
+    }
+  };
+
+  const downloadFlatLayout = () => {
+    if (!flatLayoutUrl) return;
+    const link = document.createElement('a');
+    link.href = flatLayoutUrl;
+    link.download = `flat-layout-${strategyType}.png`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -795,6 +874,27 @@ function MockupCard({
               Save
             </Button>
           </div>
+          
+          {/* Flat Layout Button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={generateFlatLayout}
+            disabled={isGeneratingFlat}
+            className="w-full mt-3 gap-1.5 text-xs"
+          >
+            {isGeneratingFlat ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                Generating Flat...
+              </>
+            ) : (
+              <>
+                <LayoutGrid className="w-3.5 h-3.5" />
+                Generate Flat Layout
+              </>
+            )}
+          </Button>
         </div>
       ) : !isGenerating && showPreview ? (
         <LabelPreview 
@@ -847,6 +947,38 @@ function MockupCard({
                 </div>
               </div>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Flat Layout Modal */}
+      <Dialog open={isFlatModalOpen} onOpenChange={setIsFlatModalOpen}>
+        <DialogContent className="max-w-5xl w-full p-0 overflow-hidden">
+          <DialogHeader className="p-4 pb-2">
+            <DialogTitle className="flex items-center gap-2">
+              <LayoutGrid className={cn("w-5 h-5", isLeaders ? "text-blue-600" : "text-orange-600")} />
+              {title} Flat Layout - Print Ready
+            </DialogTitle>
+          </DialogHeader>
+          <div className="p-4 pt-0">
+            {flatLayoutUrl && (
+              <div className="relative">
+                <img 
+                  src={flatLayoutUrl} 
+                  alt={`${title} Flat Layout - Print Ready`}
+                  className="w-full h-auto rounded-lg shadow-lg bg-muted"
+                />
+                <div className="absolute bottom-4 right-4 flex gap-2">
+                  <Button size="sm" variant="secondary" onClick={downloadFlatLayout} className="gap-1.5 shadow-lg">
+                    <Download className="w-4 h-4" />
+                    Download for Photoshop
+                  </Button>
+                </div>
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground text-center mt-3">
+              This flat layout shows all panels unwrapped and ready for print production or editing in Photoshop.
+            </p>
           </div>
         </DialogContent>
       </Dialog>

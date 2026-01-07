@@ -11,7 +11,8 @@ serve(async (req) => {
   }
 
   try {
-    const { designBrief } = await req.json();
+    const { designBrief, mode = 'mockup' } = await req.json();
+    const isFlat = mode === 'flat_layout';
     
     const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
     if (!OPENROUTER_API_KEY) {
@@ -409,9 +410,87 @@ serve(async (req) => {
     promptParts.push("- Sharp focus, high resolution, photorealistic rendering");
     promptParts.push("- Would look premium on Amazon, Chewy, or brand DTC website");
 
-    const prompt = promptParts.join("\n");
+    // Build the flat layout prompt if mode is 'flat_layout'
+    let prompt: string;
+    
+    if (isFlat) {
+      const flatPromptParts = [
+        "=== 2D FLAT PACKAGING LAYOUT FOR PRINT PRODUCTION ===",
+        "",
+        "Create a FLAT, UNWRAPPED, 2D packaging layout suitable for printing and die-cutting. This is NOT a 3D product mockup.",
+        "",
+        "CRITICAL REQUIREMENTS:",
+        "- This is a 2D FLAT VIEW showing all panels laid out on a white background",
+        "- NO perspective, NO shadows, NO 3D effects",
+        "- Show the packaging UNFOLDED as it would appear on a die-cut sheet before assembly",
+        "- All panels should be connected with visible fold/score lines (thin dotted or dashed lines)",
+        "- Include bleed area extending slightly beyond each panel edge",
+        "",
+        "PANEL LAYOUT (arrange as connected die-cut):",
+        `- FRONT PANEL (center, largest): Contains main product name, claims, and hero content`,
+        `- BACK PANEL: Supplement facts, ingredients, directions, warnings`,
+        `- LEFT SIDE PANEL: Brand info, key claims, barcode placeholder`,
+        `- RIGHT SIDE PANEL: Benefits, certifications, contact info`,
+        `- TOP FLAP: Brand logo, seal`,
+        `- BOTTOM FLAP: Batch info, manufacturing details`,
+        "",
+        "COLOR PALETTE:",
+      ];
+      
+      if (primaryColorHex) flatPromptParts.push(`- Primary: ${primaryColorHex}`);
+      if (secondaryColorHex) flatPromptParts.push(`- Secondary: ${secondaryColorHex}`);
+      if (accentColorHex) flatPromptParts.push(`- Accent: ${accentColorHex}`);
+      
+      flatPromptParts.push("");
+      flatPromptParts.push("FRONT PANEL CONTENT:");
+      if (frontPanelText) {
+        flatPromptParts.push('"""');
+        flatPromptParts.push(frontPanelText);
+        flatPromptParts.push('"""');
+      }
+      
+      flatPromptParts.push("");
+      flatPromptParts.push("BACK PANEL CONTENT:");
+      flatPromptParts.push("- Supplement Facts box with structured layout");
+      flatPromptParts.push("- Directions for use");
+      flatPromptParts.push("- Ingredient list");
+      flatPromptParts.push("- Warnings and storage information");
+      flatPromptParts.push("- Manufacturer contact info");
+      
+      if (certifications?.length > 0) {
+        flatPromptParts.push("");
+        flatPromptParts.push(`CERTIFICATION SEALS TO INCLUDE: ${certifications.join(', ')}`);
+      }
+      
+      if (flavorText) {
+        flatPromptParts.push("");
+        flatPromptParts.push(`FLAVOR: "${flavorText}" - feature prominently on front panel`);
+      }
+      
+      flatPromptParts.push("");
+      flatPromptParts.push("DESIGN STYLE:");
+      if (suggestedTone) {
+        flatPromptParts.push(`- Tone: ${suggestedTone.primaryTone || suggestedTone.primary_tone || 'premium'}`);
+      }
+      flatPromptParts.push("- Clean, print-ready design");
+      flatPromptParts.push("- Sharp edges, high contrast");
+      flatPromptParts.push("- Text must be readable at actual print size");
+      flatPromptParts.push("- Professional packaging design aesthetic");
+      
+      flatPromptParts.push("");
+      flatPromptParts.push("OUTPUT FORMAT:");
+      flatPromptParts.push("- Flat 2D layout on white background");
+      flatPromptParts.push("- All panels connected showing fold lines");
+      flatPromptParts.push("- Print-ready proportions");
+      flatPromptParts.push("- No 3D perspective or shadows");
+      flatPromptParts.push("- Suitable for editing in Photoshop/Illustrator");
+      
+      prompt = flatPromptParts.join("\n");
+    } else {
+      prompt = promptParts.join("\n");
+    }
 
-    console.log("Generating product mockup with Nano Banana Pro via OpenRouter");
+    console.log(`Generating ${isFlat ? 'flat layout' : 'product mockup'} with Nano Banana Pro via OpenRouter`);
     console.log("Design brief received:", JSON.stringify(designBrief, null, 2));
     console.log("Generated prompt:", prompt);
 

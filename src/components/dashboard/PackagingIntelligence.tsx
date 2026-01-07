@@ -15,6 +15,7 @@ import { DualMockupGenerator } from "./DualMockupGenerator";
 import { CompetitorPackagingTable } from "./CompetitorPackagingTable";
 import { ClaimPatternChart } from "./ClaimPatternChart";
 import { formatDistanceToNow } from "date-fns";
+import { extractFlavorFromFormulaBrief } from "@/lib/extractFlavor";
 
 interface PackagingData {
   type?: string;
@@ -57,6 +58,7 @@ interface PackagingIntelligenceProps {
   categoryId?: string;
   formulaVersionId?: string | null;
   versionInfo?: VersionInfo;
+  formulaBriefContent?: string | null;
 }
 
 // Progress indicator component for AI analysis
@@ -125,7 +127,11 @@ function AnalysisProgressIndicator({
   );
 }
 
-export function PackagingIntelligence({ packagingData, productsClaims, productsData = [], isLoading, categoryId, formulaVersionId, versionInfo }: PackagingIntelligenceProps) {
+export function PackagingIntelligence({ packagingData, productsClaims, productsData = [], isLoading, categoryId, formulaVersionId, versionInfo, formulaBriefContent }: PackagingIntelligenceProps) {
+  // Extract flavor from formula brief content
+  const detectedFlavor = useMemo(() => {
+    return extractFlavorFromFormulaBrief(formulaBriefContent);
+  }, [formulaBriefContent]);
   const {
     analysis: aiAnalysis,
     mockupImageUrl,
@@ -867,6 +873,8 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
               mockupImages={mockupImages}
               onSaveMockup={saveMockupImage}
               categoryId={categoryId}
+              formulaVersionId={formulaVersionId}
+              detectedFlavor={detectedFlavor}
             />
           ) : aiAnalysis ? (
             // Fallback for legacy single-strategy analysis

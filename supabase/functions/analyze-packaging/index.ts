@@ -180,6 +180,43 @@ serve(async (req) => {
     // Use total active ingredients for the primary count (not including functional excipients)
     const ourIngredientCount = totalActiveCount > 0 ? totalActiveCount : ourIngredients.length;
     
+    // ============ FLAVOR EXTRACTION FROM FORMULA BRIEF ============
+    // Extract flavor information to include on packaging design
+    let detectedFlavor: string | null = null;
+    
+    if (formulaBriefContent) {
+      const contentLower = formulaBriefContent.toLowerCase();
+      const foundFlavors: string[] = [];
+      
+      // Common protein-based flavors for pet/supplement products
+      const flavorKeywords = ['chicken', 'beef', 'bacon', 'salmon', 'fish', 'turkey', 'lamb', 'peanut butter', 'liver', 'duck', 'venison', 'bison', 'pork'];
+      
+      for (const flavor of flavorKeywords) {
+        if (contentLower.includes(flavor)) {
+          const capitalizedFlavor = flavor.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+          if (!foundFlavors.some(f => f.toLowerCase() === flavor)) {
+            foundFlavors.push(capitalizedFlavor);
+          }
+        }
+      }
+      
+      // Look for combined flavors (e.g., "Chicken & Bacon")
+      const combinedMatch = formulaBriefContent.match(/(chicken|beef|bacon|salmon|turkey|lamb|liver|duck|pork)\s*(?:&|and)\s*(chicken|beef|bacon|salmon|turkey|lamb|liver|duck|pork)/gi);
+      if (combinedMatch && combinedMatch.length > 0) {
+        const combo = combinedMatch[0].replace(/\s+and\s+/gi, ' & ').replace(/\s+/g, ' ').trim();
+        const parts = combo.split(/\s*&\s*/);
+        const formattedCombo = parts.map((p: string) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join(' & ');
+        detectedFlavor = `Natural ${formattedCombo} Flavor`;
+      } else if (foundFlavors.length >= 2) {
+        detectedFlavor = `Natural ${foundFlavors[0]} & ${foundFlavors[1]} Flavor`;
+      } else if (foundFlavors.length === 1) {
+        detectedFlavor = `Natural ${foundFlavors[0]} Flavor`;
+      }
+    }
+    
+    console.log(`Detected flavor from formula brief: ${detectedFlavor || 'None detected'}`);
+    
+    
     // Benefit category mapping for label icons/badges
     const benefitCategories: Record<string, string[]> = {
       'Hip & Joint': ['glucosamine', 'chondroitin', 'msm', 'collagen', 'hyaluronic'],
@@ -931,6 +968,15 @@ ${claimPatternSummary}
 - Ingredients: ${ourIngredients.slice(0, 10).join(', ') || 'See formulation'}${ourIngredients.length > 10 ? '...' : ''}
 
 **Benefit Categories We Cover:** ${ourBenefitClaims.length > 0 ? ourBenefitClaims.join(', ') : 'Analyze from ingredients'}
+
+${detectedFlavor ? `
+## 🍗 OUR PRODUCT FLAVOR:
+**${detectedFlavor}**
+- IMPORTANT: Include this flavor prominently on the front panel label
+- Position flavor callout below main headline or near bottom
+- Use appetizing, pet-friendly imagery cues that match the flavor
+- This is a key differentiator for pet palatability
+` : ''}
 
 ${ourDosageHighlights.length > 0 ? `
 ## 💪 OUR DOSAGE ADVANTAGES:

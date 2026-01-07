@@ -734,6 +734,7 @@ export default function Dashboard() {
             isActive: selectedVersion.is_active,
             changeSummary: selectedVersion.change_summary
           } : undefined}
+          formulaBriefContent={selectedVersion?.formula_brief_content || (analysis?.analysis_3_formula_brief as Record<string, unknown> | null)?.formula_brief_content as string | null}
         />
       </ScrollAnimate>
 

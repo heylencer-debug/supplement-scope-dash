@@ -119,6 +119,17 @@ const packagingFormatOptions = [
   { value: "tin container", label: "Tin Container" },
 ];
 
+const toneOptions = [
+  { value: "auto", label: "AI Suggested", description: "Use AI-recommended tone" },
+  { value: "premium", label: "Premium", description: "Luxury, sophisticated, high-end" },
+  { value: "clinical", label: "Clinical", description: "Scientific, medical, trust-focused" },
+  { value: "playful", label: "Playful", description: "Fun, friendly, approachable" },
+  { value: "natural", label: "Natural", description: "Organic, earthy, wholesome" },
+  { value: "bold", label: "Bold", description: "Aggressive, energetic, powerful" },
+  { value: "wellness", label: "Wellness", description: "Calm, balanced, holistic" },
+  { value: "scientific", label: "Scientific", description: "Data-driven, research-backed" },
+];
+
 // CSS-based label preview component
 function LabelPreview({
   text,
@@ -329,6 +340,9 @@ function MockupCard({
   // Get recommended packaging format from strategy
   const recommendedFormat = strategy.design_brief?.packaging_format || "soft chew resealable pouch";
   const [selectedFormat, setSelectedFormat] = useState(recommendedFormat);
+  
+  // Tone selector - defaults to "auto" which uses AI suggestion
+  const [selectedTone, setSelectedTone] = useState<string>("auto");
 
   // Update when mockupUrl prop changes
   useEffect(() => {
@@ -364,6 +378,16 @@ function MockupCard({
       const mockContent = strategy.mock_content;
       const elements = strategy.elements_checklist;
 
+      // Determine the tone to use - either user-selected or AI-suggested
+      const effectiveTone = selectedTone === "auto" 
+        ? designBrief.suggested_tone 
+        : { 
+            primary_tone: selectedTone, 
+            tone_descriptors: toneOptions.find(t => t.value === selectedTone)?.description?.split(', ') || [],
+            emotional_appeal: toneOptions.find(t => t.value === selectedTone)?.description || '',
+            copy_voice: selectedTone 
+          };
+
       const { data, error } = await supabase.functions.invoke('generate-product-mockup', {
         body: {
           designBrief: {
@@ -382,7 +406,7 @@ function MockupCard({
             trustSignals: elements?.trust_signals || [],
             packagingFormat: selectedFormat,
             flavorText: detectedFlavor, // Include detected flavor
-            suggestedTone: designBrief.suggested_tone, // Include suggested tone from analysis
+            suggestedTone: effectiveTone, // Use effective tone (user-selected or AI)
           }
         }
       });
@@ -466,37 +490,40 @@ function MockupCard({
         </div>
       )}
 
-      {/* Suggested Tone */}
-      {strategy.design_brief?.suggested_tone && (
-        <div className="p-2.5 bg-purple-500/10 border border-purple-500/20 rounded-lg">
-          <div className="flex items-start gap-2">
-            <Sparkles className="w-3.5 h-3.5 text-purple-600 mt-0.5" />
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-purple-700">Suggested Tone</p>
-              <p className="text-xs text-purple-600 capitalize">
-                {strategy.design_brief.suggested_tone.primary_tone}
-                {strategy.design_brief.suggested_tone.emotional_appeal && (
-                  <span className="text-purple-500"> • {strategy.design_brief.suggested_tone.emotional_appeal}</span>
-                )}
-              </p>
-              {strategy.design_brief.suggested_tone.tone_descriptors && 
-               strategy.design_brief.suggested_tone.tone_descriptors.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {strategy.design_brief.suggested_tone.tone_descriptors.slice(0, 3).map((desc, i) => (
-                    <Badge 
-                      key={i} 
-                      variant="secondary" 
-                      className="text-[9px] h-4 px-1.5 bg-purple-500/20 text-purple-700 border-purple-500/30"
-                    >
-                      {desc}
-                    </Badge>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+      {/* Tone Selector */}
+      <div className="p-2.5 bg-purple-500/10 border border-purple-500/20 rounded-lg space-y-2">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+          <p className="text-xs font-medium text-purple-700">Design Tone</p>
         </div>
-      )}
+        
+        <Select value={selectedTone} onValueChange={setSelectedTone}>
+          <SelectTrigger className="w-full bg-background/80 h-8 text-xs border-purple-500/30">
+            <SelectValue placeholder="Select tone" />
+          </SelectTrigger>
+          <SelectContent>
+            {toneOptions.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                <div className="flex flex-col">
+                  <span className="font-medium">{option.label}</span>
+                  <span className="text-[10px] text-muted-foreground">{option.description}</span>
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Show AI suggestion when "auto" is selected */}
+        {selectedTone === "auto" && strategy.design_brief?.suggested_tone && (
+          <div className="text-[10px] text-purple-600 bg-purple-500/10 rounded px-2 py-1">
+            <span className="font-medium">AI suggests: </span>
+            <span className="capitalize">{strategy.design_brief.suggested_tone.primary_tone}</span>
+            {strategy.design_brief.suggested_tone.emotional_appeal && (
+              <span> • {strategy.design_brief.suggested_tone.emotional_appeal}</span>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Primary Claim Preview */}
       <div className="p-2.5 bg-muted/50 rounded-lg text-center">

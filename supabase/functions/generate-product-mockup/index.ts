@@ -425,53 +425,53 @@ serve(async (req) => {
       }
     }
     
-    // Add FLAVOR IMAGERY if detected (OPTIONAL - use tastefully)
+    // Add FLAVOR IMAGERY if detected - make it LIVELY and VIBRANT
     if (flavorImagery) {
       promptParts.push("");
-      promptParts.push("=== FLAVOR IMAGERY (OPTIONAL - USE TASTEFULLY) ===");
-      promptParts.push(`Flavor detected: "${flavorText}"`);
-      promptParts.push(`- MAY include: ${flavorImagery.fruit}`);
-      promptParts.push(`- Color influence: ${flavorImagery.colors}`);
+      promptParts.push("=== FLAVOR IMAGERY (VIBRANT & LIVELY) ===");
+      promptParts.push(`Flavor: "${flavorText}"`);
+      promptParts.push(`- Feature: ${flavorImagery.fruit}`);
+      promptParts.push(`- Colors: ${flavorImagery.colors}`);
       promptParts.push("");
-      promptParts.push("RESTRAINT GUIDELINES:");
-      promptParts.push("- Include fruit imagery ONLY if it fits naturally into a clean design");
-      promptParts.push("- Keep it SMALL and ELEGANT - NOT oversized or splashy");
-      promptParts.push("- Position as a subtle accent, not the dominant element");
-      promptParts.push("- If the design looks cleaner without fruit, leave it out entirely");
-      promptParts.push("- NO juice splashes, droplets, or 'fresh burst' effects - keep it refined");
-      promptParts.push("- Prioritize clean, professional appearance over flavor imagery");
+      promptParts.push("FRUIT STYLING (make it POP):");
+      promptParts.push("- Fresh, vibrant, photorealistic fruit with natural shine");
+      promptParts.push("- Bright, saturated colors - fruits should look JUICY and APPETIZING");
+      promptParts.push("- Natural lighting with subtle highlights");
+      promptParts.push("- Position fruit as a HERO element - prominent but balanced");
+      promptParts.push("- Can use a few scattered pieces or one beautiful arrangement");
+      promptParts.push("");
+      promptParts.push("KEEP IT PROFESSIONAL:");
+      promptParts.push("- NO cartoon/illustrated fruit - use photorealistic style");
+      promptParts.push("- NO excessive splashes or explosions");
+      promptParts.push("- Clean composition - fruit enhances, doesn't overwhelm");
       promptParts.push("=== END FLAVOR IMAGERY ===");
     }
 
-    // CLEAN, PROFESSIONAL DESIGN - Less is more
+    // DISTINCTIVE, PREMIUM DESIGN - Not generic
     promptParts.push("");
-    promptParts.push("=== DESIGN PHILOSOPHY: PROFESSIONAL RESTRAINT ===");
-    promptParts.push("Create a CLEAN, PREMIUM, UNCLUTTERED design. Less is more.");
+    promptParts.push("=== DESIGN PHILOSOPHY: DISTINCTIVE & PREMIUM ===");
+    promptParts.push("Create a MEMORABLE, PREMIUM design that stands out. NOT generic.");
+    promptParts.push("");
+    promptParts.push("WHAT MAKES IT DISTINCTIVE:");
+    promptParts.push("- Strong brand personality - confident, ownable aesthetic");
+    promptParts.push("- Bold typography choices - not default/safe fonts");
+    promptParts.push("- Intentional color blocking with clear visual hierarchy");
+    promptParts.push("- One signature design element (not many small ones)");
     promptParts.push("");
     promptParts.push("BACKGROUND:");
-    promptParts.push("- Use clean color blocking OR subtle gradients - NOT busy patterns");
-    promptParts.push("- Maximum 2-3 colors in background");
-    promptParts.push("- Leave GENEROUS white/negative space for breathing room");
-    promptParts.push("- Solid colors or simple gradients work best");
+    promptParts.push("- Clean gradient OR solid color - pick ONE approach");
+    promptParts.push("- Maximum 2-3 colors total in design");
+    promptParts.push("- Generous breathing room around text");
     promptParts.push("");
-    promptParts.push("GRAPHIC ELEMENTS (USE SPARINGLY - pick only 1-2 total):");
-    promptParts.push("- ONE simple geometric accent (subtle shape or line) OR");
-    promptParts.push("- ONE minimal botanical element (single leaf/stem, not full pattern) OR");
-    promptParts.push("- ONE subtle texture overlay (very light grain only)");
+    promptParts.push("AVOID GENERIC TRAPS:");
+    promptParts.push("- NO busy patterns or multiple decorative elements");
+    promptParts.push("- NO default-looking layouts");
+    promptParts.push("- NO unnecessary icons, badges, or filler graphics");
+    promptParts.push("- NO confetti, starbursts, or scattered shapes");
+    promptParts.push("- LESS elements = MORE impact");
     promptParts.push("");
-    promptParts.push("AVOID (DO NOT INCLUDE):");
-    promptParts.push("- Multiple pattern styles on one package");
-    promptParts.push("- Busy backgrounds competing with text");
-    promptParts.push("- Too many decorative elements");
-    promptParts.push("- Confetti, scattered shapes, squiggles");
-    promptParts.push("- Juice splashes or 'burst' effects");
-    promptParts.push("- Overcrowded layouts");
-    promptParts.push("");
-    promptParts.push("REFERENCE BRANDS (clean, premium aesthetic):");
-    promptParts.push("- Ritual: Elegant simplicity, white space, sophisticated");
-    promptParts.push("- AG1: Clean lines, scientific credibility, minimal");
-    promptParts.push("- Seed: Ultra-minimal, premium, uncluttered");
-    promptParts.push("=== END DESIGN PHILOSOPHY ===")
+    promptParts.push("REFERENCE: Ritual, AG1, Seed - clean but DISTINCTIVE");
+    promptParts.push("=== END DESIGN PHILOSOPHY ===");
 
     // MODERN LAYOUT & TYPOGRAPHY
     promptParts.push("");

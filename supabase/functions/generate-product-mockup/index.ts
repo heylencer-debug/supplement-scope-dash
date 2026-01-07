@@ -42,6 +42,9 @@ serve(async (req) => {
     const keyDifferentiators = designBrief.keyDifferentiators;
     const trustSignals = designBrief.trustSignals;
     
+    // NEW: Get flavor text for the label
+    const flavorText = designBrief.flavorText;
+    
     // Get recommended packaging format (e.g., "Resealable Stand-Up Pouch", "Wide-Mouth Jar", "Bottle")
     const packagingFormat = designBrief.packagingFormat || "supplement bottle";
 
@@ -122,6 +125,15 @@ serve(async (req) => {
     // Certification badges
     if (certifications?.length > 0) {
       promptParts.push(`- Certification seals: ${certifications.slice(0, 3).join(', ')}`);
+    }
+    
+    // FLAVOR TEXT - Important for product identity
+    if (flavorText) {
+      promptParts.push("");
+      promptParts.push("FLAVOR CALLOUT (must appear prominently on label):");
+      promptParts.push(`- "${flavorText}"`);
+      promptParts.push("- Position this below the main headline or in a flavor banner");
+      promptParts.push("- Use appetizing, appealing typography for the flavor name");
     }
 
     // TARGET MARKET IMAGERY

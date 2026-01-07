@@ -946,6 +946,61 @@ export type Database = {
           },
         ]
       }
+      packaging_mockup_history: {
+        Row: {
+          category_id: string
+          created_at: string
+          design_settings: Json | null
+          formula_version_id: string | null
+          id: string
+          image_url: string
+          packaging_format: string | null
+          strategy_type: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          design_settings?: Json | null
+          formula_version_id?: string | null
+          id?: string
+          image_url: string
+          packaging_format?: string | null
+          strategy_type: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          design_settings?: Json | null
+          formula_version_id?: string | null
+          id?: string
+          image_url?: string
+          packaging_format?: string | null
+          strategy_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "packaging_mockup_history_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "packaging_mockup_history_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "v_category_dashboard"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "packaging_mockup_history_formula_version_id_fkey"
+            columns: ["formula_version_id"]
+            isOneToOne: false
+            referencedRelation: "formula_brief_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           age_months: number | null

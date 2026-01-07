@@ -133,7 +133,13 @@ Analyze the VISUAL DESIGN and AESTHETIC of the packaging:
 - **design_strengths**: What makes this design effective (e.g., "clear hierarchy", "strong contrast", "memorable brand mark")
 - **design_weaknesses**: What could be improved (e.g., "too cluttered", "weak typography", "generic look")
 - **standout_elements**: What makes it visually memorable (e.g., "unique shape", "bold color blocking", "distinctive illustration")
-- **dominant_colors**: The 2-3 main colors on the packaging (hex or color names)
+- **dominant_colors**: The 2-3 main colors on the packaging AS HEX CODES (e.g., ["#DC143C", "#8B008B", "#FFFFFF"])
+
+⚠️ CRITICAL COLOR EXTRACTION - PROVIDE EXACT HEX CODES:
+- **primary_color_hex**: The SINGLE most dominant background/brand color as HEX CODE (e.g., "#DC143C" for cherry red, "#8B008B" for purple)
+- **secondary_color_hex**: The second most prominent color (headlines, secondary elements) as HEX CODE
+- **accent_color_hex**: Any accent/highlight color used for CTAs, emphasis, or decorative elements as HEX CODE
+- YOU MUST PROVIDE ACTUAL HEX CODES, NOT COLOR NAMES. Analyze the actual pixel colors from the packaging image.
 
 ### 4. PRODUCT CONTENTS (the actual product visible inside/on packaging):
 - type: (gummy/treat/soft chew/powder/capsule/etc)
@@ -211,7 +217,7 @@ Use the extract_packaging_analysis tool.`;
                       },
                       design_impact: {
                         type: "object",
-                        description: "Visual design and aesthetic analysis of the packaging",
+                        description: "Visual design and aesthetic analysis of the packaging WITH HEX COLOR CODES",
                         properties: {
                           overall_aesthetic: { type: "string", description: "Premium/Playful/Clinical/Natural/Bold/Minimalist/Scientific/Rustic/Modern" },
                           visual_strategy: { type: "string", description: "Minimalist/Busy-information-dense/Photo-centric/Illustration-based/Typography-driven/Icon-heavy" },
@@ -220,9 +226,12 @@ Use the extract_packaging_analysis tool.`;
                           design_strengths: { type: "array", items: { type: "string" }, description: "What makes this design effective" },
                           design_weaknesses: { type: "array", items: { type: "string" }, description: "What could be improved" },
                           standout_elements: { type: "array", items: { type: "string" }, description: "What makes it visually memorable" },
-                          dominant_colors: { type: "array", items: { type: "string" }, description: "The 2-3 main colors on the packaging" }
+                          dominant_colors: { type: "array", items: { type: "string" }, description: "The 2-3 main colors as HEX CODES (e.g., #DC143C)" },
+                          primary_color_hex: { type: "string", description: "EXACT HEX CODE of most dominant color (e.g., #DC143C)" },
+                          secondary_color_hex: { type: "string", description: "EXACT HEX CODE of second color (e.g., #8B008B)" },
+                          accent_color_hex: { type: "string", description: "EXACT HEX CODE of accent color (e.g., #FFD700)" }
                         },
-                        required: ["overall_aesthetic", "visual_strategy", "color_psychology", "shelf_impact", "design_strengths", "standout_elements", "dominant_colors"]
+                        required: ["overall_aesthetic", "visual_strategy", "color_psychology", "shelf_impact", "design_strengths", "standout_elements", "dominant_colors", "primary_color_hex", "secondary_color_hex"]
                       },
                       product_contents: {
                         type: "object",

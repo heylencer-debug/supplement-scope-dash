@@ -381,6 +381,30 @@ serve(async (req) => {
     
     promptParts.push("DESIGN PHILOSOPHY: Premium and professional, but informative. Think Ritual, AG1, or high-end pet brands like Open Farm or Ollie.");
     promptParts.push("");
+    
+    // =================================================================
+    // TEXTURE & PATTERN GUIDANCE (EYE-CATCHING BUT NOT CLUTTERED)
+    // =================================================================
+    promptParts.push("=== TEXTURE & PATTERN GUIDANCE ===");
+    promptParts.push("Subtle textures and patterns are ENCOURAGED to make the design eye-catching:");
+    promptParts.push("");
+    promptParts.push("✅ GOOD (use sparingly):");
+    promptParts.push("- Subtle gradient overlays for depth");
+    promptParts.push("- Light geometric patterns in the background (low opacity)");
+    promptParts.push("- Soft paper/matte texture on label surface");
+    promptParts.push("- Elegant line accents or dividers");
+    promptParts.push("- Subtle emboss/deboss effects on logos");
+    promptParts.push("");
+    promptParts.push("❌ BAD (avoid these):");
+    promptParts.push("- Busy patterns that compete with text");
+    promptParts.push("- Multiple overlapping decorative elements");
+    promptParts.push("- Confetti, starbursts, or scattered shapes");
+    promptParts.push("- Heavy textures that reduce readability");
+    promptParts.push("- More than 2 decorative elements total");
+    promptParts.push("");
+    promptParts.push("GOAL: Clean, eye-catching, professional. ONE focal point, minimal distraction.");
+    promptParts.push("=== END TEXTURE GUIDANCE ===");
+    promptParts.push("");
 
     // =================================================================
     // MANDATORY COLOR PALETTE (EXTRACTED FROM COMPETITOR ANALYSIS)

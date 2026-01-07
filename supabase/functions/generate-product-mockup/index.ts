@@ -264,6 +264,18 @@ serve(async (req) => {
         }
       }
     }
+    
+    // Detect flavor for fruit/ingredient imagery (used by BOTH 3D mockup and flat layouts)
+    let flavorImagery: { fruit: string; colors: string; style: string } | null = null;
+    if (flavorText) {
+      const flavorLower = flavorText.toLowerCase();
+      for (const [flavor, imagery] of Object.entries(flavorToImagery)) {
+        if (flavorLower.includes(flavor)) {
+          flavorImagery = imagery;
+          break;
+        }
+      }
+    }
 
     // Build certification string
     const certBadges = certifications?.length > 0 
@@ -412,19 +424,6 @@ serve(async (req) => {
       promptParts.push("- Position prominently below the main headline");
     }
 
-    // Detect flavor and add imagery instructions
-    let flavorImagery: { fruit: string; colors: string; style: string } | null = null;
-    if (flavorText) {
-      const flavorLower = flavorText.toLowerCase();
-      // Check for combined flavors first (e.g., "mixed berry", "berry blast")
-      for (const [flavor, imagery] of Object.entries(flavorToImagery)) {
-        if (flavorLower.includes(flavor)) {
-          flavorImagery = imagery;
-          break;
-        }
-      }
-    }
-    
     // Add FLAVOR IMAGERY if detected - make it LIVELY and VIBRANT
     if (flavorImagery) {
       promptParts.push("");
@@ -618,6 +617,23 @@ serve(async (req) => {
         frontOnlyPromptParts.push("- Flavor/variant indicators");
         frontOnlyPromptParts.push("- Quantity/count information");
         
+        // Add VIBRANT flavor imagery to front-only mode
+        if (flavorImagery) {
+          frontOnlyPromptParts.push("");
+          frontOnlyPromptParts.push("=== FLAVOR IMAGERY (VIBRANT & LIVELY) ===");
+          frontOnlyPromptParts.push(`Flavor: "${flavorText}"`);
+          frontOnlyPromptParts.push(`- Feature: ${flavorImagery.fruit}`);
+          frontOnlyPromptParts.push(`- Colors: ${flavorImagery.colors}`);
+          frontOnlyPromptParts.push("");
+          frontOnlyPromptParts.push("FRUIT STYLING (make it POP):");
+          frontOnlyPromptParts.push("- Fresh, vibrant, photorealistic fruit with natural shine");
+          frontOnlyPromptParts.push("- Bright, saturated colors - fruits should look JUICY and APPETIZING");
+          frontOnlyPromptParts.push("- Position fruit as a HERO element - prominent but balanced");
+          frontOnlyPromptParts.push("- NO cartoon fruit - use photorealistic style");
+          frontOnlyPromptParts.push("- Clean composition - fruit enhances, doesn't overwhelm");
+          frontOnlyPromptParts.push("=== END FLAVOR IMAGERY ===");
+        }
+        
         frontOnlyPromptParts.push("");
         frontOnlyPromptParts.push("=== OUTPUT REQUIREMENTS ===");
         frontOnlyPromptParts.push("- Single panel, print-ready artwork");
@@ -710,6 +726,22 @@ serve(async (req) => {
       if (flavorText) {
         flatPromptParts.push("");
         flatPromptParts.push(`FLAVOR CALLOUT: "${flavorText}" - display prominently below headline`);
+      }
+      
+      // Add VIBRANT flavor imagery to full dieline mode
+      if (flavorImagery) {
+        flatPromptParts.push("");
+        flatPromptParts.push("=== FLAVOR IMAGERY (VIBRANT & LIVELY) ===");
+        flatPromptParts.push(`- Feature: ${flavorImagery.fruit}`);
+        flatPromptParts.push(`- Colors: ${flavorImagery.colors}`);
+        flatPromptParts.push("");
+        flatPromptParts.push("FRUIT STYLING (make it POP):");
+        flatPromptParts.push("- Fresh, vibrant, photorealistic fruit with natural shine");
+        flatPromptParts.push("- Bright, saturated colors - fruits should look JUICY and APPETIZING");
+        flatPromptParts.push("- Position fruit as a HERO element on FRONT PANEL");
+        flatPromptParts.push("- NO cartoon fruit - use photorealistic style");
+        flatPromptParts.push("- Clean composition - fruit enhances, doesn't overwhelm");
+        flatPromptParts.push("=== END FLAVOR IMAGERY ===");
       }
       
       if (bulletPoints?.length > 0) {

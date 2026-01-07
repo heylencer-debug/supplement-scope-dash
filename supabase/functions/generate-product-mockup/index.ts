@@ -27,9 +27,9 @@ serve(async (req) => {
       console.log(`Has valid reference image for flat layout: ${hasValidReferenceImage}`);
     }
     
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+    const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
+    if (!OPENROUTER_API_KEY) {
+      throw new Error("OPENROUTER_API_KEY is not configured");
     }
 
     // Validate required design data
@@ -773,7 +773,7 @@ serve(async (req) => {
       prompt = promptParts.join("\n");
     }
 
-    console.log(`Generating ${isFlat ? 'flat layout' : 'product mockup'} with Lovable AI Gateway`);
+    console.log(`Generating ${isFlat ? 'flat layout' : 'product mockup'} with OpenRouter Nanobanana Pro`);
     console.log("Design brief received:", JSON.stringify(designBrief, null, 2));
     console.log("Generated prompt:", prompt);
 
@@ -816,15 +816,17 @@ ${prompt}`;
       messageContent = prompt;
     }
 
-    // Use Lovable AI Gateway for higher quality image generation
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    // Use OpenRouter with Nanobanana Pro (google/gemini-3-pro-image-preview) for highest quality
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
         "Content-Type": "application/json",
+        "HTTP-Referer": "https://lovable.dev",
+        "X-Title": "Lovable Product Mockup Generator"
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image-preview",
+        model: "google/gemini-3-pro-image-preview",
         messages: [
           {
             role: "user",

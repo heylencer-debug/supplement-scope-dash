@@ -876,7 +876,7 @@ ${extractedCompetitorClaims.map(c => `• ${c.brand}: ${c.xIn1Claim ? `"${c.xIn1
                           mock_content: {
                             type: 'object',
                             properties: {
-                              front_panel_text: { type: 'string' },
+                              front_panel_text: { type: 'string', description: 'COMPLETE front label copy ready for rendering. MUST include: Brand Name, Product Name, Primary Claim, 2-3 key benefit points (extracted from bullet_points), quantity, flavor (if applicable), and one trust signal. Format with line breaks. This is the ONLY text that will appear on the mockup - make it complete and self-contained.' },
                               back_panel_text: { type: 'string' },
                               side_panel_suggestions: { type: 'array', items: { type: 'string' } }
                             },
@@ -946,7 +946,7 @@ ${extractedCompetitorClaims.map(c => `• ${c.brand}: ${c.xIn1Claim ? `"${c.xIn1
                           mock_content: {
                             type: 'object',
                             properties: {
-                              front_panel_text: { type: 'string' },
+                              front_panel_text: { type: 'string', description: 'COMPLETE front label copy ready for rendering. MUST include: Brand Name, Product Name, Primary Claim, 2-3 key benefit points (extracted from bullet_points), quantity, flavor (if applicable), and one trust signal. Format with line breaks. This is the ONLY text that will appear on the mockup - make it complete and self-contained.' },
                               back_panel_text: { type: 'string' },
                               side_panel_suggestions: { type: 'array', items: { type: 'string' } }
                             },
@@ -1214,11 +1214,49 @@ For EACH strategy, you MUST decide what HERO VISUAL IMAGERY should appear on the
 
 ## YOUR DELIVERABLES (FOR EACH STRATEGY):
 
-**1. DESIGN BRIEF**: Color palette, typography, PRIMARY CLAIM, differentiators, certifications, **hero_imagery**
+**1. DESIGN BRIEF**: Color palette, typography, PRIMARY CLAIM, differentiators, certifications, **hero_imagery**, brand_name, product_name
 
 **2. ELEMENTS CHECKLIST**: Front panel hierarchy, 5 bullet points matching competitor style, CTA, trust signals
 
-**3. MOCK CONTENT**: Complete front panel text, back panel text, side panel suggestions - ALL matching the dominant claim style in this category
+**3. MOCK CONTENT - COMPLETE FRONT PANEL**:
+
+⚠️ CRITICAL: The \`front_panel_text\` must be 100% COMPLETE and READY TO RENDER.
+   
+The mockup generator will copy this text VERBATIM onto the label. Include:
+
+**MUST INCLUDE (in this order):**
+1. Brand Name (top of label)
+2. Product Name (largest, center)
+3. Primary Claim or X-in-1 statement
+4. 2-3 KEY benefit points (EXTRACTED from your bullet_points - pick the MOST IMPACTFUL)
+5. Quantity/Count (e.g., "90 Gummies", "60 Softgels")
+6. Flavor text (if applicable)
+7. ONE trust signal or certification (e.g., "Lab Tested", "GMP Certified")
+
+**FORMAT EXAMPLE (your front_panel_text should look like this):**
+\`\`\`
+VITAWELL
+
+MAGNACALM SLEEP COMPLEX
+
+7-in-1 Complete Formula
+
+✓ Supports Deep, Restful Sleep
+✓ Promotes Natural Relaxation  
+✓ Non-Habit Forming
+
+90 Gummies | Natural Berry Flavor
+
+Made in USA • cGMP Certified
+\`\`\`
+
+**DO NOT:**
+- Create front_panel_text that only has brand name and claim
+- Leave out the key selling points (include 2-3 from bullet_points)
+- Forget quantity and flavor
+- Make it too long (max 10 lines)
+
+The front_panel_text IS the complete label copy. Nothing else will be added.
 
 **4. REASONING**: Explain how your claim style matches what's working for competitors
 

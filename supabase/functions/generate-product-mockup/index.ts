@@ -612,22 +612,10 @@ serve(async (req) => {
       promptParts.push("- Subtle abstract shapes or gradients if needed");
     }
 
-    // BENEFIT BULLET POINTS - Key selling points visible on front label
-    if (bulletPoints?.length > 0) {
-      promptParts.push("");
-      promptParts.push("BENEFIT BULLET POINTS (must be visible on front label with checkmark or icon):");
-      bulletPoints.slice(0, 5).forEach((bullet: string) => {
-        // Extract short version for label (first 8-10 words or up to first colon)
-        const colonIndex = bullet.indexOf(':');
-        const shortBullet = colonIndex > 0 
-          ? bullet.substring(0, colonIndex).trim()
-          : bullet.split(' ').slice(0, 8).join(' ');
-        promptParts.push(`✓ ${shortBullet}`);
-      });
-      promptParts.push("- Display these as checkmarks (✓) or bullet icons on the front panel");
-      promptParts.push("- Use clear, bold typography for benefit claims - must be readable");
-      promptParts.push("- Position prominently below the main headline");
-    }
+    // BENEFIT BULLET POINTS
+    // User request: do NOT auto-generate or force bullet points on the front label.
+    // If the content plan (frontPanelText) includes bullets, they will be rendered verbatim there.
+    // Otherwise, we omit bullets entirely.
 
     // DISTINCTIVE, PREMIUM DESIGN - Not generic
     promptParts.push("");
@@ -687,7 +675,6 @@ serve(async (req) => {
     promptParts.push("- Good use of whitespace, not cluttered but information-rich");
     promptParts.push("- Premium feel with subtle textures, gradients, and metallic accents on logo/badges");
     promptParts.push("- Professional D2C supplement brand aesthetic (not cheap pharmacy or generic looking)");
-    promptParts.push("- MUST include visible benefit claims/bullet points on front panel");
     
     promptParts.push("");
     promptParts.push("PHOTOGRAPHY STYLE:");

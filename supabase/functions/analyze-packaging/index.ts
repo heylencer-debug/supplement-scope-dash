@@ -851,9 +851,23 @@ ${extractedCompetitorClaims.map(c => `• ${c.brand}: ${c.xIn1Claim ? `"${c.xIn1
                                   copy_voice: { type: 'string', description: 'How copy should sound: authoritative, friendly, urgent, aspirational, scientific' }
                                 },
                                 required: ['primary_tone', 'tone_descriptors', 'emotional_appeal', 'copy_voice']
+                              },
+                              hero_imagery: {
+                                type: 'object',
+                                description: 'Visual imagery to feature on the packaging based on flavor, form, product type, and competitor visuals',
+                                properties: {
+                                  imagery_type: { type: 'string', enum: ['fruit', 'ingredient', 'animal', 'abstract', 'lifestyle', 'product_form', 'none'], description: 'What type of imagery to feature' },
+                                  primary_visual: { type: 'string', description: 'Main visual element to show (e.g., "fresh blueberries with dewdrops", "golden retriever", "gummy bears", "cacao nibs")' },
+                                  visual_style: { type: 'string', description: 'Style of the imagery (e.g., "photorealistic with shine", "illustrated", "silhouette", "abstract shapes")' },
+                                  color_palette: { type: 'string', description: 'Colors associated with the imagery (e.g., "deep purple and blue", "rich brown")' },
+                                  prominence: { type: 'string', enum: ['hero', 'accent', 'subtle', 'none'], description: 'How prominent should this imagery be on the packaging' },
+                                  placement: { type: 'string', description: 'Where to place the imagery (e.g., "front panel hero", "corner accent", "background element")' },
+                                  reasoning: { type: 'string', description: 'Why this imagery was chosen based on flavor/form/product/competitors' }
+                                },
+                                required: ['imagery_type', 'primary_visual', 'visual_style', 'prominence', 'placement', 'reasoning']
                               }
                             },
-                            required: ['primary_color', 'secondary_color', 'accent_color', 'headline_font', 'body_font', 'primary_claim', 'key_differentiators', 'certifications', 'suggested_tone']
+                            required: ['primary_color', 'secondary_color', 'accent_color', 'headline_font', 'body_font', 'primary_claim', 'key_differentiators', 'certifications', 'suggested_tone', 'hero_imagery']
                           },
                           elements_checklist: {
                             type: 'object',
@@ -905,9 +919,23 @@ ${extractedCompetitorClaims.map(c => `• ${c.brand}: ${c.xIn1Claim ? `"${c.xIn1
                                   copy_voice: { type: 'string', description: 'How copy should sound: authoritative, friendly, urgent, aspirational, scientific' }
                                 },
                                 required: ['primary_tone', 'tone_descriptors', 'emotional_appeal', 'copy_voice']
+                              },
+                              hero_imagery: {
+                                type: 'object',
+                                description: 'Visual imagery to feature on the packaging based on flavor, form, product type, and competitor visuals',
+                                properties: {
+                                  imagery_type: { type: 'string', enum: ['fruit', 'ingredient', 'animal', 'abstract', 'lifestyle', 'product_form', 'none'], description: 'What type of imagery to feature' },
+                                  primary_visual: { type: 'string', description: 'Main visual element to show (e.g., "fresh blueberries with dewdrops", "golden retriever", "gummy bears", "cacao nibs")' },
+                                  visual_style: { type: 'string', description: 'Style of the imagery (e.g., "photorealistic with shine", "illustrated", "silhouette", "abstract shapes")' },
+                                  color_palette: { type: 'string', description: 'Colors associated with the imagery (e.g., "deep purple and blue", "rich brown")' },
+                                  prominence: { type: 'string', enum: ['hero', 'accent', 'subtle', 'none'], description: 'How prominent should this imagery be on the packaging' },
+                                  placement: { type: 'string', description: 'Where to place the imagery (e.g., "front panel hero", "corner accent", "background element")' },
+                                  reasoning: { type: 'string', description: 'Why this imagery was chosen based on flavor/form/product/competitors' }
+                                },
+                                required: ['imagery_type', 'primary_visual', 'visual_style', 'prominence', 'placement', 'reasoning']
                               }
                             },
-                            required: ['primary_color', 'secondary_color', 'accent_color', 'headline_font', 'body_font', 'primary_claim', 'key_differentiators', 'certifications', 'suggested_tone']
+                            required: ['primary_color', 'secondary_color', 'accent_color', 'headline_font', 'body_font', 'primary_claim', 'key_differentiators', 'certifications', 'suggested_tone', 'hero_imagery']
                           },
                           elements_checklist: {
                             type: 'object',
@@ -1054,9 +1082,44 @@ ${perProductImageAnalysisSummary}
 4. Every claim MUST be verifiable from our formulation document
 5. Match competitor visual styles (colors, fonts, layout) while being strategically different on claims
 
+## 🎨 HERO IMAGERY DECISION (CRITICAL FOR MOCKUP GENERATION)
+
+For EACH strategy, you MUST decide what HERO VISUAL IMAGERY should appear on the packaging.
+
+**Consider these factors when deciding imagery:**
+
+1. **Flavor** (${detectedFlavor || 'none detected'}):
+   - If fruit-based flavor → Photorealistic fruit (e.g., "fresh blueberries with dewdrops and juice splashes")
+   - If savory/meat flavor → The animal or appetizing ingredient
+   - If unflavored → Abstract or product form imagery
+
+2. **Product Form** (${ourFormFactor || 'unknown'}):
+   - Gummies → Consider showing colorful gummy shapes/colors as hero OR fruit imagery
+   - Powder → Scoops, mixing action, or key ingredient
+   - Capsules → Usually minimal imagery, clinical clean look, or key ingredient
+   - Soft chews → The chew itself or flavor imagery
+
+3. **Product Type/Category** (${categoryName}):
+   - Pet supplements → Dogs/cats as hero imagery (match competitor style)
+   - Human supplements → Lifestyle, ingredient, or abstract wellness imagery
+   - Protein products → Athletic/fitness imagery
+   - Beauty supplements → Elegant, skincare-style visuals
+
+4. **Competitor Visuals** (from images analyzed above):
+   - What imagery do successful competitors prominently feature?
+   - Match their imagery approach OR differentiate strategically
+
+**Output hero_imagery with:**
+- \`imagery_type\`: fruit/ingredient/animal/abstract/lifestyle/product_form/none
+- \`primary_visual\`: SPECIFIC description (e.g., "fresh mixed berries with natural shine and dewdrops", NOT just "berries")
+- \`visual_style\`: photorealistic/illustrated/silhouette/abstract/photography
+- \`prominence\`: hero (main element 20-30% of label), accent (supporting), subtle (background), none
+- \`placement\`: Where on packaging
+- \`reasoning\`: Why you chose this based on all factors above
+
 ## YOUR DELIVERABLES (FOR EACH STRATEGY):
 
-**1. DESIGN BRIEF**: Color palette, typography, PRIMARY CLAIM (that MATCHES the dominant competitor style), differentiators, certifications
+**1. DESIGN BRIEF**: Color palette, typography, PRIMARY CLAIM, differentiators, certifications, **hero_imagery**
 
 **2. ELEMENTS CHECKLIST**: Front panel hierarchy, 5 bullet points matching competitor style, CTA, trust signals
 

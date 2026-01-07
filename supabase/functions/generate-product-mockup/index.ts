@@ -82,6 +82,57 @@ serve(async (req) => {
       'pork': { colors: 'pink, light brown', description: 'pink-tinted pork-colored chews' },
     };
     
+    // Flavor to fruit/ingredient imagery mapping for prominent visual elements
+    const flavorToImagery: Record<string, { fruit: string; colors: string; style: string }> = {
+      // Berry flavors
+      'berry': { fruit: 'mixed berries (blueberries, raspberries, blackberries)', colors: 'deep purple, red, blue', style: 'scattered fresh berries with juice splashes, glistening with dewdrops' },
+      'blueberry': { fruit: 'fresh blueberries', colors: 'deep blue, purple', style: 'cluster of blueberries with green leaves, juice droplets, some berries cut to show interior' },
+      'strawberry': { fruit: 'fresh strawberries', colors: 'bright red, pink', style: 'sliced strawberries showing seeds, strawberry halves with juice splash, leaves attached' },
+      'raspberry': { fruit: 'fresh raspberries', colors: 'deep pink, magenta', style: 'raspberries with subtle texture detail, scattered with some crushed showing juice' },
+      'blackberry': { fruit: 'fresh blackberries', colors: 'dark purple, black', style: 'glossy blackberries with small leaves, some showing drupelets' },
+      'acai': { fruit: 'acai berries', colors: 'deep purple', style: 'acai berries in bowl or palm frond, tropical aesthetic' },
+      'cranberry': { fruit: 'cranberries', colors: 'deep red, burgundy', style: 'whole cranberries, some halved, splash of juice' },
+      'mixed berry': { fruit: 'assorted berries (strawberry, blueberry, raspberry)', colors: 'red, blue, purple medley', style: 'beautiful arrangement of multiple berry types with splashes' },
+      
+      // Citrus flavors
+      'orange': { fruit: 'orange slices', colors: 'bright orange', style: 'orange cross-sections showing segments, peel zest curls, juice splash, refreshing' },
+      'lemon': { fruit: 'lemon slices', colors: 'bright yellow', style: 'lemon wedges with zest, refreshing splash, water droplets' },
+      'lime': { fruit: 'lime slices', colors: 'vibrant green', style: 'lime wedges, zest strips, mojito-fresh aesthetic' },
+      'citrus': { fruit: 'mixed citrus (orange, lemon, lime)', colors: 'orange, yellow, green', style: 'citrus wheel arrangement, multiple slices overlapping' },
+      'grapefruit': { fruit: 'grapefruit halves', colors: 'pink, coral', style: 'grapefruit segments, ruby red flesh, refreshing' },
+      'tangerine': { fruit: 'tangerine segments', colors: 'deep orange', style: 'peeled tangerine segments, easy-peel aesthetic' },
+      
+      // Tropical flavors
+      'mango': { fruit: 'mango slices', colors: 'golden yellow, orange', style: 'cubed mango hedgehog cut, tropical leaves, juice dripping' },
+      'pineapple': { fruit: 'pineapple', colors: 'golden yellow', style: 'pineapple rings, chunks, tropical crown leaves' },
+      'coconut': { fruit: 'coconut halves', colors: 'white, brown', style: 'coconut halves with white flesh, shavings, palm aesthetic' },
+      'tropical': { fruit: 'tropical fruit mix', colors: 'bright multicolor', style: 'mango, pineapple, coconut paradise arrangement' },
+      'passion fruit': { fruit: 'passion fruit halves', colors: 'purple, yellow', style: 'passion fruit cut open showing seeds and pulp' },
+      'papaya': { fruit: 'papaya slices', colors: 'orange, coral', style: 'papaya halves with black seeds visible, tropical' },
+      'guava': { fruit: 'guava slices', colors: 'pink, green', style: 'guava halves showing pink flesh, tropical leaves' },
+      
+      // Other fruits
+      'apple': { fruit: 'apples', colors: 'red, green', style: 'apple slices, whole apples with leaves, crisp and fresh' },
+      'grape': { fruit: 'grapes', colors: 'purple, green', style: 'grape clusters with vine leaves, wine country aesthetic' },
+      'cherry': { fruit: 'cherries', colors: 'deep red', style: 'cherry pairs with stems, glossy, maraschino style' },
+      'peach': { fruit: 'peaches', colors: 'peach, coral', style: 'peach halves showing pit, fuzzy skin texture, summer fresh' },
+      'watermelon': { fruit: 'watermelon', colors: 'pink, green', style: 'watermelon slices, triangular cuts, seeds visible, refreshing' },
+      'pomegranate': { fruit: 'pomegranate', colors: 'deep red', style: 'pomegranate seeds (arils) scattered, cut open fruit revealing jewel-like interior' },
+      'banana': { fruit: 'bananas', colors: 'yellow, cream', style: 'peeled banana, banana slices, tropical smoothie feel' },
+      'kiwi': { fruit: 'kiwi slices', colors: 'green, brown', style: 'kiwi cross-sections showing seeds and pattern, fuzzy skin' },
+      
+      // Non-fruit flavors
+      'mint': { fruit: 'mint leaves', colors: 'fresh green', style: 'mint sprigs, scattered leaves, refreshing ice-cold aesthetic' },
+      'vanilla': { fruit: 'vanilla beans', colors: 'cream, brown', style: 'vanilla pods split open, creamy swirls, seeds visible' },
+      'chocolate': { fruit: 'cacao/chocolate', colors: 'rich brown', style: 'chocolate pieces, cacao nibs, chocolate drizzle, indulgent' },
+      'honey': { fruit: 'honeycomb', colors: 'golden amber', style: 'honeycomb hexagons, honey drip, bee aesthetic' },
+      'cinnamon': { fruit: 'cinnamon sticks', colors: 'warm brown', style: 'cinnamon sticks, ground spice, cozy warm aesthetic' },
+      'ginger': { fruit: 'ginger root', colors: 'golden, tan', style: 'fresh ginger root, sliced ginger, spicy warmth' },
+      'turmeric': { fruit: 'turmeric root', colors: 'bright orange-gold', style: 'fresh turmeric root, golden powder, wellness aesthetic' },
+      'green tea': { fruit: 'tea leaves', colors: 'matcha green', style: 'green tea leaves, matcha powder, zen aesthetic' },
+      'coffee': { fruit: 'coffee beans', colors: 'deep brown', style: 'coffee beans, espresso swirl, energizing aesthetic' },
+    };
+    
     // Packaging format to shape/proportion details for accurate container rendering
     const packagingFormatDetails: Record<string, { shape: string; proportions: string; style: string }> = {
       'narrow-mouth glass jar': {
@@ -361,11 +412,74 @@ serve(async (req) => {
       promptParts.push("- Position prominently below the main headline");
     }
 
-    // MODERN GRAPHIC ELEMENTS
+    // Detect flavor and add imagery instructions
+    let flavorImagery: { fruit: string; colors: string; style: string } | null = null;
+    if (flavorText) {
+      const flavorLower = flavorText.toLowerCase();
+      // Check for combined flavors first (e.g., "mixed berry", "berry blast")
+      for (const [flavor, imagery] of Object.entries(flavorToImagery)) {
+        if (flavorLower.includes(flavor)) {
+          flavorImagery = imagery;
+          break;
+        }
+      }
+    }
+    
+    // Add FLAVOR IMAGERY if detected (CRITICAL for visual appeal)
+    if (flavorImagery) {
+      promptParts.push("");
+      promptParts.push("=== FLAVOR IMAGERY (CRITICAL - MUST INCLUDE PROMINENTLY) ===");
+      promptParts.push(`Based on the "${flavorText}" flavor, include PROMINENT and APPETIZING fruit/ingredient imagery:`);
+      promptParts.push(`- Feature: ${flavorImagery.fruit}`);
+      promptParts.push(`- Color palette influence: ${flavorImagery.colors}`);
+      promptParts.push(`- Visual style: ${flavorImagery.style}`);
+      promptParts.push("- The fruit/ingredient should be PHOTOREALISTIC or beautifully illustrated");
+      promptParts.push("- Position PROMINENTLY - as hero image element, floating around product, or integrated into design");
+      promptParts.push("- Include juice splashes, droplets, or fresh/vibrant effects for appetite appeal");
+      promptParts.push("- Fruit should look fresh, glossy, and delicious - not flat or generic");
+      promptParts.push("- Use the fruit colors to influence accent colors and gradients on the packaging");
+      promptParts.push("=== END FLAVOR IMAGERY ===");
+    }
+
+    // DECORATIVE PATTERN STYLE - Creative and distinctive
     promptParts.push("");
-    promptParts.push("MODERN GRAPHIC ELEMENTS (critical for contemporary premium look):");
-    promptParts.push("- Include subtle geometric shapes or abstract wave/curve patterns as background elements");
-    promptParts.push("- Add gradient overlays or color blocking sections for visual interest");
+    promptParts.push("=== DECORATIVE PATTERN STYLE (BE CREATIVE - NOT GENERIC) ===");
+    promptParts.push("Choose ONE distinctive pattern style for background elements (pick what best matches the product tone):");
+    promptParts.push("");
+    promptParts.push("OPTION A - GEOMETRIC MODERN:");
+    promptParts.push("- Bold hexagonal grids, triangular tessellations, or diamond lattice patterns");
+    promptParts.push("- Inspired by honeycomb structures, crystal formations, or Art Deco geometry");
+    promptParts.push("- Sharp, precise lines with gradient fills in brand colors");
+    promptParts.push("- Think: scientific, structured, premium supplement aesthetic");
+    promptParts.push("");
+    promptParts.push("OPTION B - ORGANIC FLOW:");
+    promptParts.push("- Flowing liquid shapes, topographic contour lines, or wood grain patterns");
+    promptParts.push("- Organic blob shapes with soft feathered edges");
+    promptParts.push("- Nature-inspired curves, waves, and fluid dynamics");
+    promptParts.push("- Think: natural, wellness, holistic health aesthetic");
+    promptParts.push("");
+    promptParts.push("OPTION C - PLAYFUL MEMPHIS:");
+    promptParts.push("- Confetti dots, squiggles, zig-zags, and abstract geometric shapes");
+    promptParts.push("- Bold outlines on shapes, fun and energetic scattered elements");
+    promptParts.push("- 80s/90s Memphis design revival, bold color blocking");
+    promptParts.push("- Think: fun, youthful, energetic pet or vitamin brand");
+    promptParts.push("");
+    promptParts.push("OPTION D - BOTANICAL LINE ART:");
+    promptParts.push("- Delicate leaf outlines, botanical illustrations, floral linework");
+    promptParts.push("- Hand-drawn quality with elegant thin strokes");
+    promptParts.push("- Nature and wellness aesthetic with subtle vine/leaf patterns");
+    promptParts.push("- Think: natural, organic, herbalist/apothecary aesthetic");
+    promptParts.push("");
+    promptParts.push("OPTION E - ABSTRACT BRUSHSTROKE:");
+    promptParts.push("- Watercolor splashes, paint strokes, ink brush marks");
+    promptParts.push("- Artistic, handmade quality with visible texture");
+    promptParts.push("- Dynamic movement and expressive energy");
+    promptParts.push("- Think: artisanal, craft, premium handmade aesthetic");
+    promptParts.push("");
+    promptParts.push("MAKE THE PATTERN DISTINCTIVE AND MEMORABLE - avoid generic gradients or plain backgrounds!");
+    promptParts.push("=== END PATTERN STYLE ===");
+    promptParts.push("");
+    promptParts.push("ADDITIONAL GRAPHIC ELEMENTS:");
     promptParts.push("- Use modern flat icons for benefits (checkmarks, shields, leaf icons, medical cross)");
     promptParts.push("- Include ribbon banners or badge shapes for key claims like 'X-in-1' or 'Vet Recommended'");
     promptParts.push("- Add subtle texture or grain effect for premium tactile feel");

@@ -180,41 +180,13 @@ serve(async (req) => {
     // Use total active ingredients for the primary count (not including functional excipients)
     const ourIngredientCount = totalActiveCount > 0 ? totalActiveCount : ourIngredients.length;
     
-    // ============ FLAVOR EXTRACTION FROM FORMULA BRIEF ============
-    // Extract flavor information to include on packaging design
-    let detectedFlavor: string | null = null;
-    
-    if (formulaBriefContent) {
-      const contentLower = formulaBriefContent.toLowerCase();
-      const foundFlavors: string[] = [];
-      
-      // Common protein-based flavors for pet/supplement products
-      const flavorKeywords = ['chicken', 'beef', 'bacon', 'salmon', 'fish', 'turkey', 'lamb', 'peanut butter', 'liver', 'duck', 'venison', 'bison', 'pork'];
-      
-      for (const flavor of flavorKeywords) {
-        if (contentLower.includes(flavor)) {
-          const capitalizedFlavor = flavor.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-          if (!foundFlavors.some(f => f.toLowerCase() === flavor)) {
-            foundFlavors.push(capitalizedFlavor);
-          }
-        }
-      }
-      
-      // Look for combined flavors (e.g., "Chicken & Bacon")
-      const combinedMatch = formulaBriefContent.match(/(chicken|beef|bacon|salmon|turkey|lamb|liver|duck|pork)\s*(?:&|and)\s*(chicken|beef|bacon|salmon|turkey|lamb|liver|duck|pork)/gi);
-      if (combinedMatch && combinedMatch.length > 0) {
-        const combo = combinedMatch[0].replace(/\s+and\s+/gi, ' & ').replace(/\s+/g, ' ').trim();
-        const parts = combo.split(/\s*&\s*/);
-        const formattedCombo = parts.map((p: string) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join(' & ');
-        detectedFlavor = `Natural ${formattedCombo} Flavor`;
-      } else if (foundFlavors.length >= 2) {
-        detectedFlavor = `Natural ${foundFlavors[0]} & ${foundFlavors[1]} Flavor`;
-      } else if (foundFlavors.length === 1) {
-        detectedFlavor = `Natural ${foundFlavors[0]} Flavor`;
-      }
-    }
-    
-    console.log(`Detected flavor from formula brief: ${detectedFlavor || 'None detected'}`);
+    // ============ FLAVOR & PRODUCT TYPE DETECTION ============
+    // NOTE: Flavor and product type detection is now handled ENTIRELY by the AI
+    // The AI will analyze the formula brief contextually to determine:
+    // 1. Product type (human_supplement, pet_dog, pet_cat, pet_general)
+    // 2. Actual flavor (if explicitly mentioned, e.g., "Natural Mixed Berry Flavor")
+    // 3. Appropriate imagery based on flavor and product type
+    // This avoids brittle regex matching that caused false positives (e.g., "salmon" from ingredient benefits)
     
     
     // Benefit category mapping for label icons/badges
@@ -960,6 +932,31 @@ ${extractedCompetitorClaims.map(c => `• ${c.brand}: ${c.xIn1Claim ? `"${c.xIn1
                         },
                         required: ['target_competitors', 'strategy_summary', 'design_brief', 'elements_checklist', 'mock_content', 'reasoning']
                       },
+                      product_classification: {
+                        type: 'object',
+                        description: 'AI-detected product type and flavor from the formula brief. REQUIRED.',
+                        properties: {
+                          product_type: { 
+                            type: 'string', 
+                            enum: ['human_supplement', 'pet_dog', 'pet_cat', 'pet_general'],
+                            description: 'Detected from formula brief context. Default to human_supplement if no pet indicators found.'
+                          },
+                          detected_flavor: { 
+                            type: 'string', 
+                            nullable: true,
+                            description: 'The EXPLICIT flavor mentioned (e.g., "Natural Mixed Berry Flavor"). Return null if unflavored. DO NOT confuse ingredient benefits with flavor (salmon omega-3 is NOT salmon flavor).'
+                          },
+                          flavor_imagery_description: {
+                            type: 'string',
+                            description: 'Specific visual description for this flavor for mockup generation (e.g., "Fresh blueberries and raspberries with dewdrops and natural shine"). Return "none" if unflavored.'
+                          },
+                          detection_reasoning: {
+                            type: 'string',
+                            description: 'Brief explanation of how you determined product type and flavor from the formula brief.'
+                          }
+                        },
+                        required: ['product_type', 'detected_flavor', 'flavor_imagery_description', 'detection_reasoning']
+                      },
                       recommendation: {
                         type: 'object',
                         description: 'Which strategy to choose and why',
@@ -970,7 +967,7 @@ ${extractedCompetitorClaims.map(c => `• ${c.brand}: ${c.xIn1Claim ? `"${c.xIn1
                         required: ['preferred_strategy', 'reasoning']
                       }
                     },
-                    required: ['match_leaders', 'match_disruptors', 'recommendation']
+                    required: ['match_leaders', 'match_disruptors', 'recommendation', 'product_classification']
                   }
                 }
               }
@@ -1019,14 +1016,28 @@ ${claimPatternSummary}
 
 **Benefit Categories We Cover:** ${ourBenefitClaims.length > 0 ? ourBenefitClaims.join(', ') : 'Analyze from ingredients'}
 
-${detectedFlavor ? `
-## 🍗 OUR PRODUCT FLAVOR:
-**${detectedFlavor}**
-- IMPORTANT: Include this flavor prominently on the front panel label
-- Position flavor callout below main headline or near bottom
-- Use appetizing, pet-friendly imagery cues that match the flavor
-- This is a key differentiator for pet palatability
-` : ''}
+## 🔍 PRODUCT CLASSIFICATION (YOU MUST DETECT FROM FORMULA BRIEF)
+
+**CRITICAL: Read the formula brief document below and determine:**
+
+1. **Product Type** - Is this a human supplement or pet product?
+   - Look for "dog", "canine", "pet", "cat", "feline", "veterinarian" → pet product
+   - If NO pet indicators found → human supplement (this is the default)
+   
+2. **Flavor Detection** - What is the ACTUAL flavor?
+   - Look for EXPLICIT flavor mentions like "Natural Mixed Berry Flavor", "Chicken & Bacon Flavor"
+   - ⚠️ DO NOT confuse ingredient BENEFITS with FLAVORS:
+     - "Salmon oil for omega-3 fatty acids" → This is an INGREDIENT, NOT a flavor
+     - "Natural Salmon Flavor" → This IS a flavor
+     - "Mixed Berry" in product name or flavor section → This IS a flavor
+   - If no flavor explicitly mentioned, return null for flavor
+
+3. **Flavor Imagery** - What visual should represent the flavor?
+   - For FRUIT flavors (berry, citrus, etc.) → Describe photorealistic fruit imagery
+   - For MEAT flavors (chicken, beef, etc.) → Only if it's a PET product with explicit flavor mention
+   - For UNFLAVORED → Abstract wellness imagery or product form
+
+**Include your detection in the product_classification field of your response.**
 
 ${ourDosageHighlights.length > 0 ? `
 ## 💪 OUR DOSAGE ADVANTAGES:
@@ -1110,24 +1121,22 @@ Your design_brief colors MUST be extracted DIRECTLY from competitor packaging im
 
 For EACH strategy, you MUST decide what HERO VISUAL IMAGERY should appear on the packaging.
 
-**Consider these factors when deciding imagery:**
+**Use your product_classification detection to guide imagery:**
 
-1. **Flavor** (${detectedFlavor || 'none detected'}):
-   - If fruit-based flavor → Photorealistic fruit (e.g., "fresh blueberries with dewdrops and juice splashes")
-   - If savory/meat flavor → The animal or appetizing ingredient
-   - If unflavored → Abstract or product form imagery
+1. **Based on Product Type you detected:**
+   - If HUMAN supplement → Use lifestyle, ingredient, or abstract wellness imagery. DO NOT use pet/animal imagery.
+   - If PET product → Feature dogs/cats prominently (match competitor style)
 
-2. **Product Form** (${ourFormFactor || 'unknown'}):
-   - Gummies → Consider showing colorful gummy shapes/colors as hero OR fruit imagery
+2. **Based on Flavor you detected:**
+   - If FRUIT flavor (berry, citrus, mango, etc.) → Photorealistic fruit (e.g., "fresh blueberries with dewdrops and juice splashes")
+   - If MEAT flavor AND pet product → The protein source or appetizing pet food imagery
+   - If no flavor detected → Abstract wellness imagery or product form
+
+3. **Product Form** (${ourFormFactor || 'unknown'}):
+   - Gummies → Consider showing colorful gummy shapes/colors as hero OR fruit imagery (for human products)
    - Powder → Scoops, mixing action, or key ingredient
    - Capsules → Usually minimal imagery, clinical clean look, or key ingredient
    - Soft chews → The chew itself or flavor imagery
-
-3. **Product Type/Category** (${categoryName}):
-   - Pet supplements → Dogs/cats as hero imagery (match competitor style)
-   - Human supplements → Lifestyle, ingredient, or abstract wellness imagery
-   - Protein products → Athletic/fitness imagery
-   - Beauty supplements → Elegant, skincare-style visuals
 
 4. **Competitor Visuals** (from images analyzed above):
    - What imagery do successful competitors prominently feature?

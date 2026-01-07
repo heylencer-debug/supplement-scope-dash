@@ -11,11 +11,12 @@ serve(async (req) => {
   }
 
   try {
-    const { designBrief, mode = 'mockup', referenceImageUrl } = await req.json();
+    const { designBrief, mode = 'mockup', referenceImageUrl, flatLayoutMode = 'full' } = await req.json();
     const isFlat = mode === 'flat_layout';
+    const isFrontOnly = flatLayoutMode === 'front_only';
     
     // Debug logging for flat layout reference image
-    console.log(`Mode: ${mode}, isFlat: ${isFlat}`);
+    console.log(`Mode: ${mode}, isFlat: ${isFlat}, flatLayoutMode: ${flatLayoutMode}`);
     console.log(`Reference image received: ${referenceImageUrl ? 'YES (length: ' + referenceImageUrl.length + ', starts with: ' + referenceImageUrl.substring(0, 50) + '...)' : 'NO'}`);
     
     // Validate reference image format
@@ -35,6 +36,7 @@ serve(async (req) => {
     if (!designBrief) {
       throw new Error("Design brief data is required");
     }
+    
 
     // Extract design details from the actual AI analysis
     const primaryColorName = designBrief.primaryColor?.name;
@@ -489,35 +491,85 @@ serve(async (req) => {
       const packagingCategory = getPackagingCategory(packagingFormat);
       const layoutStructure = flatLayoutStructures[packagingCategory] || flatLayoutStructures['jar'];
       
-      const flatPromptParts = [
-        `=== 2D FLAT DIELINE LAYOUT FOR ${packagingFormat.toUpperCase()} ===`,
-        "",
-        "Create a FLAT, UNWRAPPED, 2D packaging dieline layout suitable for printing and die-cutting.",
-        "This is a PRINT-READY layout that will be edited in Photoshop/Illustrator.",
-        "",
-        "=== CRITICAL REQUIREMENTS ===",
-        "- This is a 2D FLAT VIEW - absolutely NO perspective, NO shadows, NO 3D effects",
-        "- Show the packaging UNFOLDED as it would appear on a die-cut sheet before assembly",
-        "- All panels must be connected showing how they fold together",
-        "- Include visible fold/score lines (thin dotted or dashed lines between panels)",
-        "- Include bleed area (slight color extension beyond trim lines)",
-        "- White background surrounding the dieline",
-        "- Registration/crop marks at corners",
-        "",
-        `=== PACKAGING TYPE: ${packagingFormat} ===`,
-        `Category: ${packagingCategory.toUpperCase()}`,
-        `Description: ${layoutStructure.description}`,
-        "",
-        "=== PANEL STRUCTURE ===",
-        `Arrangement: ${layoutStructure.arrangement}`,
-        `Dimensions: ${layoutStructure.dimensions}`,
-        "",
-        "PANELS TO INCLUDE:",
-      ];
-      
-      layoutStructure.panels.forEach((panel, index) => {
-        flatPromptParts.push(`${index + 1}. ${panel}`);
-      });
+      // Front-only mode: simplified prompt for just the front panel
+      if (isFrontOnly) {
+        const frontOnlyPromptParts = [
+          `=== 2D FLAT FRONT PANEL LAYOUT FOR ${packagingFormat.toUpperCase()} ===`,
+          "",
+          "Create a SINGLE FLAT 2D front panel/label suitable for printing.",
+          "This is a PRINT-READY layout that will be edited in Photoshop/Illustrator.",
+          "",
+          "=== CRITICAL REQUIREMENTS ===",
+          "- Generate ONLY the FRONT PANEL/LABEL - not the full dieline",
+          "- This is a 2D FLAT VIEW - absolutely NO perspective, NO shadows, NO 3D effects",
+          "- Show just the front-facing label as a single rectangular artwork",
+          "- Include bleed area (slight color extension beyond trim lines)",
+          "- White/neutral background surrounding the label",
+          "- Centered, high-resolution artwork",
+          "",
+          `=== PACKAGING TYPE: ${packagingFormat} ===`,
+          "PANEL: Front Panel/Label ONLY",
+          "",
+          "=== DESIGN ELEMENTS (MUST MATCH 3D MOCKUP FRONT EXACTLY) ===",
+          "",
+          "COLOR PALETTE:",
+        ];
+        
+        if (primaryColorHex) frontOnlyPromptParts.push(`- Primary: ${primaryColorName || ''} ${primaryColorHex}`);
+        if (secondaryColorHex) frontOnlyPromptParts.push(`- Secondary: ${secondaryColorName || ''} ${secondaryColorHex}`);
+        if (accentColorHex) frontOnlyPromptParts.push(`- Accent: ${accentColorName || ''} ${accentColorHex}`);
+        
+        frontOnlyPromptParts.push("");
+        frontOnlyPromptParts.push("FRONT PANEL TEXT CONTENT:");
+        if (frontPanelText) frontOnlyPromptParts.push(frontPanelText);
+        
+        frontOnlyPromptParts.push("");
+        frontOnlyPromptParts.push("GRAPHIC ELEMENTS:");
+        frontOnlyPromptParts.push("- Product name/brand prominently displayed");
+        frontOnlyPromptParts.push("- Key claims and benefits");
+        frontOnlyPromptParts.push("- Any badges, certifications, or seals");
+        frontOnlyPromptParts.push("- Flavor/variant indicators");
+        frontOnlyPromptParts.push("- Quantity/count information");
+        
+        frontOnlyPromptParts.push("");
+        frontOnlyPromptParts.push("=== OUTPUT REQUIREMENTS ===");
+        frontOnlyPromptParts.push("- Single panel, print-ready artwork");
+        frontOnlyPromptParts.push("- Clean edges suitable for die-cutting");
+        frontOnlyPromptParts.push("- High contrast, readable text");
+        frontOnlyPromptParts.push("- Professional label design matching the 3D mockup front view");
+        
+        prompt = frontOnlyPromptParts.join("\n");
+      } else {
+        // Full dieline mode (existing logic)
+        const flatPromptParts = [
+          `=== 2D FLAT DIELINE LAYOUT FOR ${packagingFormat.toUpperCase()} ===`,
+          "",
+          "Create a FLAT, UNWRAPPED, 2D packaging dieline layout suitable for printing and die-cutting.",
+          "This is a PRINT-READY layout that will be edited in Photoshop/Illustrator.",
+          "",
+          "=== CRITICAL REQUIREMENTS ===",
+          "- This is a 2D FLAT VIEW - absolutely NO perspective, NO shadows, NO 3D effects",
+          "- Show the packaging UNFOLDED as it would appear on a die-cut sheet before assembly",
+          "- All panels must be connected showing how they fold together",
+          "- Include visible fold/score lines (thin dotted or dashed lines between panels)",
+          "- Include bleed area (slight color extension beyond trim lines)",
+          "- White background surrounding the dieline",
+          "- Registration/crop marks at corners",
+          "",
+          `=== PACKAGING TYPE: ${packagingFormat} ===`,
+          `Category: ${packagingCategory.toUpperCase()}`,
+          `Description: ${layoutStructure.description}`,
+          "",
+          "=== PANEL STRUCTURE ===",
+          `Arrangement: ${layoutStructure.arrangement}`,
+          `Dimensions: ${layoutStructure.dimensions}`,
+          "",
+          "PANELS TO INCLUDE:",
+        ];
+        
+        layoutStructure.panels.forEach((panel, index) => {
+          flatPromptParts.push(`${index + 1}. ${panel}`);
+        });
       
       flatPromptParts.push("");
       flatPromptParts.push("=== DESIGN ELEMENTS (MUST MATCH 3D MOCKUP EXACTLY) ===");
@@ -628,7 +680,8 @@ serve(async (req) => {
       flatPromptParts.push("- Suitable for opening and editing in Photoshop/Illustrator");
       flatPromptParts.push("- Include safe zone inside trim and bleed outside trim");
       
-      prompt = flatPromptParts.join("\n");
+        prompt = flatPromptParts.join("\n");
+      }
     } else {
       prompt = promptParts.join("\n");
     }

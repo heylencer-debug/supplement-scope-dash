@@ -22,11 +22,11 @@ serve(async (req) => {
     }
 
     const stylePrompts: Record<string, string> = {
-      professional: "Use sophisticated, clinical language that builds trust. Focus on efficacy and science-backed claims. Think pharmaceutical-quality messaging.",
-      playful: "Use fun, energetic language with personality. Make it approachable, memorable, and engaging. Add some creative flair.",
-      premium: "Use elegant, luxurious language that conveys exclusivity and high quality. Think high-end boutique supplement brands.",
-      minimal: "Be extremely concise and direct. Remove all fluff, keep only essential selling points. Less is more.",
-      bold: "Use power words and strong, confident statements. Be assertive and impactful. Make bold claims that stand out.",
+      professional: "Slightly more clinical phrasing. Keep 95% of original wording. Only adjust 1-2 tone words to sound more authoritative and trustworthy.",
+      playful: "OLLY-style: warm, friendly, approachable but still informative. Soften formal words without adding jokes or puns. Millennials/GenZ friendly tone. NOT childish or silly.",
+      premium: "Refine word choice to feel more upscale. Replace casual words with sophisticated alternatives. Keep structure identical. Think boutique wellness brand.",
+      minimal: "Tighten phrasing only - remove filler words but keep all claims and benefits intact. More direct, no fluff.",
+      bold: "Strengthen key action words only. Keep claims factual but more assertive and confident. Power words where appropriate.",
     };
 
     const styleInstruction = stylePrompts[style] || stylePrompts.professional;
@@ -42,9 +42,18 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `You are an expert packaging copywriter specializing in supplement labels. Rewrite the front panel label text with a ${style} tone.
+            content: `You are an expert packaging copywriter specializing in supplement labels. Make a SUBTLE tone adjustment to the front panel label text.
 
 ${styleInstruction}
+
+CRITICAL: This is a SUBTLE tone adjustment, NOT a rewrite.
+- Keep 90-95% of the original wording intact
+- Only adjust 1-2 words per line maximum
+- DO NOT change benefit claims or product facts
+- DO NOT reorder or restructure content
+- Think "polish" not "rewrite"
+- The reader should barely notice the difference
+- Reference: OLLY brand style - warm but still informative, never childish
 
 RULES:
 - Keep the same general structure (brand name line, product name, claim, bullets, callouts)
@@ -52,7 +61,7 @@ RULES:
 - DO NOT invent new health claims or benefits not in the original
 - Keep it concise - max 12 lines total
 - Preserve any dosage or quantity information exactly
-- Return ONLY the rewritten text, no explanations or commentary
+- Return ONLY the adjusted text, no explanations or commentary
 - Keep the same line-by-line format`
           },
           {

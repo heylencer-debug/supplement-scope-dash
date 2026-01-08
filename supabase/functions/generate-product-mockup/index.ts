@@ -85,9 +85,9 @@ serve(async (req) => {
       throw new Error('Design brief is required');
     }
 
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
-    if (!lovableApiKey) {
-      throw new Error('LOVABLE_API_KEY not configured');
+    const openRouterApiKey = Deno.env.get('OPENROUTER_API_KEY');
+    if (!openRouterApiKey) {
+      throw new Error('OPENROUTER_API_KEY not configured');
     }
 
     // =============================================================================
@@ -579,25 +579,27 @@ serve(async (req) => {
     }
 
     // =============================================================================
-    // CALL AI IMAGE GENERATION API
+    // CALL OPENROUTER API
     // =============================================================================
-    console.log("Calling Lovable AI Gateway...");
+    console.log("Calling OpenRouter API...");
     
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${lovableApiKey}`,
+        "Authorization": `Bearer ${openRouterApiKey}`,
         "Content-Type": "application/json",
+        "HTTP-Referer": "https://lovable.dev",
+        "X-Title": "Product Mockup Generator"
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image-preview",
+        model: "google/gemini-2.0-flash-exp:free",
         messages: [
           {
             role: "user",
             content: messageContent.length === 1 ? finalPrompt : messageContent
           }
         ],
-        modalities: ["image", "text"]
+        max_tokens: 4096,
       }),
     });
 

@@ -28,20 +28,22 @@ serve(async (req) => {
       );
     }
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY is not configured');
+    const OPENROUTER_API_KEY = Deno.env.get('OPENROUTER_API_KEY');
+    if (!OPENROUTER_API_KEY) {
+      throw new Error('OPENROUTER_API_KEY is not configured');
     }
 
     console.log('Editing mockup with prompt:', editPrompt);
     console.log('Source image URL length:', sourceImageUrl.length);
 
-    // Call Lovable AI Gateway with Nano Banana for image editing
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    // Call OpenRouter API with Gemini for image editing
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
         'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://lovable.dev',
+        'X-Title': 'Product Mockup Editor'
       },
       body: JSON.stringify({
         model: 'google/gemini-3-pro-image-preview',
@@ -70,13 +72,13 @@ Important:
             ]
           }
         ],
-        modalities: ['image', 'text']
+        max_tokens: 4096
       })
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Lovable AI Gateway error:', response.status, errorText);
+      console.error('OpenRouter API error:', response.status, errorText);
       
       if (response.status === 429) {
         return new Response(
@@ -91,14 +93,28 @@ Important:
         );
       }
       
-      throw new Error(`AI Gateway error: ${response.status}`);
+      throw new Error(`OpenRouter API error: ${response.status}`);
     }
 
     const data = await response.json();
-    console.log('AI Gateway response received');
+    console.log('OpenRouter response received');
 
-    // Extract the edited image from the response
-    const editedImageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    // Extract the edited image from the response (matching generate-product-mockup logic)
+    let editedImageUrl = null;
+
+    if (data.choices?.[0]?.message?.images?.[0]?.image_url?.url) {
+      editedImageUrl = data.choices[0].message.images[0].image_url.url;
+    } else if (data.choices?.[0]?.message?.content) {
+      const content = data.choices[0].message.content;
+      if (Array.isArray(content)) {
+        for (const item of content) {
+          if (item.type === 'image_url' && item.image_url?.url) {
+            editedImageUrl = item.image_url.url;
+            break;
+          }
+        }
+      }
+    }
     
     if (!editedImageUrl) {
       console.error('No image in response:', JSON.stringify(data, null, 2));

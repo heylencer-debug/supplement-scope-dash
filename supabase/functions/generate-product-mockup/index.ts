@@ -592,7 +592,7 @@ serve(async (req) => {
         "X-Title": "Product Mockup Generator"
       },
       body: JSON.stringify({
-        model: "google/gemini-2.0-flash-exp:free",
+        model: "google/gemini-2.5-flash-image-preview",
         messages: [
           {
             role: "user",

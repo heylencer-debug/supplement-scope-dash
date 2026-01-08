@@ -19,7 +19,9 @@ import {
   EyeOff,
   Palette,
   UtensilsCrossed,
-  LayoutGrid
+  LayoutGrid,
+  Upload,
+  X
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -309,6 +311,10 @@ function MockupCard({
   const [isEditingColors, setIsEditingColors] = useState(false);
   const [showPreview, setShowPreview] = useState(true); // Show preview by default
   
+  // Logo upload state
+  const [logoImageUrl, setLogoImageUrl] = useState<string | null>(null);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  
   // Flat layout state
   const [isGeneratingFlat, setIsGeneratingFlat] = useState(false);
   const [flatLayoutUrl, setFlatLayoutUrl] = useState<string | null>(null);
@@ -416,6 +422,52 @@ function MockupCard({
     setEditedSecondaryColor(originalSecondaryColor);
     setEditedAccentColor(originalAccentColor);
   };
+  
+  // Logo upload handler
+  const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: 'Invalid File',
+        description: 'Please upload an image file (PNG, JPG, SVG).',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: 'File Too Large',
+        description: 'Logo image must be under 5MB.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    setIsUploadingLogo(true);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setLogoImageUrl(e.target?.result as string);
+      setIsUploadingLogo(false);
+      toast({
+        title: 'Logo Uploaded',
+        description: 'Your logo will be used in the mockup generation.',
+      });
+    };
+    reader.onerror = () => {
+      setIsUploadingLogo(false);
+      toast({
+        title: 'Upload Failed',
+        description: 'Failed to read the logo file.',
+        variant: 'destructive',
+      });
+    };
+    reader.readAsDataURL(file);
+  };
 
   const generateMockup = async () => {
     setIsGenerating(true);
@@ -436,6 +488,7 @@ function MockupCard({
 
       const { data, error } = await supabase.functions.invoke('generate-product-mockup', {
         body: {
+          logoImageUrl, // Pass logo image
           designBrief: {
             // Brand & Product Identity
             brandName: (designBrief as any).brand_name || 'PREMIUM',
@@ -706,6 +759,66 @@ function MockupCard({
             ))}
           </SelectContent>
         </Select>
+      </div>
+
+      {/* Logo Upload Section */}
+      <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-lg space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ImageIcon className="w-3.5 h-3.5 text-emerald-600" />
+            <p className="text-xs font-medium text-emerald-700">Brand Logo</p>
+          </div>
+          {logoImageUrl && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-5 w-5 p-0 hover:bg-destructive/10 hover:text-destructive"
+              onClick={() => setLogoImageUrl(null)}
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
+        
+        {logoImageUrl ? (
+          <div className="flex items-center gap-3 p-2 bg-background/50 rounded border border-emerald-500/20">
+            <img 
+              src={logoImageUrl} 
+              alt="Brand logo" 
+              className="h-10 w-auto max-w-[80px] object-contain rounded border bg-white p-1" 
+            />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-emerald-600 flex items-center gap-1">
+                ✓ Logo ready
+              </p>
+              <p className="text-[10px] text-muted-foreground">
+                Will be placed at top of label
+              </p>
+            </div>
+          </div>
+        ) : (
+          <label className="flex items-center gap-2 p-2.5 border-2 border-dashed border-emerald-500/30 rounded-lg cursor-pointer hover:bg-emerald-500/5 transition-colors">
+            {isUploadingLogo ? (
+              <Loader2 className="h-4 w-4 text-emerald-500 animate-spin" />
+            ) : (
+              <Upload className="h-4 w-4 text-emerald-500" />
+            )}
+            <span className="text-xs text-emerald-700">
+              {isUploadingLogo ? 'Processing...' : 'Upload logo (PNG, JPG, SVG)'}
+            </span>
+            <input 
+              type="file" 
+              accept="image/png,image/jpeg,image/svg+xml,image/webp" 
+              onChange={handleLogoUpload}
+              className="hidden" 
+              disabled={isUploadingLogo}
+            />
+          </label>
+        )}
+        
+        <p className="text-[10px] text-muted-foreground">
+          Optional: Upload your brand logo to include on the mockup
+        </p>
       </div>
 
       {/* Editable Mock Content */}

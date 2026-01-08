@@ -899,6 +899,7 @@ export type Database = {
           analysis: Json
           category_id: string
           created_at: string
+          customizations: Json | null
           formula_version_id: string | null
           id: string
           image_analysis: Json | null
@@ -909,6 +910,7 @@ export type Database = {
           analysis: Json
           category_id: string
           created_at?: string
+          customizations?: Json | null
           formula_version_id?: string | null
           id?: string
           image_analysis?: Json | null
@@ -919,6 +921,7 @@ export type Database = {
           analysis?: Json
           category_id?: string
           created_at?: string
+          customizations?: Json | null
           formula_version_id?: string | null
           id?: string
           image_analysis?: Json | null

@@ -136,8 +136,11 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
     analysis: aiAnalysis,
     mockupImageUrl,
     mockupImages,
+    customizations,
     updatedAt: strategyUpdatedAt,
     saveMockupImage,
+    saveCustomizations,
+    clearCustomizations,
     isLoading: isAnalyzing,
     isLoadingFromDb,
     wasRestoredFromDb: strategyWasRestored,
@@ -875,6 +878,9 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
               categoryId={categoryId}
               formulaVersionId={formulaVersionId}
               detectedFlavor={detectedFlavor}
+              customizations={customizations}
+              onSaveCustomizations={saveCustomizations}
+              onClearCustomizations={clearCustomizations}
             />
           ) : aiAnalysis ? (
             // Fallback for legacy single-strategy analysis

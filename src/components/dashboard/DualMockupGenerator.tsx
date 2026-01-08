@@ -1200,34 +1200,36 @@ function MockupCard({
 
       {/* Mockup Display or Preview */}
       {generatedMockup ? (
-        <div className="relative group">
-          <img 
-            src={generatedMockup} 
-            alt={`${title} Product Mockup`}
-            className="w-full rounded-lg shadow-md cursor-pointer hover:opacity-90 transition-opacity"
-            onClick={() => setIsImageModalOpen(true)}
-          />
-          {/* Hover overlay */}
-          <div 
-            className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-            onClick={() => setIsImageModalOpen(true)}
-          >
-            <div className="bg-black/50 text-white px-3 py-1.5 rounded-full text-xs flex items-center gap-1.5">
-              <ZoomIn className="w-3 h-3" />
-              Click to enlarge
-            </div>
-          </div>
-          {/* Download button */}
-          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-            <Button 
-              size="sm" 
-              variant="secondary" 
-              onClick={(e) => { e.stopPropagation(); downloadMockup(); }} 
-              className="gap-1 h-7 text-xs"
+        <>
+          <div className="relative group">
+            <img 
+              src={generatedMockup} 
+              alt={`${title} Product Mockup`}
+              className="w-full rounded-lg shadow-md cursor-pointer hover:opacity-90 transition-opacity"
+              onClick={() => setIsImageModalOpen(true)}
+            />
+            {/* Hover overlay */}
+            <div 
+              className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+              onClick={() => setIsImageModalOpen(true)}
             >
-              <Download className="w-3 h-3" />
-              Save
-            </Button>
+              <div className="bg-black/50 text-white px-3 py-1.5 rounded-full text-xs flex items-center gap-1.5">
+                <ZoomIn className="w-3 h-3" />
+                Click to enlarge
+              </div>
+            </div>
+            {/* Download button */}
+            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <Button 
+                size="sm" 
+                variant="secondary" 
+                onClick={(e) => { e.stopPropagation(); downloadMockup(); }} 
+                className="gap-1 h-7 text-xs"
+              >
+                <Download className="w-3 h-3" />
+                Save
+              </Button>
+            </div>
           </div>
           
           {/* Edit Mockup with AI */}
@@ -1297,7 +1299,7 @@ function MockupCard({
               )}
             </Button>
           </div>
-        </div>
+        </>
       ) : !isGenerating && showPreview ? (
         <LabelPreview 
           text={editedFrontPanelText}

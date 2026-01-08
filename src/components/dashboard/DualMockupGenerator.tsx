@@ -386,6 +386,10 @@ function MockupCard({
   const [isRewriting, setIsRewriting] = useState(false);
   const [selectedRewriteStyle, setSelectedRewriteStyle] = useState<string | null>(null);
   
+  // Image edit state
+  const [editPrompt, setEditPrompt] = useState("");
+  const [isEditingImage, setIsEditingImage] = useState(false);
+  
   const rewriteStyles = [
     { value: 'professional', label: 'Professional', icon: '🏥' },
     { value: 'playful', label: 'Playful', icon: '🎉' },
@@ -426,6 +430,61 @@ function MockupCard({
     } finally {
       setIsRewriting(false);
       setSelectedRewriteStyle(null);
+    }
+  };
+  
+  // Edit mockup with AI prompt
+  const handleEditMockup = async () => {
+    if (!generatedMockup || !editPrompt.trim()) return;
+    
+    setIsEditingImage(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('edit-product-mockup', {
+        body: {
+          sourceImageUrl: generatedMockup,
+          editPrompt: editPrompt.trim()
+        }
+      });
+
+      if (error) throw error;
+      
+      if (data?.editedImageUrl) {
+        // Save edited image as new version in history
+        await saveMockupToHistory(
+          data.editedImageUrl,
+          strategyType,
+          selectedFormat,
+          {
+            colors: {
+              primary: editedPrimaryColor,
+              accent: editedAccentColor,
+              background: editedSecondaryColor,
+            },
+            text: { headline: editedFrontPanelText },
+          }
+        );
+        
+        // Update current mockup
+        setGeneratedMockup(data.editedImageUrl);
+        await onSaveMockup(data.editedImageUrl);
+        
+        // Clear the prompt
+        setEditPrompt("");
+        
+        toast({
+          title: 'Design Updated',
+          description: 'Your mockup has been refined and saved to history.',
+        });
+      }
+    } catch (err) {
+      console.error('Edit mockup error:', err);
+      toast({
+        title: 'Edit Failed',
+        description: err instanceof Error ? err.message : 'Failed to edit mockup',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsEditingImage(false);
     }
   };
   
@@ -1168,6 +1227,40 @@ function MockupCard({
             >
               <Download className="w-3 h-3" />
               Save
+            </Button>
+          </div>
+          
+          {/* Edit Mockup with AI */}
+          <div className="mt-3 space-y-2 p-3 rounded-lg bg-muted/30 border border-border/50">
+            <Label className="text-xs font-medium flex items-center gap-1.5">
+              <Sparkles className="w-3 h-3 text-primary" />
+              Refine Design with AI
+            </Label>
+            <Textarea
+              placeholder="Describe changes you'd like to make... (e.g., 'add a gold shimmer effect', 'make the background darker', 'add a shine to the label')"
+              value={editPrompt}
+              onChange={(e) => setEditPrompt(e.target.value)}
+              className="min-h-[60px] text-xs resize-none"
+              disabled={isEditingImage}
+            />
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleEditMockup}
+              disabled={isEditingImage || !editPrompt.trim()}
+              className="w-full gap-1.5 text-xs"
+            >
+              {isEditingImage ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  Refining Design...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Refine Design
+                </>
+              )}
             </Button>
           </div>
           

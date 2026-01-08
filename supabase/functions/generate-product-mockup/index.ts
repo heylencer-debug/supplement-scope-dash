@@ -333,6 +333,9 @@ serve(async (req) => {
     const hasLogoProvided = logoImageUrl && 
       (logoImageUrl.startsWith('data:image') || logoImageUrl.startsWith('http'));
     
+    // Check if text was customized (from AI rewriter) - if so, frontPanelText is the source of truth
+    const textCustomized = designBrief.textCustomized === true;
+    
     // =================================================================
     // VISUAL HIERARCHY FOR SUPPLEMENTS (ADD THIS FIRST)
     // =================================================================
@@ -342,10 +345,23 @@ serve(async (req) => {
     // If logo is provided, skip brand name text to avoid duplication
     if (hasLogoProvided) {
       promptParts.push("1. BRAND LOGO - Already provided as image, place at TOP CENTER of label. DO NOT add brand name as text - the logo IS the brand identity.");
-      promptParts.push(`2. PRODUCT NAME: "${productName}" - LARGEST text, main focus, directly below the logo`);
+      if (textCustomized && frontPanelText) {
+        // Extract product name from customized front panel text (first line)
+        const extractedName = frontPanelText.split('\n')[0].trim();
+        promptParts.push(`2. PRODUCT NAME: "${extractedName}" - LARGEST text, main focus, directly below the logo`);
+      } else {
+        promptParts.push(`2. PRODUCT NAME: "${productName}" - LARGEST text, main focus, directly below the logo`);
+      }
     } else {
-      promptParts.push(`1. BRAND NAME: "${brandName}" - Top of label, PROMINENT, stylized logo treatment with premium typography`);
-      promptParts.push(`2. PRODUCT NAME: "${productName}" - LARGEST text, main focus, center of label`);
+      if (textCustomized && frontPanelText) {
+        // When text is customized by AI, DO NOT use original brandName - extract from frontPanelText
+        const extractedName = frontPanelText.split('\n')[0].trim();
+        promptParts.push("1. BRAND NAME: Use brand identity from the front panel text content - design a stylized text logo treatment");
+        promptParts.push(`2. PRODUCT NAME: "${extractedName}" - LARGEST text, main focus, center of label`);
+      } else {
+        promptParts.push(`1. BRAND NAME: "${brandName}" - Top of label, PROMINENT, stylized logo treatment with premium typography`);
+        promptParts.push(`2. PRODUCT NAME: "${productName}" - LARGEST text, main focus, center of label`);
+      }
     }
     promptParts.push("3. PRIMARY CLAIM - Key benefit statement, second largest");
     promptParts.push("4. BENEFIT BULLETS - Clear, readable, with SEMANTIC ICONS (see icon guidance below)");

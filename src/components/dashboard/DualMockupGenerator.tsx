@@ -368,6 +368,51 @@ function MockupCard({
   const [editedFrontPanelText, setEditedFrontPanelText] = useState(originalFrontPanelText);
   const hasTextEdits = editedFrontPanelText !== originalFrontPanelText;
   
+  // AI rewrite state
+  const [isRewriting, setIsRewriting] = useState(false);
+  const [selectedRewriteStyle, setSelectedRewriteStyle] = useState<string | null>(null);
+  
+  const rewriteStyles = [
+    { value: 'professional', label: 'Professional', icon: '🏥' },
+    { value: 'playful', label: 'Playful', icon: '🎉' },
+    { value: 'premium', label: 'Premium', icon: '✨' },
+    { value: 'minimal', label: 'Minimal', icon: '◻️' },
+    { value: 'bold', label: 'Bold', icon: '💪' },
+  ];
+
+  const handleRewriteText = async (style: string) => {
+    setIsRewriting(true);
+    setSelectedRewriteStyle(style);
+    try {
+      const { data, error } = await supabase.functions.invoke('rewrite-label-text', {
+        body: {
+          currentText: editedFrontPanelText,
+          style,
+          productContext: strategy.design_brief?.primary_claim
+        }
+      });
+
+      if (error) throw error;
+      if (data?.rewrittenText) {
+        setEditedFrontPanelText(data.rewrittenText);
+        toast({
+          title: 'Label Rewritten',
+          description: `Text updated with ${style} style.`,
+        });
+      }
+    } catch (err) {
+      console.error('Rewrite error:', err);
+      toast({
+        title: 'Rewrite Failed',
+        description: err instanceof Error ? err.message : 'Failed to rewrite text',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsRewriting(false);
+      setSelectedRewriteStyle(null);
+    }
+  };
+  
   // Editable colors
   const originalPrimaryColor = strategy.design_brief?.primary_color?.hex || '#1e3a5f';
   const originalSecondaryColor = strategy.design_brief?.secondary_color?.hex || '#ffffff';
@@ -773,6 +818,31 @@ function MockupCard({
                 Reset
               </Button>
             )}
+          </div>
+          
+          {/* AI Rewrite Options */}
+          <div className="flex flex-wrap gap-1.5 pt-2 border-t border-border/50">
+            <span className="text-[10px] text-muted-foreground w-full mb-1 flex items-center gap-1">
+              <Sparkles className="w-3 h-3" />
+              Rewrite with Gemini 3 Pro:
+            </span>
+            {rewriteStyles.map((style) => (
+              <Button
+                key={style.value}
+                variant="outline"
+                size="sm"
+                onClick={() => handleRewriteText(style.value)}
+                disabled={isRewriting}
+                className="h-6 px-2 text-[10px] gap-1"
+              >
+                {isRewriting && selectedRewriteStyle === style.value ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <span>{style.icon}</span>
+                )}
+                {style.label}
+              </Button>
+            ))}
           </div>
         </CollapsibleContent>
       </Collapsible>

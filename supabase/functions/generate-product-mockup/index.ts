@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { designBrief, mode = 'mockup', referenceImageUrl, flatLayoutMode = 'full' } = await req.json();
+    const { designBrief, mode = 'mockup', referenceImageUrl, flatLayoutMode = 'full', logoImageUrl } = await req.json();
     const isFlat = mode === 'flat_layout';
     const isFrontOnly = flatLayoutMode === 'front_only';
     
@@ -1031,14 +1031,51 @@ serve(async (req) => {
     console.log("Design brief received:", JSON.stringify(designBrief, null, 2));
     console.log("Generated prompt:", prompt);
 
-    // Build message content - include reference image for flat layout if available
-    let messageContent: any;
+    // Build message content - include images as needed
+    let messageContent: any[] = [];
+    
+    // Check if logo image is provided
+    const hasValidLogoImage = logoImageUrl && 
+      (logoImageUrl.startsWith('data:image') || logoImageUrl.startsWith('http'));
+    
+    if (hasValidLogoImage) {
+      console.log("Adding logo image to multi-modal message");
+      messageContent.push({
+        type: "image_url",
+        image_url: { url: logoImageUrl }
+      });
+    }
+    
+    // Add reference image for flat layout if available
     if (hasValidReferenceImage) {
       console.log("Creating multi-modal message with reference image for flat layout");
-      
-      // Multi-modal message with reference image for flat layout
+      messageContent.push({
+        type: "image_url",
+        image_url: { url: referenceImageUrl }
+      });
+    }
+    
+    // Build the prompt with logo and reference instructions
+    let finalPrompt = prompt;
+    
+    if (hasValidLogoImage) {
+      const logoInstruction = `=== BRAND LOGO PROVIDED (CRITICAL - USE EXACTLY) ===
+${hasValidReferenceImage ? 'The FIRST attached image is the brand logo.' : 'The attached image is the brand logo.'}
+You MUST:
+1. Place this EXACT brand logo at the TOP CENTER of the front panel
+2. Do NOT redesign, redraw, modify, or recreate the logo in any way
+3. Use the logo EXACTLY as provided - same colors, proportions, and details
+4. Size the logo appropriately (roughly 15-20% of the front panel width)
+5. Ensure the logo is clearly visible and prominent
+=== END LOGO ===
+
+`;
+      finalPrompt = logoInstruction + finalPrompt;
+    }
+    
+    if (hasValidReferenceImage) {
       const referenceImagePrompt = `=== CRITICAL: REFERENCE IMAGE PROVIDED ===
-LOOK AT THE ATTACHED 3D PRODUCT MOCKUP IMAGE. You MUST create a FLAT, UNWRAPPED 2D dieline layout that EXACTLY COPIES the design from this image.
+${hasValidLogoImage ? 'The SECOND attached image is the 3D product mockup to copy.' : 'LOOK AT THE ATTACHED 3D PRODUCT MOCKUP IMAGE.'} You MUST create a FLAT, UNWRAPPED 2D dieline layout that EXACTLY COPIES the design from this image.
 
 DO NOT GENERATE A NEW DESIGN. COPY THE EXISTING DESIGN FROM THE IMAGE:
 - EXACT same color scheme, gradients, and color blocking as shown
@@ -1051,23 +1088,19 @@ DO NOT GENERATE A NEW DESIGN. COPY THE EXISTING DESIGN FROM THE IMAGE:
 The flat layout is simply the 3D mockup "unwrapped" into a 2D template. Every visual element from the mockup image MUST appear in the flat layout.
 === END REFERENCE ===
 
-${prompt}`;
-      
-      messageContent = [
-        {
-          type: "image_url",
-          image_url: {
-            url: referenceImageUrl
-          }
-        },
-        {
-          type: "text",
-          text: referenceImagePrompt
-        }
-      ];
+`;
+      finalPrompt = referenceImagePrompt + finalPrompt;
+    }
+    
+    // Add the text prompt
+    if (messageContent.length > 0) {
+      messageContent.push({
+        type: "text",
+        text: finalPrompt
+      });
     } else {
-      console.log("Creating text-only message (no valid reference image)");
-      messageContent = prompt;
+      console.log("Creating text-only message (no images)");
+      messageContent = finalPrompt as any;
     }
 
     // Use OpenRouter with Nanobanana Pro (google/gemini-3-pro-image-preview) for highest quality

@@ -56,6 +56,7 @@ const flavorToImageryMap: Record<string, { visual: string; style: string; colors
 // PACKAGING FORMAT DEFINITIONS (ALL 15 FORMATS PRESERVED)
 // =============================================================================
 const packagingFormatDetails: Record<string, { shape: string; proportions: string; style: string; labelArea: string }> = {
+  // Default/legacy mappings
   'bottle': { shape: 'cylindrical supplement bottle with screw cap', proportions: 'standard 2:1 height-to-width ratio', style: 'opaque HDPE plastic', labelArea: 'wraparound label covering 70% of bottle height' },
   'wide-mouth jar': { shape: 'wide cylindrical jar with large screw-top lid', proportions: 'squat 1:1 ratio, wide opening', style: 'opaque HDPE plastic', labelArea: 'wraparound label, prominent lid visibility' },
   'narrow-mouth bottle': { shape: 'tall narrow bottle with small cap', proportions: 'elongated 3:1 height-to-width', style: 'sleek modern HDPE', labelArea: 'full-height wraparound label' },
@@ -66,11 +67,35 @@ const packagingFormatDetails: Record<string, { shape: string; proportions: strin
   'tube': { shape: 'squeezable tube with flip cap', proportions: 'elongated cylinder 4:1 ratio', style: 'aluminum or plastic tube', labelArea: 'wraparound tube label' },
   'dropper bottle': { shape: 'small glass bottle with dropper cap', proportions: 'compact 2:1 ratio', style: 'amber or clear glass with rubber dropper', labelArea: 'front label with dropper visible' },
   'spray bottle': { shape: 'bottle with pump spray mechanism', proportions: 'standard bottle with spray head', style: 'plastic with spray pump', labelArea: 'front label below spray mechanism' },
-  'tall jar - glass (clear)': { shape: 'TALL cylindrical clear glass jar with wide screw-top lid', proportions: 'ELONGATED 3:1 height-to-width ratio (noticeably TALLER than wide)', style: 'TRANSPARENT clear glass showing contents, premium feel', labelArea: 'Front label panel (not wraparound) covering 60% of jar height' },
   'jar': { shape: 'standard cylindrical jar with screw lid', proportions: 'balanced 1.5:1 height-to-width', style: 'opaque plastic or glass', labelArea: 'wraparound or front panel label' },
   'canister': { shape: 'large cylindrical canister with removable lid', proportions: 'tall 2.5:1 ratio for powder storage', style: 'opaque plastic with scoop', labelArea: 'full wraparound label' },
   'box': { shape: 'rectangular cardboard box', proportions: 'varies by content', style: 'printed cardboard', labelArea: 'all six sides designable' },
   'tin': { shape: 'metal tin container with lid', proportions: 'round or rectangular', style: 'metal with printed graphics', labelArea: 'lid and sides' },
+  
+  // NEW: Frontend dropdown values (exact match)
+  'soft chew resealable pouch': { shape: 'stand-up flexible pouch with resealable zipper', proportions: 'rectangular with rounded bottom gusset', style: 'matte finish flexible packaging for soft chews', labelArea: 'full front panel coverage' },
+  'resealable stand-up pouch': { shape: 'stand-up flexible pouch with resealable zipper', proportions: 'rectangular with rounded bottom gusset', style: 'matte finish flexible packaging', labelArea: 'full front panel coverage' },
+  'wide-mouth plastic jar': { shape: 'wide cylindrical jar with large screw-top lid', proportions: 'squat 1:1 ratio, wide opening', style: 'opaque HDPE plastic', labelArea: 'wraparound label, prominent lid visibility' },
+  'narrow-mouth plastic jar': { shape: 'tall narrow plastic jar with screw cap', proportions: 'elongated 2.5:1 height-to-width', style: 'opaque HDPE plastic, slim profile', labelArea: 'full-height wraparound label' },
+  'glass jar with screw cap': { shape: 'cylindrical glass jar with metal or plastic screw cap', proportions: 'standard 1.5:1 height-to-width', style: 'clear or amber glass, premium feel', labelArea: 'front label panel or wraparound' },
+  'narrow-mouth glass jar': { shape: 'tall narrow glass jar with screw cap', proportions: 'elongated 2.5:1 height-to-width', style: 'clear glass, slim elegant profile', labelArea: 'full-height front label' },
+  'tall clear glass jar': { shape: 'TALL cylindrical clear glass jar with wide screw-top lid', proportions: 'ELONGATED 3:1 height-to-width ratio (noticeably TALLER than wide)', style: 'TRANSPARENT clear glass showing contents, premium feel', labelArea: 'Front label panel (not wraparound) covering 60% of jar height' },
+  'hexagonal glass jar': { shape: 'hexagonal glass jar with screw lid', proportions: 'balanced 1.5:1 ratio, 6-sided', style: 'clear glass with unique hexagonal shape', labelArea: 'front panel label on flat face' },
+  'square glass jar': { shape: 'square glass jar with screw lid', proportions: 'balanced 1.5:1 ratio, 4 flat sides', style: 'clear glass with modern square shape', labelArea: 'front panel label on flat face' },
+  'amber apothecary jar': { shape: 'apothecary-style jar with wide mouth', proportions: 'classic 1.5:1 ratio', style: 'amber glass with vintage apothecary aesthetic', labelArea: 'front label with vintage styling' },
+  'cobalt blue glass jar': { shape: 'cylindrical glass jar with screw lid', proportions: 'balanced 1.5:1 ratio', style: 'deep cobalt blue glass, premium medicinal look', labelArea: 'front label panel' },
+  'mason jar': { shape: 'mason jar with two-piece lid', proportions: 'classic mason jar 1.5:1 ratio', style: 'clear glass with embossed pattern, rustic charm', labelArea: 'front label or wraparound' },
+  'supplement bottle with flip cap': { shape: 'cylindrical supplement bottle with flip-top cap', proportions: 'standard 2:1 height-to-width', style: 'opaque HDPE plastic with flip cap', labelArea: 'wraparound label covering 70% of height' },
+  'amber dropper bottle': { shape: 'small amber glass bottle with dropper cap', proportions: 'compact 2:1 ratio', style: 'amber glass with rubber dropper, medicinal aesthetic', labelArea: 'front label with dropper visible' },
+  'squeeze bottle': { shape: 'flexible squeeze bottle with nozzle', proportions: 'elongated 2.5:1 ratio', style: 'soft plastic squeeze bottle', labelArea: 'front and back labels' },
+  'pump bottle': { shape: 'bottle with pump dispenser mechanism', proportions: 'standard bottle with pump head', style: 'plastic or glass with pump mechanism', labelArea: 'front label below pump' },
+  'tube packaging': { shape: 'squeezable tube with flip cap', proportions: 'elongated cylinder 4:1 ratio', style: 'aluminum or plastic tube', labelArea: 'wraparound tube label' },
+  'sachet packet': { shape: 'single-serve flat sachet packet', proportions: 'rectangular flat pouch', style: 'foil or matte finish', labelArea: 'full front and back coverage' },
+  'tin container': { shape: 'metal tin container with removable lid', proportions: 'round or rectangular', style: 'metal with printed graphics, vintage appeal', labelArea: 'lid and sides' },
+  'kraft paper bag': { shape: 'stand-up kraft paper bag with window', proportions: 'rectangular with flat bottom', style: 'natural kraft paper, eco-friendly aesthetic', labelArea: 'front panel with optional window' },
+  
+  // Legacy key (kept for backwards compatibility)
+  'tall jar - glass (clear)': { shape: 'TALL cylindrical clear glass jar with wide screw-top lid', proportions: 'ELONGATED 3:1 height-to-width ratio (noticeably TALLER than wide)', style: 'TRANSPARENT clear glass showing contents, premium feel', labelArea: 'Front label panel (not wraparound) covering 60% of jar height' },
 };
 
 serve(async (req) => {

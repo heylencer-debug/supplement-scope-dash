@@ -241,9 +241,9 @@ export function Layout({ children }: LayoutProps) {
                     onTouchStart={handleTouchStart}
                     onTouchMove={handleTouchMove}
                     onTouchEnd={handleTouchEnd}
-                    className="overflow-x-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent touch-pan-x"
+                    className="overflow-x-auto scrollbar-hide touch-pan-x"
                   >
-                    <div className="flex items-center gap-2 min-w-max px-1">
+                    <div className="flex items-center gap-2 w-max px-1">
                       {allTabs.map((tab) => {
                         const isActive = currentCategory === tab.category_name;
                         const isComplete = (tab.products_analyzed ?? 0) > 0;

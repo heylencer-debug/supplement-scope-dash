@@ -434,28 +434,44 @@ serve(async (req) => {
     // =================================================================
     // UNIVERSAL DESIGN LANGUAGE - AI ADAPTIVE PREMIUM AESTHETIC
     // =================================================================
-    promptParts.push("=== UNIVERSAL DESIGN LANGUAGE (MANDATORY) ===");
+    promptParts.push("=== IMAGE SCENE (STUDIO BACKGROUND) ===");
     promptParts.push("");
-    promptParts.push("ANALYZE the product name, claims, ingredients, and flavor. Then INTELLIGENTLY ADAPT the following 5 design principles to match the product's purpose and mood:");
+    promptParts.push("The SCENE/ENVIRONMENT behind the packaging:");
+    promptParts.push("- Use PLAIN WHITE background like a professional studio shot");
+    promptParts.push("- Clean, simple, uncluttered studio environment");
+    promptParts.push("- White creates premium, professional product photography feel");
+    promptParts.push("- Soft shadows so packaging FLOATS naturally in the scene");
+    promptParts.push("- Allows product and label colors to POP without distraction");
+    promptParts.push("");
+    promptParts.push("=== LABEL DESIGN LANGUAGE (5 PILLARS) ===");
+    promptParts.push("The following pillars define the design of the LABEL ITSELF:");
+    promptParts.push("ANALYZE the product name, claims, ingredients, and flavor. Then INTELLIGENTLY ADAPT these 5 label design principles:");
     promptParts.push("");
     
-    // PILLAR 1: THE ATMOSPHERE
-    promptParts.push("🎨 1. THE ATMOSPHERE");
+    // PILLAR 1: THE ATMOSPHERE (LABEL BACKGROUND)
+    promptParts.push("🎨 1. THE ATMOSPHERE (LABEL BACKGROUND)");
     promptParts.push("");
-    promptParts.push("BACKGROUND:");
-    promptParts.push("- Use a CLEAN WHITE or OFF-WHITE background");
-    promptParts.push("- Keep background simple and uncluttered");
-    promptParts.push("- White creates premium, clean, professional feel");
-    promptParts.push("- Allows product and colors to POP without distraction");
+    promptParts.push("LABEL GRADIENT BACKGROUND:");
+    promptParts.push("- Use GRADIENT backgrounds on the label - never flat solid colors");
+    promptParts.push("- Gradient flows smoothly using the brand's color palette");
+    promptParts.push("- Creates depth, dimension, and premium feel on the label surface");
+    promptParts.push("- Gradient direction: top-to-bottom, radial, or diagonal");
     promptParts.push("");
-    promptParts.push("DEPTH & TEXTURE:");
-    promptParts.push("- Design should feel like 'a little world'");
-    promptParts.push("- Soft shadows behind text and elements so they FLOAT");
-    promptParts.push("- Create depth layers: background, mid-ground, foreground");
+    promptParts.push("MOOD-APPROPRIATE LABEL GRADIENTS:");
+    promptParts.push("  * Sleep → Deep purples fading to soft lavender, twilight blues");
+    promptParts.push("  * Energy → Vibrant oranges to warm yellows, sunrise feel");
+    promptParts.push("  * Focus → Cool teals to deep navy, crisp and clear");
+    promptParts.push("  * Immunity → Fresh greens to golden yellows, morning light");
+    promptParts.push("  * Beauty → Soft pinks to rose gold, luminous glow");
     promptParts.push("");
-    promptParts.push("SUBTLE DETAILS (OPTIONAL):");
-    promptParts.push("- Very faint decorative elements can be added at 3-5% opacity");
-    promptParts.push("- Keep minimal to maintain clean white aesthetic");
+    promptParts.push("DEPTH & TEXTURE ON LABEL:");
+    promptParts.push("- Label design should feel like 'a little world'");
+    promptParts.push("- Soft shadows behind text and elements so they FLOAT on the label");
+    promptParts.push("- Create depth layers on the label surface");
+    promptParts.push("");
+    promptParts.push("SUBTLE LABEL DETAILS:");
+    promptParts.push("- Very faint decorative patterns at 3-5% opacity on label");
+    promptParts.push("- Adds richness without cluttering the design");
     promptParts.push("");
     
     // PILLAR 2: THE TASTE

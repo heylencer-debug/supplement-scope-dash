@@ -1165,9 +1165,27 @@ The flat layout is simply the 3D mockup "unwrapped" into a 2D template. Every vi
     
     const textResponse = data.choices?.[0]?.message?.content;
 
+    // Check for upstream provider errors (e.g., network issues, 502 errors)
+    const choiceError = data.choices?.[0]?.error;
+    if (choiceError) {
+      console.error("Upstream provider error:", JSON.stringify(choiceError));
+      const errorMessage = choiceError.message || "AI provider error";
+      const errorCode = choiceError.code || 500;
+      
+      // Return a user-friendly error for transient issues
+      if (errorCode === 502 || errorMessage.includes("Network") || errorMessage.includes("connection")) {
+        return new Response(
+          JSON.stringify({ error: "AI provider temporarily unavailable. Please try again in a few seconds." }),
+          { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
+      throw new Error(errorMessage);
+    }
+
     if (!imageUrl) {
       console.error("No image in response:", JSON.stringify(data));
-      throw new Error("No image generated in response");
+      throw new Error("No image generated in response. Please try again.");
     }
 
     console.log("Product mockup generated successfully");

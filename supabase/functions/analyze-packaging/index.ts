@@ -67,16 +67,29 @@ serve(async (req) => {
     const categoryScores = analysisData?.analysis_1_category_scores || {};
     const categoryName = analysisData?.category_name || 'Unknown Category';
     
-    // ============ EXTRACT PRODUCT NAME FROM FORMULA BRIEF ============
+    // ============ EXTRACT BRAND NAME + PRODUCT NAME FROM FORMULA BRIEF ============
     let productName = '';
+    let brandName = '';
+    
     const productNameMatch = formulaBriefContent.match(/\*\*Product Name:\*\*\s*([^\n]+)/i);
     if (productNameMatch) {
       productName = productNameMatch[1].trim();
+      // Extract brand name as first word (typically the brand prefix)
+      const words = productName.split(/\s+/);
+      if (words.length > 0) {
+        brandName = words[0].trim();
+      }
     }
+    
     // Fallback: try to extract from category name
     if (!productName) {
       productName = categoryName.replace(/supplements?/i, '').trim() || 'Premium Formula';
     }
+    if (!brandName) {
+      brandName = categoryName.replace(/supplements?/i, '').trim().split(/\s+/)[0] || 'BRAND';
+    }
+    
+    console.log(`Extracted brand name: ${brandName}`);
     console.log(`Extracted product name: ${productName}`);
     const recommendedPackaging = categoryScores?.product_development?.packaging || {};
     
@@ -1098,6 +1111,14 @@ ${ourKeyFeatures.length > 0 ? ourKeyFeatures.map(f => `• ${f}`).join('\n') : '
 ## THINGS TO AVOID → POSITIVE CLAIMS:
 ${ourThingsToAvoid.length > 0 ? ourThingsToAvoid.slice(0, 4).map(a => `• No ${a} → "Free from ${a}"`).join('\n') : 'N/A'}
 
+## 📋 YOUR PRODUCT (EXTRACTED FROM FORMULA BRIEF - USE EXACTLY):
+
+**Brand Name:** ${brandName}
+**Full Product Name:** ${productName}
+
+⚠️ CRITICAL: You MUST use these EXACT names in your front_panel_text. 
+DO NOT invent brand names like "VITAWELL" or "NATURAVIBE" - use "${brandName}" exactly as shown above.
+
 ## 🏷️ LABEL CALLOUTS EXTRACTION (CRITICAL!)
 
 Scan the COMPLETE FORMULA BRIEF DOCUMENT below and EXTRACT all consumer-facing label callouts.
@@ -1120,6 +1141,31 @@ Scan the COMPLETE FORMULA BRIEF DOCUMENT below and EXTRACT all consumer-facing l
 3. **Third**: Pick callouts that address top customer complaints (e.g., "NO ARTIFICIAL TASTE")
 
 **You MUST include 3-5 of these callouts in your front_panel_text as a dedicated row!**
+
+## ⛔ FORMULA BRIEF COMPLIANCE (NON-NEGOTIABLE):
+
+Every piece of text on the label MUST come from the formula brief document. Here's how:
+
+| Label Element | Where to Find It |
+|---------------|------------------|
+| **Brand Name** | "${brandName}" (extracted above - USE EXACTLY) |
+| **Product Name** | "${productName}" (extracted above - USE EXACTLY) |
+| **Primary Claim** | From "Key Differentiators" section in formula brief |
+| **Benefits** | From "Key Differentiators" numbered list |
+| **Callouts** | ONLY include if explicitly mentioned in formula brief: |
+| - VEGAN | Only if "vegan" or "plant-based" appears |
+| - LOW SUGAR | Only if "reduced sugar", "low sugar", or sugar amount mentioned |
+| - NON-GMO | Only if "Non-GMO" explicitly stated |
+| - GLUTEN FREE | Only if "gluten-free" explicitly stated |
+| **Quantity** | From "Servings Per Container" field |
+| **Form** | From "Dosage Form" field |
+| **Trust Signals** | From "Certifications" or "Testing Requirements" |
+
+**YOU MAY NOT:**
+- ⛔ Invent brand names not in the document (NO "VITAWELL", "NATURAVIBE", etc.)
+- ⛔ Add claims like "Maximum Strength" unless explicitly stated
+- ⛔ Include callouts (e.g., "ORGANIC") unless the formula brief confirms them
+- ⛔ Make up benefits not in Key Differentiators
 
 ## 📄 COMPLETE FORMULA BRIEF DOCUMENT:
 ════════════════════════════════════════════════════════════════════════════════
@@ -1258,24 +1304,27 @@ The mockup generator will copy this text VERBATIM onto the label. Include:
 6. Quantity/Count + Flavor (e.g., "90 Gummies | Natural Berry Flavor")
 7. ONE trust signal footer (e.g., "Made in USA • cGMP Certified")
 
-**FORMAT EXAMPLE (your front_panel_text should look like this):**
+**FORMAT EXAMPLE (REPLACE BRACKETED TEXT WITH VALUES FROM FORMULA BRIEF):**
 \`\`\`
-VITAWELL
+${brandName.toUpperCase()}
 
-MAGNACALM SLEEP COMPLEX
+[REST OF PRODUCT NAME FROM FORMULA BRIEF]
 
-7-in-1 Complete Formula
+[Primary Claim - MUST BE FROM Key Differentiators]
 
-✓ Supports Deep, Restful Sleep
-✓ Promotes Natural Relaxation  
-✓ Non-Habit Forming
+✓ [Benefit 1 - from Key Differentiators]
+✓ [Benefit 2 - from Key Differentiators]  
+✓ [Benefit 3 - from Key Differentiators]
 
-VEGAN • ZERO SUGAR • NON-GMO • GLUTEN FREE
+[CALLOUTS - ONLY those confirmed in formula brief]
 
-90 Gummies | Natural Berry Flavor
+[Servings Per Container] [Dosage Form] | [Flavor from formula brief]
 
-Made in USA • cGMP Certified
+[Trust signal from Certifications section]
 \`\`\`
+
+⚠️ ABOVE IS A TEMPLATE - REPLACE ALL BRACKETED TEXT WITH ACTUAL VALUES FROM THE FORMULA BRIEF DOCUMENT!
+DO NOT USE "VITAWELL" OR ANY MADE-UP BRAND NAME - USE "${brandName}" EXACTLY!
 
 **DO NOT:**
 - Create front_panel_text that only has brand name and claim
@@ -1283,6 +1332,9 @@ Made in USA • cGMP Certified
 - Forget quantity and flavor
 - **Skip the label callouts row** (this is often what SELLS the product!)
 - Make it too long (max 12 lines)
+- **⛔ INVENT BRAND NAMES** - use "${brandName}" exactly as extracted
+- **⛔ ADD CLAIMS NOT IN FORMULA BRIEF** - every claim must be traceable to the document
+- **⛔ USE PLACEHOLDER EXAMPLE VALUES** - replace ALL bracketed text with real values
 
 The front_panel_text IS the complete label copy. Nothing else will be added.
 

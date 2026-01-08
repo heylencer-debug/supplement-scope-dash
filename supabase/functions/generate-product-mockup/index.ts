@@ -463,12 +463,42 @@ serve(async (req) => {
     if (labelAtmosphere) {
       promptParts.push("=== AI-RECOMMENDED ATMOSPHERE FOR THIS PRODUCT ===");
       promptParts.push(`GRADIENT: ${labelAtmosphere.gradient_description || labelAtmosphere.gradientDescription}`);
+      
+      // Decorative elements
       const decorativeElements = labelAtmosphere.decorative_elements || labelAtmosphere.decorativeElements || [];
       if (decorativeElements.length > 0) {
         promptParts.push(`DECORATIVE ELEMENTS ON LABEL: ${decorativeElements.join(', ')}`);
         promptParts.push("- These elements should appear subtly on the label at 10-20% opacity");
         promptParts.push("- They enhance the mood and create atmosphere WITHOUT cluttering");
       }
+      
+      // Ambient pattern (NEW)
+      const ambientPattern = labelAtmosphere.ambient_pattern || labelAtmosphere.ambientPattern;
+      if (ambientPattern) {
+        const patternOpacity = labelAtmosphere.pattern_opacity || labelAtmosphere.patternOpacity || '10%';
+        promptParts.push(`AMBIENT PATTERN: ${ambientPattern}`);
+        promptParts.push(`PATTERN OPACITY: ${patternOpacity}`);
+        promptParts.push("- Pattern should be VISIBLE but NOT distract from text");
+        promptParts.push("- Pattern adds depth, richness, and visual interest to the label");
+        promptParts.push("- Pattern must be rendered as part of the label design");
+      }
+      
+      // Texture finish (NEW)
+      const textureFinish = labelAtmosphere.texture_finish || labelAtmosphere.textureFinish;
+      if (textureFinish) {
+        promptParts.push(`TEXTURE FINISH: ${textureFinish}`);
+        promptParts.push("- Render the label surface with this tactile quality");
+        promptParts.push("- Texture should be visible and add premium feel");
+      }
+      
+      // Design accents (NEW)
+      const designAccents = labelAtmosphere.design_accents || labelAtmosphere.designAccents || [];
+      if (designAccents.length > 0) {
+        promptParts.push(`DESIGN ACCENTS: ${designAccents.join(', ')}`);
+        promptParts.push("- Include these premium finishing touches on the label");
+        promptParts.push("- Accents should complement the overall design without overwhelming");
+      }
+      
       promptParts.push(`TEXT FINISH: ${labelAtmosphere.text_finish || labelAtmosphere.textFinish}`);
       const moodAdjectives = labelAtmosphere.mood_adjectives || labelAtmosphere.moodAdjectives || [];
       if (moodAdjectives.length > 0) {
@@ -560,31 +590,42 @@ serve(async (req) => {
     // Dynamic claims with icons from Gemini analysis
     const claimsWithIcons = designBrief.claimsWithIcons || designBrief.claims_with_icons;
     if (claimsWithIcons && claimsWithIcons.length > 0) {
-      promptParts.push("=== CLAIMS WITH ICONS (MANDATORY - FROM AI ANALYSIS) ===");
-      promptParts.push("EVERY claim/benefit badge MUST have an accompanying ICON:");
+      promptParts.push("=== CLAIMS WITH ICONS (MANDATORY - EVERY CLAIM MUST HAVE AN ICON) ===");
+      promptParts.push("⚠️ CRITICAL: Render EACH claim with its paired icon. No exceptions.");
+      promptParts.push("");
       claimsWithIcons.forEach((c: { claim: string; icon: string }) => {
-        promptParts.push(`  • "${c.claim}" → [${c.icon}]`);
+        promptParts.push(`  • [${c.icon}] "${c.claim}"`);
       });
       promptParts.push("");
-      promptParts.push("ICON STYLING:");
-      promptParts.push("- Icons should be simple, elegant, and clearly visible");
-      promptParts.push("- Consistent icon style throughout (all line art OR all filled)");
-      promptParts.push("- Icons placed NEXT TO their claim text");
-      promptParts.push("- Small but legible size");
+      promptParts.push("ICON RENDERING RULES:");
+      promptParts.push("- Icons must be CLEARLY VISIBLE next to each claim");
+      promptParts.push("- Consistent icon style (all line art OR all filled, not mixed)");
+      promptParts.push("- Icons should be rendered as simple, elegant graphics");
+      promptParts.push("- Size: Small but easily recognizable (approximately text height)");
+      promptParts.push("- Position: Immediately LEFT of the claim text");
+      promptParts.push("- Color: Match the label's accent color or white for contrast");
       promptParts.push("=== END CLAIMS WITH ICONS ===");
       promptParts.push("");
     } else {
-      promptParts.push("CLAIMS WITH ICONS (MANDATORY):");
-      promptParts.push("- EVERY claim/benefit badge MUST have an accompanying ICON");
-      promptParts.push("- Choose appropriate icons based on claim meaning:");
-      promptParts.push("  * Sleep/Calm → Moon, stars, Z's, cloud icon");
-      promptParts.push("  * Energy/Performance → Lightning bolt, sun, flame icon");
-      promptParts.push("  * Focus/Brain → Brain icon, target, lightbulb");
-      promptParts.push("  * Muscle/Recovery → Flexed arm, dumbbell icon");
-      promptParts.push("  * Immunity/Health → Shield, heart, plus sign icon");
-      promptParts.push("  * Digestion → Stomach outline, leaf icon");
-      promptParts.push("- Icons should be simple, elegant, and relevant");
+      promptParts.push("=== CLAIMS WITH ICONS (MANDATORY - GENERATE ICONS) ===");
+      promptParts.push("⚠️ EVERY claim/benefit MUST have an icon. Generate appropriate icons:");
+      promptParts.push("");
+      promptParts.push("| Claim Type | Required Icon |");
+      promptParts.push("|------------|---------------|");
+      promptParts.push("| Sleep/Calm | moon icon, star icon, cloud icon |");
+      promptParts.push("| Energy | lightning bolt icon, sun icon, flame icon |");
+      promptParts.push("| Focus/Brain | brain icon, target icon, lightbulb icon |");
+      promptParts.push("| Muscle/Recovery | flexed arm icon, dumbbell icon |");
+      promptParts.push("| Immunity/Health | shield icon, heart icon, plus icon |");
+      promptParts.push("| Digestion | leaf icon, stomach icon |");
+      promptParts.push("| Sugar-Free | zero icon, crossed sugar icon |");
+      promptParts.push("| Made in USA | flag icon, star badge icon |");
+      promptParts.push("");
+      promptParts.push("ICON RENDERING RULES:");
+      promptParts.push("- Icons must be CLEARLY VISIBLE next to each claim");
       promptParts.push("- Consistent icon style throughout");
+      promptParts.push("- Position: Immediately LEFT of the claim text");
+      promptParts.push("=== END CLAIMS WITH ICONS ===");
       promptParts.push("");
     }
     

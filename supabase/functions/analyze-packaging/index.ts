@@ -872,9 +872,43 @@ ${extractedCompetitorClaims.map(c => `• ${c.brand}: ${c.xIn1Claim ? `"${c.xIn1
                                   reasoning: { type: 'string', description: 'Why this imagery was chosen based on flavor/form/product/competitors' }
                                 },
                                 required: ['imagery_type', 'primary_visual', 'visual_style', 'prominence', 'placement', 'reasoning']
+                              },
+                              label_atmosphere: {
+                                type: 'object',
+                                description: 'Dynamically generated label atmosphere based on product analysis',
+                                properties: {
+                                  gradient_description: { type: 'string', description: 'Gradient colors that match this specific product mood (e.g., "Deep Eggplant to Midnight Blue" for sleep, "Vibrant Orange to Warm Gold" for energy)' },
+                                  decorative_elements: { type: 'array', items: { type: 'string' }, description: 'Subtle decorative elements appropriate for this product label background (e.g., ["subtle stars", "crescent moon", "soft clouds"] for sleep, ["sunbursts", "light rays"] for energy)' },
+                                  text_finish: { type: 'string', description: 'Text styling that fits this product (e.g., "Gold metallic" for premium sleep, "Bright white" for energy, "Emerald accents" for immunity)' },
+                                  mood_adjectives: { type: 'array', items: { type: 'string' }, description: '3-4 adjectives describing the label mood based on product purpose' }
+                                },
+                                required: ['gradient_description', 'decorative_elements', 'text_finish', 'mood_adjectives']
+                              },
+                              label_hierarchy: {
+                                type: 'object',
+                                description: 'Structured hierarchy for label text elements based on product formula',
+                                properties: {
+                                  big_name: { type: 'string', description: 'The main ingredient/product name customers search for (e.g., "Magnesium Glycinate", "Omega-3 Fish Oil")' },
+                                  promise: { type: 'string', description: 'The primary benefit promise statement (e.g., "Deep Sleep & Muscle Recovery", "Heart & Brain Health")' },
+                                  differentiator: { type: 'string', description: 'Key differentiating badge or claim (e.g., "SUGAR FREE", "3X ABSORPTION", "CLINICALLY PROVEN")' },
+                                  flavor_name: { type: 'string', description: 'Evocative flavor name that fits the product mood (e.g., "Midnight Berry" for sleep, "Citrus Burst" for energy)' }
+                                },
+                                required: ['big_name', 'promise', 'differentiator', 'flavor_name']
+                              },
+                              claims_with_icons: {
+                                type: 'array',
+                                description: 'Each claim/benefit paired with an appropriate icon - EVERY claim must have an icon',
+                                items: {
+                                  type: 'object',
+                                  properties: {
+                                    claim: { type: 'string', description: 'The claim or benefit text' },
+                                    icon: { type: 'string', description: 'Specific icon to accompany this claim (e.g., "moon icon", "shield icon", "lightning bolt", "leaf icon", "heart icon")' }
+                                  },
+                                  required: ['claim', 'icon']
+                                }
                               }
                             },
-                            required: ['primary_color', 'secondary_color', 'accent_color', 'headline_font', 'body_font', 'primary_claim', 'key_differentiators', 'certifications', 'suggested_tone', 'hero_imagery']
+                            required: ['primary_color', 'secondary_color', 'accent_color', 'headline_font', 'body_font', 'primary_claim', 'key_differentiators', 'certifications', 'suggested_tone', 'hero_imagery', 'label_atmosphere', 'label_hierarchy', 'claims_with_icons']
                           },
                           elements_checklist: {
                             type: 'object',
@@ -942,9 +976,43 @@ ${extractedCompetitorClaims.map(c => `• ${c.brand}: ${c.xIn1Claim ? `"${c.xIn1
                                   reasoning: { type: 'string', description: 'Why this imagery was chosen based on flavor/form/product/competitors' }
                                 },
                                 required: ['imagery_type', 'primary_visual', 'visual_style', 'prominence', 'placement', 'reasoning']
+                              },
+                              label_atmosphere: {
+                                type: 'object',
+                                description: 'Dynamically generated label atmosphere based on product analysis',
+                                properties: {
+                                  gradient_description: { type: 'string', description: 'Gradient colors that match this specific product mood (e.g., "Deep Eggplant to Midnight Blue" for sleep, "Vibrant Orange to Warm Gold" for energy)' },
+                                  decorative_elements: { type: 'array', items: { type: 'string' }, description: 'Subtle decorative elements appropriate for this product label background (e.g., ["subtle stars", "crescent moon", "soft clouds"] for sleep, ["sunbursts", "light rays"] for energy)' },
+                                  text_finish: { type: 'string', description: 'Text styling that fits this product (e.g., "Gold metallic" for premium sleep, "Bright white" for energy, "Emerald accents" for immunity)' },
+                                  mood_adjectives: { type: 'array', items: { type: 'string' }, description: '3-4 adjectives describing the label mood based on product purpose' }
+                                },
+                                required: ['gradient_description', 'decorative_elements', 'text_finish', 'mood_adjectives']
+                              },
+                              label_hierarchy: {
+                                type: 'object',
+                                description: 'Structured hierarchy for label text elements based on product formula',
+                                properties: {
+                                  big_name: { type: 'string', description: 'The main ingredient/product name customers search for (e.g., "Magnesium Glycinate", "Omega-3 Fish Oil")' },
+                                  promise: { type: 'string', description: 'The primary benefit promise statement (e.g., "Deep Sleep & Muscle Recovery", "Heart & Brain Health")' },
+                                  differentiator: { type: 'string', description: 'Key differentiating badge or claim (e.g., "SUGAR FREE", "3X ABSORPTION", "CLINICALLY PROVEN")' },
+                                  flavor_name: { type: 'string', description: 'Evocative flavor name that fits the product mood (e.g., "Midnight Berry" for sleep, "Citrus Burst" for energy)' }
+                                },
+                                required: ['big_name', 'promise', 'differentiator', 'flavor_name']
+                              },
+                              claims_with_icons: {
+                                type: 'array',
+                                description: 'Each claim/benefit paired with an appropriate icon - EVERY claim must have an icon',
+                                items: {
+                                  type: 'object',
+                                  properties: {
+                                    claim: { type: 'string', description: 'The claim or benefit text' },
+                                    icon: { type: 'string', description: 'Specific icon to accompany this claim (e.g., "moon icon", "shield icon", "lightning bolt", "leaf icon", "heart icon")' }
+                                  },
+                                  required: ['claim', 'icon']
+                                }
                               }
                             },
-                            required: ['primary_color', 'secondary_color', 'accent_color', 'headline_font', 'body_font', 'primary_claim', 'key_differentiators', 'certifications', 'suggested_tone', 'hero_imagery']
+                            required: ['primary_color', 'secondary_color', 'accent_color', 'headline_font', 'body_font', 'primary_claim', 'key_differentiators', 'certifications', 'suggested_tone', 'hero_imagery', 'label_atmosphere', 'label_hierarchy', 'claims_with_icons']
                           },
                           elements_checklist: {
                             type: 'object',
@@ -1142,7 +1210,48 @@ Scan the COMPLETE FORMULA BRIEF DOCUMENT below and EXTRACT all consumer-facing l
 
 **You MUST include 3-5 of these callouts in your front_panel_text as a dedicated row!**
 
-## ⛔ FORMULA BRIEF COMPLIANCE (NON-NEGOTIABLE):
+## 🎨 LABEL ATMOSPHERE, HIERARCHY & ICONS (FORMULA-DRIVEN - REQUIRED!)
+
+Based on the product's ingredients, benefits, and purpose, you MUST generate:
+
+### 1. **Label Atmosphere** (dynamic based on product type):
+Analyze the formula and determine the appropriate visual mood:
+
+| Product Purpose | Gradient | Decorative Elements | Text Finish | Mood |
+|-----------------|----------|---------------------|-------------|------|
+| Sleep/Calm | Deep eggplant → midnight blue | Stars, crescent moon, soft clouds, twilight mist | Gold metallic | Mystic, premium, calming, dreamy |
+| Energy | Vibrant orange → warm gold | Sunbursts, light rays, dynamic lines | Bright white | Energizing, bold, powerful, fresh |
+| Focus/Brain | Cool teal → deep navy | Geometric shapes, targets, precision lines | Crisp silver | Clear, sharp, intelligent, focused |
+| Immunity | Fresh green → golden yellow | Shields, leaves, botanical patterns | Emerald accents | Protective, natural, vital, fresh |
+| Beauty/Skin | Soft pink → rose gold | Sparkles, dewdrops, soft petals, glow effects | Rose gold metallic | Luminous, radiant, elegant, youthful |
+| Digestive | Calm blue → soft teal | Soft curves, gentle waves, probiotic symbols | Clean white | Soothing, balanced, gentle, pure |
+| Joint/Muscle | Deep blue → forest green | Anatomical hints, motion lines, strength symbols | Bold silver | Strong, supportive, active, resilient |
+| Heart | Rich red → warm coral | Heart motifs, flowing lines, pulse patterns | Warm gold | Vital, loving, energetic, healthy |
+
+### 2. **Label Hierarchy** (what customers scan instantly):
+Create based on the specific formula:
+- **big_name**: The main ingredient/term customers SEARCH for (e.g., "Magnesium Glycinate", "Ashwagandha", "Omega-3")
+- **promise**: The benefit statement (e.g., "Deep Sleep & Muscle Recovery", "Stress Relief & Energy")  
+- **differentiator**: Key badge that sets us apart (e.g., "SUGAR FREE", "3X ABSORPTION", "CLINICALLY DOSED")
+- **flavor_name**: Creative, mood-appropriate flavor name (e.g., "Midnight Berry" for sleep, "Sunrise Citrus" for energy)
+
+### 3. **Claims with Icons** (EVERY claim needs an icon):
+For EACH benefit/claim, pair it with a relevant icon:
+
+| Claim Type | Suggested Icons |
+|------------|-----------------|
+| Sleep/Calm | 🌙 moon, ⭐ stars, ☁️ cloud, 💤 Z's |
+| Energy | ⚡ lightning bolt, ☀️ sun, 🔥 flame |
+| Focus/Brain | 🧠 brain, 🎯 target, 💡 lightbulb |
+| Muscle/Recovery | 💪 flexed arm, 🏋️ dumbbell, 🏃 runner |
+| Immunity | 🛡️ shield, ❤️ heart, ✓ checkmark |
+| Digestion | 🌿 leaf, 🦠 probiotic symbol |
+| Sugar-Free | 🚫 prohibition sign with sugar, 0️⃣ zero |
+| Made in USA | 🇺🇸 flag, ⭐ star |
+
+You MUST populate label_atmosphere, label_hierarchy, and claims_with_icons in the design_brief!
+
+
 
 Every piece of text on the label MUST come from the formula brief document. Here's how:
 

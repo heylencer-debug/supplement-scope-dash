@@ -879,10 +879,14 @@ ${extractedCompetitorClaims.map(c => `• ${c.brand}: ${c.xIn1Claim ? `"${c.xIn1
                                 properties: {
                                   gradient_description: { type: 'string', description: 'Gradient colors that match this specific product mood (e.g., "Deep Eggplant to Midnight Blue" for sleep, "Vibrant Orange to Warm Gold" for energy)' },
                                   decorative_elements: { type: 'array', items: { type: 'string' }, description: 'Subtle decorative elements appropriate for this product label background (e.g., ["subtle stars", "crescent moon", "soft clouds"] for sleep, ["sunbursts", "light rays"] for energy)' },
+                                  ambient_pattern: { type: 'string', description: 'Background pattern for the label (e.g., "subtle geometric hexagons", "soft botanical leaves", "abstract waves", "fine dot matrix", "starfield scatter", "topographic lines")' },
+                                  pattern_opacity: { type: 'string', description: 'How visible the pattern should be (e.g., "5% very subtle", "10% noticeable", "15% prominent")' },
+                                  texture_finish: { type: 'string', description: 'Texture/finish on the label surface (e.g., "matte with soft touch", "glossy with shine", "frosted glass effect", "linen paper texture", "metallic shimmer", "velvet soft-touch")' },
+                                  design_accents: { type: 'array', items: { type: 'string' }, description: 'Additional design elements (e.g., "thin gold border", "corner flourishes", "embossed logo", "foil stamp badge", "shadow depth layers")' },
                                   text_finish: { type: 'string', description: 'Text styling that fits this product (e.g., "Gold metallic" for premium sleep, "Bright white" for energy, "Emerald accents" for immunity)' },
                                   mood_adjectives: { type: 'array', items: { type: 'string' }, description: '3-4 adjectives describing the label mood based on product purpose' }
                                 },
-                                required: ['gradient_description', 'decorative_elements', 'text_finish', 'mood_adjectives']
+                                required: ['gradient_description', 'decorative_elements', 'ambient_pattern', 'texture_finish', 'design_accents', 'text_finish', 'mood_adjectives']
                               },
                               label_hierarchy: {
                                 type: 'object',
@@ -983,10 +987,14 @@ ${extractedCompetitorClaims.map(c => `• ${c.brand}: ${c.xIn1Claim ? `"${c.xIn1
                                 properties: {
                                   gradient_description: { type: 'string', description: 'Gradient colors that match this specific product mood (e.g., "Deep Eggplant to Midnight Blue" for sleep, "Vibrant Orange to Warm Gold" for energy)' },
                                   decorative_elements: { type: 'array', items: { type: 'string' }, description: 'Subtle decorative elements appropriate for this product label background (e.g., ["subtle stars", "crescent moon", "soft clouds"] for sleep, ["sunbursts", "light rays"] for energy)' },
+                                  ambient_pattern: { type: 'string', description: 'Background pattern for the label (e.g., "subtle geometric hexagons", "soft botanical leaves", "abstract waves", "fine dot matrix", "starfield scatter", "topographic lines")' },
+                                  pattern_opacity: { type: 'string', description: 'How visible the pattern should be (e.g., "5% very subtle", "10% noticeable", "15% prominent")' },
+                                  texture_finish: { type: 'string', description: 'Texture/finish on the label surface (e.g., "matte with soft touch", "glossy with shine", "frosted glass effect", "linen paper texture", "metallic shimmer", "velvet soft-touch")' },
+                                  design_accents: { type: 'array', items: { type: 'string' }, description: 'Additional design elements (e.g., "thin gold border", "corner flourishes", "embossed logo", "foil stamp badge", "shadow depth layers")' },
                                   text_finish: { type: 'string', description: 'Text styling that fits this product (e.g., "Gold metallic" for premium sleep, "Bright white" for energy, "Emerald accents" for immunity)' },
                                   mood_adjectives: { type: 'array', items: { type: 'string' }, description: '3-4 adjectives describing the label mood based on product purpose' }
                                 },
-                                required: ['gradient_description', 'decorative_elements', 'text_finish', 'mood_adjectives']
+                                required: ['gradient_description', 'decorative_elements', 'ambient_pattern', 'texture_finish', 'design_accents', 'text_finish', 'mood_adjectives']
                               },
                               label_hierarchy: {
                                 type: 'object',
@@ -1215,18 +1223,18 @@ Scan the COMPLETE FORMULA BRIEF DOCUMENT below and EXTRACT all consumer-facing l
 Based on the product's ingredients, benefits, and purpose, you MUST generate:
 
 ### 1. **Label Atmosphere** (dynamic based on product type):
-Analyze the formula and determine the appropriate visual mood:
+Analyze the formula and determine the appropriate visual mood. You MUST include ALL fields:
 
-| Product Purpose | Gradient | Decorative Elements | Text Finish | Mood |
-|-----------------|----------|---------------------|-------------|------|
-| Sleep/Calm | Deep eggplant → midnight blue | Stars, crescent moon, soft clouds, twilight mist | Gold metallic | Mystic, premium, calming, dreamy |
-| Energy | Vibrant orange → warm gold | Sunbursts, light rays, dynamic lines | Bright white | Energizing, bold, powerful, fresh |
-| Focus/Brain | Cool teal → deep navy | Geometric shapes, targets, precision lines | Crisp silver | Clear, sharp, intelligent, focused |
-| Immunity | Fresh green → golden yellow | Shields, leaves, botanical patterns | Emerald accents | Protective, natural, vital, fresh |
-| Beauty/Skin | Soft pink → rose gold | Sparkles, dewdrops, soft petals, glow effects | Rose gold metallic | Luminous, radiant, elegant, youthful |
-| Digestive | Calm blue → soft teal | Soft curves, gentle waves, probiotic symbols | Clean white | Soothing, balanced, gentle, pure |
-| Joint/Muscle | Deep blue → forest green | Anatomical hints, motion lines, strength symbols | Bold silver | Strong, supportive, active, resilient |
-| Heart | Rich red → warm coral | Heart motifs, flowing lines, pulse patterns | Warm gold | Vital, loving, energetic, healthy |
+| Product Purpose | Gradient | Decorative Elements | Ambient Pattern | Texture Finish | Design Accents | Text Finish | Mood |
+|-----------------|----------|---------------------|-----------------|----------------|----------------|-------------|------|
+| Sleep/Calm | Deep eggplant → midnight blue | Stars, crescent moon, soft clouds | Starfield scatter, soft cloud wisps | Matte soft-touch, velvet | Gold foil badge, subtle emboss | Gold metallic | Mystic, premium, calming, dreamy |
+| Energy | Vibrant orange → warm gold | Sunbursts, light rays, dynamic lines | Dynamic diagonal lines, energy waves | Glossy shine, metallic | Bold borders, power badge | Bright white | Energizing, bold, powerful, fresh |
+| Focus/Brain | Cool teal → deep navy | Geometric shapes, targets, precision lines | Hexagonal grid, precision dots | Crisp matte, clean | Silver accent lines, sharp edges | Crisp silver | Clear, sharp, intelligent, focused |
+| Immunity | Fresh green → golden yellow | Shields, leaves, botanical patterns | Botanical leaf pattern, organic curves | Natural linen texture | Leaf embellishments, nature motifs | Emerald accents | Protective, natural, vital, fresh |
+| Beauty/Skin | Soft pink → rose gold | Sparkles, dewdrops, soft petals | Soft shimmer particles, glow spots | Frosted glass, pearlescent | Rose gold borders, elegant flourishes | Rose gold metallic | Luminous, radiant, elegant, youthful |
+| Digestive | Calm blue → soft teal | Soft curves, gentle waves, probiotic symbols | Flowing wave lines, soft curves | Smooth matte, clean | Calming accent lines | Clean white | Soothing, balanced, gentle, pure |
+| Joint/Muscle | Deep blue → forest green | Anatomical hints, motion lines, strength symbols | Dynamic motion streaks, anatomical hints | Textured matte, sturdy | Bold strength badges | Bold silver | Strong, supportive, active, resilient |
+| Heart | Rich red → warm coral | Heart motifs, flowing lines, pulse patterns | Pulse wave pattern, flowing lines | Smooth semi-gloss | Heart embellishments, warm borders | Warm gold | Vital, loving, energetic, healthy |
 
 ### 2. **Label Hierarchy** (what customers scan instantly):
 Create based on the specific formula:
@@ -1235,21 +1243,35 @@ Create based on the specific formula:
 - **differentiator**: Key badge that sets us apart (e.g., "SUGAR FREE", "3X ABSORPTION", "CLINICALLY DOSED")
 - **flavor_name**: Creative, mood-appropriate flavor name (e.g., "Midnight Berry" for sleep, "Sunrise Citrus" for energy)
 
-### 3. **Claims with Icons** (EVERY claim needs an icon):
-For EACH benefit/claim, pair it with a relevant icon:
+### 3. **Claims with Icons** (MANDATORY - NO EXCEPTIONS):
 
-| Claim Type | Suggested Icons |
-|------------|-----------------|
-| Sleep/Calm | 🌙 moon, ⭐ stars, ☁️ cloud, 💤 Z's |
-| Energy | ⚡ lightning bolt, ☀️ sun, 🔥 flame |
-| Focus/Brain | 🧠 brain, 🎯 target, 💡 lightbulb |
-| Muscle/Recovery | 💪 flexed arm, 🏋️ dumbbell, 🏃 runner |
-| Immunity | 🛡️ shield, ❤️ heart, ✓ checkmark |
-| Digestion | 🌿 leaf, 🦠 probiotic symbol |
-| Sugar-Free | 🚫 prohibition sign with sugar, 0️⃣ zero |
-| Made in USA | 🇺🇸 flag, ⭐ star |
+⚠️ **CRITICAL: Every single claim MUST have an icon. Claims without icons will be REJECTED.**
 
-You MUST populate label_atmosphere, label_hierarchy, and claims_with_icons in the design_brief!
+For EACH benefit/claim in key_differentiators, you MUST:
+1. Identify the claim text
+2. Assign a relevant icon from the table below
+3. Include BOTH in the claims_with_icons array
+
+| Claim Type | REQUIRED Icons (choose one) |
+|------------|----------------------------|
+| Sleep/Calm | moon icon, star icon, cloud icon, Z's icon |
+| Energy | lightning bolt icon, sun icon, flame icon, rocket icon |
+| Focus/Brain | brain icon, target icon, lightbulb icon, gear icon |
+| Muscle/Recovery | flexed arm icon, dumbbell icon, runner icon, muscle icon |
+| Immunity | shield icon, heart icon, checkmark icon, plus sign icon |
+| Digestion | leaf icon, stomach icon, probiotic icon, gut icon |
+| Sugar-Free | zero icon, crossed-out sugar icon, "0g" badge icon |
+| Made in USA | flag icon, star badge icon, USA seal icon |
+| Vegan/Plant | leaf icon, plant icon, V badge icon |
+| Non-GMO | butterfly icon, checkmark icon, verified icon |
+| Gluten-Free | wheat-crossed icon, GF badge icon |
+
+**VALIDATION RULE:**
+- Count of items in claims_with_icons MUST EQUAL count of items in key_differentiators
+- If key_differentiators has 5 items, claims_with_icons MUST have 5 items
+- EACH claim_with_icon MUST have both "claim" AND "icon" fields populated
+
+You MUST populate label_atmosphere (with ALL fields including ambient_pattern, texture_finish, design_accents), label_hierarchy, and claims_with_icons in the design_brief!
 
 
 

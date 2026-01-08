@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import type { Json } from '@/integrations/supabase/types';
 
 export interface PackagingDesignAnalysis {
   summary: {
@@ -79,6 +80,19 @@ export interface MockupImages {
   match_disruptors: string | null;
 }
 
+// Structure for user customizations per strategy
+export interface StrategyCustomization {
+  front_panel_text?: string;
+  primary_color?: string;
+  secondary_color?: string;
+  accent_color?: string;
+}
+
+export interface PackagingCustomizations {
+  match_leaders?: StrategyCustomization;
+  match_disruptors?: StrategyCustomization;
+}
+
 export function usePackagingAnalysis(categoryId?: string, formulaVersionId?: string | null) {
   const [analysis, setAnalysis] = useState<PackagingDesignAnalysis | null>(null);
   const [mockupImageUrl, setMockupImageUrl] = useState<string | null>(null);
@@ -87,6 +101,8 @@ export function usePackagingAnalysis(categoryId?: string, formulaVersionId?: str
     match_leaders: null,
     match_disruptors: null,
   });
+  // User customizations (text/color edits)
+  const [customizations, setCustomizations] = useState<PackagingCustomizations | null>(null);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingFromDb, setIsLoadingFromDb] = useState(true);
@@ -105,6 +121,7 @@ export function usePackagingAnalysis(categoryId?: string, formulaVersionId?: str
     setAnalysis(null);
     setMockupImageUrl(null);
     setMockupImages({ match_leaders: null, match_disruptors: null });
+    setCustomizations(null);
     setUpdatedAt(null);
     setIsLoadingFromDb(true);
     setWasRestoredFromDb(false);
@@ -122,7 +139,7 @@ export function usePackagingAnalysis(categoryId?: string, formulaVersionId?: str
       try {
         let query = supabase
           .from('packaging_analyses')
-          .select('analysis, mockup_image_url, updated_at')
+          .select('analysis, mockup_image_url, customizations, updated_at')
           .eq('category_id', categoryId);
         
         // Filter by formula version - null means original analysis
@@ -140,6 +157,10 @@ export function usePackagingAnalysis(categoryId?: string, formulaVersionId?: str
           if (data.analysis) {
             setAnalysis(data.analysis as unknown as PackagingDesignAnalysis);
             setWasRestoredFromDb(true);
+          }
+          // Load customizations
+          if (data.customizations) {
+            setCustomizations(data.customizations as unknown as PackagingCustomizations);
           }
           // Handle legacy single mockup URL
           if (data.mockup_image_url) {
@@ -221,6 +242,69 @@ export function usePackagingAnalysis(categoryId?: string, formulaVersionId?: str
       console.error('Error saving mockup to DB:', e);
     }
   }, [categoryId, mockupImages]);
+
+  // Save user customizations for text/colors
+  const saveCustomizations = useCallback(async (
+    strategyType: 'match_leaders' | 'match_disruptors',
+    updates: StrategyCustomization
+  ) => {
+    if (!categoryId) return;
+    
+    const newCustomizations: PackagingCustomizations = {
+      ...customizations,
+      [strategyType]: {
+        ...customizations?.[strategyType],
+        ...updates
+      }
+    };
+    
+    setCustomizations(newCustomizations);
+    
+    try {
+      let query = supabase
+        .from('packaging_analyses')
+        .update({ customizations: newCustomizations as unknown as Json })
+        .eq('category_id', categoryId);
+      
+      if (formulaVersionId) {
+        query = query.eq('formula_version_id', formulaVersionId);
+      } else {
+        query = query.is('formula_version_id', null);
+      }
+      
+      await query;
+    } catch (e) {
+      console.error('Error saving customizations:', e);
+    }
+  }, [categoryId, formulaVersionId, customizations]);
+
+  // Clear customizations for a strategy (reset to original)
+  const clearCustomizations = useCallback(async (strategyType: 'match_leaders' | 'match_disruptors') => {
+    if (!categoryId) return;
+    
+    const newCustomizations: PackagingCustomizations = { ...customizations };
+    delete newCustomizations[strategyType];
+    
+    const hasRemaining = Object.keys(newCustomizations).length > 0;
+    setCustomizations(hasRemaining ? newCustomizations : null);
+    
+    try {
+      let query = supabase
+        .from('packaging_analyses')
+        .update({ customizations: (hasRemaining ? newCustomizations : null) as unknown as Json })
+        .eq('category_id', categoryId);
+      
+      if (formulaVersionId) {
+        query = query.eq('formula_version_id', formulaVersionId);
+      } else {
+        query = query.is('formula_version_id', null);
+      }
+      
+      await query;
+    } catch (e) {
+      console.error('Error clearing customizations:', e);
+    }
+  }, [categoryId, formulaVersionId, customizations]);
 
   const runAnalysis = useCallback(async (copyStyle?: string) => {
     if (!categoryId) {
@@ -391,8 +475,11 @@ export function usePackagingAnalysis(categoryId?: string, formulaVersionId?: str
     analysis,
     mockupImageUrl,
     mockupImages,
+    customizations,
     updatedAt,
     saveMockupImage,
+    saveCustomizations,
+    clearCustomizations,
     isLoading,
     isLoadingFromDb,
     wasRestoredFromDb,

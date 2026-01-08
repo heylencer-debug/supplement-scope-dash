@@ -47,7 +47,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { MockupImages } from "@/hooks/usePackagingAnalysis";
+import { MockupImages, StrategyCustomization, PackagingCustomizations } from "@/hooks/usePackagingAnalysis";
 import { useMockupHistory } from "@/hooks/useMockupHistory";
 import { useFlatLayoutHistory } from "@/hooks/useFlatLayoutHistory";
 import { MockupHistoryGallery } from "@/components/dashboard/MockupHistoryGallery";
@@ -106,6 +106,9 @@ interface DualMockupGeneratorProps {
   categoryId?: string;
   formulaVersionId?: string | null;
   detectedFlavor?: string | null;
+  customizations?: PackagingCustomizations | null;
+  onSaveCustomizations?: (strategyType: 'match_leaders' | 'match_disruptors', updates: StrategyCustomization) => Promise<void>;
+  onClearCustomizations?: (strategyType: 'match_leaders' | 'match_disruptors') => Promise<void>;
 }
 
 const packagingFormatOptions = [
@@ -295,6 +298,9 @@ function MockupCard({
   formulaVersionId,
   detectedFlavor,
   logoImageUrl,
+  savedCustomization,
+  onSaveCustomizations,
+  onClearCustomizations,
 }: {
   strategy: PackagingStrategy;
   strategyType: 'match_leaders' | 'match_disruptors';
@@ -304,6 +310,9 @@ function MockupCard({
   formulaVersionId?: string | null;
   detectedFlavor?: string | null;
   logoImageUrl?: string | null;
+  savedCustomization?: StrategyCustomization | null;
+  onSaveCustomizations?: (updates: StrategyCustomization) => Promise<void>;
+  onClearCustomizations?: () => Promise<void>;
 }) {
   const { toast } = useToast();
   const [isGenerating, setIsGenerating] = useState(false);
@@ -363,9 +372,11 @@ function MockupCard({
     });
   };
   
-  // Editable mock content
+  // Editable mock content - initialize from saved customization or original
   const originalFrontPanelText = strategy.mock_content?.front_panel_text || '';
-  const [editedFrontPanelText, setEditedFrontPanelText] = useState(originalFrontPanelText);
+  const [editedFrontPanelText, setEditedFrontPanelText] = useState(
+    savedCustomization?.front_panel_text ?? originalFrontPanelText
+  );
   const hasTextEdits = editedFrontPanelText !== originalFrontPanelText;
   
   // AI rewrite state
@@ -395,6 +406,8 @@ function MockupCard({
       if (error) throw error;
       if (data?.rewrittenText) {
         setEditedFrontPanelText(data.rewrittenText);
+        // Auto-save the rewritten text
+        onSaveCustomizations?.({ front_panel_text: data.rewrittenText });
         toast({
           title: 'Label Rewritten',
           description: `Text updated with ${style} style.`,
@@ -413,13 +426,19 @@ function MockupCard({
     }
   };
   
-  // Editable colors
+  // Editable colors - initialize from saved customization or original
   const originalPrimaryColor = strategy.design_brief?.primary_color?.hex || '#1e3a5f';
   const originalSecondaryColor = strategy.design_brief?.secondary_color?.hex || '#ffffff';
   const originalAccentColor = strategy.design_brief?.accent_color?.hex || '#0ea5e9';
-  const [editedPrimaryColor, setEditedPrimaryColor] = useState(originalPrimaryColor);
-  const [editedSecondaryColor, setEditedSecondaryColor] = useState(originalSecondaryColor);
-  const [editedAccentColor, setEditedAccentColor] = useState(originalAccentColor);
+  const [editedPrimaryColor, setEditedPrimaryColor] = useState(
+    savedCustomization?.primary_color ?? originalPrimaryColor
+  );
+  const [editedSecondaryColor, setEditedSecondaryColor] = useState(
+    savedCustomization?.secondary_color ?? originalSecondaryColor
+  );
+  const [editedAccentColor, setEditedAccentColor] = useState(
+    savedCustomization?.accent_color ?? originalAccentColor
+  );
   const hasColorEdits = 
     editedPrimaryColor !== originalPrimaryColor ||
     editedSecondaryColor !== originalSecondaryColor ||
@@ -444,26 +463,72 @@ function MockupCard({
     }
   }, [mockupUrl, isGenerating, isGeneratingFlat]);
   
-  // Reset edited text when strategy changes
+  // Initialize text from saved customization or original when strategy changes
   useEffect(() => {
-    setEditedFrontPanelText(strategy.mock_content?.front_panel_text || '');
-  }, [strategy.mock_content?.front_panel_text]);
+    // Only reset if no saved customization for this strategy
+    if (!savedCustomization?.front_panel_text) {
+      setEditedFrontPanelText(strategy.mock_content?.front_panel_text || '');
+    }
+  }, [strategy.mock_content?.front_panel_text, savedCustomization?.front_panel_text]);
   
-  // Reset edited colors when strategy changes
+  // Initialize colors from saved customization or original when strategy changes
   useEffect(() => {
-    setEditedPrimaryColor(strategy.design_brief?.primary_color?.hex || '#1e3a5f');
-    setEditedSecondaryColor(strategy.design_brief?.secondary_color?.hex || '#ffffff');
-    setEditedAccentColor(strategy.design_brief?.accent_color?.hex || '#0ea5e9');
-  }, [strategy.design_brief?.primary_color?.hex, strategy.design_brief?.secondary_color?.hex, strategy.design_brief?.accent_color?.hex]);
+    if (!savedCustomization?.primary_color) {
+      setEditedPrimaryColor(strategy.design_brief?.primary_color?.hex || '#1e3a5f');
+    }
+    if (!savedCustomization?.secondary_color) {
+      setEditedSecondaryColor(strategy.design_brief?.secondary_color?.hex || '#ffffff');
+    }
+    if (!savedCustomization?.accent_color) {
+      setEditedAccentColor(strategy.design_brief?.accent_color?.hex || '#0ea5e9');
+    }
+  }, [
+    strategy.design_brief?.primary_color?.hex, 
+    strategy.design_brief?.secondary_color?.hex, 
+    strategy.design_brief?.accent_color?.hex,
+    savedCustomization?.primary_color,
+    savedCustomization?.secondary_color,
+    savedCustomization?.accent_color
+  ]);
   
-  const resetTextToOriginal = () => {
-    setEditedFrontPanelText(originalFrontPanelText);
+  // Auto-save text on blur
+  const handleTextBlur = () => {
+    if (editedFrontPanelText !== originalFrontPanelText) {
+      onSaveCustomizations?.({ front_panel_text: editedFrontPanelText });
+    }
   };
   
-  const resetColorsToOriginal = () => {
+  // Auto-save colors on change
+  const handlePrimaryColorChange = (color: string) => {
+    setEditedPrimaryColor(color);
+    onSaveCustomizations?.({ primary_color: color });
+  };
+  
+  const handleSecondaryColorChange = (color: string) => {
+    setEditedSecondaryColor(color);
+    onSaveCustomizations?.({ secondary_color: color });
+  };
+  
+  const handleAccentColorChange = (color: string) => {
+    setEditedAccentColor(color);
+    onSaveCustomizations?.({ accent_color: color });
+  };
+  
+  const resetTextToOriginal = async () => {
+    setEditedFrontPanelText(originalFrontPanelText);
+    await onClearCustomizations?.();
+  };
+  
+  const resetColorsToOriginal = async () => {
     setEditedPrimaryColor(originalPrimaryColor);
     setEditedSecondaryColor(originalSecondaryColor);
     setEditedAccentColor(originalAccentColor);
+    // Save the cleared colors
+    onSaveCustomizations?.({ 
+      primary_color: originalPrimaryColor, 
+      secondary_color: originalSecondaryColor, 
+      accent_color: originalAccentColor 
+    });
   };
   
   const generateMockup = async () => {
@@ -800,6 +865,7 @@ function MockupCard({
           <Textarea
             value={editedFrontPanelText}
             onChange={(e) => setEditedFrontPanelText(e.target.value)}
+            onBlur={handleTextBlur}
             placeholder="Enter front panel text..."
             className="min-h-[120px] text-xs font-mono leading-relaxed resize-y"
           />
@@ -879,13 +945,13 @@ function MockupCard({
                 <Input
                   type="color"
                   value={editedPrimaryColor}
-                  onChange={(e) => setEditedPrimaryColor(e.target.value)}
+                  onChange={(e) => handlePrimaryColorChange(e.target.value)}
                   className="w-8 h-8 p-0.5 cursor-pointer rounded border-border"
                 />
                 <Input
                   type="text"
                   value={editedPrimaryColor}
-                  onChange={(e) => setEditedPrimaryColor(e.target.value)}
+                  onChange={(e) => handlePrimaryColorChange(e.target.value)}
                   className="h-7 text-[10px] font-mono px-1.5 uppercase"
                   maxLength={7}
                 />
@@ -897,13 +963,13 @@ function MockupCard({
                 <Input
                   type="color"
                   value={editedSecondaryColor}
-                  onChange={(e) => setEditedSecondaryColor(e.target.value)}
+                  onChange={(e) => handleSecondaryColorChange(e.target.value)}
                   className="w-8 h-8 p-0.5 cursor-pointer rounded border-border"
                 />
                 <Input
                   type="text"
                   value={editedSecondaryColor}
-                  onChange={(e) => setEditedSecondaryColor(e.target.value)}
+                  onChange={(e) => handleSecondaryColorChange(e.target.value)}
                   className="h-7 text-[10px] font-mono px-1.5 uppercase"
                   maxLength={7}
                 />
@@ -915,13 +981,13 @@ function MockupCard({
                 <Input
                   type="color"
                   value={editedAccentColor}
-                  onChange={(e) => setEditedAccentColor(e.target.value)}
+                  onChange={(e) => handleAccentColorChange(e.target.value)}
                   className="w-8 h-8 p-0.5 cursor-pointer rounded border-border"
                 />
                 <Input
                   type="text"
                   value={editedAccentColor}
-                  onChange={(e) => setEditedAccentColor(e.target.value)}
+                  onChange={(e) => handleAccentColorChange(e.target.value)}
                   className="h-7 text-[10px] font-mono px-1.5 uppercase"
                   maxLength={7}
                 />
@@ -1229,7 +1295,7 @@ function MockupCard({
   );
 }
 
-export function DualMockupGenerator({ analysis, mockupImages, onSaveMockup, categoryId, formulaVersionId, detectedFlavor }: DualMockupGeneratorProps) {
+export function DualMockupGenerator({ analysis, mockupImages, onSaveMockup, categoryId, formulaVersionId, detectedFlavor, customizations, onSaveCustomizations, onClearCustomizations }: DualMockupGeneratorProps) {
   const { toast } = useToast();
   
   // Shared logo state - persisted to database
@@ -1426,6 +1492,9 @@ export function DualMockupGenerator({ analysis, mockupImages, onSaveMockup, cate
           formulaVersionId={formulaVersionId}
           detectedFlavor={detectedFlavor}
           logoImageUrl={logoImageUrl}
+          savedCustomization={customizations?.match_leaders}
+          onSaveCustomizations={onSaveCustomizations ? (updates) => onSaveCustomizations('match_leaders', updates) : undefined}
+          onClearCustomizations={onClearCustomizations ? () => onClearCustomizations('match_leaders') : undefined}
         />
         <MockupCard
           strategy={analysis.match_disruptors}
@@ -1436,6 +1505,9 @@ export function DualMockupGenerator({ analysis, mockupImages, onSaveMockup, cate
           formulaVersionId={formulaVersionId}
           detectedFlavor={detectedFlavor}
           logoImageUrl={logoImageUrl}
+          savedCustomization={customizations?.match_disruptors}
+          onSaveCustomizations={onSaveCustomizations ? (updates) => onSaveCustomizations('match_disruptors', updates) : undefined}
+          onClearCustomizations={onClearCustomizations ? () => onClearCustomizations('match_disruptors') : undefined}
         />
       </div>
 

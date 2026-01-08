@@ -439,29 +439,74 @@ serve(async (req) => {
     // =================================================================
     promptParts.push("=== DYNAMIC DESIGN ELEMENTS (EYE-CATCHING & BOLD) ===");
     promptParts.push("");
-    promptParts.push("CREATE A VISUALLY STRIKING, SHELF-STOPPING DESIGN:");
+    promptParts.push("CREATE A VIBRANT, SHELF-STOPPING DESIGN THAT FEELS ALIVE:");
     promptParts.push("");
-    promptParts.push("✅ ENCOURAGED (make it POP):");
-    promptParts.push("- Bold gradient transitions between primary and secondary colors");
-    promptParts.push("- Dynamic diagonal lines or swooshes for energy and movement");
-    promptParts.push("- Subtle geometric patterns in background (low opacity)");
-    promptParts.push("- Elegant emboss/deboss effects on brand name/logo");
-    promptParts.push("- Color blocking with clean, crisp transitions");
-    promptParts.push("- Metallic or foil accents on brand name and key claims");
-    promptParts.push("- Subtle texture overlays (paper grain, matte/gloss contrast)");
-    promptParts.push("- Dynamic light effects or subtle glows behind key elements");
-    promptParts.push("- Curved design elements that guide the eye to the product name");
-    promptParts.push("- Drop shadows and depth for a premium 3D feel");
+    promptParts.push("✅ MAKE IT POP WITH ENERGY:");
+    promptParts.push("- Bold, SATURATED gradient transitions - not subtle, NOTICEABLE");
+    promptParts.push("- Dynamic diagonal lines or swooshes suggesting motion and energy");
+    promptParts.push("- Vibrant color blocking with crisp, sharp transitions");
+    promptParts.push("- Metallic or holographic foil accents that catch light");
+    promptParts.push("- Glossy highlights and reflections for a premium, alive feel");
+    promptParts.push("- Light rays or subtle lens effects for energy");
+    promptParts.push("- Deep, rich shadows that create dimension and depth");
+    promptParts.push("- Bright accent colors that draw the eye");
+    promptParts.push("");
+    promptParts.push("💡 LIGHTING THAT CREATES LIFE:");
+    promptParts.push("- Studio lighting with bright highlights and defined shadows");
+    promptParts.push("- Rim lighting on product edges for separation and glow");
+    promptParts.push("- Catchlights and reflections on glossy surfaces");
+    promptParts.push("- Overall bright, fresh, energetic mood");
     promptParts.push("");
     promptParts.push("❌ STILL AVOID:");
     promptParts.push("- Cluttered layouts with too many competing focal points");
     promptParts.push("- Random confetti or scattered shapes without purpose");
     promptParts.push("- Heavy textures that reduce text readability");
-    promptParts.push("- More than 3 decorative/dynamic elements total");
+    promptParts.push("- Muted, desaturated, or 'dusty' color palettes");
+    promptParts.push("- Flat lighting with no depth or dimension");
     promptParts.push("");
-    promptParts.push("GOAL: Premium, dynamic, shelf-stopping. The design should DEMAND attention while remaining professional.");
-    promptParts.push("Think: Olly, AG1, Ritual - modern, bold, but clean. STAND OUT from competitors!");
+    promptParts.push("GOAL: VIBRANT, dynamic, shelf-stopping. Colors should POP, lighting should be ALIVE.");
+    promptParts.push("Think: Olly, AG1, Vital Proteins - fresh, bright, makes you want to grab it!");
     promptParts.push("=== END DYNAMIC DESIGN GUIDANCE ===");
+    promptParts.push("");
+    
+    // =================================================================
+    // VIBRANCY & ENERGY - ALIVE, DYNAMIC VISUALS
+    // =================================================================
+    promptParts.push("=== VIBRANCY & ENERGY (MAKE IT ALIVE) ===");
+    promptParts.push("");
+    promptParts.push("CREATE VISUALS THAT FEEL ALIVE AND ENERGETIC:");
+    promptParts.push("");
+    promptParts.push("🎨 COLOR INTENSITY:");
+    promptParts.push("- SATURATED, RICH colors - not muted or dusty");
+    promptParts.push("- Colors should POP and feel fresh, not faded");
+    promptParts.push("- High contrast between elements for visual punch");
+    promptParts.push("- If using primary color, make it VIBRANT - full saturation");
+    promptParts.push("- Whites should be crisp, colors should be bold");
+    promptParts.push("");
+    promptParts.push("✨ LIGHTING & GLOW EFFECTS:");
+    promptParts.push("- Bright, energetic lighting - not flat or dull");
+    promptParts.push("- Subtle rim lighting or backlight glow on the product");
+    promptParts.push("- Fresh, dewy highlights on fruit/ingredient imagery");
+    promptParts.push("- Slight luminosity behind key elements (subtle glow)");
+    promptParts.push("- Reflections and shine that make it look premium and alive");
+    promptParts.push("");
+    promptParts.push("🌊 DYNAMIC ELEMENTS:");
+    promptParts.push("- Ingredient imagery should look FRESH and JUICY");
+    promptParts.push("- Add motion hints: juice droplets mid-splash, light rays");
+    promptParts.push("- Fruit should glisten with water droplets or natural shine");
+    promptParts.push("- Elements should feel like they're in motion, not static");
+    promptParts.push("- Think TV commercial quality - appetizing and inviting");
+    promptParts.push("");
+    promptParts.push("❌ AVOID DULL/FLAT VISUALS:");
+    promptParts.push("- Muted, desaturated, or 'dusty' color palettes");
+    promptParts.push("- Flat lighting with no depth or dimension");
+    promptParts.push("- Static, lifeless fruit or ingredient imagery");
+    promptParts.push("- Overly matte/flat finishes without any shine");
+    promptParts.push("- Washed out or faded looking colors");
+    promptParts.push("");
+    promptParts.push("REFERENCE ENERGY: Think Olly, Vital Proteins, Athletic Greens");
+    promptParts.push("- Fresh, bright, alive - like you want to grab it off the shelf");
+    promptParts.push("=== END VIBRANCY ===");
     promptParts.push("");
 
     // =================================================================
@@ -620,7 +665,7 @@ serve(async (req) => {
       promptParts.push("");
       promptParts.push("OLLY-STYLE FLAVOR GRAPHICS (MANDATORY):");
       promptParts.push("- SIZE: Take up 15-20% of the front label area - PROMINENT, not subtle");
-      promptParts.push("- STYLE: Bold, saturated, photorealistic fruit/ingredient imagery");
+      promptParts.push("- STYLE: Bold, MAXIMUM SATURATION, photorealistic fruit/ingredient imagery");
       promptParts.push("- PLACEMENT: Position as a HERO element - either:");
       promptParts.push("  • Top/bottom banner area with fruit arrangement");
       promptParts.push("  • Side accent with fruits extending beyond label edge");
@@ -628,15 +673,25 @@ serve(async (req) => {
       promptParts.push("- QUALITY: Fresh, vibrant, juicy - should look APPETIZING");
       promptParts.push("- ENERGY: Dynamic, not static - use splashes, droplets, or movement");
       promptParts.push("");
+      promptParts.push("VIBRANCY REQUIREMENTS FOR IMAGERY:");
+      promptParts.push("- Colors at MAXIMUM saturation - deep reds, bright yellows, vivid purples");
+      promptParts.push("- Glistening with water droplets or juice splashes mid-air");
+      promptParts.push("- Light catching the surface creating bright highlights and shine");
+      promptParts.push("- Natural translucency where applicable (citrus, berries)");
+      promptParts.push("- Fresh-picked, farm-to-table quality appearance");
+      promptParts.push("- Juice mid-splash or droplets suspended in air for dynamism");
+      promptParts.push("- NOT dried, dull, matte, or artificial looking");
+      promptParts.push("");
       promptParts.push("REFERENCE: Olly supplements - bold fruit imagery that takes real visual space");
       promptParts.push("- NOT a tiny icon - a MAJOR design element");
-      promptParts.push("- Fruit should have shine, texture, and depth");
+      promptParts.push("- Fruit should have SHINE, texture, depth, and glistening highlights");
       promptParts.push("- Can overlap slightly with other elements for dynamism");
       promptParts.push("");
       promptParts.push("⚠️ DO NOT:");
       promptParts.push("- Use tiny fruit icons (less than 10% of label)");
       promptParts.push("- Use flat/illustrated style - must be photorealistic");
       promptParts.push("- Hide fruit in a corner where it's barely visible");
+      promptParts.push("- Use muted, desaturated, or dull fruit colors");
       promptParts.push("=== END FLAVOR GRAPHICS ===");
       
     } else if (isDogProduct) {
@@ -725,13 +780,16 @@ serve(async (req) => {
     promptParts.push("- Professional D2C supplement brand aesthetic (not cheap pharmacy or generic looking)");
     
     promptParts.push("");
-    promptParts.push("PHOTOGRAPHY STYLE:");
-    promptParts.push("- Professional product photography, Amazon/e-commerce hero image quality");
-    promptParts.push("- Clean white or very light gradient background");
-    promptParts.push("- Soft studio lighting with gentle shadows for depth");
-    promptParts.push("- Product at slight 3/4 angle to show dimension and label detail");
-    promptParts.push("- Sharp focus, high resolution, photorealistic rendering");
-    promptParts.push("- Would look premium on Amazon, Chewy, or brand DTC website");
+    promptParts.push("PHOTOGRAPHY STYLE (VIBRANT & ALIVE):");
+    promptParts.push("- Professional HERO product photography with VIBRANT energy");
+    promptParts.push("- Clean white or subtle gradient background for depth");
+    promptParts.push("- BRIGHT studio lighting - defined highlights and shadows, not flat");
+    promptParts.push("- Rim lighting to separate product from background with subtle glow");
+    promptParts.push("- Colors should POP - rich, saturated, ALIVE");
+    promptParts.push("- Product at 3/4 angle with catch-light reflections on surface");
+    promptParts.push("- Sharp focus, high contrast, commercial-quality rendering");
+    promptParts.push("- Should look like a premium TV commercial still frame");
+    promptParts.push("- Fresh, energetic, makes you want to pick it up immediately");
     
     // =================================================================
     // FINAL REMINDER - Repeat hero imagery at end (AI models also weight the end)

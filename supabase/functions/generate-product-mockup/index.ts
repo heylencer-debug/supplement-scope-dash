@@ -517,6 +517,67 @@ serve(async (req) => {
     promptParts.push("");
 
     // =========================================================================
+    // SECTION 7B: DESIGN TONE (USER-SELECTED OR AI-SUGGESTED)
+    // =========================================================================
+    if (suggestedTone) {
+      promptParts.push("═══════════════════════════════════════════════════════════════");
+      promptParts.push("                    🎭 DESIGN TONE                              ");
+      promptParts.push("═══════════════════════════════════════════════════════════════");
+      promptParts.push("");
+      
+      const toneValue = typeof suggestedTone === 'string' 
+        ? suggestedTone 
+        : suggestedTone.primary_tone || 'premium';
+      
+      const descriptors = typeof suggestedTone === 'object' && suggestedTone.tone_descriptors
+        ? suggestedTone.tone_descriptors.join(', ')
+        : '';
+        
+      const emotionalAppeal = typeof suggestedTone === 'object' && suggestedTone.emotional_appeal
+        ? suggestedTone.emotional_appeal
+        : '';
+
+      const copyVoice = typeof suggestedTone === 'object' && suggestedTone.copy_voice
+        ? suggestedTone.copy_voice
+        : '';
+        
+      promptParts.push(`Primary Tone: ${toneValue.toUpperCase()}`);
+      
+      if (descriptors) {
+        promptParts.push(`Style Descriptors: ${descriptors}`);
+      }
+      
+      if (emotionalAppeal) {
+        promptParts.push(`Emotional Appeal: ${emotionalAppeal}`);
+      }
+
+      if (copyVoice) {
+        promptParts.push(`Copy Voice: ${copyVoice}`);
+      }
+      
+      // Map tones to specific visual guidance
+      const toneGuidance: Record<string, string> = {
+        'premium': 'Luxurious finishes, rich colors, elegant typography, subtle metallic accents',
+        'clean': 'Minimal design, ample white space, crisp typography, clinical precision',
+        'bold': 'High contrast, saturated colors, impactful typography, dynamic composition',
+        'natural': 'Earth tones, organic shapes, textured finishes, botanical elements',
+        'scientific': 'Technical precision, data-driven layouts, clinical colors, structured hierarchy',
+        'playful': 'Vibrant colors, rounded shapes, friendly typography, energetic composition',
+        'clinical': 'Medical precision, clean whites, structured layout, trust-building design',
+        'organic': 'Natural textures, muted earth tones, handcrafted feel, sustainable aesthetics',
+        'energetic': 'Dynamic angles, bold colors, motion-inspired elements, active lifestyle feel',
+        'luxurious': 'Gold/metallic accents, rich deep colors, refined typography, opulent feel',
+        'minimalist': 'Maximum white space, single accent color, essential elements only',
+        'trustworthy': 'Conservative layout, professional colors, established brand feel'
+      };
+      
+      const guidance = toneGuidance[toneValue.toLowerCase()] || toneGuidance['premium'];
+      promptParts.push("");
+      promptParts.push(`Visual Execution: ${guidance}`);
+      promptParts.push("");
+    }
+
+    // =========================================================================
     // SECTION 8: PET PRODUCT (CONDITIONAL)
     // =========================================================================
     if (isPetProduct) {

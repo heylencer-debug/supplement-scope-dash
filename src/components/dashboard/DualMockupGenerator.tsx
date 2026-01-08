@@ -588,21 +588,39 @@ function MockupCard({
         editedSecondaryColor !== strategy.design_brief?.secondary_color?.hex ||
         editedAccentColor !== strategy.design_brief?.accent_color?.hex;
 
+      // Detect if text has been customized (different from original mock content)
+      const originalFrontPanelText = mockContent?.front_panel_text || '';
+      const textCustomized = editedFrontPanelText !== originalFrontPanelText && editedFrontPanelText.length > 0;
+
+      // Extract product name from customized text if available (first line is typically product name)
+      const extractedProductName = textCustomized && editedFrontPanelText
+        ? editedFrontPanelText.split('\n')[0].trim()
+        : (designBrief as any).product_name || designBrief.primary_claim;
+
+      // Only use original brand name if text hasn't been customized by AI rewriter
+      const effectiveBrandName = textCustomized
+        ? '' // Let the front panel text be the source of truth
+        : (designBrief as any).brand_name || 'PREMIUM';
+
       // Log the data being sent to mockup generator for debugging
       console.log("Sending to mockup generator:", {
         labelAtmosphere: (designBrief as any).label_atmosphere,
         labelHierarchy: (designBrief as any).label_hierarchy,
         claimsWithIcons: (designBrief as any).claims_with_icons,
         colorsCustomized,
+        textCustomized,
+        extractedProductName,
+        effectiveBrandName,
       });
 
       const { data, error } = await supabase.functions.invoke('generate-product-mockup', {
         body: {
           logoImageUrl, // Pass logo image
           designBrief: {
-            // Brand & Product Identity
-            brandName: (designBrief as any).brand_name || 'PREMIUM',
-            productName: (designBrief as any).product_name || designBrief.primary_claim,
+            // Brand & Product Identity - use extracted values when text is customized
+            brandName: effectiveBrandName,
+            productName: extractedProductName,
+            textCustomized, // Flag to tell edge function to prioritize frontPanelText
             // Colors
             primaryColor: { hex: editedPrimaryColor, name: strategy.design_brief?.primary_color?.name || 'Primary' },
             secondaryColor: { hex: editedSecondaryColor, name: strategy.design_brief?.secondary_color?.name || 'Secondary' },

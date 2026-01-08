@@ -77,6 +77,10 @@ serve(async (req) => {
     console.log("Label hierarchy received:", JSON.stringify(designBrief.labelHierarchy || designBrief.label_hierarchy));
     console.log("Claims with icons received:", JSON.stringify(designBrief.claimsWithIcons || designBrief.claims_with_icons));
     
+    // NEW: Check if user has customized colors
+    const colorsCustomized = designBrief.colorsCustomized === true;
+    console.log("Colors customized by user:", colorsCustomized);
+    
     // Get recommended packaging format (e.g., "Resealable Stand-Up Pouch", "Wide-Mouth Jar", "Bottle")
     const packagingFormat = designBrief.packagingFormat || "supplement bottle";
     
@@ -467,7 +471,14 @@ serve(async (req) => {
     const labelAtmosphere = designBrief.labelAtmosphere || designBrief.label_atmosphere;
     if (labelAtmosphere) {
       promptParts.push("=== AI-RECOMMENDED ATMOSPHERE FOR THIS PRODUCT ===");
-      promptParts.push(`GRADIENT: ${labelAtmosphere.gradient_description || labelAtmosphere.gradientDescription}`);
+      
+      // If user customized colors, tell AI to ignore gradient_description
+      if (colorsCustomized) {
+        promptParts.push("⚠️ USER HAS CUSTOMIZED COLORS - USE MANDATORY COLOR PALETTE BELOW INSTEAD OF:");
+        promptParts.push(`(Ignored gradient: ${labelAtmosphere.gradient_description || labelAtmosphere.gradientDescription})`);
+      } else {
+        promptParts.push(`GRADIENT: ${labelAtmosphere.gradient_description || labelAtmosphere.gradientDescription}`);
+      }
       
       // Decorative elements
       const decorativeElements = labelAtmosphere.decorative_elements || labelAtmosphere.decorativeElements || [];
@@ -477,23 +488,45 @@ serve(async (req) => {
         promptParts.push("- They enhance the mood and create atmosphere WITHOUT cluttering");
       }
       
-      // Ambient pattern (NEW)
+      // Ambient pattern (NEW) - STRENGTHENED for visibility
       const ambientPattern = labelAtmosphere.ambient_pattern || labelAtmosphere.ambientPattern;
       if (ambientPattern) {
         const patternOpacity = labelAtmosphere.pattern_opacity || labelAtmosphere.patternOpacity || '10%';
-        promptParts.push(`AMBIENT PATTERN: ${ambientPattern}`);
+        promptParts.push("");
+        promptParts.push(`⚠️ AMBIENT PATTERN (MUST BE VISIBLY RENDERED): ${ambientPattern}`);
         promptParts.push(`PATTERN OPACITY: ${patternOpacity}`);
-        promptParts.push("- Pattern should be VISIBLE but NOT distract from text");
-        promptParts.push("- Pattern adds depth, richness, and visual interest to the label");
-        promptParts.push("- Pattern must be rendered as part of the label design");
+        promptParts.push("PATTERN RENDERING REQUIREMENTS:");
+        promptParts.push("- THIS PATTERN MUST BE CLEARLY VISIBLE on the label - not just a subtle hint");
+        promptParts.push("- Starfield scatter = actual star shapes scattered across the background");
+        promptParts.push("- Wave patterns = visible flowing wave lines or curves");
+        promptParts.push("- Hexagonal grid = visible hexagon shapes creating geometric pattern");
+        promptParts.push("- Cloud wisps = soft, visible cloud shapes floating in background");
+        promptParts.push("- The pattern adds visual richness and depth - make it NOTICEABLE");
+        promptParts.push("- Pattern should cover the gradient background area");
+        
+        // Extra geometry instructions
+        const patternLower = ambientPattern.toLowerCase();
+        if (patternLower.includes('geometric') || patternLower.includes('hexagon') || 
+            patternLower.includes('grid') || patternLower.includes('wave') || patternLower.includes('line')) {
+          promptParts.push("GEOMETRIC PATTERN RENDERING:");
+          promptParts.push("- Render actual geometric shapes (not just texture hints)");
+          promptParts.push("- Shapes should be clean, vector-like, and modern");
+          promptParts.push("- Pattern should create visual interest and depth");
+        }
       }
       
-      // Texture finish (NEW)
+      // Texture finish (NEW) - STRENGTHENED for visibility
       const textureFinish = labelAtmosphere.texture_finish || labelAtmosphere.textureFinish;
       if (textureFinish) {
-        promptParts.push(`TEXTURE FINISH: ${textureFinish}`);
+        promptParts.push("");
+        promptParts.push(`⚠️ TEXTURE FINISH (MUST BE VISIBLE): ${textureFinish}`);
+        promptParts.push("TEXTURE RENDERING REQUIREMENTS:");
         promptParts.push("- Render the label surface with this tactile quality");
-        promptParts.push("- Texture should be visible and add premium feel");
+        promptParts.push("- Matte soft-touch = soft diffuse lighting, no harsh reflections");
+        promptParts.push("- Velvet = subtle grain/fiber texture visible on surface");
+        promptParts.push("- Glossy = reflective highlights and shine");
+        promptParts.push("- The label should NOT look like plain flat plastic");
+        promptParts.push("- Texture adds premium, tactile quality to the design");
       }
       
       // Design accents (NEW)
@@ -526,10 +559,7 @@ serve(async (req) => {
     promptParts.push("- Soft shadows behind text and elements so they FLOAT on the label");
     promptParts.push("- Create depth layers on the label surface");
     promptParts.push("");
-    promptParts.push("SUBTLE LABEL DETAILS:");
-    promptParts.push("- Very faint decorative patterns at 3-5% opacity on label");
-    promptParts.push("- Adds richness without cluttering the design");
-    promptParts.push("");
+    // REMOVED conflicting "3-5% opacity" instruction - let AI atmosphere control pattern opacity
     
     // PILLAR 2: THE TASTE
     promptParts.push("🍇 2. THE TASTE: 'DREAMY & DELICIOUS'");
@@ -730,32 +760,42 @@ serve(async (req) => {
     promptParts.push("");
 
     // =================================================================
-    // MANDATORY COLOR PALETTE (EXTRACTED FROM COMPETITOR ANALYSIS)
+    // MANDATORY COLOR PALETTE (HIGHEST PRIORITY - MOVED TO TOP)
     // =================================================================
     promptParts.push("");
-    promptParts.push("=== 🎨 MANDATORY COLOR PALETTE (NON-NEGOTIABLE) ===");
-    promptParts.push("These colors were extracted from TOP-PERFORMING competitor packaging.");
+    promptParts.push("=== 🎨 MANDATORY COLOR PALETTE (HIGHEST PRIORITY - NON-NEGOTIABLE) ===");
+    if (colorsCustomized) {
+      promptParts.push("⚠️⚠️⚠️ USER HAS CUSTOMIZED THESE COLORS - THEY OVERRIDE ALL AI SUGGESTIONS ⚠️⚠️⚠️");
+      promptParts.push("The user explicitly chose these colors. Use them EXACTLY as specified.");
+      promptParts.push("IGNORE any gradient_description or atmosphere colors - USE THESE INSTEAD.");
+    } else {
+      promptParts.push("These colors were extracted from TOP-PERFORMING competitor packaging.");
+    }
     promptParts.push("You MUST use these EXACT colors - do not interpret or improve them.");
     promptParts.push("");
     if (primaryColorHex) {
       promptParts.push(`PRIMARY COLOR: ${primaryColorHex}`);
-      promptParts.push(`- This is the DOMINANT color - use for background, main label area, or largest color blocks`);
-      promptParts.push(`- Extracted from the #1 selling competitor - MATCH IT EXACTLY`);
+      promptParts.push(`- This is the DOMINANT color - MUST cover at least 60% of the visible label area`);
+      promptParts.push(`- Use for background gradient, main label area, or largest color blocks`);
+      promptParts.push(`- This color should be IMMEDIATELY and OBVIOUSLY visible as the main color`);
     }
     if (secondaryColorHex) {
       promptParts.push(`SECONDARY COLOR: ${secondaryColorHex}`);
-      promptParts.push(`- Use for headlines, accents, or secondary panels`);
+      promptParts.push(`- Use for text, headlines, accents, or secondary panels`);
+      promptParts.push(`- Should contrast well with the primary color`);
     }
     if (accentColorHex) {
       promptParts.push(`ACCENT COLOR: ${accentColorHex}`);
-      promptParts.push(`- Use for small accents, icons, or highlights`);
+      promptParts.push(`- Use for small accents, icons, badges, or highlights`);
+      promptParts.push(`- Should pop against both primary and secondary colors`);
     }
     promptParts.push("");
-    promptParts.push("⚠️ COLOR RULES:");
+    promptParts.push("⚠️ COLOR RULES (STRICT):");
     promptParts.push("- Use ONLY these 3 colors (plus white/black for text if needed)");
     promptParts.push("- DO NOT add new colors that 'look better'");
     promptParts.push("- DO NOT invert or complement these colors");
-    promptParts.push("- The primary color should be IMMEDIATELY visible as the dominant color");
+    promptParts.push("- The PRIMARY COLOR should be IMMEDIATELY visible as the dominant color");
+    promptParts.push("- If user customized colors, IGNORE any AI atmosphere/gradient suggestions");
     promptParts.push("=== END MANDATORY COLORS ===");
 
     // EXACT FRONT PANEL TEXT - This is the MOST IMPORTANT and NON-NEGOTIABLE section
@@ -957,19 +997,56 @@ serve(async (req) => {
     promptParts.push("- Generous breathing room around text");
     promptParts.push("");
     promptParts.push("AVOID GENERIC TRAPS & UNNECESSARY ELEMENTS:");
-    promptParts.push("- NO busy patterns or multiple decorative elements");
-    promptParts.push("- NO default-looking layouts");
+    promptParts.push("- NO busy patterns or multiple decorative elements UNLESS specified in AI ATMOSPHERE above");
+    promptParts.push("- NO default-looking layouts - create DYNAMIC, eye-catching compositions");
     promptParts.push("- NO unnecessary icons, badges, or filler graphics");
     promptParts.push("- NO confetti, starbursts, or scattered shapes");
     promptParts.push("- NO decorative borders or frames");
     promptParts.push("- NO generic wellness icons (leaves, hearts, DNA strands) unless specifically part of hero imagery");
     promptParts.push("- NO gradient overlays or lens flares");
-    promptParts.push("- NO abstract swooshes or wave patterns as filler");
+    promptParts.push("- NO abstract swooshes or wave patterns UNLESS specified in ambient_pattern above");
+    promptParts.push("- If ambient_pattern is specified above, RENDER IT - it's intentional design, not filler");
     promptParts.push("- ONLY essential elements: brand, product name, hero imagery (if specified), key claims");
     promptParts.push("- LESS elements = MORE impact");
     promptParts.push("");
     promptParts.push("REFERENCE: Ritual, AG1, Seed - clean but DISTINCTIVE");
     promptParts.push("=== END DESIGN PHILOSOPHY ===");
+    
+    // =================================================================
+    // DYNAMIC LAYOUT DESIGN - NOT PLAIN/STATIC
+    // =================================================================
+    promptParts.push("");
+    promptParts.push("=== 🎯 DYNAMIC LAYOUT DESIGN (NOT PLAIN/STATIC) ===");
+    promptParts.push("Create a VISUALLY DYNAMIC layout, not a boring centered stack:");
+    promptParts.push("");
+    promptParts.push("LAYOUT ENERGY (choose approaches that fit the product):");
+    promptParts.push("- ASYMMETRIC COMPOSITION: Don't center everything - use off-center placement for visual interest");
+    promptParts.push("- DIAGONAL ELEMENTS: Angled text, tilted badges, or diagonal divider lines add motion");
+    promptParts.push("- LAYERED DEPTH: Elements that overlap slightly create dimension (e.g., fruit overlapping badge)");
+    promptParts.push("- SCALE CONTRAST: One LARGE element + several small elements creates hierarchy");
+    promptParts.push("- BREAKING THE FRAME: Hero imagery that extends to or beyond the label edge");
+    promptParts.push("");
+    promptParts.push("VISUAL RHYTHM:");
+    promptParts.push("- Create FLOW that guides the eye: top-left → center → bottom-right");
+    promptParts.push("- Use color blocking to create distinct zones on the label");
+    promptParts.push("- Balance busy areas with breathing room");
+    promptParts.push("");
+    promptParts.push("DYNAMIC EXAMPLES BY PRODUCT TYPE:");
+    promptParts.push("- SLEEP: Floating/dreamy layout with elements at varying depths, moon/stars at different scales");
+    promptParts.push("- ENERGY: Explosive/burst layout with elements radiating outward, dynamic angles");
+    promptParts.push("- FOCUS: Precision layout with intentional asymmetry, geometric alignment");
+    promptParts.push("- IMMUNITY: Organic flow layout with natural curves and botanical arrangements");
+    promptParts.push("- BEAUTY: Elegant asymmetry with delicate floating elements and soft overlaps");
+    promptParts.push("");
+    promptParts.push("❌ AVOID STATIC LAYOUTS:");
+    promptParts.push("- Everything perfectly centered in a vertical stack");
+    promptParts.push("- All text at the same size");
+    promptParts.push("- Rigid left-to-right alignment");
+    promptParts.push("- Flat, same-plane placement of all elements");
+    promptParts.push("- Generic template look");
+    promptParts.push("");
+    promptParts.push("REFERENCE: Olly, Vital Proteins, Moon Juice - dynamic, eye-catching, shelf-stopping");
+    promptParts.push("=== END DYNAMIC LAYOUT ===");
 
     // MODERN LAYOUT & TYPOGRAPHY
     promptParts.push("");

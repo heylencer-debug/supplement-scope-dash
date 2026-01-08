@@ -449,12 +449,42 @@ function MockupCard({
   const title = isLeaders ? 'Match Leaders' : 'Match Disruptors';
   const accentClass = isLeaders ? 'text-blue-600 bg-blue-500/10' : 'text-orange-600 bg-orange-500/10';
   
-  // Get recommended packaging format from strategy
+  // Get recommended packaging format from strategy - prioritize saved customization
   const recommendedFormat = strategy.design_brief?.packaging_format || "soft chew resealable pouch";
-  const [selectedFormat, setSelectedFormat] = useState(recommendedFormat);
+  const [selectedFormat, setSelectedFormat] = useState(
+    savedCustomization?.packaging_format ?? recommendedFormat
+  );
   
-  // Tone selector - defaults to "auto" which uses AI suggestion
-  const [selectedTone, setSelectedTone] = useState<string>("auto");
+  // Tone selector - defaults to saved customization or "auto"
+  const [selectedTone, setSelectedTone] = useState<string>(
+    savedCustomization?.selected_tone ?? "auto"
+  );
+  
+  // Handle packaging format change with persistence
+  const handleFormatChange = (format: string) => {
+    setSelectedFormat(format);
+    onSaveCustomizations?.({ packaging_format: format });
+  };
+  
+  // Handle tone change with persistence
+  const handleToneChange = (tone: string) => {
+    setSelectedTone(tone);
+    onSaveCustomizations?.({ selected_tone: tone });
+  };
+  
+  // Sync format from saved customization when it changes
+  useEffect(() => {
+    if (savedCustomization?.packaging_format) {
+      setSelectedFormat(savedCustomization.packaging_format);
+    }
+  }, [savedCustomization?.packaging_format]);
+  
+  // Sync tone from saved customization when it changes  
+  useEffect(() => {
+    if (savedCustomization?.selected_tone) {
+      setSelectedTone(savedCustomization.selected_tone);
+    }
+  }, [savedCustomization?.selected_tone]);
 
   // Update when mockupUrl prop changes, but NOT while generating (prevents race condition)
   useEffect(() => {
@@ -548,11 +578,18 @@ function MockupCard({
             copy_voice: selectedTone 
           };
 
+      // Detect if user has customized colors from the original
+      const colorsCustomized = 
+        editedPrimaryColor !== strategy.design_brief?.primary_color?.hex ||
+        editedSecondaryColor !== strategy.design_brief?.secondary_color?.hex ||
+        editedAccentColor !== strategy.design_brief?.accent_color?.hex;
+
       // Log the data being sent to mockup generator for debugging
       console.log("Sending to mockup generator:", {
         labelAtmosphere: (designBrief as any).label_atmosphere,
         labelHierarchy: (designBrief as any).label_hierarchy,
         claimsWithIcons: (designBrief as any).claims_with_icons,
+        colorsCustomized,
       });
 
       const { data, error } = await supabase.functions.invoke('generate-product-mockup', {
@@ -566,6 +603,7 @@ function MockupCard({
             primaryColor: { hex: editedPrimaryColor, name: strategy.design_brief?.primary_color?.name || 'Primary' },
             secondaryColor: { hex: editedSecondaryColor, name: strategy.design_brief?.secondary_color?.name || 'Secondary' },
             accentColor: { hex: editedAccentColor, name: strategy.design_brief?.accent_color?.name || 'Accent' },
+            colorsCustomized, // NEW: Flag to tell edge function to prioritize user colors
             // Claims & Content
             primaryClaim: designBrief.primary_claim,
             certifications: designBrief.certifications,
@@ -783,7 +821,7 @@ function MockupCard({
           <p className="text-xs font-medium text-purple-700">Design Tone</p>
         </div>
         
-        <Select value={selectedTone} onValueChange={setSelectedTone}>
+        <Select value={selectedTone} onValueChange={handleToneChange}>
           <SelectTrigger className="w-full bg-background/80 h-8 text-xs border-purple-500/30">
             <SelectValue placeholder="Select tone" />
           </SelectTrigger>
@@ -824,7 +862,7 @@ function MockupCard({
         <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
           Packaging Format
         </label>
-        <Select value={selectedFormat} onValueChange={setSelectedFormat}>
+        <Select value={selectedFormat} onValueChange={handleFormatChange}>
           <SelectTrigger className="w-full bg-background h-9 text-sm">
             <SelectValue placeholder="Select format" />
           </SelectTrigger>

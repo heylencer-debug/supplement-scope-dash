@@ -86,6 +86,8 @@ export interface StrategyCustomization {
   primary_color?: string;
   secondary_color?: string;
   accent_color?: string;
+  packaging_format?: string;
+  selected_tone?: string;
 }
 
 export interface PackagingCustomizations {

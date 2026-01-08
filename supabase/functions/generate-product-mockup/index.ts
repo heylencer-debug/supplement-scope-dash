@@ -363,12 +363,67 @@ serve(async (req) => {
     promptParts.push("═══════════════════════════════════════════════════════════════");
     promptParts.push("");
     
-    // PILLAR 1: ATMOSPHERE
-    promptParts.push("PILLAR 1: ATMOSPHERE");
-    promptParts.push("─────────────────────");
+    // PILLAR 1: ATMOSPHERE & VISUAL STYLING (EXPANDED)
+    promptParts.push("PILLAR 1: ATMOSPHERE & VISUAL STYLING");
+    promptParts.push("─────────────────────────────────────");
     if (labelAtmosphere) {
       promptParts.push(`Overall mood: ${labelAtmosphere.overall_mood || 'Premium and trustworthy'}`);
       promptParts.push(`Design direction: ${labelAtmosphere.design_direction || 'Modern supplement aesthetic'}`);
+      
+      // RESTORED: Gradient description
+      if (labelAtmosphere.gradient_description) {
+        promptParts.push("");
+        promptParts.push("🎨 GRADIENT STYLING:");
+        promptParts.push(`   Apply this gradient effect: ${labelAtmosphere.gradient_description}`);
+        promptParts.push("   → Use as subtle background transition or color flow across label");
+      }
+      
+      // RESTORED: Ambient pattern (geometric elements)
+      if (labelAtmosphere.ambient_pattern) {
+        promptParts.push("");
+        promptParts.push("🔷 BACKGROUND PATTERN:");
+        promptParts.push(`   Pattern type: ${labelAtmosphere.ambient_pattern}`);
+        if (labelAtmosphere.pattern_opacity) {
+          promptParts.push(`   Opacity: ${labelAtmosphere.pattern_opacity}`);
+        }
+        promptParts.push("   → Apply as subtle background texture/pattern on label");
+      }
+      
+      // RESTORED: Decorative elements
+      if (labelAtmosphere.decorative_elements && labelAtmosphere.decorative_elements.length > 0) {
+        promptParts.push("");
+        promptParts.push("✨ DECORATIVE ELEMENTS:");
+        promptParts.push(`   Include: ${labelAtmosphere.decorative_elements.join(', ')}`);
+        promptParts.push("   → These are subtle background/accent elements matching product mood");
+      }
+      
+      // RESTORED: Design accents
+      if (labelAtmosphere.design_accents && labelAtmosphere.design_accents.length > 0) {
+        promptParts.push("");
+        promptParts.push("🏅 DESIGN ACCENTS:");
+        promptParts.push(`   Add: ${labelAtmosphere.design_accents.join(', ')}`);
+        promptParts.push("   → Premium finishing touches like borders, foil stamps, embossing");
+      }
+      
+      // RESTORED: Texture finish
+      if (labelAtmosphere.texture_finish) {
+        promptParts.push("");
+        promptParts.push("🎯 LABEL FINISH:");
+        promptParts.push(`   Surface: ${labelAtmosphere.texture_finish}`);
+      }
+      
+      // RESTORED: Text finish
+      if (labelAtmosphere.text_finish) {
+        promptParts.push("");
+        promptParts.push("📝 TEXT STYLING:");
+        promptParts.push(`   Text finish: ${labelAtmosphere.text_finish}`);
+      }
+      
+      // RESTORED: Mood adjectives
+      if (labelAtmosphere.mood_adjectives && labelAtmosphere.mood_adjectives.length > 0) {
+        promptParts.push("");
+        promptParts.push(`Label should feel: ${labelAtmosphere.mood_adjectives.join(', ')}`);
+      }
     } else {
       promptParts.push("Overall mood: Premium, trustworthy, effective");
       promptParts.push("Design direction: Modern supplement aesthetic with professional appeal");

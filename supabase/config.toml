@@ -38,3 +38,6 @@ verify_jwt = false
 
 [functions.rewrite-label-text]
 verify_jwt = false
+
+[functions.edit-product-mockup]
+verify_jwt = false

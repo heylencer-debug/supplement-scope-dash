@@ -548,6 +548,13 @@ function MockupCard({
             copy_voice: selectedTone 
           };
 
+      // Log the data being sent to mockup generator for debugging
+      console.log("Sending to mockup generator:", {
+        labelAtmosphere: (designBrief as any).label_atmosphere,
+        labelHierarchy: (designBrief as any).label_hierarchy,
+        claimsWithIcons: (designBrief as any).claims_with_icons,
+      });
+
       const { data, error } = await supabase.functions.invoke('generate-product-mockup', {
         body: {
           logoImageUrl, // Pass logo image
@@ -573,7 +580,11 @@ function MockupCard({
             packagingFormat: selectedFormat,
             flavorText: detectedFlavor,
             suggestedTone: effectiveTone,
-            heroImagery: (designBrief as any).hero_imagery, // AI-decided hero imagery
+            heroImagery: (designBrief as any).hero_imagery,
+            // NEW: Pass AI-generated label design fields
+            labelAtmosphere: (designBrief as any).label_atmosphere,
+            labelHierarchy: (designBrief as any).label_hierarchy,
+            claimsWithIcons: (designBrief as any).claims_with_icons,
           }
         }
       });
@@ -663,8 +674,8 @@ function MockupCard({
       const { data, error } = await supabase.functions.invoke('generate-product-mockup', {
         body: {
           mode: 'flat_layout',
-          flatLayoutMode: flatLayoutMode, // 'full' or 'front_only'
-          referenceImageUrl: generatedMockup, // Pass the generated mockup as reference
+          flatLayoutMode: flatLayoutMode,
+          referenceImageUrl: generatedMockup,
           designBrief: {
             primaryColor: { hex: editedPrimaryColor, name: strategy.design_brief?.primary_color?.name || 'Primary' },
             secondaryColor: { hex: editedSecondaryColor, name: strategy.design_brief?.secondary_color?.name || 'Secondary' },
@@ -682,7 +693,11 @@ function MockupCard({
             packagingFormat: selectedFormat,
             flavorText: detectedFlavor,
             suggestedTone: effectiveTone,
-            heroImagery: (designBrief as any).hero_imagery, // AI-decided hero imagery
+            heroImagery: (designBrief as any).hero_imagery,
+            // NEW: Pass AI-generated label design fields
+            labelAtmosphere: (designBrief as any).label_atmosphere,
+            labelHierarchy: (designBrief as any).label_hierarchy,
+            claimsWithIcons: (designBrief as any).claims_with_icons,
           }
         }
       });

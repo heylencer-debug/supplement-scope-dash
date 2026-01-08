@@ -72,6 +72,11 @@ serve(async (req) => {
     console.log("Hero imagery received:", JSON.stringify(heroImagery));
     console.log("Colors received:", { primary: primaryColorHex, secondary: secondaryColorHex, accent: accentColorHex });
     
+    // Debug logging for new label design fields
+    console.log("Label atmosphere received:", JSON.stringify(designBrief.labelAtmosphere || designBrief.label_atmosphere));
+    console.log("Label hierarchy received:", JSON.stringify(designBrief.labelHierarchy || designBrief.label_hierarchy));
+    console.log("Claims with icons received:", JSON.stringify(designBrief.claimsWithIcons || designBrief.claims_with_icons));
+    
     // Get recommended packaging format (e.g., "Resealable Stand-Up Pouch", "Wide-Mouth Jar", "Bottle")
     const packagingFormat = designBrief.packagingFormat || "supplement bottle";
     

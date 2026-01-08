@@ -373,17 +373,11 @@ function MockupCard({
   };
   
   // Editable mock content - initialize from saved customization or original
+  // Always prioritize saved customization (includes Gemini rewrites) over original mock_content
   const originalFrontPanelText = strategy.mock_content?.front_panel_text || '';
   
-  // Detect if saved customization is stale (from a previous analysis run)
-  // If the saved text doesn't match the new original, the analysis was re-run
-  const isMockContentStale = savedCustomization?.front_panel_text && 
-    originalFrontPanelText !== '' &&
-    savedCustomization.front_panel_text !== originalFrontPanelText;
-  
   const [editedFrontPanelText, setEditedFrontPanelText] = useState(
-    // Use new content if stale, otherwise use saved customization
-    isMockContentStale ? originalFrontPanelText : (savedCustomization?.front_panel_text ?? originalFrontPanelText)
+    savedCustomization?.front_panel_text ?? originalFrontPanelText
   );
   const hasTextEdits = editedFrontPanelText !== originalFrontPanelText;
   
@@ -502,15 +496,12 @@ function MockupCard({
   }, [mockupUrl, isGenerating, isGeneratingFlat]);
   
   // Initialize text from saved customization or original when strategy changes
+  // Always prioritize saved customization (includes Gemini rewrites)
   useEffect(() => {
-    const newOriginal = strategy.mock_content?.front_panel_text || '';
-    // Reset if no saved customization OR if saved customization is stale
-    const isStale = savedCustomization?.front_panel_text && 
-      newOriginal !== '' &&
-      savedCustomization.front_panel_text !== newOriginal;
-    
-    if (!savedCustomization?.front_panel_text || isStale) {
-      setEditedFrontPanelText(newOriginal);
+    if (savedCustomization?.front_panel_text) {
+      setEditedFrontPanelText(savedCustomization.front_panel_text);
+    } else {
+      setEditedFrontPanelText(strategy.mock_content?.front_panel_text || '');
     }
   }, [strategy.mock_content?.front_panel_text, savedCustomization?.front_panel_text]);
   

@@ -431,42 +431,120 @@ serve(async (req) => {
       promptParts.push("");
     }
     
-    promptParts.push("DESIGN PHILOSOPHY: Premium and professional, but informative. Think Ritual, AG1, or high-end pet brands like Open Farm or Ollie.");
+    // =================================================================
+    // UNIVERSAL DESIGN LANGUAGE - AI ADAPTIVE PREMIUM AESTHETIC
+    // =================================================================
+    promptParts.push("=== UNIVERSAL DESIGN LANGUAGE (MANDATORY) ===");
+    promptParts.push("");
+    promptParts.push("ANALYZE the product name, claims, ingredients, and flavor. Then INTELLIGENTLY ADAPT the following 5 design principles to match the product's purpose and mood:");
     promptParts.push("");
     
-    // =================================================================
-    // DYNAMIC DESIGN ELEMENTS (EYE-CATCHING & BOLD)
-    // =================================================================
-    promptParts.push("=== DYNAMIC DESIGN ELEMENTS (EYE-CATCHING & BOLD) ===");
+    // PILLAR 1: THE ATMOSPHERE
+    promptParts.push("🎨 1. THE ATMOSPHERE");
     promptParts.push("");
-    promptParts.push("CREATE A VIBRANT, SHELF-STOPPING DESIGN THAT FEELS ALIVE:");
+    promptParts.push("BACKGROUND (NO FLAT SOLID COLORS - EVER):");
+    promptParts.push("- Always create a GRADIENT background that matches the product's mood");
+    promptParts.push("- Examples of mood-appropriate gradients:");
+    promptParts.push("  * Sleep/Calm products → Deep purple to midnight blue (twilight)");
+    promptParts.push("  * Energy products → Deep amber to sunrise gold (dawn)");
+    promptParts.push("  * Focus/Brain products → Deep teal to clear blue (clarity)");
+    promptParts.push("  * Immunity products → Soft white to sky blue (fresh/clean)");
+    promptParts.push("  * Beauty products → Blush pink to rose gold (luxe)");
+    promptParts.push("  * Digestion products → Sage green to mint (natural)");
+    promptParts.push("  * Stress/Mood products → Lavender to soft periwinkle (zen)");
+    promptParts.push("- Gradient should flow from bottom to top");
+    promptParts.push("- ANALYZE the product and choose the most appropriate gradient");
     promptParts.push("");
-    promptParts.push("✅ MAKE IT POP WITH ENERGY:");
-    promptParts.push("- Bold, SATURATED gradient transitions - not subtle, NOTICEABLE");
-    promptParts.push("- Dynamic diagonal lines or swooshes suggesting motion and energy");
-    promptParts.push("- Vibrant color blocking with crisp, sharp transitions");
-    promptParts.push("- Metallic or holographic foil accents that catch light");
-    promptParts.push("- Glossy highlights and reflections for a premium, alive feel");
-    promptParts.push("- Light rays or subtle lens effects for energy");
-    promptParts.push("- Deep, rich shadows that create dimension and depth");
-    promptParts.push("- Bright accent colors that draw the eye");
+    promptParts.push("DEPTH & TEXTURE:");
+    promptParts.push("- Design should feel like 'a little world'");
+    promptParts.push("- Soft shadows behind text and elements so they FLOAT");
+    promptParts.push("- Create depth layers: background, mid-ground, foreground");
     promptParts.push("");
-    promptParts.push("💡 LIGHTING THAT CREATES LIFE:");
-    promptParts.push("- Studio lighting with bright highlights and defined shadows");
-    promptParts.push("- Rim lighting on product edges for separation and glow");
-    promptParts.push("- Catchlights and reflections on glossy surfaces");
-    promptParts.push("- Overall bright, fresh, energetic mood");
+    promptParts.push("SUBTLE LINE-ART DETAILS (5-10% opacity):");
+    promptParts.push("- Add faint decorative elements that match the product's purpose:");
+    promptParts.push("  * Sleep → constellations, crescent moon, soft clouds");
+    promptParts.push("  * Energy → sun rays, dynamic lines, lightning hints");
+    promptParts.push("  * Focus → neural patterns, geometric precision");
+    promptParts.push("  * Immunity → shields, protective bubbles, leaves");
+    promptParts.push("  * Beauty → sparkles, dewdrops, soft florals");
+    promptParts.push("- Should be barely visible, adding interest without clutter");
     promptParts.push("");
-    promptParts.push("❌ STILL AVOID:");
-    promptParts.push("- Cluttered layouts with too many competing focal points");
-    promptParts.push("- Random confetti or scattered shapes without purpose");
-    promptParts.push("- Heavy textures that reduce text readability");
-    promptParts.push("- Muted, desaturated, or 'dusty' color palettes");
-    promptParts.push("- Flat lighting with no depth or dimension");
+    
+    // PILLAR 2: THE TASTE
+    promptParts.push("🍇 2. THE TASTE: 'DREAMY & DELICIOUS'");
     promptParts.push("");
-    promptParts.push("GOAL: VIBRANT, dynamic, shelf-stopping. Colors should POP, lighting should be ALIVE.");
-    promptParts.push("Think: Olly, AG1, Vital Proteins - fresh, bright, makes you want to grab it!");
-    promptParts.push("=== END DYNAMIC DESIGN GUIDANCE ===");
+    promptParts.push("PRODUCT INTERACTION (NOT JUST PLACED):");
+    promptParts.push("- Show gummy/product in an ENVIRONMENT that matches its purpose:");
+    promptParts.push("  * Sleep → resting on soft cloud, floating in moonlit mist");
+    promptParts.push("  * Energy → bursting from citrus, surrounded by light rays");
+    promptParts.push("  * Focus → centered with geometric precision");
+    promptParts.push("  * Immunity → protected by shield glow, surrounded by botanicals");
+    promptParts.push("  * Beauty → with dewdrop highlights, sparkles, soft petals");
+    promptParts.push("- Product should look SOFT, PILLOWY, INVITING");
+    promptParts.push("");
+    promptParts.push("LIGHTING (ADAPT TO PRODUCT MOOD):");
+    promptParts.push("  * Sleep → Moonlight: dramatic but soft, ethereal, silver highlights");
+    promptParts.push("  * Energy → Sunrise: warm, golden, energizing rim lights");
+    promptParts.push("  * Focus → Crystal: clean, sharp, focused spotlights");
+    promptParts.push("  * Immunity → Fresh morning: bright, clean, airy");
+    promptParts.push("  * Beauty → Dewy glow: soft luminosity, pearl-like");
+    promptParts.push("- Always add small white SPECULARS to gummy surface");
+    promptParts.push("- Gummy must look JUICY and FRESH");
+    promptParts.push("");
+    promptParts.push("COLOR SATURATION:");
+    promptParts.push("- Background can be moody/atmospheric");
+    promptParts.push("- Fruit and gummy colors MUST be RICH and SATURATED");
+    promptParts.push("- High contrast between product and background - product POPS");
+    promptParts.push("");
+    
+    // PILLAR 3: TYPOGRAPHY
+    promptParts.push("✍️ 3. THE TYPOGRAPHY: 'CALM AUTHORITY'");
+    promptParts.push("");
+    promptParts.push("PRODUCT NAME:");
+    promptParts.push("- Clean, modern SANS-SERIF font");
+    promptParts.push("- BOLD and CONFIDENT");
+    promptParts.push("- Color: Silver, Gold, or White (metallic feel)");
+    promptParts.push("");
+    promptParts.push("TAGLINE/EMOTIONAL MESSAGE:");
+    promptParts.push("- Delicate SERIF or handwritten SCRIPT font");
+    promptParts.push("- Contrast with bold title = premium, human touch");
+    promptParts.push("");
+    promptParts.push("SPACING:");
+    promptParts.push("- PLENTY of negative space around text");
+    promptParts.push("- Crowded = stressful, Open = premium and relaxing");
+    promptParts.push("");
+    
+    // PILLAR 4: TRUST & HEALTH
+    promptParts.push("🏅 4. TRUST & HEALTH: 'LOWERING BARRIERS'");
+    promptParts.push("");
+    promptParts.push("QUALITY BADGES (THE 'JEWEL'):");
+    promptParts.push("- DO NOT make badges look like cheap discount stickers");
+    promptParts.push("- Design like a JEWEL or quality seal");
+    promptParts.push("- Thin gold or silver circle with elegant text (e.g., '0g SUGAR')");
+    promptParts.push("- Should look like a stamp of QUALITY");
+    promptParts.push("");
+    promptParts.push("CERTIFICATION ICONS:");
+    promptParts.push("- Clean row of minimalist white LINE-ICONS at bottom");
+    promptParts.push("- STROKE ONLY, no fill - elegant and refined");
+    promptParts.push("- Stomach = High Absorption, Leaf = Vegan, Wheat-slash = Gluten-Free, Moon/Zzz = Non-Habit Forming");
+    promptParts.push("- Small, uniform, evenly spaced");
+    promptParts.push("");
+    
+    // PILLAR 5: PRINT FINISH
+    promptParts.push("🖨️ 5. PRINT FINISH: 'TACTILE LUXURY'");
+    promptParts.push("");
+    promptParts.push("MATTE VS GLOSS CONTRAST:");
+    promptParts.push("- Label background: Soft-Touch MATTE finish (velvety texture)");
+    promptParts.push("- HIGH-GLOSS Spot UV only on:");
+    promptParts.push("  * The Logo");
+    promptParts.push("  * The Gummy/product visual");
+    promptParts.push("  * Quality badges");
+    promptParts.push("- Matte/gloss contrast = immediate high-end feel");
+    promptParts.push("- Glossy elements should show subtle reflections");
+    promptParts.push("");
+    promptParts.push("=== END UNIVERSAL DESIGN LANGUAGE ===");
+    promptParts.push("");
+    promptParts.push("IMPORTANT: Analyze this specific product and INTELLIGENTLY choose the most appropriate gradient, lighting, line-art, and product environment based on its purpose, ingredients, and mood. Blend styles if the product serves multiple purposes.");
     promptParts.push("");
     
     // =================================================================

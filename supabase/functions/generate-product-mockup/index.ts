@@ -320,13 +320,24 @@ serve(async (req) => {
       "",
     ];
     
+    // Check if a valid logo image is provided (for brand name handling)
+    const hasLogoProvided = logoImageUrl && 
+      (logoImageUrl.startsWith('data:image') || logoImageUrl.startsWith('http'));
+    
     // =================================================================
     // VISUAL HIERARCHY FOR SUPPLEMENTS (ADD THIS FIRST)
     // =================================================================
     promptParts.push("");
     promptParts.push("=== VISUAL HIERARCHY FOR SUPPLEMENTS (FOLLOW THIS ORDER) ===");
-    promptParts.push(`1. BRAND NAME: "${brandName}" - Top of label, PROMINENT, stylized logo treatment with premium typography`);
-    promptParts.push(`2. PRODUCT NAME: "${productName}" - LARGEST text, main focus, center of label`);
+    
+    // If logo is provided, skip brand name text to avoid duplication
+    if (hasLogoProvided) {
+      promptParts.push("1. BRAND LOGO - Already provided as image, place at TOP CENTER of label. DO NOT add brand name as text - the logo IS the brand identity.");
+      promptParts.push(`2. PRODUCT NAME: "${productName}" - LARGEST text, main focus, directly below the logo`);
+    } else {
+      promptParts.push(`1. BRAND NAME: "${brandName}" - Top of label, PROMINENT, stylized logo treatment with premium typography`);
+      promptParts.push(`2. PRODUCT NAME: "${productName}" - LARGEST text, main focus, center of label`);
+    }
     promptParts.push("3. PRIMARY CLAIM - Key benefit statement, second largest");
     promptParts.push("4. BENEFIT BULLETS - Clear, readable, with checkmarks/icons");
     promptParts.push("5. FLAVOR TEXT - Visible but not dominant (e.g., 'Natural Mixed Berry Flavor')");
@@ -1063,10 +1074,12 @@ serve(async (req) => {
 ${hasValidReferenceImage ? 'The FIRST attached image is the brand logo.' : 'The attached image is the brand logo.'}
 You MUST:
 1. Place this EXACT brand logo at the TOP CENTER of the front panel
-2. Do NOT redesign, redraw, modify, or recreate the logo in any way
-3. Use the logo EXACTLY as provided - same colors, proportions, and details
-4. Size the logo appropriately (roughly 15-20% of the front panel width)
-5. Ensure the logo is clearly visible and prominent
+2. DO NOT add any text-based brand name - the logo replaces the brand name text entirely
+3. The product name should appear BELOW the logo as the main headline
+4. Do NOT redesign, redraw, modify, or recreate the logo in any way
+5. Use the logo EXACTLY as provided - same colors, proportions, and details
+6. Size the logo appropriately (roughly 15-20% of the front panel width)
+7. Ensure the logo is clearly visible and prominent
 === END LOGO ===
 
 `;

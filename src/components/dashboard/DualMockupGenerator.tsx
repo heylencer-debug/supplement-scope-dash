@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { handleApiError } from "@/lib/handleApiError";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { 
@@ -478,10 +479,9 @@ function MockupCard({
       }
     } catch (err) {
       console.error('Edit mockup error:', err);
-      toast({
-        title: 'Edit Failed',
-        description: err instanceof Error ? err.message : 'Failed to edit mockup',
-        variant: 'destructive',
+      handleApiError(err, {
+        fallbackTitle: 'Edit Failed',
+        fallbackDescription: 'Failed to edit mockup'
       });
     } finally {
       setIsEditingImage(false);
@@ -740,10 +740,9 @@ function MockupCard({
       }
     } catch (err) {
       console.error('Mockup generation error:', err);
-      toast({
-        title: 'Generation Failed',
-        description: err instanceof Error ? err.message : 'Failed to generate mockup',
-        variant: 'destructive',
+      handleApiError(err, {
+        fallbackTitle: 'Generation Failed',
+        fallbackDescription: 'Failed to generate mockup'
       });
     } finally {
       setIsGenerating(false);
@@ -848,10 +847,9 @@ function MockupCard({
       }
     } catch (err) {
       console.error('Flat layout generation error:', err);
-      toast({
-        title: 'Generation Failed',
-        description: err instanceof Error ? err.message : 'Failed to generate flat layout',
-        variant: 'destructive',
+      handleApiError(err, {
+        fallbackTitle: 'Generation Failed',
+        fallbackDescription: 'Failed to generate flat layout'
       });
     } finally {
       setIsGeneratingFlat(false);

@@ -442,32 +442,20 @@ serve(async (req) => {
     // PILLAR 1: THE ATMOSPHERE
     promptParts.push("🎨 1. THE ATMOSPHERE");
     promptParts.push("");
-    promptParts.push("BACKGROUND (NO FLAT SOLID COLORS - EVER):");
-    promptParts.push("- Always create a GRADIENT background that matches the product's mood");
-    promptParts.push("- Examples of mood-appropriate gradients:");
-    promptParts.push("  * Sleep/Calm products → Deep purple to midnight blue (twilight)");
-    promptParts.push("  * Energy products → Deep amber to sunrise gold (dawn)");
-    promptParts.push("  * Focus/Brain products → Deep teal to clear blue (clarity)");
-    promptParts.push("  * Immunity products → Soft white to sky blue (fresh/clean)");
-    promptParts.push("  * Beauty products → Blush pink to rose gold (luxe)");
-    promptParts.push("  * Digestion products → Sage green to mint (natural)");
-    promptParts.push("  * Stress/Mood products → Lavender to soft periwinkle (zen)");
-    promptParts.push("- Gradient should flow from bottom to top");
-    promptParts.push("- ANALYZE the product and choose the most appropriate gradient");
+    promptParts.push("BACKGROUND:");
+    promptParts.push("- Use a CLEAN WHITE or OFF-WHITE background");
+    promptParts.push("- Keep background simple and uncluttered");
+    promptParts.push("- White creates premium, clean, professional feel");
+    promptParts.push("- Allows product and colors to POP without distraction");
     promptParts.push("");
     promptParts.push("DEPTH & TEXTURE:");
     promptParts.push("- Design should feel like 'a little world'");
     promptParts.push("- Soft shadows behind text and elements so they FLOAT");
     promptParts.push("- Create depth layers: background, mid-ground, foreground");
     promptParts.push("");
-    promptParts.push("SUBTLE LINE-ART DETAILS (5-10% opacity):");
-    promptParts.push("- Add faint decorative elements that match the product's purpose:");
-    promptParts.push("  * Sleep → constellations, crescent moon, soft clouds");
-    promptParts.push("  * Energy → sun rays, dynamic lines, lightning hints");
-    promptParts.push("  * Focus → neural patterns, geometric precision");
-    promptParts.push("  * Immunity → shields, protective bubbles, leaves");
-    promptParts.push("  * Beauty → sparkles, dewdrops, soft florals");
-    promptParts.push("- Should be barely visible, adding interest without clutter");
+    promptParts.push("SUBTLE DETAILS (OPTIONAL):");
+    promptParts.push("- Very faint decorative elements can be added at 3-5% opacity");
+    promptParts.push("- Keep minimal to maintain clean white aesthetic");
     promptParts.push("");
     
     // PILLAR 2: THE TASTE
@@ -500,10 +488,17 @@ serve(async (req) => {
     // PILLAR 3: TYPOGRAPHY
     promptParts.push("✍️ 3. THE TYPOGRAPHY: 'CALM AUTHORITY'");
     promptParts.push("");
+    promptParts.push("LOGO & BRAND NAME CONTRAST:");
+    promptParts.push("- ADAPTIVE CONTRAST: Logo must always be READABLE");
+    promptParts.push("- On WHITE/LIGHT backgrounds → Use DARK text (black, dark gray, navy)");
+    promptParts.push("- On DARK backgrounds → Use LIGHT text (white, cream, silver)");
+    promptParts.push("- Ensure minimum contrast ratio for readability");
+    promptParts.push("- Logo should stand out clearly against any background");
+    promptParts.push("");
     promptParts.push("PRODUCT NAME:");
     promptParts.push("- Clean, modern SANS-SERIF font");
     promptParts.push("- BOLD and CONFIDENT");
-    promptParts.push("- Color: Silver, Gold, or White (metallic feel)");
+    promptParts.push("- Color adapts to background for maximum contrast");
     promptParts.push("");
     promptParts.push("TAGLINE/EMOTIONAL MESSAGE:");
     promptParts.push("- Delicate SERIF or handwritten SCRIPT font");
@@ -523,11 +518,18 @@ serve(async (req) => {
     promptParts.push("- Thin gold or silver circle with elegant text (e.g., '0g SUGAR')");
     promptParts.push("- Should look like a stamp of QUALITY");
     promptParts.push("");
-    promptParts.push("CERTIFICATION ICONS:");
-    promptParts.push("- Clean row of minimalist white LINE-ICONS at bottom");
-    promptParts.push("- STROKE ONLY, no fill - elegant and refined");
-    promptParts.push("- Stomach = High Absorption, Leaf = Vegan, Wheat-slash = Gluten-Free, Moon/Zzz = Non-Habit Forming");
-    promptParts.push("- Small, uniform, evenly spaced");
+    promptParts.push("CERTIFICATION BADGES/ICONS:");
+    promptParts.push("- Display certifications as PROPER BADGES or ICONS");
+    promptParts.push("- Each certification gets its own badge shape (circle, shield, seal)");
+    promptParts.push("- Badge style: outlined or filled with subtle color");
+    promptParts.push("- Include both icon AND text label in each badge:");
+    promptParts.push("  * Stomach icon + 'High Absorption'");
+    promptParts.push("  * Leaf icon + 'Vegan'");
+    promptParts.push("  * Wheat-slash icon + 'Gluten-Free'");
+    promptParts.push("  * Moon/Zzz icon + 'Non-Habit Forming'");
+    promptParts.push("- Arrange badges in a clean row at bottom of label");
+    promptParts.push("- Badges should look professional and trustworthy");
+    promptParts.push("- Use consistent sizing and spacing between badges");
     promptParts.push("");
     
     // PILLAR 5: PRINT FINISH

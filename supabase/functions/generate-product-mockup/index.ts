@@ -339,13 +339,50 @@ serve(async (req) => {
       promptParts.push(`2. PRODUCT NAME: "${productName}" - LARGEST text, main focus, center of label`);
     }
     promptParts.push("3. PRIMARY CLAIM - Key benefit statement, second largest");
-    promptParts.push("4. BENEFIT BULLETS - Clear, readable, with checkmarks/icons");
+    promptParts.push("4. BENEFIT BULLETS - Clear, readable, with SEMANTIC ICONS (see icon guidance below)");
     promptParts.push("5. FLAVOR TEXT - Visible but not dominant (e.g., 'Natural Mixed Berry Flavor')");
     promptParts.push("6. FLAVOR IMAGERY - Small accent only, NOT the hero element");
     promptParts.push("7. CERTIFICATIONS/BADGES - Bottom area, small but visible");
     promptParts.push("");
     promptParts.push("THE PACKAGING SHOULD CLEARLY READ AS A SUPPLEMENT, NOT A FOOD/DRINK PRODUCT.");
     promptParts.push("=== END HIERARCHY ===");
+    promptParts.push("");
+    
+    // =================================================================
+    // BENEFIT ICON GUIDANCE - SEMANTIC ICONS ONLY
+    // =================================================================
+    promptParts.push("=== BENEFIT ICON GUIDANCE (MANDATORY) ===");
+    promptParts.push("");
+    promptParts.push("When showing benefits/feature bullets, use SEMANTIC ICONS that visually represent each benefit:");
+    promptParts.push("");
+    promptParts.push("ICON EXAMPLES BY BENEFIT TYPE:");
+    promptParts.push("- Energy/Strength: lightning bolt ⚡, flexed arm 💪, battery icon");
+    promptParts.push("- Sleep/Calm: moon 🌙, pillow, cloud, ZZZ");
+    promptParts.push("- Heart/Cardio: heart icon ❤️, heartbeat line");
+    promptParts.push("- Brain/Focus: brain icon 🧠, lightbulb 💡, target 🎯");
+    promptParts.push("- Bone/Joint: bone icon 🦴, joint/knee shape");
+    promptParts.push("- Immune: shield icon 🛡️, plus sign");
+    promptParts.push("- Digestion/Gut: stomach icon, leaf 🌿");
+    promptParts.push("- Beauty/Skin: sparkle ✨, diamond 💎, dewdrop");
+    promptParts.push("- Muscle: dumbbell 🏋️, flexed bicep");
+    promptParts.push("- Mood: smiley face 😊, sun ☀️");
+    promptParts.push("- Antioxidant: shield, cell icon");
+    promptParts.push("");
+    promptParts.push("❌ DO NOT USE:");
+    promptParts.push("- Generic checkmarks (✓ ✔ ☑) for all bullets");
+    promptParts.push("- Numbers or letters as bullets");
+    promptParts.push("- Plain dots or dashes");
+    promptParts.push("");
+    promptParts.push("✅ DO USE:");
+    promptParts.push("- A DIFFERENT, RELEVANT icon for each benefit");
+    promptParts.push("- Icons that help readers understand the benefit at a glance");
+    promptParts.push("- Clean, simple line icons (not complex illustrations)");
+    promptParts.push("");
+    promptParts.push("Example: If benefits are 'Supports Energy, Better Sleep, Heart Health'");
+    promptParts.push("→ Use: ⚡ Supports Energy | 🌙 Better Sleep | ❤️ Heart Health");
+    promptParts.push("→ NOT: ✓ Supports Energy | ✓ Better Sleep | ✓ Heart Health");
+    promptParts.push("");
+    promptParts.push("=== END ICON GUIDANCE ===");
     promptParts.push("");
     
     // =================================================================

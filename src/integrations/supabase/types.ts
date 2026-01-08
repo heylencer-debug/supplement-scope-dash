@@ -22,6 +22,7 @@ export type Database = {
           created_at: string | null
           id: string
           last_scanned: string | null
+          logo_image_url: string | null
           name: string
           product_forms: string[] | null
           run_number: number | null
@@ -38,6 +39,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           last_scanned?: string | null
+          logo_image_url?: string | null
           name: string
           product_forms?: string[] | null
           run_number?: number | null
@@ -54,6 +56,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           last_scanned?: string | null
+          logo_image_url?: string | null
           name?: string
           product_forms?: string[] | null
           run_number?: number | null

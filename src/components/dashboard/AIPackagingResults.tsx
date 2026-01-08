@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { handleApiError } from "@/lib/handleApiError";
 import { PackagingDesignAnalysis } from "@/hooks/usePackagingAnalysis";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -368,10 +369,9 @@ export function AIPackagingResults({ analysis, mockupImageUrl, onSaveMockup, onR
       }
     } catch (err) {
       console.error('Mockup generation error:', err);
-      toast({
-        title: 'Generation Failed',
-        description: err instanceof Error ? err.message : 'Failed to generate mockup',
-        variant: 'destructive',
+      handleApiError(err, {
+        fallbackTitle: 'Generation Failed',
+        fallbackDescription: 'Failed to generate mockup'
       });
     } finally {
       setIsGenerating(false);

@@ -144,13 +144,18 @@ const packagingFormatOptions = [
 
 const toneOptions = [
   { value: "auto", label: "AI Suggested", description: "Use AI-recommended tone" },
-  { value: "premium", label: "Premium", description: "Luxury, sophisticated, high-end" },
-  { value: "clinical", label: "Clinical", description: "Scientific, medical, trust-focused" },
-  { value: "playful", label: "Playful", description: "Fun, friendly, approachable" },
-  { value: "natural", label: "Natural", description: "Organic, earthy, wholesome" },
-  { value: "bold", label: "Bold", description: "Aggressive, energetic, powerful" },
-  { value: "wellness", label: "Wellness", description: "Calm, balanced, holistic" },
-  { value: "scientific", label: "Scientific", description: "Data-driven, research-backed" },
+  { value: "premium", label: "Premium", description: "Luxurious finishes, rich colors, elegant typography" },
+  { value: "clean", label: "Clean", description: "Minimal design, ample white space, crisp typography" },
+  { value: "bold", label: "Bold", description: "High contrast, saturated colors, impactful typography" },
+  { value: "natural", label: "Natural", description: "Earth tones, organic shapes, textured finishes" },
+  { value: "scientific", label: "Scientific", description: "Technical precision, data-driven layouts, clinical colors" },
+  { value: "playful", label: "Playful", description: "Vibrant colors, rounded shapes, friendly typography" },
+  { value: "clinical", label: "Clinical", description: "Medical precision, clean whites, trust-building design" },
+  { value: "organic", label: "Organic", description: "Natural textures, muted earth tones, sustainable aesthetics" },
+  { value: "energetic", label: "Energetic", description: "Dynamic angles, bold colors, active lifestyle feel" },
+  { value: "luxurious", label: "Luxurious", description: "Gold/metallic accents, rich deep colors, opulent feel" },
+  { value: "minimalist", label: "Minimalist", description: "Maximum white space, single accent color, essential elements" },
+  { value: "trustworthy", label: "Trustworthy", description: "Conservative layout, professional colors, established brand feel" },
 ];
 
 // CSS-based label preview component

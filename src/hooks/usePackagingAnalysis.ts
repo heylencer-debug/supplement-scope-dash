@@ -202,27 +202,50 @@ export function usePackagingAnalysis(categoryId?: string, formulaVersionId?: str
   }, [categoryId, formulaVersionId]);
 
   // Save mockup image to database - now supports strategy type
+  // Uses read-then-merge pattern to prevent race conditions when both mockups finish simultaneously
   const saveMockupImage = useCallback(async (imageUrl: string, strategyType?: 'match_leaders' | 'match_disruptors') => {
     if (!categoryId) return;
 
     try {
-      // Update local state
       if (strategyType) {
-        const newMockupImages = {
-          ...mockupImages,
-          [strategyType]: imageUrl,
-        };
-        setMockupImages(newMockupImages);
-        
         // Also update legacy field for backwards compatibility
         if (strategyType === 'match_leaders') {
           setMockupImageUrl(imageUrl);
         }
 
-        // Save as JSON string to the mockup_image_url column
+        // Read current DB state first to prevent race condition overwrites
+        const { data: currentData } = await supabase
+          .from('packaging_analyses')
+          .select('mockup_image_url')
+          .eq('category_id', categoryId)
+          .maybeSingle();
+
+        // Parse existing mockup images from DB
+        let existingImages: MockupImages = { match_leaders: null, match_disruptors: null };
+        if (currentData?.mockup_image_url && typeof currentData.mockup_image_url === 'string') {
+          try {
+            const parsed = JSON.parse(currentData.mockup_image_url);
+            if (parsed && typeof parsed === 'object') {
+              existingImages = parsed;
+            }
+          } catch {
+            // Not JSON, ignore
+          }
+        }
+
+        // Merge: preserve other strategy's image, update this one
+        const mergedImages: MockupImages = {
+          ...existingImages,
+          [strategyType]: imageUrl,
+        };
+
+        // Update local state with merged data
+        setMockupImages(mergedImages);
+
+        // Save merged result to DB
         const { error: updateError } = await supabase
           .from('packaging_analyses')
-          .update({ mockup_image_url: JSON.stringify(newMockupImages) })
+          .update({ mockup_image_url: JSON.stringify(mergedImages) })
           .eq('category_id', categoryId);
 
         if (updateError) {
@@ -243,7 +266,7 @@ export function usePackagingAnalysis(categoryId?: string, formulaVersionId?: str
     } catch (e) {
       console.error('Error saving mockup to DB:', e);
     }
-  }, [categoryId, mockupImages]);
+  }, [categoryId]);
 
   // Save user customizations for text/colors
   const saveCustomizations = useCallback(async (

@@ -370,10 +370,17 @@ serve(async (req) => {
       promptParts.push(`Overall mood: ${labelAtmosphere.overall_mood || 'Premium and trustworthy'}`);
       promptParts.push(`Design direction: ${labelAtmosphere.design_direction || 'Modern supplement aesthetic'}`);
       
-      // RESTORED: Gradient description
-      if (labelAtmosphere.gradient_description) {
-        promptParts.push("");
-        promptParts.push("🎨 GRADIENT STYLING:");
+      // GRADIENT STYLING - Respects user's brand colors when customized
+      promptParts.push("");
+      promptParts.push("🎨 GRADIENT STYLING:");
+      if (colorsCustomized) {
+        // User selected colors - generate gradient from their palette
+        promptParts.push(`   Apply gradient using YOUR SELECTED BRAND COLORS:`);
+        promptParts.push(`   Primary (${primaryColorHex}) → Secondary (${secondaryColorHex})`);
+        promptParts.push(`   Use accent (${accentColorHex}) for highlights in the gradient`);
+        promptParts.push("   → Create smooth transition between your brand colors on label background");
+      } else if (labelAtmosphere.gradient_description) {
+        // AI-suggested gradient when no customization
         promptParts.push(`   Apply this gradient effect: ${labelAtmosphere.gradient_description}`);
         promptParts.push("   → Use as subtle background transition or color flow across label");
       }

@@ -457,13 +457,35 @@ serve(async (req) => {
     promptParts.push("- Creates depth, dimension, and premium feel on the label surface");
     promptParts.push("- Gradient direction: top-to-bottom, radial, or diagonal");
     promptParts.push("");
-    promptParts.push("MOOD-APPROPRIATE LABEL GRADIENTS:");
-    promptParts.push("  * Sleep → Deep purples fading to soft lavender, twilight blues");
-    promptParts.push("  * Energy → Vibrant oranges to warm yellows, sunrise feel");
-    promptParts.push("  * Focus → Cool teals to deep navy, crisp and clear");
-    promptParts.push("  * Immunity → Fresh greens to golden yellows, morning light");
-    promptParts.push("  * Beauty → Soft pinks to rose gold, luminous glow");
-    promptParts.push("");
+    
+    // Dynamic label atmosphere from Gemini analysis
+    const labelAtmosphere = designBrief.labelAtmosphere || designBrief.label_atmosphere;
+    if (labelAtmosphere) {
+      promptParts.push("=== AI-RECOMMENDED ATMOSPHERE FOR THIS PRODUCT ===");
+      promptParts.push(`GRADIENT: ${labelAtmosphere.gradient_description || labelAtmosphere.gradientDescription}`);
+      const decorativeElements = labelAtmosphere.decorative_elements || labelAtmosphere.decorativeElements || [];
+      if (decorativeElements.length > 0) {
+        promptParts.push(`DECORATIVE ELEMENTS ON LABEL: ${decorativeElements.join(', ')}`);
+        promptParts.push("- These elements should appear subtly on the label at 10-20% opacity");
+        promptParts.push("- They enhance the mood and create atmosphere WITHOUT cluttering");
+      }
+      promptParts.push(`TEXT FINISH: ${labelAtmosphere.text_finish || labelAtmosphere.textFinish}`);
+      const moodAdjectives = labelAtmosphere.mood_adjectives || labelAtmosphere.moodAdjectives || [];
+      if (moodAdjectives.length > 0) {
+        promptParts.push(`MOOD: ${moodAdjectives.join(', ')}`);
+      }
+      promptParts.push("=== END AI ATMOSPHERE ===");
+      promptParts.push("");
+    } else {
+      promptParts.push("MOOD-APPROPRIATE LABEL GRADIENTS (if no specific guidance):");
+      promptParts.push("  * Sleep → Deep purples fading to soft lavender, twilight blues");
+      promptParts.push("  * Energy → Vibrant oranges to warm yellows, sunrise feel");
+      promptParts.push("  * Focus → Cool teals to deep navy, crisp and clear");
+      promptParts.push("  * Immunity → Fresh greens to golden yellows, morning light");
+      promptParts.push("  * Beauty → Soft pinks to rose gold, luminous glow");
+      promptParts.push("");
+    }
+    
     promptParts.push("DEPTH & TEXTURE ON LABEL:");
     promptParts.push("- Label design should feel like 'a little world'");
     promptParts.push("- Soft shadows behind text and elements so they FLOAT on the label");
@@ -534,30 +556,62 @@ serve(async (req) => {
     promptParts.push("- Thin gold or silver circle with elegant text (e.g., '0g SUGAR')");
     promptParts.push("- Should look like a stamp of QUALITY");
     promptParts.push("");
-promptParts.push("CERTIFICATION GRAPHIC SEALS:");
-promptParts.push("- Render certifications as PROFESSIONAL GRAPHIC SEALS/STAMPS");
-promptParts.push("- These should look like REAL packaging seals you see on products:");
-promptParts.push("");
-promptParts.push("EXAMPLES OF GRAPHIC SEAL STYLES:");
-promptParts.push("  * 'Made in USA' → American flag ribbon seal or circular flag badge");
-promptParts.push("  * 'Sugar Free' → Circular stamp with '0g SUGAR' or 'SUGAR FREE' text");
-promptParts.push("  * 'Non-GMO' → Classic butterfly project seal or leaf emblem");
-promptParts.push("  * 'Vegan' → Green circular seal with 'V' or leaf graphic");
-promptParts.push("  * 'Gluten-Free' → Wheat stalk with cross-out in circular seal");
-promptParts.push("  * 'GMP Certified' → Shield or emblem with stars");
-promptParts.push("  * 'Third Party Tested' → Laboratory/checkmark seal");
-promptParts.push("  * 'Non-Habit Forming' → Gentle circular badge");
-promptParts.push("");
-promptParts.push("SEAL DESIGN GUIDELINES:");
-promptParts.push("- Each seal should be a COMPLETE GRAPHIC (not just icon + text)");
-promptParts.push("- Use circular, shield, ribbon, or emblem shapes");
-promptParts.push("- Seals can include: borders, stars, banners, emblems, symbols");
-promptParts.push("- Colors: Gold, silver, green, red/white/blue for USA, etc.");
-promptParts.push("- Should look like official certification marks");
-promptParts.push("- Arrange seals in a clean row, typically at bottom of label");
-promptParts.push("- Consistent sizing (small but legible)");
-promptParts.push("- These seals BUILD TRUST - make them look official and authoritative");
-promptParts.push("");
+    
+    // Dynamic claims with icons from Gemini analysis
+    const claimsWithIcons = designBrief.claimsWithIcons || designBrief.claims_with_icons;
+    if (claimsWithIcons && claimsWithIcons.length > 0) {
+      promptParts.push("=== CLAIMS WITH ICONS (MANDATORY - FROM AI ANALYSIS) ===");
+      promptParts.push("EVERY claim/benefit badge MUST have an accompanying ICON:");
+      claimsWithIcons.forEach((c: { claim: string; icon: string }) => {
+        promptParts.push(`  • "${c.claim}" → [${c.icon}]`);
+      });
+      promptParts.push("");
+      promptParts.push("ICON STYLING:");
+      promptParts.push("- Icons should be simple, elegant, and clearly visible");
+      promptParts.push("- Consistent icon style throughout (all line art OR all filled)");
+      promptParts.push("- Icons placed NEXT TO their claim text");
+      promptParts.push("- Small but legible size");
+      promptParts.push("=== END CLAIMS WITH ICONS ===");
+      promptParts.push("");
+    } else {
+      promptParts.push("CLAIMS WITH ICONS (MANDATORY):");
+      promptParts.push("- EVERY claim/benefit badge MUST have an accompanying ICON");
+      promptParts.push("- Choose appropriate icons based on claim meaning:");
+      promptParts.push("  * Sleep/Calm → Moon, stars, Z's, cloud icon");
+      promptParts.push("  * Energy/Performance → Lightning bolt, sun, flame icon");
+      promptParts.push("  * Focus/Brain → Brain icon, target, lightbulb");
+      promptParts.push("  * Muscle/Recovery → Flexed arm, dumbbell icon");
+      promptParts.push("  * Immunity/Health → Shield, heart, plus sign icon");
+      promptParts.push("  * Digestion → Stomach outline, leaf icon");
+      promptParts.push("- Icons should be simple, elegant, and relevant");
+      promptParts.push("- Consistent icon style throughout");
+      promptParts.push("");
+    }
+    
+    promptParts.push("CERTIFICATION GRAPHIC SEALS:");
+    promptParts.push("- Render certifications as PROFESSIONAL GRAPHIC SEALS/STAMPS");
+    promptParts.push("- These should look like REAL packaging seals you see on products:");
+    promptParts.push("");
+    promptParts.push("EXAMPLES OF GRAPHIC SEAL STYLES:");
+    promptParts.push("  * 'Made in USA' → American flag ribbon seal or circular flag badge");
+    promptParts.push("  * 'Sugar Free' → Circular stamp with '0g SUGAR' or 'SUGAR FREE' text");
+    promptParts.push("  * 'Non-GMO' → Classic butterfly project seal or leaf emblem");
+    promptParts.push("  * 'Vegan' → Green circular seal with 'V' or leaf graphic");
+    promptParts.push("  * 'Gluten-Free' → Wheat stalk with cross-out in circular seal");
+    promptParts.push("  * 'GMP Certified' → Shield or emblem with stars");
+    promptParts.push("  * 'Third Party Tested' → Laboratory/checkmark seal");
+    promptParts.push("  * 'Non-Habit Forming' → Gentle circular badge");
+    promptParts.push("");
+    promptParts.push("SEAL DESIGN GUIDELINES:");
+    promptParts.push("- Each seal should be a COMPLETE GRAPHIC (not just icon + text)");
+    promptParts.push("- Use circular, shield, ribbon, or emblem shapes");
+    promptParts.push("- Seals can include: borders, stars, banners, emblems, symbols");
+    promptParts.push("- Colors: Gold, silver, green, red/white/blue for USA, etc.");
+    promptParts.push("- Should look like official certification marks");
+    promptParts.push("- Arrange seals in a clean row, typically at bottom of label");
+    promptParts.push("- Consistent sizing (small but legible)");
+    promptParts.push("- These seals BUILD TRUST - make them look official and authoritative");
+    promptParts.push("");
     
     // PILLAR 5: PRINT FINISH
     promptParts.push("🖨️ 5. PRINT FINISH: 'TACTILE LUXURY'");
@@ -573,6 +627,19 @@ promptParts.push("");
     promptParts.push("");
     promptParts.push("=== END UNIVERSAL DESIGN LANGUAGE ===");
     promptParts.push("");
+    
+    // Dynamic label hierarchy from Gemini analysis
+    const labelHierarchy = designBrief.labelHierarchy || designBrief.label_hierarchy;
+    if (labelHierarchy) {
+      promptParts.push("=== LABEL HIERARCHY (RENDER IN THIS ORDER - FROM AI ANALYSIS) ===");
+      promptParts.push(`1. BIG NAME: "${labelHierarchy.big_name || labelHierarchy.bigName}" - This is the main ingredient/term customers search for. Make it LARGEST and most prominent.`);
+      promptParts.push(`2. PROMISE: "${labelHierarchy.promise}" - The benefit statement. Clear and compelling below the big name.`);
+      promptParts.push(`3. DIFFERENTIATOR: "${labelHierarchy.differentiator}" - PROMINENT BADGE. This must stand out (e.g., "SUGAR FREE" in a visible badge).`);
+      promptParts.push(`4. FLAVOR: "${labelHierarchy.flavor_name || labelHierarchy.flavorName}" - Evocative flavor name that fits the product mood.`);
+      promptParts.push("=== END LABEL HIERARCHY ===");
+      promptParts.push("");
+    }
+    
     promptParts.push("IMPORTANT: Analyze this specific product and INTELLIGENTLY choose the most appropriate gradient, lighting, line-art, and product environment based on its purpose, ingredients, and mood. Blend styles if the product serves multiple purposes.");
     promptParts.push("");
     

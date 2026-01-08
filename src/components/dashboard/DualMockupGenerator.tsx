@@ -120,6 +120,7 @@ const packagingFormatOptions = [
   { value: "narrow-mouth plastic jar", label: "Tall Slim Jar (Plastic)" },
   { value: "glass jar with screw cap", label: "Glass Jar" },
   { value: "narrow-mouth glass jar", label: "Tall Slim Jar (Glass)" },
+  { value: "tall clear glass jar", label: "Tall Jar Glass (Clear)" },
   // Specialty Jars
   { value: "hexagonal glass jar", label: "Hexagonal Glass Jar" },
   { value: "square glass jar", label: "Square Glass Jar" },

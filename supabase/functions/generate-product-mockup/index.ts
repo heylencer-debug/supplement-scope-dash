@@ -158,6 +158,11 @@ serve(async (req) => {
         proportions: 'HEIGHT-TO-WIDTH RATIO OF 3:1 (three times taller than wide). TALL and NARROW like a vitamin pill bottle or apothecary jar. NOT wide or squat.',
         style: 'elegant pharmaceutical glass, clear or amber, slim profile'
       },
+      'tall clear glass jar': {
+        shape: 'tall, elegant cylindrical CLEAR TRANSPARENT glass jar with metal or black screw cap',
+        proportions: 'HEIGHT-TO-WIDTH RATIO OF 3:1 (three times taller than wide). TALL and NARROW like a premium vitamin bottle or apothecary jar. NOT wide or squat.',
+        style: 'premium CLEAR transparent glass (not frosted, not colored), tall slim profile, pharmaceutical/apothecary aesthetic, product visible inside through glass'
+      },
       'narrow-mouth plastic jar': {
         shape: 'tall, slim cylindrical plastic jar with narrow threaded cap',
         proportions: 'HEIGHT-TO-WIDTH RATIO OF 3:1 (three times taller than wide). TALL and NARROW like a supplement bottle. NOT wide or squat.',
@@ -243,7 +248,9 @@ serve(async (req) => {
     }
     
     // Specific format matching
-    if (formatLower.includes('hexagonal')) {
+    if (formatLower.includes('tall') && formatLower.includes('clear') && formatLower.includes('glass')) {
+      containerDetails = packagingFormatDetails['tall clear glass jar'];
+    } else if (formatLower.includes('hexagonal')) {
       containerDetails = packagingFormatDetails['hexagonal glass jar'];
     } else if (formatLower.includes('square') && formatLower.includes('glass')) {
       containerDetails = packagingFormatDetails['square glass jar'];
@@ -1012,18 +1019,12 @@ serve(async (req) => {
     promptParts.push("- Maximum 2-3 colors total in design");
     promptParts.push("- Generous breathing room around text");
     promptParts.push("");
-    promptParts.push("AVOID GENERIC TRAPS & UNNECESSARY ELEMENTS:");
-    promptParts.push("- NO busy patterns or multiple decorative elements UNLESS specified in AI ATMOSPHERE above");
-    promptParts.push("- NO default-looking layouts - create DYNAMIC, eye-catching compositions");
+    promptParts.push("AVOID GENERIC TRAPS:");
+    promptParts.push("- NO busy patterns that compete with content");
     promptParts.push("- NO unnecessary icons, badges, or filler graphics");
-    promptParts.push("- NO confetti, starbursts, or scattered shapes");
-    promptParts.push("- NO decorative borders or frames");
+    promptParts.push("- NO confetti, starbursts, or scattered random shapes");
     promptParts.push("- NO generic wellness icons (leaves, hearts, DNA strands) unless specifically part of hero imagery");
-    promptParts.push("- NO gradient overlays or lens flares");
-    promptParts.push("- NO abstract swooshes or wave patterns UNLESS specified in ambient_pattern above");
-    promptParts.push("- If ambient_pattern is specified above, RENDER IT - it's intentional design, not filler");
     promptParts.push("- ONLY essential elements: brand, product name, hero imagery (if specified), key claims");
-    promptParts.push("- LESS elements = MORE impact");
     promptParts.push("");
     promptParts.push("REFERENCE: Ritual, AG1, Seed - clean but DISTINCTIVE");
     promptParts.push("=== END DESIGN PHILOSOPHY ===");
@@ -1035,33 +1036,48 @@ serve(async (req) => {
     promptParts.push("=== 🎯 DYNAMIC LAYOUT DESIGN (NOT PLAIN/STATIC) ===");
     promptParts.push("Create a VISUALLY DYNAMIC layout, not a boring centered stack:");
     promptParts.push("");
-    promptParts.push("LAYOUT ENERGY (choose approaches that fit the product):");
-    promptParts.push("- ASYMMETRIC COMPOSITION: Don't center everything - use off-center placement for visual interest");
-    promptParts.push("- DIAGONAL ELEMENTS: Angled text, tilted badges, or diagonal divider lines add motion");
-    promptParts.push("- LAYERED DEPTH: Elements that overlap slightly create dimension (e.g., fruit overlapping badge)");
+    promptParts.push("🌊 GRAPHIC SEPARATORS & DIVIDERS (MANDATORY - USE AT LEAST ONE):");
+    promptParts.push("The label MUST include dynamic graphic elements to create visual interest:");
+    promptParts.push("");
+    promptParts.push("SEPARATOR OPTIONS (use 1-2 of these on the label):");
+    promptParts.push("- WAVE SEPARATOR: A flowing wave line or curve that divides sections of the label");
+    promptParts.push("- DIAGONAL STRIPE: A bold angled stripe or band of color creating visual movement");
+    promptParts.push("- CURVED BANNER: A ribbon or banner shape containing text (flavor, claim, etc.)");
+    promptParts.push("- SWOOSH/CURVE: An organic flowing curve that guides the eye across the label");
+    promptParts.push("- COLOR BLOCK TIER: Label in 2-3 horizontal tiers with different background colors");
+    promptParts.push("- ARC/ARCH: Text or graphics following a curved arc path");
+    promptParts.push("");
+    promptParts.push("PLACEMENT IDEAS:");
+    promptParts.push("- Wave curve between brand name and product name sections");
+    promptParts.push("- Diagonal stripe behind or framing the hero ingredient imagery");
+    promptParts.push("- Curved banner at bottom containing flavor text or key claim");
+    promptParts.push("- Color tier: darker section at top with brand, lighter section below with product info");
+    promptParts.push("");
+    promptParts.push("STYLE REQUIREMENTS:");
+    promptParts.push("- Graphics should use the PRIMARY or ACCENT color");
+    promptParts.push("- Smooth, modern curves - not harsh or jagged");
+    promptParts.push("- Think premium brand design: Olly, Vital Proteins, AG1");
+    promptParts.push("");
+    promptParts.push("LAYOUT ENERGY:");
+    promptParts.push("- ASYMMETRIC COMPOSITION: Don't center everything - use off-center placement");
+    promptParts.push("- LAYERED DEPTH: Elements that overlap slightly create dimension");
     promptParts.push("- SCALE CONTRAST: One LARGE element + several small elements creates hierarchy");
     promptParts.push("- BREAKING THE FRAME: Hero imagery that extends to or beyond the label edge");
     promptParts.push("");
-    promptParts.push("VISUAL RHYTHM:");
-    promptParts.push("- Create FLOW that guides the eye: top-left → center → bottom-right");
-    promptParts.push("- Use color blocking to create distinct zones on the label");
-    promptParts.push("- Balance busy areas with breathing room");
-    promptParts.push("");
     promptParts.push("DYNAMIC EXAMPLES BY PRODUCT TYPE:");
-    promptParts.push("- SLEEP: Floating/dreamy layout with elements at varying depths, moon/stars at different scales");
-    promptParts.push("- ENERGY: Explosive/burst layout with elements radiating outward, dynamic angles");
-    promptParts.push("- FOCUS: Precision layout with intentional asymmetry, geometric alignment");
-    promptParts.push("- IMMUNITY: Organic flow layout with natural curves and botanical arrangements");
-    promptParts.push("- BEAUTY: Elegant asymmetry with delicate floating elements and soft overlaps");
+    promptParts.push("- SLEEP: Wave separators in deep purple, floating moon behind text, layered depth");
+    promptParts.push("- ENERGY: Bold diagonal stripes in orange/yellow, burst graphics, dynamic angles");
+    promptParts.push("- FOCUS: Geometric arc patterns, clean wave lines in teal, precision curves");
+    promptParts.push("- IMMUNITY: Organic flowing curves in green, botanical frame elements");
+    promptParts.push("- BEAUTY: Elegant curved banners in rose gold, soft wave gradients");
     promptParts.push("");
-    promptParts.push("❌ AVOID STATIC LAYOUTS:");
-    promptParts.push("- Everything perfectly centered in a vertical stack");
-    promptParts.push("- All text at the same size");
-    promptParts.push("- Rigid left-to-right alignment");
-    promptParts.push("- Flat, same-plane placement of all elements");
-    promptParts.push("- Generic template look");
+    promptParts.push("❌ NOT ACCEPTABLE:");
+    promptParts.push("- Plain flat gradient with NO graphic elements or separators");
+    promptParts.push("- Static vertical text stacking with no visual breaks");
+    promptParts.push("- Boring centered layout with no dynamic curves, waves, or shapes");
+    promptParts.push("- Generic template look with just text on gradient");
     promptParts.push("");
-    promptParts.push("REFERENCE: Olly, Vital Proteins, Moon Juice - dynamic, eye-catching, shelf-stopping");
+    promptParts.push("REFERENCE: Olly (wave separators), Vital Proteins (color tiers), Moon Juice (curved graphics)");
     promptParts.push("=== END DYNAMIC LAYOUT ===");
 
     // MODERN LAYOUT & TYPOGRAPHY
@@ -1076,11 +1092,17 @@ serve(async (req) => {
     promptParts.push(`- Container Type: ${containerDetails.shape}`);
     promptParts.push(`- PROPORTIONS: ${containerDetails.proportions}`);
     promptParts.push(`- Style: ${containerDetails.style}`);
-    if (formatLower.includes('narrow')) {
+    if (formatLower.includes('narrow') || formatLower.includes('tall')) {
       promptParts.push("- IMPORTANT: This is a TALL, SLIM jar - significantly taller than it is wide");
       promptParts.push("- Think pharmacy vitamin bottle or elegant apothecary jar shape");
       promptParts.push("- The jar should be at least 3x taller than its width");
       promptParts.push("- DO NOT make it wide or squat like a peanut butter jar");
+    }
+    if (formatLower.includes('clear') && formatLower.includes('glass')) {
+      promptParts.push("- CRITICAL: The jar MUST be made of CLEAR, TRANSPARENT glass");
+      promptParts.push("- Show the product (gummies/chews) VISIBLE INSIDE the jar through the glass");
+      promptParts.push("- Glass should have subtle reflections and refractions showing its transparency");
+      promptParts.push("- The jar should NOT be opaque, frosted, or colored - it must be crystal clear");
     }
     promptParts.push("=== END CONTAINER SHAPE ===");
 

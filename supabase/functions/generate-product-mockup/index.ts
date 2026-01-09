@@ -635,7 +635,7 @@ serve(async (req) => {
     // =========================================================================
     // FLAT LAYOUT MODE
     // =========================================================================
-    if (mode === 'flat') {
+    if (mode === 'flat' || mode === 'flat_layout') {
       promptParts.length = 0;
       
       promptParts.push("═══════════════════════════════════════════════════════════════");
@@ -715,7 +715,7 @@ serve(async (req) => {
     const messageContent: any[] = [{ type: "text", text: finalPrompt }];
     
     // Add reference image for flat layout
-    if (referenceImageUrl && mode === 'flat') {
+    if (referenceImageUrl && (mode === 'flat' || mode === 'flat_layout')) {
       messageContent.push({ type: "image_url", image_url: { url: referenceImageUrl } });
       console.log(`Reference image: ${referenceImageUrl.substring(0, 50)}...`);
     }

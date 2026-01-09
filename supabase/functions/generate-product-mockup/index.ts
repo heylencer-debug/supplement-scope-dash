@@ -633,69 +633,78 @@ serve(async (req) => {
     promptParts.push("");
 
     // =========================================================================
-    // FLAT LAYOUT MODE
+    // FLAT LAYOUT MODE - 1:1 EXACT COPY OF 3D MOCKUP
     // =========================================================================
     if (mode === 'flat' || mode === 'flat_layout') {
       promptParts.length = 0;
       
       promptParts.push("═══════════════════════════════════════════════════════════════");
-      promptParts.push("              FLAT PACKAGING LABEL DESIGN (2D)                 ");
+      promptParts.push("       FLAT LABEL LAYOUT - EXACT COPY OF 3D MOCKUP             ");
       promptParts.push("═══════════════════════════════════════════════════════════════");
       promptParts.push("");
       
-      if (colorsCustomized) {
-        promptParts.push("⚠️ USER CUSTOMIZED COLORS - USE EXACTLY:");
-        promptParts.push(`   PRIMARY: ${primaryColorHex}`);
-        promptParts.push(`   SECONDARY: ${secondaryColorHex}`);
-        promptParts.push(`   ACCENT: ${accentColorHex}`);
-        promptParts.push("");
-      }
+      promptParts.push("⚠️ CRITICAL INSTRUCTION: You are provided with a 3D product mockup image.");
+      promptParts.push("Your ONLY task is to create a FLAT 2D version of THE EXACT SAME DESIGN.");
+      promptParts.push("Think of this as 'unwrapping' the label from the bottle and laying it flat.");
+      promptParts.push("");
+      
+      promptParts.push("1:1 DESIGN FIDELITY REQUIREMENTS:");
+      promptParts.push("───────────────────────────────────");
+      promptParts.push("• SAME exact colors, gradients, and color placement as the mockup");
+      promptParts.push("• SAME exact typography (fonts, sizes, weights, styling)");
+      promptParts.push("• SAME exact text content - copy every word exactly as shown");
+      promptParts.push("• SAME exact logo position, size, and styling");
+      promptParts.push("• SAME exact hero imagery, graphics, and illustrations");
+      promptParts.push("• SAME exact badges, icons, certifications, and trust signals");
+      promptParts.push("• SAME exact overall layout and visual hierarchy");
+      promptParts.push("• SAME exact decorative elements, lines, borders, patterns");
+      promptParts.push("");
       
       if (flatLayoutMode === 'front-only') {
-        promptParts.push("MODE: FRONT PANEL ONLY");
-        promptParts.push("");
-        promptParts.push("Create a FLAT 2D design of JUST the FRONT PANEL.");
-        promptParts.push("CANVAS: Rectangular, 16:9 or 4:3 aspect ratio");
-        promptParts.push("VIEW: Perfectly flat, no perspective, no 3D");
-        promptParts.push("");
+        promptParts.push("OUTPUT FORMAT: FRONT PANEL ONLY");
+        promptParts.push("• Create ONLY the front panel as a flat 2D rectangle");
+        promptParts.push("• Remove all 3D perspective, shadows, bottle curvature, and reflections");
+        promptParts.push("• Output a perfectly flat, print-ready rectangular label");
+        promptParts.push("• Maintain the original aspect ratio of the label");
       } else {
-        promptParts.push("MODE: FULL DIELINE LAYOUT");
-        promptParts.push("");
-        promptParts.push("Create a FLAT 2D dieline showing ALL PANELS:");
-        promptParts.push("• Front panel (center, largest)");
-        promptParts.push("• Back panel (product info)");
-        promptParts.push("• Side panels if applicable");
-        promptParts.push("");
+        promptParts.push("OUTPUT FORMAT: FULL DIELINE (unwrapped layout)");
+        promptParts.push("• Front panel (center, largest) - EXACT copy of mockup front");
+        promptParts.push("• Back panel - use supplement facts style or leave as placeholder area");
+        promptParts.push("• Side panels if applicable to the packaging format");
+        promptParts.push("• All panels laid out flat in a print-ready arrangement");
       }
+      promptParts.push("");
       
       promptParts.push(`PACKAGING FORMAT: ${packagingFormat}`);
       promptParts.push("");
-      promptParts.push("COLOR PALETTE:");
+      
+      // Include colors for reference (but AI should match the image exactly)
+      promptParts.push("REFERENCE COLOR PALETTE (verify against mockup image):");
       promptParts.push(`   PRIMARY: ${primaryColorHex}`);
       promptParts.push(`   SECONDARY: ${secondaryColorHex}`);
       promptParts.push(`   ACCENT: ${accentColorHex}`);
       promptParts.push("");
       
       if (frontPanelText) {
-        promptParts.push("FRONT PANEL TEXT (EXACT):");
+        promptParts.push("FRONT PANEL TEXT (for reference - but COPY FROM IMAGE):");
         promptParts.push("```");
         promptParts.push(frontPanelText);
         promptParts.push("```");
         promptParts.push("");
       }
       
-      if (hasHeroImagery || hasFlavorImagery) {
-        const visual = heroImagery?.primary_visual || heroImagery?.primaryVisual || 
-                      flavorImagery?.visual || flavorMapping?.visual || '';
-        promptParts.push(`HERO IMAGERY: ${visual}`);
-        promptParts.push("");
-      }
-      
-      promptParts.push("DESIGN REQUIREMENTS:");
-      promptParts.push("• Professional label design, print-ready");
-      promptParts.push("• Clear visual hierarchy");
-      promptParts.push("• ONE dynamic layout element");
-      promptParts.push("• High contrast, readable text");
+      promptParts.push("════════════════════════════════════════════════════════════════");
+      promptParts.push("                    STRICT RULES - DO NOT VIOLATE               ");
+      promptParts.push("════════════════════════════════════════════════════════════════");
+      promptParts.push("• DO NOT redesign anything - COPY the design exactly from the reference image");
+      promptParts.push("• DO NOT change any colors, fonts, or layout elements");
+      promptParts.push("• DO NOT add new elements that aren't in the mockup");
+      promptParts.push("• DO NOT remove any elements that are in the mockup");
+      promptParts.push("• DO NOT interpret or improve - simply flatten/unwrap the 3D mockup");
+      promptParts.push("• The result should look IDENTICAL to the mockup, just laid flat");
+      promptParts.push("• If you printed both and compared, they should match perfectly");
+      promptParts.push("");
+      promptParts.push("Your output is the label as if peeled off the product and laid flat on a table.");
     }
 
     // =============================================================================

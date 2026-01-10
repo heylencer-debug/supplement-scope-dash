@@ -416,7 +416,11 @@ function MockupCard({
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        // Try to extract error message from the response
+        const errorMsg = data?.error || error.message || String(error);
+        throw new Error(errorMsg);
+      }
       if (data?.rewrittenText) {
         setEditedFrontPanelText(data.rewrittenText);
         // Auto-save the rewritten text
@@ -425,13 +429,16 @@ function MockupCard({
           title: 'Label Rewritten',
           description: `Text updated with ${style} style.`,
         });
+      } else if (data?.error) {
+        // Handle error in response body
+        throw new Error(data.error);
       }
     } catch (err) {
       console.error('Rewrite error:', err);
-      toast({
-        title: 'Rewrite Failed',
-        description: err instanceof Error ? err.message : 'Failed to rewrite text',
-        variant: 'destructive',
+      // Use handleApiError for friendly billing/rate-limit messages
+      handleApiError(err, {
+        fallbackTitle: 'Rewrite Failed',
+        fallbackDescription: 'Failed to rewrite text. Please try again.',
       });
     } finally {
       setIsRewriting(false);

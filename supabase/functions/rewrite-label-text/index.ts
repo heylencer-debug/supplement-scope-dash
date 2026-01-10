@@ -16,9 +16,9 @@ serve(async (req) => {
     console.log("Rewriting label text with style:", style);
     console.log("Product context:", productContext);
     
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY not configured");
+    const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
+    if (!OPENROUTER_API_KEY) {
+      throw new Error("OPENROUTER_API_KEY not configured");
     }
 
     const stylePrompts: Record<string, string> = {
@@ -31,14 +31,16 @@ serve(async (req) => {
 
     const styleInstruction = stylePrompts[style] || stylePrompts.professional;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
         "Content-Type": "application/json",
+        "HTTP-Referer": "https://lovable.dev",
+        "X-Title": "Label Text Rewriter",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-pro-preview",
+        model: "google/gemini-2.5-pro-preview",
         messages: [
           {
             role: "system",
@@ -79,7 +81,7 @@ Rewrite this label text in a ${style} tone while maintaining the structure and k
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
+      console.error("OpenRouter error:", response.status, errorText);
       
       if (response.status === 429) {
         return new Response(
@@ -94,7 +96,7 @@ Rewrite this label text in a ${style} tone while maintaining the structure and k
         );
       }
       
-      throw new Error(`AI gateway error: ${response.status}`);
+      throw new Error(`OpenRouter error: ${response.status}`);
     }
 
     const data = await response.json();

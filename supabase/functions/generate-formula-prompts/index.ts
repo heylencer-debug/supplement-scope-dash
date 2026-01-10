@@ -124,7 +124,7 @@ Make the prompts specific to the actual formula - mention real ingredients, dosa
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "anthropic/claude-sonnet-4",
+        model: "google/gemini-3-pro-preview",
         messages: [
           {
             role: "system",

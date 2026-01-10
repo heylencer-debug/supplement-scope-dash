@@ -742,7 +742,7 @@ Provide a comprehensive analysis including SWOT, clinical dosage adequacy, custo
             'X-Title': 'Noodle Search - Ingredient Analysis'
           },
           body: JSON.stringify({
-            model: 'anthropic/claude-sonnet-4',
+            model: 'google/gemini-3-pro-preview',
             messages: [
               { role: 'system', content: systemPrompt },
               { role: 'user', content: userPrompt }

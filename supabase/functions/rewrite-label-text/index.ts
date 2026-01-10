@@ -31,20 +31,29 @@ serve(async (req) => {
 
     const styleInstruction = stylePrompts[style] || stylePrompts.professional;
 
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://lovable.dev",
-        "X-Title": "Label Text Rewriter",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-pro-preview",
-        messages: [
-          {
-            role: "system",
-            content: `You are an expert packaging copywriter specializing in supplement labels. Make a SUBTLE tone adjustment to the front panel label text.
+    // Add timeout and retry logic for reliability
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
+    let response;
+    let retries = 2;
+    
+    while (retries >= 0) {
+      try {
+        response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://lovable.dev",
+            "X-Title": "Label Text Rewriter",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-3-pro-preview",
+            messages: [
+              {
+                role: "system",
+                content: `You are an expert packaging copywriter specializing in supplement labels. Make a SUBTLE tone adjustment to the front panel label text.
 
 ${styleInstruction}
 
@@ -65,38 +74,49 @@ RULES:
 - Preserve any dosage or quantity information exactly
 - Return ONLY the adjusted text, no explanations or commentary
 - Keep the same line-by-line format`
-          },
-          {
-            role: "user",
-            content: `Product context: ${productContext || 'Dietary supplement product'}
+              },
+              {
+                role: "user",
+                content: `Product context: ${productContext || 'Dietary supplement product'}
 
 Current label text:
 ${currentText}
 
 Rewrite this label text in a ${style} tone while maintaining the structure and key information.`
-          }
-        ],
-      }),
-    });
+              }
+            ],
+          }),
+          signal: controller.signal,
+        });
+        break; // Success, exit retry loop
+      } catch (fetchError) {
+        console.error(`Fetch attempt failed (${retries} retries left):`, fetchError);
+        if (retries === 0) throw fetchError;
+        retries--;
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1s before retry
+      }
+    }
+    
+    clearTimeout(timeoutId);
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("OpenRouter error:", response.status, errorText);
+    if (!response || !response.ok) {
+      const errorText = response ? await response.text() : 'No response';
+      console.error("OpenRouter error:", response?.status, errorText);
       
-      if (response.status === 429) {
+      if (response?.status === 429) {
         return new Response(
           JSON.stringify({ error: "Rate limit exceeded. Please try again in a few seconds." }),
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      if (response.status === 402) {
+      if (response?.status === 402) {
         return new Response(
           JSON.stringify({ error: "API credits exhausted. Please add credits to continue." }),
           { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
       
-      throw new Error(`OpenRouter error: ${response.status}`);
+      throw new Error(`OpenRouter error: ${response?.status || 'unknown'}`);
     }
 
     const data = await response.json();

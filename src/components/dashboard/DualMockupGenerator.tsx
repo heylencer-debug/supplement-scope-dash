@@ -54,6 +54,12 @@ import { useFlatLayoutHistory } from "@/hooks/useFlatLayoutHistory";
 import { MockupHistoryGallery } from "@/components/dashboard/MockupHistoryGallery";
 import { FlatLayoutHistoryGallery } from "@/components/dashboard/FlatLayoutHistoryGallery";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface SuggestedTone {
   primary_tone: string;
@@ -489,11 +495,18 @@ function MockupCard({
   const [isEditingImage, setIsEditingImage] = useState(false);
   
   const rewriteStyles = [
-    { value: 'professional', label: 'Professional', icon: '🏥' },
-    { value: 'playful', label: 'Playful', icon: '🎉' },
-    { value: 'premium', label: 'Premium', icon: '✨' },
-    { value: 'minimal', label: 'Minimal', icon: '◻️' },
-    { value: 'bold', label: 'Bold', icon: '💪' },
+    { value: 'professional', label: 'Professional', icon: '🏥', example: 'Clinical Focus' },
+    { value: 'playful', label: 'Playful', icon: '🎉', example: 'Brain Buddy' },
+    { value: 'bold', label: 'Bold', icon: '💪', example: 'FOCUS FUEL' },
+    { value: 'natural', label: 'Natural', icon: '🌿', example: 'Pure Focus' },
+    { value: 'scientific', label: 'Scientific', icon: '🔬', example: 'NeuroMax' },
+    { value: 'energetic', label: 'Energetic', icon: '⚡', example: 'SURGE UP' },
+    { value: 'zen', label: 'Zen', icon: '🧘', example: 'Still Mind' },
+    { value: 'premium', label: 'Premium', icon: '✨', example: 'Élite Focus' },
+    { value: 'minimal', label: 'Minimal', icon: '◻️', example: 'Focus' },
+    { value: 'artisanal', label: 'Artisanal', icon: '🏺', example: 'Batch Focus' },
+    { value: 'tech', label: 'Tech', icon: '🤖', example: 'NeuroStack' },
+    { value: 'luxurious', label: 'Luxurious', icon: '👑', example: 'Noir Mind' },
   ];
 
   const handleRewriteText = async (style: string) => {
@@ -1139,23 +1152,31 @@ function MockupCard({
               <Sparkles className="w-3 h-3" />
               Rewrite with Gemini 3 Pro:
             </span>
-            {rewriteStyles.map((style) => (
-              <Button
-                key={style.value}
-                variant="outline"
-                size="sm"
-                onClick={() => handleRewriteText(style.value)}
-                disabled={isRewriting}
-                className="h-6 px-2 text-[10px] gap-1"
-              >
-                {isRewriting && selectedRewriteStyle === style.value ? (
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                ) : (
-                  <span>{style.icon}</span>
-                )}
-                {style.label}
-              </Button>
-            ))}
+            <TooltipProvider delayDuration={300}>
+              {rewriteStyles.map((style) => (
+                <Tooltip key={style.value}>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleRewriteText(style.value)}
+                      disabled={isRewriting}
+                      className="h-6 px-2 text-[10px] gap-1"
+                    >
+                      {isRewriting && selectedRewriteStyle === style.value ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <span>{style.icon}</span>
+                      )}
+                      {style.label}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs">
+                    <p className="font-medium">e.g., "{style.example}"</p>
+                  </TooltipContent>
+                </Tooltip>
+              ))}
+            </TooltipProvider>
           </div>
         </CollapsibleContent>
       </Collapsible>

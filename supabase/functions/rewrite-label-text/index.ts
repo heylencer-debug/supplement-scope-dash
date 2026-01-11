@@ -5,6 +5,70 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Comprehensive style definitions with headline examples
+const stylePrompts: Record<string, { headline: string; body: string; examples: string }> = {
+  professional: {
+    headline: "2-3 clinical, authoritative words. Medical/pharmaceutical feel.",
+    body: "Evidence-based language, regulatory-compliant claims, trustworthy",
+    examples: "Clinical Focus | Neuro Support | Cognitive Elite | Pro Strength | MedGrade Plus"
+  },
+  playful: {
+    headline: "2-3 friendly, warm words. OLLY-style approachable.",
+    body: "Conversational, lifestyle-focused, emotionally connecting",
+    examples: "Brain Buddy | Focus Friend | Happy Mind | Daily Boost | Feel Good"
+  },
+  premium: {
+    headline: "2-3 sophisticated, luxury words. Boutique wellness feel.",
+    body: "Elevated language, refined, understated elegance",
+    examples: "Élite Focus | Luxe Mind | Noir Clarity | Refined | Prestige"
+  },
+  minimal: {
+    headline: "1-2 essential words only. Apple-style reduction.",
+    body: "Stripped down, no fluff, maximum clarity",
+    examples: "Focus | Clarity | Mind | Pure | Essential"
+  },
+  bold: {
+    headline: "2-3 POWER words. Assertive, action-oriented. ALL-CAPS OK.",
+    body: "No hedging, direct benefit statements, maximum punch",
+    examples: "FOCUS FUEL | MIND POWER | BRAIN BEAST | MAX FORCE | PURE POWER"
+  },
+  natural: {
+    headline: "2-3 earthy, organic words. Farm-to-bottle feel.",
+    body: "Plant-based emphasis, nature-inspired, authentic",
+    examples: "Pure Focus | Earth Mind | Green Clarity | Nature's Gift | Rooted"
+  },
+  scientific: {
+    headline: "2-3 tech/research words. Lab-backed precision.",
+    body: "Data-driven, clinical study language, bioavailability mentions",
+    examples: "NeuroMax | CogniCore | SynapseX | BioFocus | NeuroGen"
+  },
+  energetic: {
+    headline: "2-3 high-energy words. Athletic, performance-focused.",
+    body: "Speed/efficiency emphasis, results-focused",
+    examples: "IGNITE | SURGE UP | POWER ON | GO MODE | ACTIVATE"
+  },
+  zen: {
+    headline: "2-3 calm, peaceful words. Mindfulness-focused.",
+    body: "Gentle language, balance, holistic approach",
+    examples: "Still Mind | Clear Calm | Inner Focus | Zen State | Tranquil"
+  },
+  luxurious: {
+    headline: "2-3 indulgent, exclusive words. Premium boutique.",
+    body: "Rare, precious, hand-selected, bespoke",
+    examples: "Noir Mind | Gold Reserve | Velvet | Opulent | Maison"
+  },
+  artisanal: {
+    headline: "2-3 handcrafted, authentic words. Small-batch feel.",
+    body: "Craft terminology, heritage, traditional methods",
+    examples: "Batch Focus | Crafted Mind | Small Batch | Handmade | Heritage"
+  },
+  tech: {
+    headline: "2-3 biohacker, futuristic words. Optimization-focused.",
+    body: "Stack-friendly, protocol language, cutting-edge",
+    examples: "NeuroStack | MindOS | CogHack | BioMod | SynapticX"
+  }
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -21,15 +85,7 @@ serve(async (req) => {
       throw new Error("OPENROUTER_API_KEY not configured");
     }
 
-    const stylePrompts: Record<string, string> = {
-      professional: "Slightly more clinical phrasing. Keep 95% of original wording. Only adjust 1-2 tone words to sound more authoritative and trustworthy.",
-      playful: "OLLY-style: warm, friendly, approachable but still informative. Soften formal words without adding jokes or puns. Millennials/GenZ friendly tone. NOT childish or silly.",
-      premium: "Refine word choice to feel more upscale. Replace casual words with sophisticated alternatives. Keep structure identical. Think boutique wellness brand.",
-      minimal: "Tighten phrasing only - remove filler words but keep all claims and benefits intact. More direct, no fluff.",
-      bold: "Strengthen key action words only. Keep claims factual but more assertive and confident. Power words where appropriate.",
-    };
-
-    const styleInstruction = stylePrompts[style] || stylePrompts.professional;
+    const styleConfig = stylePrompts[style] || stylePrompts.professional;
 
     // Add timeout and retry logic for reliability
     const controller = new AbortController();
@@ -53,27 +109,39 @@ serve(async (req) => {
             messages: [
               {
                 role: "system",
-                content: `You are an expert packaging copywriter specializing in supplement labels. Make a SUBTLE tone adjustment to the front panel label text.
+                content: `You are an expert packaging copywriter specializing in supplement labels. Transform the label text to match the "${style}" style.
 
-${styleInstruction}
+=== HEADLINE TRANSFORMATION (LINE 1 - MOST CRITICAL) ===
+${styleConfig.headline}
 
-CRITICAL: This is a SUBTLE tone adjustment, NOT a rewrite.
-- Keep 90-95% of the original wording intact
-- Only adjust 1-2 words per line maximum
-- DO NOT change benefit claims or product facts
-- DO NOT reorder or restructure content
-- Think "polish" not "rewrite"
-- The reader should barely notice the difference
-- Reference: OLLY brand style - warm but still informative, never childish
+HEADLINE EXAMPLES for ${style} style:
+${styleConfig.examples}
 
-RULES:
-- Keep the same general structure (brand name line, product name, claim, bullets, callouts)
-- Maintain all certification claims (FDA, GMP, etc.) exactly as given
-- DO NOT invent new health claims or benefits not in the original
+HEADLINE RULES:
+- The headline MUST be exactly 2-3 words (or 1-2 for minimal style)
+- The headline MUST be SHORT, PUNCHY, and MEMORABLE
+- The headline MUST obviously reflect the ${style} tone
+- NO long phrases like "Premium Cognitive Support Complex"
+- YES short punches like the examples above
+- This is the MOST important line - it sets the entire tone
+
+=== BODY TEXT TRANSFORMATION ===
+${styleConfig.body}
+
+BODY RULES:
+- Preserve all factual claims and ingredient information
+- Transform the VOICE and WORD CHOICE to match ${style}
+- Keep all certification claims (FDA, GMP, etc.) exactly as given
+- Same benefits, completely different personality
+- Keep checkmarks (✓) or bullets (•) for benefit lines
 - Keep it concise - max 12 lines total
 - Preserve any dosage or quantity information exactly
-- Return ONLY the adjusted text, no explanations or commentary
-- Keep the same line-by-line format`
+
+=== OUTPUT FORMAT ===
+- Return ONLY the transformed text, no explanations
+- Keep the same line-by-line structure
+- First line = transformed headline (2-3 words)
+- Following lines = transformed body content`
               },
               {
                 role: "user",
@@ -82,7 +150,7 @@ RULES:
 Current label text:
 ${currentText}
 
-Rewrite this label text in a ${style} tone while maintaining the structure and key information.`
+Transform this COMPLETELY to the ${style} style. The headline (first line) should be a SHORT 2-3 word punch that captures the ${style} personality. Examples: ${styleConfig.examples}`
               }
             ],
           }),
@@ -126,7 +194,7 @@ Rewrite this label text in a ${style} tone while maintaining the structure and k
       throw new Error("No response from AI");
     }
 
-    console.log("Label rewritten successfully");
+    console.log("Label rewritten successfully with style:", style);
 
     return new Response(
       JSON.stringify({ rewrittenText: rewrittenText.trim() }),

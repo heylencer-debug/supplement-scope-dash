@@ -144,18 +144,26 @@ const packagingFormatOptions = [
 
 const toneOptions = [
   { value: "auto", label: "AI Suggested", description: "Use AI-recommended tone" },
-  { value: "premium", label: "Premium", description: "Luxurious finishes, rich colors, elegant typography" },
-  { value: "clean", label: "Clean", description: "Minimal design, ample white space, crisp typography" },
-  { value: "bold", label: "Bold", description: "High contrast, saturated colors, impactful typography" },
-  { value: "natural", label: "Natural", description: "Earth tones, organic shapes, textured finishes" },
-  { value: "scientific", label: "Scientific", description: "Technical precision, data-driven layouts, clinical colors" },
-  { value: "playful", label: "Playful", description: "Vibrant colors, rounded shapes, friendly typography" },
-  { value: "clinical", label: "Clinical", description: "Medical precision, clean whites, trust-building design" },
-  { value: "organic", label: "Organic", description: "Natural textures, muted earth tones, sustainable aesthetics" },
-  { value: "energetic", label: "Energetic", description: "Dynamic angles, bold colors, active lifestyle feel" },
-  { value: "luxurious", label: "Luxurious", description: "Gold/metallic accents, rich deep colors, opulent feel" },
-  { value: "minimalist", label: "Minimalist", description: "Maximum white space, single accent color, essential elements" },
-  { value: "trustworthy", label: "Trustworthy", description: "Conservative layout, professional colors, established brand feel" },
+  // Classic tones
+  { value: "premium", label: "Premium", description: "Elegant serif, gold foil, embossed luxury finish" },
+  { value: "clean", label: "Clean", description: "Ultra-thin fonts, 70%+ white space, flat matte" },
+  { value: "bold", label: "Bold", description: "Impact fonts, diagonal stripes, maximum saturation" },
+  { value: "natural", label: "Natural", description: "Kraft paper, botanical elements, earth tones" },
+  { value: "scientific", label: "Scientific", description: "Monospace fonts, hexagonal grids, clinical blues" },
+  { value: "playful", label: "Playful", description: "Rounded fonts, candy colors, glossy 3D depth" },
+  { value: "clinical", label: "Clinical", description: "Rx-style layout, 80% white, pharmaceutical precision" },
+  { value: "organic", label: "Organic", description: "Botanical icons, sage/terracotta, eco-paper feel" },
+  { value: "energetic", label: "Energetic", description: "Italic condensed, speed lines, neon accents" },
+  { value: "luxurious", label: "Luxurious", description: "Bodoni serif, black/gold, velvet soft-touch" },
+  { value: "minimalist", label: "Minimalist", description: "Ultra-light fonts, 85%+ white, hairline icons" },
+  { value: "trustworthy", label: "Trustworthy", description: "Traditional serif, navy/burgundy, badge elements" },
+  // NEW specialty tones
+  { value: "pharmaceutical", label: "Pharmaceutical", description: "Drug-facts style, sterile white, Rx symbols" },
+  { value: "artisanal", label: "Artisanal", description: "Hand-lettered, letterpress texture, wax seal accents" },
+  { value: "tech", label: "Tech / Biohacker", description: "Monospace, circuit patterns, holographic foil" },
+  { value: "vintage", label: "Vintage / Retro", description: "Art Deco fonts, aged paper, ribbon banners" },
+  { value: "sporty", label: "Sporty / Athletic", description: "Racing stripes, performance stats, carbon fiber" },
+  { value: "zen", label: "Zen / Calm", description: "Light airy fonts, soft pastels, lotus/wave icons" },
 ];
 
 // CSS-based label preview component

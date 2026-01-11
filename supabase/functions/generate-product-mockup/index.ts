@@ -83,7 +83,7 @@ const packagingFormatDetails: Record<string, { shape: string; proportions: strin
   'hexagonal glass jar': { shape: 'hexagonal glass jar with screw lid', proportions: 'balanced 1.5:1 ratio, 6-sided', style: 'clear glass with unique hexagonal shape', labelArea: 'front panel label on flat face' },
   'square glass jar': { shape: 'square glass jar with screw lid', proportions: 'balanced 1.5:1 ratio, 4 flat sides', style: 'clear glass with modern square shape', labelArea: 'front panel label on flat face' },
   'amber apothecary jar': { shape: 'apothecary-style jar with wide mouth', proportions: 'classic 1.5:1 ratio', style: 'amber glass with vintage apothecary aesthetic', labelArea: 'front label with vintage styling' },
-  'cobalt blue glass jar': { shape: 'cylindrical glass jar with screw lid', proportions: 'balanced 1.5:1 ratio', style: 'deep cobalt blue glass, premium medicinal look', labelArea: 'front label panel' },
+  'cobalt blue glass jar': { shape: 'cylindrical glass jar with screw lid', proportions: 'balanced 1.5:1 ratio', style: 'deep cobalt blue glass, premium medicinal look', labelArea: 'front panel label' },
   'mason jar': { shape: 'mason jar with two-piece lid', proportions: 'classic mason jar 1.5:1 ratio', style: 'clear glass with embossed pattern, rustic charm', labelArea: 'front label or wraparound' },
   'supplement bottle with flip cap': { shape: 'cylindrical supplement bottle with flip-top cap', proportions: 'standard 2:1 height-to-width', style: 'opaque HDPE plastic with flip cap', labelArea: 'wraparound label covering 70% of height' },
   'amber dropper bottle': { shape: 'small amber glass bottle with dropper cap', proportions: 'compact 2:1 ratio', style: 'amber glass with rubber dropper, medicinal aesthetic', labelArea: 'front label with dropper visible' },
@@ -96,6 +96,166 @@ const packagingFormatDetails: Record<string, { shape: string; proportions: strin
   
   // Legacy key (kept for backwards compatibility)
   'tall jar - glass (clear)': { shape: 'TALL cylindrical clear glass jar with wide screw-top lid', proportions: 'ELONGATED 3:1 height-to-width ratio (noticeably TALLER than wide)', style: 'TRANSPARENT clear glass showing contents, premium feel', labelArea: 'Front label panel (not wraparound) covering 60% of jar height' },
+};
+
+// =============================================================================
+// TONE-SPECIFIC DESIGN SYSTEMS - EACH TONE HAS DISTINCT VISUAL CHARACTERISTICS
+// =============================================================================
+interface ToneDesignSystem {
+  typography: string;
+  dynamicLayout: string;
+  colorApplication: string;
+  finish: string;
+  iconStyle: string;
+  avoidList: string[];
+}
+
+const toneDesignSystems: Record<string, ToneDesignSystem> = {
+  premium: {
+    typography: "Elegant serif OR refined thin sans-serif (Playfair Display, Didot, Futura Light). Wide letter-spacing (0.1em+). Thin to medium weights ONLY. Gold or embossed text effects.",
+    dynamicLayout: "Centered symmetry, ornate gold foil borders, subtle embossed textures, classical proportions. NO diagonal stripes or bold aggressive shapes.",
+    colorApplication: "Deep jewel tones as primary (60%), metallic gold/silver accents (15%), rich gradients allowed. Colors should feel EXPENSIVE.",
+    finish: "Soft-touch matte base with SPOT GLOSS accents, gold/silver FOIL STAMPING on key text, embossed logo, tactile premium feel.",
+    iconStyle: "Thin-line elegant icons, gold-outlined, refined simplicity, ornate flourishes acceptable.",
+    avoidList: ["Bold aggressive shapes", "Bright neon colors", "Playful rounded fonts", "Cluttered layouts", "Cheap plastic look"]
+  },
+  clean: {
+    typography: "Minimal ultra-thin sans-serif (Helvetica Neue Light, Inter Thin, SF Pro Thin). Maximum letter-spacing. Single font weight throughout. NO decorative fonts.",
+    dynamicLayout: "Strict invisible grid, asymmetric balance, 70%+ white space. ONLY horizontal or vertical lines allowed. ONE visual element maximum.",
+    colorApplication: "Monochromatic palette (one hue + white + black). Single accent at 10% maximum. High contrast. NO gradients.",
+    finish: "Pure flat matte, no textures, no embossing, no effects. Architectural clean lines. Paper-like simplicity.",
+    iconStyle: "Single-line hairline icons, geometric precision, maximum reduction. Icons should be barely noticeable.",
+    avoidList: ["Multiple colors", "Decorative elements", "Bold weights", "Busy layouts", "Gradients", "Textures"]
+  },
+  bold: {
+    typography: "HEAVY condensed sans-serif (Impact, Bebas Neue, Anton). ALL-CAPS headlines. Extreme weight contrast. Thick strokes. Aggressive letterforms.",
+    dynamicLayout: "Aggressive diagonal stripes (30-45° angles), sharp angular color blocks, asymmetric corner bursts, maximum visual tension.",
+    colorApplication: "MAXIMUM saturation only, stark black/white contrast, NO pastels ever, aggressive color blocking with hard edges. Colors should SHOUT.",
+    finish: "HIGH GLOSS maximum shine, bold metallic accents, no subtlety. Chrome or mirror effects acceptable.",
+    iconStyle: "Thick bold filled icons, maximum visual weight, sharp edges, aggressive styling.",
+    avoidList: ["Subtle elements", "Light font weights", "Gentle curves", "Muted colors", "Pastels", "Delicate details"]
+  },
+  natural: {
+    typography: "Organic serif with personality (Garamond, Libre Baskerville) OR hand-lettered script. Warm, approachable. Intentional imperfection welcome.",
+    dynamicLayout: "Asymmetric organic flow, botanical leaf/vine elements, hand-drawn borders, flowing curves that mimic nature. NO sharp geometric shapes.",
+    colorApplication: "Earth tones ONLY (terracotta, sage, cream, olive, brown, forest green). Muted saturation. Kraft paper feel. NO bright colors.",
+    finish: "Kraft paper or recycled texture, letterpress effect, uncoated matte, visible paper grain. NO gloss anywhere.",
+    iconStyle: "Hand-drawn botanical icons, leaves, branches, sketch-style illustrations, woodcut aesthetic.",
+    avoidList: ["Geometric precision", "Bright neon", "Metallic accents", "Clinical layouts", "Glossy finishes", "Sans-serif fonts"]
+  },
+  scientific: {
+    typography: "Technical sans-serif (DIN, Eurostile Extended, IBM Plex Mono). Monospace for data points. Precise spacing. Medium weights.",
+    dynamicLayout: "Infographic-style layout, hexagonal patterns, molecular structures, data visualization grids, precise measurements shown.",
+    colorApplication: "Clinical blues, laboratory whites, data-viz palette (precise color ratios). Scientific precision in color choices. Cool temperature.",
+    finish: "Matte technical, precision printing, no decorative elements whatsoever. Laboratory sterile.",
+    iconStyle: "Geometric molecular icons, hexagons, atom symbols, chart/graph elements, scientific notation.",
+    avoidList: ["Organic shapes", "Warm colors", "Handwriting", "Decorative flourishes", "Playful elements", "Rounded corners"]
+  },
+  playful: {
+    typography: "Rounded bouncy sans-serif (Quicksand, Nunito, Fredoka One, Baloo). Varied sizes creating rhythm. Fun weight contrasts. Character-like letterforms.",
+    dynamicLayout: "Asymmetric scattered elements, floating shapes, confetti-style accents, diagonal energy, corner bursts, speech bubbles acceptable.",
+    colorApplication: "Bright CANDY colors (4+ colors OK), rainbow gradients encouraged, pink/yellow/turquoise/orange palette. NO muted tones.",
+    finish: "GLOSSY bright finish, slight 3D depth on elements, bubble/balloon effects, cheerful reflections.",
+    iconStyle: "Filled colorful cartoon-style icons, rounded shapes, character-like illustrations, emoji-inspired.",
+    avoidList: ["Serif fonts", "Formal layouts", "Muted colors", "Thin typography", "Serious/clinical feel", "Monochromatic"]
+  },
+  clinical: {
+    typography: "Medical-grade sans-serif (Helvetica, Arial, Roboto). Clean, precise, maximum readability. Regular weights. Pharmaceutical styling.",
+    dynamicLayout: "Strict horizontal bands, drug-facts style boxes, structured data hierarchy, Rx-style layout. NO diagonal elements.",
+    colorApplication: "White dominant (80%+), clinical blues, pharmaceutical greens. Single brand color accent. Sterile precision.",
+    finish: "Pharmacy-grade clean matte, tamper-evident styling suggestion, sterile hospital appearance. No decorative elements.",
+    iconStyle: "Medical crosses, Rx symbols, pill shapes, dosage icons, warning triangles, simple outlined medical imagery.",
+    avoidList: ["Decorative elements", "Multiple bright colors", "Playful shapes", "Organic forms", "Hand-drawn anything", "Warm tones"]
+  },
+  organic: {
+    typography: "Natural script elements OR soft serif (Libre Baskerville, EB Garamond). Hand-lettering accents. Warm and authentic feeling.",
+    dynamicLayout: "Flowing botanical-inspired shapes, asymmetric natural balance, leaf/flower motifs, curved natural borders.",
+    colorApplication: "Muted earth tones (sage, terracotta, mushroom, sand). Sustainable green accents. Eco-friendly palette. Desaturated.",
+    finish: "Textured uncoated paper look, eco-friendly recycled feel, subtle organic patterns, no plastic appearance.",
+    iconStyle: "Botanical line art, sustainability symbols, leaf/plant icons, eco-certification badges, nature-inspired.",
+    avoidList: ["Synthetic colors", "Glossy plastic look", "Geometric precision", "Bold industrial fonts", "Neon anything"]
+  },
+  energetic: {
+    typography: "Dynamic condensed sans (Oswald, Barlow Condensed, Bebas Neue). Italicized for speed. Motion blur text effects welcome.",
+    dynamicLayout: "Diagonal compositions (15-30°), speed lines, motion blur effects, lightning bolt shapes, forward-leaning angles.",
+    colorApplication: "Electric neon colors (electric blue, lime green, hot orange), energy drink palette, motion gradients, black backgrounds OK.",
+    finish: "High gloss metallic, reflective speed accents, chrome energy effects, dynamic lighting.",
+    iconStyle: "Lightning bolts, arrows, motion lines, speed indicators, energy symbols, athletic icons.",
+    avoidList: ["Static centered layouts", "Calm pastel colors", "Serif fonts", "Gentle curves", "Slow/relaxed imagery"]
+  },
+  luxurious: {
+    typography: "Ultra-elegant serif (Bodoni, Didot, Playfair Display). Hairline thin strokes. EXTREME letter-spacing. Refined uppercase.",
+    dynamicLayout: "Perfect centered symmetry, ornate classical borders, refined margins (20%+ padding), aristocratic proportions.",
+    colorApplication: "Deep blacks, rich golds, royal purples, champagne, jewel tones ONLY. 50% should feel metallic or rich.",
+    finish: "METALLIC FOIL everywhere possible, velvet soft-touch, embossed crests/monograms, luxury unboxing feel.",
+    iconStyle: "Ornate refined icons, gold-outlined crests, classical motifs, heraldic elements, monogram-style.",
+    avoidList: ["Bright primary colors", "Casual fonts", "Asymmetric layouts", "Bold chunky weights", "Playful elements"]
+  },
+  minimalist: {
+    typography: "Ultra-light sans-serif ONLY (Avenir Next Ultra Light, Helvetica Ultra Light). Single weight. Maximum tracking (0.2em+).",
+    dynamicLayout: "EXTREME reduction - only essential elements. 85%+ white space. Invisible grid. ONE focal point only.",
+    colorApplication: "Monochromatic with ONE accent at 5%. 85%+ white. Maximum restraint. Consider all-white with subtle gray.",
+    finish: "Pure matte, ZERO effects, ZERO textures, ZERO decoration. Architectural museum quality.",
+    iconStyle: "Hairline single-stroke icons only. Consider NO icons. If used, barely visible.",
+    avoidList: ["Multiple colors", "Decorative anything", "Bold weights", "Patterns", "Textures", "More than 3 elements total"]
+  },
+  trustworthy: {
+    typography: "Traditional serif (Times, Georgia) OR conservative sans (Arial, Calibri). Medium weights. Professional and established.",
+    dynamicLayout: "Centered traditional hierarchy, badge/seal elements, established brand patterns, conventional structure.",
+    colorApplication: "Navy blue, forest green, burgundy, conservative professional palette. Traditional color blocking.",
+    finish: "Professional matte, subtle texture, conservative elegance, bank/institution quality.",
+    iconStyle: "Traditional badges, shields, established trust seals, checkmarks, professional certification icons.",
+    avoidList: ["Trendy fonts", "Neon colors", "Playful elements", "Extreme minimalism", "Avant-garde layouts"]
+  },
+  // NEW TONES
+  pharmaceutical: {
+    typography: "Medical precise sans-serif (Helvetica Neue, Arial Narrow, Roboto). Clean pharmaceutical styling. ALL regulatory text clearly readable.",
+    dynamicLayout: "Rx-style horizontal bands, drug facts panel mimicry, dosage emphasis boxes, strict medical grid, FDA-compliant appearance.",
+    colorApplication: "Clinical white base (85%+), single pharmacy blue or green accent. NO bright colors. Sterile medical palette.",
+    finish: "Clinical matte, pharmacy-grade clean, tamper-evident visual cues, blister pack precision.",
+    iconStyle: "Rx pharmacy symbols, medical dosage icons, capsule/pill shapes, healthcare professional imagery, warning symbols.",
+    avoidList: ["Decorative elements", "Warm colors", "Playful anything", "Marketing-heavy design", "Lifestyle imagery"]
+  },
+  artisanal: {
+    typography: "Hand-drawn letterforms OR vintage serif (hand-lettering, antique scripts, wood type revival). Intentionally imperfect. Batch-numbered feel.",
+    dynamicLayout: "Intentionally imperfect alignment, wax seal elements, hand-stamped borders, maker's marks, craft label aesthetic.",
+    colorApplication: "Vintage muted palette (mustard, burgundy, olive, aged cream). Single or two-color print look. Aged paper tones.",
+    finish: "Letterpress texture, rough deckled edges, wax seal impression, stamp effects, uncoated fibrous paper.",
+    iconStyle: "Hand-drawn illustrations, woodcut style, vintage emblems, maker's marks, craft badges.",
+    avoidList: ["Perfect digital precision", "Modern sans-serif", "Bright saturated colors", "Glossy finish", "Corporate look"]
+  },
+  tech: {
+    typography: "Futuristic/cyber sans OR monospace (Space Grotesk, JetBrains Mono, Orbitron, Rajdhani). Data-driven. Biohacker aesthetic.",
+    dynamicLayout: "Circuit board patterns, hexagonal bio grids, data streams, holographic effects, tech startup aesthetic.",
+    colorApplication: "Cyber palette (electric blue, neon green, purple glow), DARK backgrounds encouraged, matrix-style accents.",
+    finish: "Holographic foil, circuit-board texture, LED glow effects, futuristic material simulation.",
+    iconStyle: "Tech icons, circuits, DNA helixes, biometric patterns, data visualizations, futuristic symbols.",
+    avoidList: ["Traditional fonts", "Warm earth tones", "Vintage styling", "Organic shapes", "Classical layouts"]
+  },
+  vintage: {
+    typography: "Retro-revival fonts (Playfair, vintage scripts, Art Deco inspired, 1920s-1960s type). Nostalgic warmth. Period-accurate.",
+    dynamicLayout: "Retro badge layouts, vintage frames, ribbon banners, classic symmetry, era-specific motifs (Art Deco, Mid-Century).",
+    colorApplication: "Faded vintage palette (cream, rust, sage, faded navy, sepia). Aged appearance. Period-appropriate colors.",
+    finish: "Aged paper texture, vintage printing effects (slight misregistration), patina, classic label appearance.",
+    iconStyle: "Vintage emblems, retro badges, classic era illustrations, nostalgic imagery, hand-drawn vintage style.",
+    avoidList: ["Modern minimalism", "Neon colors", "Futuristic elements", "Sharp digital precision", "Contemporary layouts"]
+  },
+  sporty: {
+    typography: "Athletic condensed (Bebas Neue Bold, Oswald Bold, Impact). Aggressive angles. PERFORMANCE-focused. Action sports aesthetic.",
+    dynamicLayout: "Dynamic 30-45° angles, racing stripes, performance stat callouts, athletic swooshes, victory podium energy.",
+    colorApplication: "High-energy action colors (red, orange, electric blue), aggressive contrast, black as base. Team jersey palette.",
+    finish: "Metallic performance accents, carbon fiber texture optional, athletic sheen, sports equipment material feel.",
+    iconStyle: "Athletic icons, muscles, motion arrows, performance metrics, sports equipment, victory symbols.",
+    avoidList: ["Delicate serif fonts", "Pastel colors", "Gentle curves", "Luxury styling", "Calm/zen aesthetic"]
+  },
+  zen: {
+    typography: "Light airy sans-serif (Inter Light, Lato Light, Quicksand Light). Generous spacing. Peaceful breathing room. Meditation-app feel.",
+    dynamicLayout: "Flowing organic curves, water ripple effects, minimal elements, maximum calm. Asymmetric natural balance. Japanese minimalism.",
+    colorApplication: "Soft pastels (lavender, sage, cream, soft pink), 70%+ white/light space. Colors should lower heart rate.",
+    finish: "Soft matte, gentle-touch paper feel, no harsh contrasts anywhere, spa-like calm.",
+    iconStyle: "Simple nature icons, lotus flowers, gentle waves, leaves, minimal strokes, meditation symbols.",
+    avoidList: ["Bold aggressive elements", "Bright saturated colors", "Busy layouts", "Sharp angles", "High contrast", "Energetic elements"]
+  }
 };
 
 serve(async (req) => {
@@ -462,37 +622,71 @@ serve(async (req) => {
     }
     promptParts.push("");
     
-    // PILLAR 2: DYNAMIC LAYOUT
+    // =========================================================================
+    // GET TONE-SPECIFIC DESIGN SYSTEM (if tone is selected)
+    // =========================================================================
+    const toneValue = suggestedTone 
+      ? (typeof suggestedTone === 'string' ? suggestedTone : suggestedTone.primary_tone || 'premium')
+      : null;
+    const toneSystem = toneValue && toneValue !== 'auto' ? toneDesignSystems[toneValue.toLowerCase()] : null;
+
+    // =========================================================================
+    // TONE PRIORITY BLOCK (when user explicitly selects a tone)
+    // =========================================================================
+    if (toneSystem) {
+      promptParts.push("╔══════════════════════════════════════════════════════════════╗");
+      promptParts.push(`║  🎭 TONE PRIORITY: ${toneValue.toUpperCase()} - MANDATORY VISUAL STYLE  🎭    ║`);
+      promptParts.push("╚══════════════════════════════════════════════════════════════╝");
+      promptParts.push("");
+      promptParts.push(`The design MUST look distinctly ${toneValue.toUpperCase()}.`);
+      promptParts.push("The tone characteristics below OVERRIDE generic design guidance.");
+      promptParts.push("If there's ANY conflict, the tone-specific instruction WINS.");
+      promptParts.push("");
+    }
+
+    // PILLAR 2: DYNAMIC LAYOUT (tone-specific override)
     promptParts.push("PILLAR 2: DYNAMIC LAYOUT");
     promptParts.push("────────────────────────");
-    promptParts.push("The label MUST have visual movement and energy.");
+    if (toneSystem) {
+      promptParts.push(`LAYOUT STYLE: ${toneSystem.dynamicLayout}`);
+    } else {
+      promptParts.push("The label MUST have visual movement and energy.");
+      promptParts.push("");
+      promptParts.push("CHOOSE ONE signature dynamic element:");
+      promptParts.push("• WAVE SEPARATOR: Curved wave dividing color zones");
+      promptParts.push("• DIAGONAL STRIPE: Angled color band creating energy");
+      promptParts.push("• CURVED BANNER: Arched text banner for key claims");
+      promptParts.push("• COLOR TIER: 2-3 horizontal color zones with transitions");
+      promptParts.push("• CORNER BURST: Asymmetric corner element drawing the eye");
+    }
     promptParts.push("");
-    promptParts.push("CHOOSE ONE signature dynamic element:");
-    promptParts.push("• WAVE SEPARATOR: Curved wave dividing color zones");
-    promptParts.push("• DIAGONAL STRIPE: Angled color band creating energy");
-    promptParts.push("• CURVED BANNER: Arched text banner for key claims");
-    promptParts.push("• COLOR TIER: 2-3 horizontal color zones with transitions");
-    promptParts.push("• CORNER BURST: Asymmetric corner element drawing the eye");
-    promptParts.push("");
-    promptParts.push("⚠️ Choose ONLY ONE. Multiple competing elements = cluttered.");
+    promptParts.push("⚠️ Choose ONLY ONE dynamic element. Multiple competing elements = cluttered.");
     promptParts.push("");
     
-    // PILLAR 3: TYPOGRAPHY
+    // PILLAR 3: TYPOGRAPHY (tone-specific override)
     promptParts.push("PILLAR 3: TYPOGRAPHY");
     promptParts.push("─────────────────────");
-    promptParts.push("• Headlines: Bold sans-serif (Montserrat, Poppins, Gilroy)");
-    promptParts.push("• Body text: Clean, readable sans-serif");
+    if (toneSystem) {
+      promptParts.push(`TYPOGRAPHY STYLE: ${toneSystem.typography}`);
+    } else {
+      promptParts.push("• Headlines: Bold sans-serif (Montserrat, Poppins, Gilroy)");
+      promptParts.push("• Body text: Clean, readable sans-serif");
+    }
     promptParts.push("• Hierarchy: Clear size difference between levels");
     promptParts.push("• Contrast: Text ALWAYS readable against background");
     promptParts.push("");
     
-    // PILLAR 4: SEMANTIC BENEFIT ICONS
+    // PILLAR 4: SEMANTIC BENEFIT ICONS (tone-specific override)
     promptParts.push("PILLAR 4: BENEFIT ICONS");
     promptParts.push("───────────────────────");
-    promptParts.push("Use SEMANTIC icons matching the benefit:");
-    promptParts.push("  • Sleep → Moon    • Energy → Lightning");
-    promptParts.push("  • Heart → Heart   • Brain → Brain");
-    promptParts.push("  • Immunity → Shield  • Muscle → Flexed arm");
+    if (toneSystem) {
+      promptParts.push(`ICON STYLE: ${toneSystem.iconStyle}`);
+    } else {
+      promptParts.push("Use SEMANTIC icons matching the benefit:");
+      promptParts.push("  • Sleep → Moon    • Energy → Lightning");
+      promptParts.push("  • Heart → Heart   • Brain → Brain");
+      promptParts.push("  • Immunity → Shield  • Muscle → Flexed arm");
+    }
     promptParts.push("");
     promptParts.push("✗ NO generic checkmarks for everything");
     promptParts.push("");
@@ -507,27 +701,35 @@ serve(async (req) => {
     promptParts.push("• Small but legible, badge/seal styling");
     promptParts.push("");
     
-    // PILLAR 6: PREMIUM FINISH
-    promptParts.push("PILLAR 6: PREMIUM FINISH");
-    promptParts.push("────────────────────────");
-    promptParts.push("• Matte or soft-touch label appearance");
-    promptParts.push("• Subtle metallic accents optional");
+    // PILLAR 6: FINISH & TEXTURE (tone-specific override)
+    promptParts.push("PILLAR 6: FINISH & TEXTURE");
+    promptParts.push("──────────────────────────");
+    if (toneSystem) {
+      promptParts.push(`FINISH STYLE: ${toneSystem.finish}`);
+    } else {
+      promptParts.push("• Matte or soft-touch label appearance");
+      promptParts.push("• Subtle metallic accents optional");
+    }
     promptParts.push("• Clean edges, precise alignment");
     promptParts.push("• Professional, shelf-ready appearance");
     promptParts.push("");
 
+    // PILLAR 7: COLOR APPLICATION (tone-specific override)
+    if (toneSystem && !colorsCustomized) {
+      promptParts.push("PILLAR 7: COLOR APPLICATION");
+      promptParts.push("───────────────────────────");
+      promptParts.push(`COLOR STRATEGY: ${toneSystem.colorApplication}`);
+      promptParts.push("");
+    }
+
     // =========================================================================
-    // SECTION 7B: DESIGN TONE (USER-SELECTED OR AI-SUGGESTED)
+    // SECTION 7B: DESIGN TONE DETAILS
     // =========================================================================
     if (suggestedTone) {
       promptParts.push("═══════════════════════════════════════════════════════════════");
-      promptParts.push("                    🎭 DESIGN TONE                              ");
+      promptParts.push("                    🎭 DESIGN TONE DETAILS                       ");
       promptParts.push("═══════════════════════════════════════════════════════════════");
       promptParts.push("");
-      
-      const toneValue = typeof suggestedTone === 'string' 
-        ? suggestedTone 
-        : suggestedTone.primary_tone || 'premium';
       
       const descriptors = typeof suggestedTone === 'object' && suggestedTone.tone_descriptors
         ? suggestedTone.tone_descriptors.join(', ')
@@ -541,7 +743,7 @@ serve(async (req) => {
         ? suggestedTone.copy_voice
         : '';
         
-      promptParts.push(`Primary Tone: ${toneValue.toUpperCase()}`);
+      promptParts.push(`Active Tone: ${(toneValue || 'premium').toUpperCase()}`);
       
       if (descriptors) {
         promptParts.push(`Style Descriptors: ${descriptors}`);
@@ -555,25 +757,6 @@ serve(async (req) => {
         promptParts.push(`Copy Voice: ${copyVoice}`);
       }
       
-      // Map tones to specific visual guidance
-      const toneGuidance: Record<string, string> = {
-        'premium': 'Luxurious finishes, rich colors, elegant typography, subtle metallic accents',
-        'clean': 'Minimal design, ample white space, crisp typography, clinical precision',
-        'bold': 'High contrast, saturated colors, impactful typography, dynamic composition',
-        'natural': 'Earth tones, organic shapes, textured finishes, botanical elements',
-        'scientific': 'Technical precision, data-driven layouts, clinical colors, structured hierarchy',
-        'playful': 'Vibrant colors, rounded shapes, friendly typography, energetic composition',
-        'clinical': 'Medical precision, clean whites, structured layout, trust-building design',
-        'organic': 'Natural textures, muted earth tones, handcrafted feel, sustainable aesthetics',
-        'energetic': 'Dynamic angles, bold colors, motion-inspired elements, active lifestyle feel',
-        'luxurious': 'Gold/metallic accents, rich deep colors, refined typography, opulent feel',
-        'minimalist': 'Maximum white space, single accent color, essential elements only',
-        'trustworthy': 'Conservative layout, professional colors, established brand feel'
-      };
-      
-      const guidance = toneGuidance[toneValue.toLowerCase()] || toneGuidance['premium'];
-      promptParts.push("");
-      promptParts.push(`Visual Execution: ${guidance}`);
       promptParts.push("");
     }
 
@@ -593,22 +776,33 @@ serve(async (req) => {
     }
 
     // =========================================================================
-    // SECTION 9: AVOID LIST
+    // SECTION 9: AVOID LIST (includes tone-specific restrictions)
     // =========================================================================
     promptParts.push("═══════════════════════════════════════════════════════════════");
     promptParts.push("                     ❌ AVOID THESE MISTAKES                     ");
     promptParts.push("═══════════════════════════════════════════════════════════════");
     promptParts.push("");
+    promptParts.push("UNIVERSAL MISTAKES:");
     promptParts.push("• Adding text not in the front panel text");
-    promptParts.push("• Changing the specified colors");
+    promptParts.push("• Changing the specified colors (if customized)");
     promptParts.push("• Generic checkmarks instead of semantic icons");
-    promptParts.push("• Plain centered text stack with no visual interest");
-    promptParts.push("• Muted, desaturated, or washed-out colors");
-    promptParts.push("• Multiple competing graphic elements");
-    promptParts.push("• Confetti, starbursts, or scattered shapes");
     promptParts.push("• Unreadable text (poor contrast)");
     promptParts.push("• Wrong container shape/proportions");
     promptParts.push("");
+    
+    // Add tone-specific avoid list
+    if (toneSystem && toneSystem.avoidList.length > 0) {
+      promptParts.push(`TONE-SPECIFIC (${(toneValue || 'premium').toUpperCase()}) - NEVER DO:`);
+      toneSystem.avoidList.forEach(item => {
+        promptParts.push(`• ${item}`);
+      });
+      promptParts.push("");
+    } else {
+      promptParts.push("• Plain centered text stack with no visual interest");
+      promptParts.push("• Multiple competing graphic elements");
+      promptParts.push("• Confetti, starbursts, or scattered shapes");
+      promptParts.push("");
+    }
 
     // =========================================================================
     // SECTION 10: FINAL CHECKLIST

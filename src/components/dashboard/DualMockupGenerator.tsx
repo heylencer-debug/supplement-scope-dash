@@ -142,29 +142,113 @@ const packagingFormatOptions = [
   { value: "kraft paper bag", label: "Kraft Paper Bag" },
 ];
 
-const toneOptions = [
-  { value: "auto", label: "AI Suggested", description: "Use AI-recommended tone" },
+// Tone preview styling for visual thumbnails
+interface ToneOption {
+  value: string;
+  label: string;
+  description: string;
+  preview: {
+    bg: string;
+    accent: string;
+    text: string;
+    pattern?: string;
+    icon?: string;
+  };
+}
+
+const toneOptions: ToneOption[] = [
+  { value: "auto", label: "AI Suggested", description: "Use AI-recommended tone", 
+    preview: { bg: "linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%)", accent: "#c4b5fd", text: "#ffffff", icon: "✨" } },
   // Classic tones
-  { value: "premium", label: "Premium", description: "Elegant serif, gold foil, embossed luxury finish" },
-  { value: "clean", label: "Clean", description: "Ultra-thin fonts, 70%+ white space, flat matte" },
-  { value: "bold", label: "Bold", description: "Impact fonts, diagonal stripes, maximum saturation" },
-  { value: "natural", label: "Natural", description: "Kraft paper, botanical elements, earth tones" },
-  { value: "scientific", label: "Scientific", description: "Monospace fonts, hexagonal grids, clinical blues" },
-  { value: "playful", label: "Playful", description: "Rounded fonts, candy colors, glossy 3D depth" },
-  { value: "clinical", label: "Clinical", description: "Rx-style layout, 80% white, pharmaceutical precision" },
-  { value: "organic", label: "Organic", description: "Botanical icons, sage/terracotta, eco-paper feel" },
-  { value: "energetic", label: "Energetic", description: "Italic condensed, speed lines, neon accents" },
-  { value: "luxurious", label: "Luxurious", description: "Bodoni serif, black/gold, velvet soft-touch" },
-  { value: "minimalist", label: "Minimalist", description: "Ultra-light fonts, 85%+ white, hairline icons" },
-  { value: "trustworthy", label: "Trustworthy", description: "Traditional serif, navy/burgundy, badge elements" },
-  // NEW specialty tones
-  { value: "pharmaceutical", label: "Pharmaceutical", description: "Drug-facts style, sterile white, Rx symbols" },
-  { value: "artisanal", label: "Artisanal", description: "Hand-lettered, letterpress texture, wax seal accents" },
-  { value: "tech", label: "Tech / Biohacker", description: "Monospace, circuit patterns, holographic foil" },
-  { value: "vintage", label: "Vintage / Retro", description: "Art Deco fonts, aged paper, ribbon banners" },
-  { value: "sporty", label: "Sporty / Athletic", description: "Racing stripes, performance stats, carbon fiber" },
-  { value: "zen", label: "Zen / Calm", description: "Light airy fonts, soft pastels, lotus/wave icons" },
+  { value: "premium", label: "Premium", description: "Elegant serif, gold foil, embossed luxury finish",
+    preview: { bg: "linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)", accent: "#d4af37", text: "#f5f5dc", icon: "👑" } },
+  { value: "clean", label: "Clean", description: "Ultra-thin fonts, 70%+ white space, flat matte",
+    preview: { bg: "#ffffff", accent: "#e5e7eb", text: "#1f2937", icon: "◻️" } },
+  { value: "bold", label: "Bold", description: "Impact fonts, diagonal stripes, maximum saturation",
+    preview: { bg: "linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)", accent: "#fbbf24", text: "#ffffff", pattern: "diagonal", icon: "💪" } },
+  { value: "natural", label: "Natural", description: "Kraft paper, botanical elements, earth tones",
+    preview: { bg: "#d4a574", accent: "#8b7355", text: "#3d2914", pattern: "kraft", icon: "🌿" } },
+  { value: "scientific", label: "Scientific", description: "Monospace fonts, hexagonal grids, clinical blues",
+    preview: { bg: "linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%)", accent: "#38bdf8", text: "#e0f2fe", pattern: "hex", icon: "🔬" } },
+  { value: "playful", label: "Playful", description: "Rounded fonts, candy colors, glossy 3D depth",
+    preview: { bg: "linear-gradient(135deg, #f472b6 0%, #c084fc 100%)", accent: "#fcd34d", text: "#ffffff", icon: "🎉" } },
+  { value: "clinical", label: "Clinical", description: "Rx-style layout, 80% white, pharmaceutical precision",
+    preview: { bg: "#f8fafc", accent: "#0ea5e9", text: "#0f172a", pattern: "grid", icon: "💊" } },
+  { value: "organic", label: "Organic", description: "Botanical icons, sage/terracotta, eco-paper feel",
+    preview: { bg: "#f5f0e8", accent: "#84a98c", text: "#2d3a2d", icon: "🍃" } },
+  { value: "energetic", label: "Energetic", description: "Italic condensed, speed lines, neon accents",
+    preview: { bg: "linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%)", accent: "#22d3ee", text: "#f0fdf4", pattern: "speed", icon: "⚡" } },
+  { value: "luxurious", label: "Luxurious", description: "Bodoni serif, black/gold, velvet soft-touch",
+    preview: { bg: "#0a0a0a", accent: "#d4af37", text: "#faf7f0", icon: "✨" } },
+  { value: "minimalist", label: "Minimalist", description: "Ultra-light fonts, 85%+ white, hairline icons",
+    preview: { bg: "#fafafa", accent: "#d4d4d4", text: "#525252", icon: "—" } },
+  { value: "trustworthy", label: "Trustworthy", description: "Traditional serif, navy/burgundy, badge elements",
+    preview: { bg: "linear-gradient(135deg, #1e3a5f 0%, #172554 100%)", accent: "#7c2d12", text: "#fef3c7", icon: "🛡️" } },
+  // Specialty tones
+  { value: "pharmaceutical", label: "Pharmaceutical", description: "Drug-facts style, sterile white, Rx symbols",
+    preview: { bg: "#ffffff", accent: "#2563eb", text: "#1e293b", pattern: "rx", icon: "℞" } },
+  { value: "artisanal", label: "Artisanal", description: "Hand-lettered, letterpress texture, wax seal accents",
+    preview: { bg: "#f5f0e1", accent: "#8b4513", text: "#3d2914", pattern: "stamp", icon: "🔖" } },
+  { value: "tech", label: "Tech / Biohacker", description: "Monospace, circuit patterns, holographic foil",
+    preview: { bg: "linear-gradient(135deg, #0f0f23 0%, #1a1a3e 100%)", accent: "#00ff88", text: "#00ff88", pattern: "circuit", icon: "⚙️" } },
+  { value: "vintage", label: "Vintage / Retro", description: "Art Deco fonts, aged paper, ribbon banners",
+    preview: { bg: "#f4e4bc", accent: "#8b0000", text: "#2d1b0e", pattern: "deco", icon: "🎭" } },
+  { value: "sporty", label: "Sporty / Athletic", description: "Racing stripes, performance stats, carbon fiber",
+    preview: { bg: "linear-gradient(135deg, #1f2937 0%, #111827 100%)", accent: "#ef4444", text: "#ffffff", pattern: "stripe", icon: "🏆" } },
+  { value: "zen", label: "Zen / Calm", description: "Light airy fonts, soft pastels, lotus/wave icons",
+    preview: { bg: "linear-gradient(135deg, #e0e7ff 0%, #ddd6fe 100%)", accent: "#a5b4fc", text: "#4338ca", icon: "🪷" } },
 ];
+
+// Tone preview thumbnail component
+function TonePreviewThumbnail({ tone }: { tone: ToneOption }) {
+  const patternStyles: Record<string, React.CSSProperties> = {
+    diagonal: {
+      backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(255,255,255,0.1) 3px, rgba(255,255,255,0.1) 6px)`,
+    },
+    kraft: {
+      backgroundImage: `url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23000' fill-opacity='0.05'%3E%3Ccircle cx='1' cy='1' r='1'/%3E%3C/g%3E%3C/svg%3E")`,
+    },
+    hex: {
+      backgroundImage: `url("data:image/svg+xml,%3Csvg width='24' height='20' viewBox='0 0 24 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12 0l12 7v6l-12 7L0 13V7l12-7z' fill='none' stroke='%2338bdf8' stroke-opacity='0.15' stroke-width='0.5'/%3E%3C/svg%3E")`,
+    },
+    grid: {
+      backgroundImage: `linear-gradient(rgba(14,165,233,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(14,165,233,0.1) 1px, transparent 1px)`,
+      backgroundSize: '4px 4px',
+    },
+    speed: {
+      backgroundImage: `repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(34,211,238,0.2) 2px, rgba(34,211,238,0.2) 4px)`,
+    },
+    rx: {
+      backgroundImage: `linear-gradient(rgba(37,99,235,0.05) 1px, transparent 1px)`,
+      backgroundSize: '100% 3px',
+    },
+    stamp: {
+      backgroundImage: `url("data:image/svg+xml,%3Csvg width='16' height='16' viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='8' cy='8' r='6' fill='none' stroke='%238b4513' stroke-opacity='0.1' stroke-width='0.5'/%3E%3C/svg%3E")`,
+    },
+    circuit: {
+      backgroundImage: `url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 10h8v-2h4v2h8' fill='none' stroke='%2300ff88' stroke-opacity='0.15' stroke-width='0.5'/%3E%3C/svg%3E")`,
+    },
+    deco: {
+      backgroundImage: `url("data:image/svg+xml,%3Csvg width='16' height='16' viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 8h16M8 0v16' fill='none' stroke='%238b0000' stroke-opacity='0.1' stroke-width='0.5'/%3E%3C/svg%3E")`,
+    },
+    stripe: {
+      backgroundImage: `repeating-linear-gradient(90deg, transparent, transparent 4px, rgba(239,68,68,0.15) 4px, rgba(239,68,68,0.15) 6px)`,
+    },
+  };
+
+  return (
+    <div 
+      className="w-8 h-8 rounded-md flex items-center justify-center text-xs font-bold shrink-0 border border-border/30 shadow-sm"
+      style={{
+        background: tone.preview.bg,
+        color: tone.preview.text,
+        ...(tone.preview.pattern ? patternStyles[tone.preview.pattern] : {}),
+      }}
+    >
+      {tone.preview.icon || tone.label.charAt(0)}
+    </div>
+  );
+}
 
 // CSS-based label preview component
 function LabelPreview({
@@ -922,15 +1006,25 @@ function MockupCard({
         </div>
         
         <Select value={selectedTone} onValueChange={handleToneChange}>
-          <SelectTrigger className="w-full bg-background/80 h-8 text-xs border-purple-500/30">
-            <SelectValue placeholder="Select tone" />
+          <SelectTrigger className="w-full bg-background/80 h-9 text-xs border-purple-500/30">
+            <SelectValue placeholder="Select tone">
+              {selectedTone && (
+                <div className="flex items-center gap-2">
+                  <TonePreviewThumbnail tone={toneOptions.find(t => t.value === selectedTone)!} />
+                  <span className="font-medium">{toneOptions.find(t => t.value === selectedTone)?.label}</span>
+                </div>
+              )}
+            </SelectValue>
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="max-h-[400px]">
             {toneOptions.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                <div className="flex flex-col">
-                  <span className="font-medium">{option.label}</span>
-                  <span className="text-[10px] text-muted-foreground">{option.description}</span>
+              <SelectItem key={option.value} value={option.value} className="py-2">
+                <div className="flex items-center gap-3">
+                  <TonePreviewThumbnail tone={option} />
+                  <div className="flex flex-col">
+                    <span className="font-medium text-sm">{option.label}</span>
+                    <span className="text-[10px] text-muted-foreground leading-tight">{option.description}</span>
+                  </div>
                 </div>
               </SelectItem>
             ))}

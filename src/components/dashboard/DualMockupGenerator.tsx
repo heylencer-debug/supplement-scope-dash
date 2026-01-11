@@ -168,6 +168,29 @@ const containerMaterialOptions = [
   { value: "kraft", label: "Kraft/Natural", material: "natural kraft paper/cardboard look", hex: "#c4a35a" },
 ];
 
+// Lid/cap color options
+const lidColorOptions = [
+  { value: "auto", label: "Auto (Match Container)", hex: "" },
+  // Basic colors
+  { value: "white", label: "White", hex: "#FFFFFF" },
+  { value: "black", label: "Black", hex: "#1a1a1a" },
+  { value: "silver", label: "Silver/Chrome", hex: "#c0c0c0" },
+  { value: "gold", label: "Gold", hex: "#d4af37" },
+  // Colored caps
+  { value: "red", label: "Red", hex: "#dc2626" },
+  { value: "blue", label: "Blue", hex: "#2563eb" },
+  { value: "green", label: "Green", hex: "#16a34a" },
+  { value: "orange", label: "Orange", hex: "#ea580c" },
+  { value: "purple", label: "Purple", hex: "#9333ea" },
+  { value: "pink", label: "Pink", hex: "#ec4899" },
+  // Special finishes
+  { value: "matte-black", label: "Matte Black", hex: "#0a0a0a" },
+  { value: "brushed-gold", label: "Brushed Gold", hex: "#b8860b" },
+  { value: "rose-gold", label: "Rose Gold", hex: "#b76e79" },
+  { value: "bamboo", label: "Bamboo/Wood", hex: "#deb887" },
+  { value: "cork", label: "Cork", hex: "#c4a35a" },
+];
+
 // Tone preview styling for visual thumbnails
 interface ToneOption {
   value: string;
@@ -682,6 +705,17 @@ function MockupCard({
     onSaveCustomizations?.({ container_material: material });
   };
   
+  // Lid color selector - defaults to saved customization or "auto"
+  const [selectedLidColor, setSelectedLidColor] = useState<string>(
+    savedCustomization?.lid_color ?? "auto"
+  );
+  
+  // Handle lid color change with persistence
+  const handleLidColorChange = (color: string) => {
+    setSelectedLidColor(color);
+    onSaveCustomizations?.({ lid_color: color });
+  };
+  
   // Sync format from saved customization when it changes
   useEffect(() => {
     if (savedCustomization?.packaging_format) {
@@ -702,6 +736,13 @@ function MockupCard({
       setSelectedContainerMaterial(savedCustomization.container_material);
     }
   }, [savedCustomization?.container_material]);
+  
+  // Sync lid color from saved customization when it changes
+  useEffect(() => {
+    if (savedCustomization?.lid_color) {
+      setSelectedLidColor(savedCustomization.lid_color);
+    }
+  }, [savedCustomization?.lid_color]);
 
   // Update when mockupUrl prop changes, but NOT while generating (prevents race condition)
   useEffect(() => {
@@ -833,6 +874,11 @@ function MockupCard({
         ? null 
         : containerMaterialOptions.find(m => m.value === selectedContainerMaterial);
 
+      // Get lid color if selected
+      const lidColor = selectedLidColor === "auto"
+        ? null
+        : lidColorOptions.find(l => l.value === selectedLidColor);
+
       const { data, error } = await supabase.functions.invoke('generate-product-mockup', {
         body: {
           logoImageUrl, // Pass logo image
@@ -866,6 +912,12 @@ function MockupCard({
               value: containerMaterial.value,
               material: containerMaterial.material,
               hex: containerMaterial.hex
+            } : null,
+            // Lid color customization
+            lidColor: lidColor ? {
+              value: lidColor.value,
+              label: lidColor.label,
+              hex: lidColor.hex
             } : null,
             // NEW: Pass AI-generated label design fields
             labelAtmosphere: (designBrief as any).label_atmosphere,
@@ -1169,7 +1221,47 @@ function MockupCard({
                     }}
                   />
                   <span>{option.label}</span>
+      </div>
+
+      {/* Lid/Cap Color Selector */}
+      <div>
+        <label className="text-xs font-medium text-muted-foreground mb-1.5 block flex items-center gap-1.5">
+          <span className="w-3 h-3 flex items-center justify-center text-[10px]">🔘</span>
+          Lid/Cap Color
+        </label>
+        <Select value={selectedLidColor} onValueChange={handleLidColorChange}>
+          <SelectTrigger className="w-full bg-background h-9 text-sm">
+            <SelectValue placeholder="Select lid color">
+              {selectedLidColor && (
+                <div className="flex items-center gap-2">
+                  <div 
+                    className="w-4 h-4 rounded-full border border-border/50 shrink-0"
+                    style={{ 
+                      background: lidColorOptions.find(l => l.value === selectedLidColor)?.hex || '#e5e7eb'
+                    }}
+                  />
+                  <span>{lidColorOptions.find(l => l.value === selectedLidColor)?.label}</span>
                 </div>
+              )}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {lidColorOptions.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                <div className="flex items-center gap-2">
+                  <div 
+                    className="w-4 h-4 rounded-full border border-border/50 shrink-0"
+                    style={{ 
+                      background: option.hex || '#e5e7eb'
+                    }}
+                  />
+                  <span>{option.label}</span>
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
               </SelectItem>
             ))}
           </SelectContent>

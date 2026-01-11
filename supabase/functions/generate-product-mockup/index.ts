@@ -76,6 +76,7 @@ const packagingFormatDetails: Record<string, { shape: string; proportions: strin
   'soft chew resealable pouch': { shape: 'stand-up flexible pouch with resealable zipper', proportions: 'rectangular with rounded bottom gusset', style: 'matte finish flexible packaging for soft chews', labelArea: 'full front panel coverage' },
   'resealable stand-up pouch': { shape: 'stand-up flexible pouch with resealable zipper', proportions: 'rectangular with rounded bottom gusset', style: 'matte finish flexible packaging', labelArea: 'full front panel coverage' },
   'wide-mouth plastic jar': { shape: 'wide cylindrical jar with large screw-top lid', proportions: 'squat 1:1 ratio, wide opening', style: 'opaque HDPE plastic', labelArea: 'wraparound label, prominent lid visibility' },
+  'wide-mouth clear plastic jar': { shape: 'wide cylindrical jar with large screw-top lid', proportions: 'squat 1:1 ratio, wide opening', style: 'TRANSPARENT clear PET plastic showing contents', labelArea: 'wraparound label, contents visible through clear material, prominent lid' },
   'narrow-mouth plastic jar': { shape: 'tall narrow plastic jar with screw cap', proportions: 'elongated 2.5:1 height-to-width', style: 'opaque HDPE plastic, slim profile', labelArea: 'full-height wraparound label' },
   'glass jar with screw cap': { shape: 'cylindrical glass jar with metal or plastic screw cap', proportions: 'standard 1.5:1 height-to-width', style: 'clear or amber glass, premium feel', labelArea: 'front label panel or wraparound' },
   'narrow-mouth glass jar': { shape: 'tall narrow glass jar with screw cap', proportions: 'elongated 2.5:1 height-to-width', style: 'clear glass, slim elegant profile', labelArea: 'full-height front label' },
@@ -299,6 +300,7 @@ serve(async (req) => {
       flavor,
       servingSize,
       servingsPerContainer,
+      containerMaterial, // NEW: User-specified container material/color
     } = designBrief;
 
     // Get container details
@@ -396,6 +398,34 @@ serve(async (req) => {
       promptParts.push("• Show the gusseted bottom that allows it to stand");
       promptParts.push("• Resealable zipper visible at top");
       promptParts.push("• Matte or soft-touch finish appearance");
+      promptParts.push("");
+    }
+
+    // =========================================================================
+    // SECTION 2B: USER-SPECIFIED CONTAINER MATERIAL/COLOR
+    // =========================================================================
+    if (containerMaterial && containerMaterial.value !== 'auto') {
+      promptParts.push("═══════════════════════════════════════════════════════════════");
+      promptParts.push("          ⚠️ USER-SPECIFIED CONTAINER MATERIAL (MANDATORY)       ");
+      promptParts.push("═══════════════════════════════════════════════════════════════");
+      promptParts.push("");
+      promptParts.push(`CONTAINER MATERIAL: ${containerMaterial.material}`);
+      promptParts.push("");
+      
+      if (containerMaterial.hex === 'transparent') {
+        promptParts.push("TRANSPARENCY REQUIREMENTS:");
+        promptParts.push("• Container MUST be TRANSPARENT/CLEAR");
+        promptParts.push("• Show contents visible inside the container");
+        promptParts.push("• Subtle reflections and refractions on the container surface");
+        promptParts.push("• Premium glass or clear plastic appearance");
+      } else {
+        promptParts.push(`CONTAINER COLOR: ${containerMaterial.hex}`);
+        promptParts.push("• Container must be OPAQUE in this color");
+        promptParts.push("• Contents should NOT be visible through container");
+        promptParts.push("• Solid material appearance matching the specified color");
+      }
+      promptParts.push("");
+      promptParts.push("⛔ DO NOT use the default container material - use EXACTLY what is specified above.");
       promptParts.push("");
     }
 

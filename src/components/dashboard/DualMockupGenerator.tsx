@@ -124,6 +124,7 @@ const packagingFormatOptions = [
   { value: "resealable stand-up pouch", label: "Stand-Up Pouch" },
   // Standard Jars
   { value: "wide-mouth plastic jar", label: "Wide-Mouth Jar (Plastic)" },
+  { value: "wide-mouth clear plastic jar", label: "Wide-Mouth Jar (Plastic Clear)" },
   { value: "narrow-mouth plastic jar", label: "Tall Slim Jar (Plastic)" },
   { value: "glass jar with screw cap", label: "Glass Jar" },
   { value: "narrow-mouth glass jar", label: "Tall Slim Jar (Glass)" },
@@ -146,6 +147,25 @@ const packagingFormatOptions = [
   { value: "blister pack", label: "Blister Pack" },
   { value: "tin container", label: "Tin Container" },
   { value: "kraft paper bag", label: "Kraft Paper Bag" },
+];
+
+// Container material/color options
+const containerMaterialOptions = [
+  { value: "auto", label: "Auto (AI Decides)", material: "", hex: "" },
+  // Plastic options
+  { value: "white-plastic", label: "White Plastic", material: "opaque white HDPE plastic", hex: "#FFFFFF" },
+  { value: "clear-plastic", label: "Clear Plastic", material: "transparent clear PET plastic", hex: "transparent" },
+  { value: "black-plastic", label: "Black Plastic", material: "opaque black HDPE plastic", hex: "#1a1a1a" },
+  { value: "frosted-plastic", label: "Frosted Plastic", material: "frosted translucent plastic", hex: "#e8e8e8" },
+  // Glass options
+  { value: "clear-glass", label: "Clear Glass", material: "transparent clear glass", hex: "transparent" },
+  { value: "amber-glass", label: "Amber Glass", material: "amber/brown glass for UV protection", hex: "#b87333" },
+  { value: "cobalt-glass", label: "Cobalt Blue Glass", material: "deep cobalt blue glass", hex: "#0047ab" },
+  { value: "green-glass", label: "Green Glass", material: "green tinted glass", hex: "#355e3b" },
+  // Premium/Metal options
+  { value: "matte-black", label: "Matte Black", material: "matte black soft-touch finish", hex: "#0a0a0a" },
+  { value: "metallic-silver", label: "Metallic Silver", material: "metallic silver/chrome finish", hex: "#c0c0c0" },
+  { value: "kraft", label: "Kraft/Natural", material: "natural kraft paper/cardboard look", hex: "#c4a35a" },
 ];
 
 // Tone preview styling for visual thumbnails
@@ -651,6 +671,17 @@ function MockupCard({
     onSaveCustomizations?.({ selected_tone: tone });
   };
   
+  // Container material selector - defaults to saved customization or "auto"
+  const [selectedContainerMaterial, setSelectedContainerMaterial] = useState<string>(
+    savedCustomization?.container_material ?? "auto"
+  );
+  
+  // Handle container material change with persistence
+  const handleContainerMaterialChange = (material: string) => {
+    setSelectedContainerMaterial(material);
+    onSaveCustomizations?.({ container_material: material });
+  };
+  
   // Sync format from saved customization when it changes
   useEffect(() => {
     if (savedCustomization?.packaging_format) {
@@ -664,6 +695,13 @@ function MockupCard({
       setSelectedTone(savedCustomization.selected_tone);
     }
   }, [savedCustomization?.selected_tone]);
+  
+  // Sync container material from saved customization when it changes
+  useEffect(() => {
+    if (savedCustomization?.container_material) {
+      setSelectedContainerMaterial(savedCustomization.container_material);
+    }
+  }, [savedCustomization?.container_material]);
 
   // Update when mockupUrl prop changes, but NOT while generating (prevents race condition)
   useEffect(() => {
@@ -790,6 +828,11 @@ function MockupCard({
         effectiveBrandName,
       });
 
+      // Get container material if selected
+      const containerMaterial = selectedContainerMaterial === "auto" 
+        ? null 
+        : containerMaterialOptions.find(m => m.value === selectedContainerMaterial);
+
       const { data, error } = await supabase.functions.invoke('generate-product-mockup', {
         body: {
           logoImageUrl, // Pass logo image
@@ -818,6 +861,12 @@ function MockupCard({
             flavorText: detectedFlavor,
             suggestedTone: effectiveTone,
             heroImagery: (designBrief as any).hero_imagery,
+            // Container material customization
+            containerMaterial: containerMaterial ? {
+              value: containerMaterial.value,
+              material: containerMaterial.material,
+              hex: containerMaterial.hex
+            } : null,
             // NEW: Pass AI-generated label design fields
             labelAtmosphere: (designBrief as any).label_atmosphere,
             labelHierarchy: (designBrief as any).label_hierarchy,
@@ -1077,6 +1126,50 @@ function MockupCard({
             {packagingFormatOptions.map((option) => (
               <SelectItem key={option.value} value={option.value}>
                 {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Container Material Color Selector */}
+      <div>
+        <label className="text-xs font-medium text-muted-foreground mb-1.5 block flex items-center gap-1.5">
+          <Package className="w-3 h-3" />
+          Container Material
+        </label>
+        <Select value={selectedContainerMaterial} onValueChange={handleContainerMaterialChange}>
+          <SelectTrigger className="w-full bg-background h-9 text-sm">
+            <SelectValue placeholder="Select material">
+              {selectedContainerMaterial && (
+                <div className="flex items-center gap-2">
+                  <div 
+                    className="w-4 h-4 rounded border border-border/50 shrink-0"
+                    style={{ 
+                      background: containerMaterialOptions.find(m => m.value === selectedContainerMaterial)?.hex === 'transparent' 
+                        ? 'repeating-linear-gradient(45deg, #ccc, #ccc 2px, #fff 2px, #fff 4px)' 
+                        : containerMaterialOptions.find(m => m.value === selectedContainerMaterial)?.hex || '#e5e7eb'
+                    }}
+                  />
+                  <span>{containerMaterialOptions.find(m => m.value === selectedContainerMaterial)?.label}</span>
+                </div>
+              )}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {containerMaterialOptions.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                <div className="flex items-center gap-2">
+                  <div 
+                    className="w-4 h-4 rounded border border-border/50 shrink-0"
+                    style={{ 
+                      background: option.hex === 'transparent' 
+                        ? 'repeating-linear-gradient(45deg, #ccc, #ccc 2px, #fff 2px, #fff 4px)' 
+                        : option.hex || '#e5e7eb'
+                    }}
+                  />
+                  <span>{option.label}</span>
+                </div>
               </SelectItem>
             ))}
           </SelectContent>

@@ -22,7 +22,10 @@ import {
   UtensilsCrossed,
   LayoutGrid,
   Upload,
-  X
+  X,
+  History,
+  ArrowLeft,
+  ArrowRight
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -558,6 +561,9 @@ function MockupCard({
     setIsRewriting(true);
     setSelectedRewriteStyle(style);
     try {
+      // Save current text to history before rewriting
+      const currentText = editedFrontPanelText;
+      
       const { data, error } = await supabase.functions.invoke('rewrite-label-text', {
         body: {
           currentText: editedFrontPanelText,
@@ -572,9 +578,17 @@ function MockupCard({
         throw new Error(errorMsg);
       }
       if (data?.rewrittenText) {
+        // Add current text to history before updating
+        const newHistory = [...textHistory.slice(0, historyIndex + 1), currentText];
+        setTextHistory(newHistory);
+        setHistoryIndex(newHistory.length - 1);
+        
         setEditedFrontPanelText(data.rewrittenText);
-        // Auto-save the rewritten text
-        onSaveCustomizations?.({ front_panel_text: data.rewrittenText });
+        // Auto-save the rewritten text and updated history
+        onSaveCustomizations?.({ 
+          front_panel_text: data.rewrittenText,
+          text_history: newHistory
+        });
         toast({
           title: 'Label Rewritten',
           description: `Text updated with ${style} style.`,
@@ -712,14 +726,56 @@ function MockupCard({
     savedCustomization?.lid_color ?? "auto"
   );
   
-  // Custom hex color states for container and lid
-  const [customContainerHex, setCustomContainerHex] = useState<string>("#4A90A4");
-  const [customLidHex, setCustomLidHex] = useState<string>("#333333");
+  // Custom hex color states for container and lid - initialize from saved customization
+  const [customContainerHex, setCustomContainerHex] = useState<string>(
+    savedCustomization?.custom_container_hex ?? "#4A90A4"
+  );
+  const [customLidHex, setCustomLidHex] = useState<string>(
+    savedCustomization?.custom_lid_hex ?? "#333333"
+  );
+  
+  // Text history for undo/redo of AI rewrites
+  const [textHistory, setTextHistory] = useState<string[]>(
+    savedCustomization?.text_history ?? []
+  );
+  const [historyIndex, setHistoryIndex] = useState<number>(-1);
   
   // Handle lid color change with persistence
   const handleLidColorChange = (color: string) => {
     setSelectedLidColor(color);
     onSaveCustomizations?.({ lid_color: color });
+  };
+  
+  // Handle custom container hex change with persistence
+  const handleCustomContainerHexChange = (hex: string) => {
+    setCustomContainerHex(hex);
+    onSaveCustomizations?.({ custom_container_hex: hex });
+  };
+  
+  // Handle custom lid hex change with persistence
+  const handleCustomLidHexChange = (hex: string) => {
+    setCustomLidHex(hex);
+    onSaveCustomizations?.({ custom_lid_hex: hex });
+  };
+  
+  // Undo text to previous version
+  const handleUndoText = () => {
+    if (historyIndex >= 0) {
+      const previousText = textHistory[historyIndex];
+      setEditedFrontPanelText(previousText);
+      setHistoryIndex(prev => prev - 1);
+      onSaveCustomizations?.({ front_panel_text: previousText });
+    }
+  };
+  
+  // Redo text to next version
+  const handleRedoText = () => {
+    if (historyIndex < textHistory.length - 1) {
+      const nextText = textHistory[historyIndex + 1];
+      setEditedFrontPanelText(nextText);
+      setHistoryIndex(prev => prev + 1);
+      onSaveCustomizations?.({ front_panel_text: nextText });
+    }
   };
   
   // Sync format from saved customization when it changes
@@ -749,6 +805,27 @@ function MockupCard({
       setSelectedLidColor(savedCustomization.lid_color);
     }
   }, [savedCustomization?.lid_color]);
+  
+  // Sync custom hex colors from saved customization
+  useEffect(() => {
+    if (savedCustomization?.custom_container_hex) {
+      setCustomContainerHex(savedCustomization.custom_container_hex);
+    }
+  }, [savedCustomization?.custom_container_hex]);
+  
+  useEffect(() => {
+    if (savedCustomization?.custom_lid_hex) {
+      setCustomLidHex(savedCustomization.custom_lid_hex);
+    }
+  }, [savedCustomization?.custom_lid_hex]);
+  
+  // Sync text history from saved customization
+  useEffect(() => {
+    if (savedCustomization?.text_history) {
+      setTextHistory(savedCustomization.text_history);
+      setHistoryIndex(savedCustomization.text_history.length - 1);
+    }
+  }, [savedCustomization?.text_history]);
 
   // Update when mockupUrl prop changes, but NOT while generating (prevents race condition)
   useEffect(() => {
@@ -1270,13 +1347,13 @@ function MockupCard({
             <input
               type="color"
               value={customContainerHex}
-              onChange={(e) => setCustomContainerHex(e.target.value)}
+              onChange={(e) => handleCustomContainerHexChange(e.target.value)}
               className="w-8 h-8 rounded border border-border/50 cursor-pointer"
             />
             <Input
               type="text"
               value={customContainerHex}
-              onChange={(e) => setCustomContainerHex(e.target.value)}
+              onChange={(e) => handleCustomContainerHexChange(e.target.value)}
               placeholder="#RRGGBB"
               className="h-8 text-xs font-mono uppercase"
               maxLength={7}
@@ -1337,13 +1414,13 @@ function MockupCard({
             <input
               type="color"
               value={customLidHex}
-              onChange={(e) => setCustomLidHex(e.target.value)}
+              onChange={(e) => handleCustomLidHexChange(e.target.value)}
               className="w-8 h-8 rounded border border-border/50 cursor-pointer"
             />
             <Input
               type="text"
               value={customLidHex}
-              onChange={(e) => setCustomLidHex(e.target.value)}
+              onChange={(e) => handleCustomLidHexChange(e.target.value)}
               placeholder="#RRGGBB"
               className="h-8 text-xs font-mono uppercase"
               maxLength={7}
@@ -1447,6 +1524,53 @@ function MockupCard({
               ))}
             </TooltipProvider>
           </div>
+          
+          {/* Text History Undo/Redo */}
+          {textHistory.length > 0 && (
+            <div className="flex items-center gap-1.5 pt-2 border-t border-border/50">
+              <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                <History className="w-3 h-3" />
+                History ({textHistory.length}):
+              </span>
+              <TooltipProvider delayDuration={300}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleUndoText}
+                      disabled={historyIndex < 0}
+                      className="h-6 w-6 p-0"
+                    >
+                      <ArrowLeft className="w-3 h-3" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs">
+                    Restore previous version
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleRedoText}
+                      disabled={historyIndex >= textHistory.length - 1}
+                      className="h-6 w-6 p-0"
+                    >
+                      <ArrowRight className="w-3 h-3" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs">
+                    Go to next version
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <span className="text-[10px] text-muted-foreground ml-auto">
+                {historyIndex + 1}/{textHistory.length}
+              </span>
+            </div>
+          )}
         </CollapsibleContent>
       </Collapsible>
 

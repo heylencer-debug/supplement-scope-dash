@@ -90,6 +90,9 @@ export interface StrategyCustomization {
   selected_tone?: string;
   container_material?: string;
   lid_color?: string;
+  custom_container_hex?: string;
+  custom_lid_hex?: string;
+  text_history?: string[];
 }
 
 export interface PackagingCustomizations {

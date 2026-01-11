@@ -109,48 +109,52 @@ serve(async (req) => {
             messages: [
               {
                 role: "system",
-                content: `You are an expert packaging copywriter specializing in supplement labels. Transform the label text to match the "${style}" style.
+                content: `You are an expert supplement LABEL copywriter. Your job is to rewrite product label text in the "${style}" style.
 
-=== HEADLINE TRANSFORMATION (LINE 1 - MOST CRITICAL) ===
+=== CRITICAL LABEL RULES ===
+1. This goes on a REAL PRODUCT LABEL - space is LIMITED
+2. Keep ALL ingredient names, dosages, and claims EXACTLY as given
+3. NEVER add unverified health claims or exaggerate benefits
+4. Stay CLOSE to the original formula messaging - just change the TONE
+5. Be CONVINCING but HONEST - no hype, just compelling copy
+
+=== HEADLINE RULES (LINE 1) ===
 ${styleConfig.headline}
 
-HEADLINE EXAMPLES for ${style} style:
-${styleConfig.examples}
+EXAMPLES: ${styleConfig.examples}
 
-HEADLINE RULES:
-- The headline MUST be exactly 2-3 words (or 1-2 for minimal style)
-- The headline MUST be SHORT, PUNCHY, and MEMORABLE
-- The headline MUST obviously reflect the ${style} tone
+HEADLINE REQUIREMENTS:
+- EXACTLY 2-3 punchy words (1-2 for minimal style)
+- Must fit on a product label (not a marketing tagline)
+- Obviously reflects the ${style} tone
 - NO long phrases like "Premium Cognitive Support Complex"
-- YES short punches like the examples above
-- This is the MOST important line - it sets the entire tone
 
-=== BODY TEXT TRANSFORMATION ===
+=== BODY TEXT RULES ===
 ${styleConfig.body}
 
-BODY RULES:
-- Preserve all factual claims and ingredient information
-- Transform the VOICE and WORD CHOICE to match ${style}
-- Keep all certification claims (FDA, GMP, etc.) exactly as given
-- Same benefits, completely different personality
-- Keep checkmarks (✓) or bullets (•) for benefit lines
-- Keep it concise - max 12 lines total
-- Preserve any dosage or quantity information exactly
+BODY REQUIREMENTS:
+- Each bullet/line: 5-8 words MAX
+- Preserve ALL factual info (dosages, certifications, ingredients)
+- Transform TONE, not FACTS
+- Keep checkmarks (✓) or bullets (•) 
+- MAX 10-12 lines total
+- Stay formula-focused - don't invent new claims
 
 === OUTPUT FORMAT ===
-- Return ONLY the transformed text, no explanations
-- Keep the same line-by-line structure
-- First line = transformed headline (2-3 words)
-- Following lines = transformed body content`
+Line 1: SHORT 2-3 word headline
+Lines 2+: Transformed body (preserve checkmarks/bullets)
+NOTHING ELSE - no explanations`
               },
               {
                 role: "user",
-                content: `Product context: ${productContext || 'Dietary supplement product'}
+                content: `Product: ${productContext || 'Dietary supplement'}
 
-Current label text:
+CURRENT LABEL TEXT:
 ${currentText}
 
-Transform this COMPLETELY to the ${style} style. The headline (first line) should be a SHORT 2-3 word punch that captures the ${style} personality. Examples: ${styleConfig.examples}`
+REWRITE for ${style} style.
+REMEMBER: This is a REAL PRODUCT LABEL - keep it SHORT, CONVINCING, and FORMULA-ACCURATE.
+Headline examples: ${styleConfig.examples}`
               }
             ],
           }),

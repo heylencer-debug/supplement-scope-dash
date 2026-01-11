@@ -152,6 +152,7 @@ const packagingFormatOptions = [
 // Container material/color options
 const containerMaterialOptions = [
   { value: "auto", label: "Auto (AI Decides)", material: "", hex: "" },
+  { value: "custom", label: "Custom Color", material: "custom colored container", hex: "" },
   // Plastic options
   { value: "white-plastic", label: "White Plastic", material: "opaque white HDPE plastic", hex: "#FFFFFF" },
   { value: "clear-plastic", label: "Clear Plastic", material: "transparent clear PET plastic", hex: "transparent" },
@@ -171,6 +172,7 @@ const containerMaterialOptions = [
 // Lid/cap color options
 const lidColorOptions = [
   { value: "auto", label: "Auto (Match Container)", hex: "" },
+  { value: "custom", label: "Custom Color", hex: "" },
   // Basic colors
   { value: "white", label: "White", hex: "#FFFFFF" },
   { value: "black", label: "Black", hex: "#1a1a1a" },
@@ -710,6 +712,10 @@ function MockupCard({
     savedCustomization?.lid_color ?? "auto"
   );
   
+  // Custom hex color states for container and lid
+  const [customContainerHex, setCustomContainerHex] = useState<string>("#4A90A4");
+  const [customLidHex, setCustomLidHex] = useState<string>("#333333");
+  
   // Handle lid color change with persistence
   const handleLidColorChange = (color: string) => {
     setSelectedLidColor(color);
@@ -869,15 +875,47 @@ function MockupCard({
         effectiveBrandName,
       });
 
-      // Get container material if selected
-      const containerMaterial = selectedContainerMaterial === "auto" 
-        ? null 
-        : containerMaterialOptions.find(m => m.value === selectedContainerMaterial);
+      // Get container material if selected (handle custom hex)
+      let containerMaterial: { value: string; material: string; hex: string } | null = null;
+      if (selectedContainerMaterial !== "auto") {
+        if (selectedContainerMaterial === "custom") {
+          containerMaterial = {
+            value: "custom",
+            material: `custom colored container in ${customContainerHex}`,
+            hex: customContainerHex
+          };
+        } else {
+          const preset = containerMaterialOptions.find(m => m.value === selectedContainerMaterial);
+          if (preset) {
+            containerMaterial = {
+              value: preset.value,
+              material: preset.material,
+              hex: preset.hex
+            };
+          }
+        }
+      }
 
-      // Get lid color if selected
-      const lidColor = selectedLidColor === "auto"
-        ? null
-        : lidColorOptions.find(l => l.value === selectedLidColor);
+      // Get lid color if selected (handle custom hex)
+      let lidColor: { value: string; label: string; hex: string } | null = null;
+      if (selectedLidColor !== "auto") {
+        if (selectedLidColor === "custom") {
+          lidColor = {
+            value: "custom",
+            label: `Custom (${customLidHex})`,
+            hex: customLidHex
+          };
+        } else {
+          const preset = lidColorOptions.find(l => l.value === selectedLidColor);
+          if (preset) {
+            lidColor = {
+              value: preset.value,
+              label: preset.label,
+              hex: preset.hex
+            };
+          }
+        }
+      }
 
       const { data, error } = await supabase.functions.invoke('generate-product-mockup', {
         body: {
@@ -908,17 +946,9 @@ function MockupCard({
             suggestedTone: effectiveTone,
             heroImagery: (designBrief as any).hero_imagery,
             // Container material customization
-            containerMaterial: containerMaterial ? {
-              value: containerMaterial.value,
-              material: containerMaterial.material,
-              hex: containerMaterial.hex
-            } : null,
+            containerMaterial,
             // Lid color customization
-            lidColor: lidColor ? {
-              value: lidColor.value,
-              label: lidColor.label,
-              hex: lidColor.hex
-            } : null,
+            lidColor,
             // NEW: Pass AI-generated label design fields
             labelAtmosphere: (designBrief as any).label_atmosphere,
             labelHierarchy: (designBrief as any).label_hierarchy,
@@ -1185,7 +1215,7 @@ function MockupCard({
       </div>
 
       {/* Container Material Color Selector */}
-      <div>
+      <div className="space-y-2">
         <label className="text-xs font-medium text-muted-foreground mb-1.5 block flex items-center gap-1.5">
           <Package className="w-3 h-3" />
           Container Material
@@ -1198,12 +1228,18 @@ function MockupCard({
                   <div 
                     className="w-4 h-4 rounded border border-border/50 shrink-0"
                     style={{ 
-                      background: containerMaterialOptions.find(m => m.value === selectedContainerMaterial)?.hex === 'transparent' 
-                        ? 'repeating-linear-gradient(45deg, #ccc, #ccc 2px, #fff 2px, #fff 4px)' 
-                        : containerMaterialOptions.find(m => m.value === selectedContainerMaterial)?.hex || '#e5e7eb'
+                      background: selectedContainerMaterial === 'custom' 
+                        ? customContainerHex
+                        : containerMaterialOptions.find(m => m.value === selectedContainerMaterial)?.hex === 'transparent' 
+                          ? 'repeating-linear-gradient(45deg, #ccc, #ccc 2px, #fff 2px, #fff 4px)' 
+                          : containerMaterialOptions.find(m => m.value === selectedContainerMaterial)?.hex || '#e5e7eb'
                     }}
                   />
-                  <span>{containerMaterialOptions.find(m => m.value === selectedContainerMaterial)?.label}</span>
+                  <span>
+                    {selectedContainerMaterial === 'custom' 
+                      ? `Custom (${customContainerHex})`
+                      : containerMaterialOptions.find(m => m.value === selectedContainerMaterial)?.label}
+                  </span>
                 </div>
               )}
             </SelectValue>
@@ -1215,16 +1251,42 @@ function MockupCard({
                   <div 
                     className="w-4 h-4 rounded border border-border/50 shrink-0"
                     style={{ 
-                      background: option.hex === 'transparent' 
-                        ? 'repeating-linear-gradient(45deg, #ccc, #ccc 2px, #fff 2px, #fff 4px)' 
-                        : option.hex || '#e5e7eb'
+                      background: option.value === 'custom'
+                        ? 'linear-gradient(135deg, #ff6b6b 0%, #4ecdc4 50%, #45b7d1 100%)'
+                        : option.hex === 'transparent' 
+                          ? 'repeating-linear-gradient(45deg, #ccc, #ccc 2px, #fff 2px, #fff 4px)' 
+                          : option.hex || '#e5e7eb'
                     }}
                   />
                   <span>{option.label}</span>
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {/* Custom hex input for container */}
+        {selectedContainerMaterial === 'custom' && (
+          <div className="flex items-center gap-2 mt-2">
+            <input
+              type="color"
+              value={customContainerHex}
+              onChange={(e) => setCustomContainerHex(e.target.value)}
+              className="w-8 h-8 rounded border border-border/50 cursor-pointer"
+            />
+            <Input
+              type="text"
+              value={customContainerHex}
+              onChange={(e) => setCustomContainerHex(e.target.value)}
+              placeholder="#RRGGBB"
+              className="h-8 text-xs font-mono uppercase"
+              maxLength={7}
+            />
+          </div>
+        )}
       </div>
 
       {/* Lid/Cap Color Selector */}
-      <div>
+      <div className="space-y-2">
         <label className="text-xs font-medium text-muted-foreground mb-1.5 block flex items-center gap-1.5">
           <span className="w-3 h-3 flex items-center justify-center text-[10px]">🔘</span>
           Lid/Cap Color
@@ -1237,10 +1299,16 @@ function MockupCard({
                   <div 
                     className="w-4 h-4 rounded-full border border-border/50 shrink-0"
                     style={{ 
-                      background: lidColorOptions.find(l => l.value === selectedLidColor)?.hex || '#e5e7eb'
+                      background: selectedLidColor === 'custom'
+                        ? customLidHex
+                        : lidColorOptions.find(l => l.value === selectedLidColor)?.hex || '#e5e7eb'
                     }}
                   />
-                  <span>{lidColorOptions.find(l => l.value === selectedLidColor)?.label}</span>
+                  <span>
+                    {selectedLidColor === 'custom'
+                      ? `Custom (${customLidHex})`
+                      : lidColorOptions.find(l => l.value === selectedLidColor)?.label}
+                  </span>
                 </div>
               )}
             </SelectValue>
@@ -1252,7 +1320,9 @@ function MockupCard({
                   <div 
                     className="w-4 h-4 rounded-full border border-border/50 shrink-0"
                     style={{ 
-                      background: option.hex || '#e5e7eb'
+                      background: option.value === 'custom'
+                        ? 'linear-gradient(135deg, #ff6b6b 0%, #4ecdc4 50%, #45b7d1 100%)'
+                        : option.hex || '#e5e7eb'
                     }}
                   />
                   <span>{option.label}</span>
@@ -1261,11 +1331,25 @@ function MockupCard({
             ))}
           </SelectContent>
         </Select>
-      </div>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {/* Custom hex input for lid */}
+        {selectedLidColor === 'custom' && (
+          <div className="flex items-center gap-2 mt-2">
+            <input
+              type="color"
+              value={customLidHex}
+              onChange={(e) => setCustomLidHex(e.target.value)}
+              className="w-8 h-8 rounded border border-border/50 cursor-pointer"
+            />
+            <Input
+              type="text"
+              value={customLidHex}
+              onChange={(e) => setCustomLidHex(e.target.value)}
+              placeholder="#RRGGBB"
+              className="h-8 text-xs font-mono uppercase"
+              maxLength={7}
+            />
+          </div>
+        )}
       </div>
 
       {/* Logo indicator (upload is handled in parent) */}

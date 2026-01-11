@@ -300,7 +300,8 @@ serve(async (req) => {
       flavor,
       servingSize,
       servingsPerContainer,
-      containerMaterial, // NEW: User-specified container material/color
+      containerMaterial, // User-specified container material/color
+      lidColor, // User-specified lid/cap color
     } = designBrief;
 
     // Get container details
@@ -430,8 +431,25 @@ serve(async (req) => {
     }
 
     // =========================================================================
-    // SECTION 3: MANDATORY COLOR PALETTE
+    // SECTION 2C: USER-SPECIFIED LID/CAP COLOR
     // =========================================================================
+    if (lidColor && lidColor.value !== 'auto') {
+      promptParts.push("═══════════════════════════════════════════════════════════════");
+      promptParts.push("          ⚠️ USER-SPECIFIED LID/CAP COLOR (MANDATORY)           ");
+      promptParts.push("═══════════════════════════════════════════════════════════════");
+      promptParts.push("");
+      promptParts.push(`LID/CAP COLOR: ${lidColor.label}`);
+      promptParts.push(`LID/CAP HEX: ${lidColor.hex}`);
+      promptParts.push("");
+      promptParts.push("REQUIREMENTS:");
+      promptParts.push(`• The lid, cap, or closure MUST be ${lidColor.label} (${lidColor.hex})`);
+      promptParts.push("• This is INDEPENDENT from the container body color");
+      promptParts.push("• Ensure the lid is clearly visible and in the specified color");
+      promptParts.push("");
+      promptParts.push("⛔ DO NOT use a different lid color - use EXACTLY what is specified above.");
+      promptParts.push("");
+    }
+
     promptParts.push("═══════════════════════════════════════════════════════════════");
     promptParts.push("                    🎨 COLOR PALETTE (MANDATORY)                ");
     promptParts.push("═══════════════════════════════════════════════════════════════");

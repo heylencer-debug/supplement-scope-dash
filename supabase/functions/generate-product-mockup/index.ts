@@ -256,6 +256,14 @@ const toneDesignSystems: Record<string, ToneDesignSystem> = {
     finish: "Soft matte, gentle-touch paper feel, no harsh contrasts anywhere, spa-like calm.",
     iconStyle: "Simple nature icons, lotus flowers, gentle waves, leaves, minimal strokes, meditation symbols.",
     avoidList: ["Bold aggressive elements", "Bright saturated colors", "Busy layouts", "Sharp angles", "High contrast", "Energetic elements"]
+  },
+  premiumClean: {
+    typography: "Bold condensed sans-serif headlines (Bebas Neue, Oswald, Montserrat Bold). Clean supporting sans-serif (Inter, Helvetica). Strong hierarchy with large product name. Professional weight contrast.",
+    dynamicLayout: "Clean organized sections with clear hierarchy. Balanced white space (40-50%). Product name prominent center. Supporting info in clean rows. No clutter, no extreme minimalism. Professional supplement label structure.",
+    colorApplication: "DARK MATTE BLACK container and lid. CREAM/OFF-WHITE label background (not pure white - use #f5f0e8 or similar warm cream). GOLD/WARM YELLOW accent color for highlights and key text (#d4a21f or similar). High contrast between dark container and light label.",
+    finish: "Matte black container finish (no gloss). Clean label with subtle sheen. Professional quality paper feel. Sophisticated but not luxurious.",
+    iconStyle: "Minimal clean icons if any. Simple geometric shapes. No decorative flourishes. Professional certification seals welcome but not required.",
+    avoidList: ["Glossy container", "Pure white backgrounds", "Busy patterns", "Playful elements", "Extreme minimalism", "Racing stripes", "Neon colors", "Handwritten fonts", "Vintage styling"]
   }
 };
 

@@ -253,6 +253,8 @@ const toneOptions: ToneOption[] = [
     preview: { bg: "linear-gradient(135deg, #e0e7ff 0%, #ddd6fe 100%)", accent: "#a5b4fc", text: "#4338ca", icon: "🪷" } },
   { value: "modernPremium", label: "Modern Premium", description: "Angular shapes, glowing gold accents, ultra-modern fonts, dark minimalist",
     preview: { bg: "#0a0a0a", accent: "#fbbf24", text: "#ffffff", icon: "◆" } },
+  { value: "modernPopArt", label: "Modern Pop Art", description: "Solid black, photorealistic ingredients in motion, single vibrant pop color",
+    preview: { bg: "#000000", accent: "#FF6B00", text: "#ffffff", icon: "🍊" } },
 ];
 
 // Tone preview thumbnail component

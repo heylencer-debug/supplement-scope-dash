@@ -256,7 +256,15 @@ const toneOptions: ToneOption[] = [
 ];
 
 // Tone preview thumbnail component
-function TonePreviewThumbnail({ tone }: { tone: ToneOption }) {
+function TonePreviewThumbnail({ tone }: { tone: ToneOption | undefined }) {
+  // Fallback for undefined tone (e.g., if stored value doesn't match any option)
+  if (!tone) {
+    return (
+      <div className="w-8 h-8 rounded-md flex items-center justify-center text-xs font-bold shrink-0 border border-border/30 shadow-sm bg-muted text-muted-foreground">
+        ?
+      </div>
+    );
+  }
   const patternStyles: Record<string, React.CSSProperties> = {
     diagonal: {
       backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(255,255,255,0.1) 3px, rgba(255,255,255,0.1) 6px)`,

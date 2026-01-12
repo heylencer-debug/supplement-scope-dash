@@ -267,6 +267,19 @@ const toneDesignSystems: Record<string, ToneDesignSystem> = {
   }
 };
 
+// =============================================================================
+// HELPER: Check if background elements should be skipped for this tone
+// =============================================================================
+function shouldSkipForTone(toneSystem: ToneDesignSystem | null, elementKeywords: string[]): boolean {
+  if (!toneSystem || !toneSystem.avoidList) return false;
+  const avoidLower = toneSystem.avoidList.map(item => item.toLowerCase());
+  return elementKeywords.some(keyword => 
+    avoidLower.some(avoided => 
+      avoided.includes(keyword.toLowerCase()) || keyword.toLowerCase().includes(avoided)
+    )
+  );
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -604,6 +617,12 @@ serve(async (req) => {
     promptParts.push("═══════════════════════════════════════════════════════════════");
     promptParts.push("");
     
+    // GET TONE-SPECIFIC DESIGN SYSTEM EARLY (needed for conditional background elements)
+    const toneValue = suggestedTone 
+      ? (typeof suggestedTone === 'string' ? suggestedTone : suggestedTone.primary_tone || 'premium')
+      : null;
+    const toneSystem = toneValue && toneValue !== 'auto' ? toneDesignSystems[toneValue.toLowerCase()] : null;
+    
     // PILLAR 1: ATMOSPHERE & VISUAL STYLING (EXPANDED)
     promptParts.push("PILLAR 1: ATMOSPHERE & VISUAL STYLING");
     promptParts.push("─────────────────────────────────────");
@@ -626,8 +645,9 @@ serve(async (req) => {
         promptParts.push("   → Use as subtle background transition or color flow across label");
       }
       
-      // RESTORED: Ambient pattern (geometric elements)
-      if (labelAtmosphere.ambient_pattern) {
+      // CONDITIONAL: Ambient pattern - skip for tones that avoid patterns/textures
+      const skipPatterns = shouldSkipForTone(toneSystem, ['patterns', 'textures', 'decorative', 'busy']);
+      if (labelAtmosphere.ambient_pattern && !skipPatterns) {
         promptParts.push("");
         promptParts.push("🔷 BACKGROUND PATTERN:");
         promptParts.push(`   Pattern type: ${labelAtmosphere.ambient_pattern}`);
@@ -637,30 +657,33 @@ serve(async (req) => {
         promptParts.push("   → Apply as subtle background texture/pattern on label");
       }
       
-      // RESTORED: Decorative elements
-      if (labelAtmosphere.decorative_elements && labelAtmosphere.decorative_elements.length > 0) {
+      // CONDITIONAL: Decorative elements - skip for minimalist/clean/clinical tones
+      const skipDecorative = shouldSkipForTone(toneSystem, ['decorative', 'flourishes', 'multiple', 'busy']);
+      if (labelAtmosphere.decorative_elements && labelAtmosphere.decorative_elements.length > 0 && !skipDecorative) {
         promptParts.push("");
         promptParts.push("✨ DECORATIVE ELEMENTS:");
         promptParts.push(`   Include: ${labelAtmosphere.decorative_elements.join(', ')}`);
         promptParts.push("   → These are subtle background/accent elements matching product mood");
       }
       
-      // RESTORED: Design accents
-      if (labelAtmosphere.design_accents && labelAtmosphere.design_accents.length > 0) {
+      // CONDITIONAL: Design accents - skip for tones that avoid textures/effects
+      const skipAccents = shouldSkipForTone(toneSystem, ['textures', 'effects', 'embossing', 'borders']);
+      if (labelAtmosphere.design_accents && labelAtmosphere.design_accents.length > 0 && !skipAccents) {
         promptParts.push("");
         promptParts.push("🏅 DESIGN ACCENTS:");
         promptParts.push(`   Add: ${labelAtmosphere.design_accents.join(', ')}`);
         promptParts.push("   → Premium finishing touches like borders, foil stamps, embossing");
       }
       
-      // RESTORED: Texture finish
-      if (labelAtmosphere.texture_finish) {
+      // CONDITIONAL: Texture finish - skip for tones that explicitly avoid textures
+      const skipTextures = shouldSkipForTone(toneSystem, ['textures', 'flat', 'no textures']);
+      if (labelAtmosphere.texture_finish && !skipTextures) {
         promptParts.push("");
         promptParts.push("🎯 LABEL FINISH:");
         promptParts.push(`   Surface: ${labelAtmosphere.texture_finish}`);
       }
       
-      // RESTORED: Text finish
+      // Text finish - generally allowed for all tones
       if (labelAtmosphere.text_finish) {
         promptParts.push("");
         promptParts.push("📝 TEXT STYLING:");
@@ -679,12 +702,9 @@ serve(async (req) => {
     promptParts.push("");
     
     // =========================================================================
-    // GET TONE-SPECIFIC DESIGN SYSTEM (if tone is selected)
+    // TONE PRIORITY BLOCK (when user explicitly selects a tone)
+    // toneSystem and toneValue already defined earlier for conditional elements
     // =========================================================================
-    const toneValue = suggestedTone 
-      ? (typeof suggestedTone === 'string' ? suggestedTone : suggestedTone.primary_tone || 'premium')
-      : null;
-    const toneSystem = toneValue && toneValue !== 'auto' ? toneDesignSystems[toneValue.toLowerCase()] : null;
 
     // =========================================================================
     // TONE PRIORITY BLOCK (when user explicitly selects a tone)

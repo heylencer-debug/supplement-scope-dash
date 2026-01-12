@@ -251,8 +251,8 @@ const toneOptions: ToneOption[] = [
     preview: { bg: "linear-gradient(135deg, #1f2937 0%, #111827 100%)", accent: "#ef4444", text: "#ffffff", pattern: "stripe", icon: "🏆" } },
   { value: "zen", label: "Zen / Calm", description: "Light airy fonts, soft pastels, lotus/wave icons",
     preview: { bg: "linear-gradient(135deg, #e0e7ff 0%, #ddd6fe 100%)", accent: "#a5b4fc", text: "#4338ca", icon: "🪷" } },
-  { value: "premiumClean", label: "Premium Clean", description: "Dark matte container, cream label, gold accents, bold condensed fonts",
-    preview: { bg: "#1a1a1a", accent: "#d4a21f", text: "#f5f0e8", icon: "✦" } },
+  { value: "modernPremium", label: "Modern Premium", description: "Angular shapes, glowing gold accents, ultra-modern fonts, dark minimalist",
+    preview: { bg: "#0a0a0a", accent: "#fbbf24", text: "#ffffff", icon: "◆" } },
 ];
 
 // Tone preview thumbnail component

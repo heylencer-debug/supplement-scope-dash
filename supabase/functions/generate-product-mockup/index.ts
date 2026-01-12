@@ -257,13 +257,13 @@ const toneDesignSystems: Record<string, ToneDesignSystem> = {
     iconStyle: "Simple nature icons, lotus flowers, gentle waves, leaves, minimal strokes, meditation symbols.",
     avoidList: ["Bold aggressive elements", "Bright saturated colors", "Busy layouts", "Sharp angles", "High contrast", "Energetic elements"]
   },
-  premiumClean: {
-    typography: "Bold condensed sans-serif headlines (Bebas Neue, Oswald, Montserrat Bold). Clean supporting sans-serif (Inter, Helvetica). Strong hierarchy with large product name. Professional weight contrast.",
-    dynamicLayout: "Clean organized sections with clear hierarchy. Balanced white space (40-50%). Product name prominent center. Supporting info in clean rows. No clutter, no extreme minimalism. Professional supplement label structure.",
-    colorApplication: "DARK MATTE BLACK container and lid. CREAM/OFF-WHITE label background (not pure white - use #f5f0e8 or similar warm cream). GOLD/WARM YELLOW accent color for highlights and key text (#d4a21f or similar). High contrast between dark container and light label.",
-    finish: "Matte black container finish (no gloss). Clean label with subtle sheen. Professional quality paper feel. Sophisticated but not luxurious.",
-    iconStyle: "Minimal clean icons if any. Simple geometric shapes. No decorative flourishes. Professional certification seals welcome but not required.",
-    avoidList: ["Glossy container", "Pure white backgrounds", "Busy patterns", "Playful elements", "Extreme minimalism", "Racing stripes", "Neon colors", "Handwritten fonts", "Vintage styling"]
+  modernPremium: {
+    typography: "Ultra-modern geometric sans-serif (Poppins, DM Sans, Archivo Black, Manrope). Sharp clean letterforms with no rounded edges. Strong weight contrast - extra bold headlines, light supporting text. Contemporary tech-forward feel.",
+    dynamicLayout: "ANGULAR geometric layout with sharp edges and clean lines. NO rounded corners anywhere. Structured grid-based design. Minimalist with strategic white space (50-60%). Product name large and centered. Information in clean horizontal bands or angular sections.",
+    colorApplication: "DEEP BLACK container and lid (#0a0a0a or pure black). GLOWING GOLD/AMBER accent (#fbbf24, #f59e0b) with LUMINOUS GLOW EFFECT - accents should appear to emit light against the dark background. White or very light text for contrast. Accent color used sparingly but with high visual impact through glow/gradient effects.",
+    finish: "Matte black container with subtle texture. Label areas with clean flat finish. GLOW EFFECTS on gold accent elements - subtle luminosity, ambient light effect, or subtle gradient glow around accent colors to make them pop.",
+    iconStyle: "Geometric angular icons only. Diamond shapes, hexagons, sharp chevrons. No organic or curved elements. Minimal icon usage - let typography do the work.",
+    avoidList: ["Rounded corners", "Curved shapes", "Organic forms", "Soft edges", "Pastel colors", "Playful elements", "Serif fonts", "Traditional layouts", "Cream/warm whites", "Vintage styling", "Decorative flourishes"]
   }
 };
 

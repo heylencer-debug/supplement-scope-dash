@@ -258,12 +258,12 @@ const toneDesignSystems: Record<string, ToneDesignSystem> = {
     avoidList: ["Bold aggressive elements", "Bright saturated colors", "Busy layouts", "Sharp angles", "High contrast", "Energetic elements"]
   },
   modernPremium: {
-    typography: "Ultra-modern geometric sans-serif (Poppins, DM Sans, Archivo Black, Manrope). Sharp clean letterforms with no rounded edges. Strong weight contrast - extra bold headlines, light supporting text. Contemporary tech-forward feel.",
-    dynamicLayout: "ANGULAR geometric layout with sharp edges and clean lines. NO rounded corners anywhere. Structured grid-based design. Minimalist with strategic white space (50-60%). Product name large and centered. Information in clean horizontal bands or angular sections.",
-    colorApplication: "DEEP BLACK container and lid (#0a0a0a or pure black). GLOWING GOLD/AMBER accent (#fbbf24, #f59e0b) with LUMINOUS GLOW EFFECT - accents should appear to emit light against the dark background. White or very light text for contrast. Accent color used sparingly but with high visual impact through glow/gradient effects.",
-    finish: "Matte black container with subtle texture. Label areas with clean flat finish. GLOW EFFECTS on gold accent elements - subtle luminosity, ambient light effect, or subtle gradient glow around accent colors to make them pop.",
-    iconStyle: "Geometric angular icons only. Diamond shapes, hexagons, sharp chevrons. No organic or curved elements. Minimal icon usage - let typography do the work.",
-    avoidList: ["Rounded corners", "Curved shapes", "Organic forms", "Soft edges", "Pastel colors", "Playful elements", "Serif fonts", "Traditional layouts", "Cream/warm whites", "Vintage styling", "Decorative flourishes"]
+    typography: "Ultra-modern geometric sans-serif (Poppins, DM Sans, Archivo, Manrope). Sharp clean letterforms. Strong weight contrast - extra bold headline, ultra-light supporting text. Minimal text - product name and essential info only.",
+    dynamicLayout: "MINIMALIST layout with GRADIENT BACKGROUND as the primary design element. Include ONLY: benefit icons, badges, and flavor graphics. NO borders, NO extra decorative patterns, NO busy sections. Clean centered hierarchy with generous negative space (60%+).",
+    colorApplication: "DEEP BLACK base (#0a0a0a). GRADIENT BACKGROUND with subtle GLOWING GOLD/AMBER tones (#fbbf24 to #0a0a0a) creating ambient glow effect. The gradient IS the main visual. White or gold text for contrast. Icons and badges in accent gold color.",
+    finish: "Matte black container. GRADIENT GLOW as the primary visual element - subtle light-to-dark gradient creating ambient luminosity. No textures, no embossing. Clean surfaces with focused visual elements.",
+    iconStyle: "Clean geometric benefit icons in gold/white. Small subtle badges for certifications or claims. Flavor graphics should be minimal and elegant - subtle fruit/ingredient imagery that complements the gradient.",
+    avoidList: ["Borders", "Patterns", "Textures", "Rounded corners", "Curved shapes", "Organic forms", "Busy layouts", "Serif fonts", "Traditional layouts", "Cream colors", "Decorative flourishes", "Multiple accent colors", "Excessive text", "Complex graphics"]
   }
 };
 

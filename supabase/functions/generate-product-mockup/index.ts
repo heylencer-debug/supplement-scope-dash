@@ -264,6 +264,14 @@ const toneDesignSystems: Record<string, ToneDesignSystem> = {
     finish: "Matte black container. GRADIENT GLOW as the primary visual element - subtle light-to-dark gradient creating ambient luminosity. No textures, no embossing. Clean surfaces with focused visual elements.",
     iconStyle: "Clean geometric benefit icons in gold/white. Small subtle badges for certifications or claims. Flavor graphics should be minimal and elegant - subtle fruit/ingredient imagery that complements the gradient.",
     avoidList: ["Borders", "Patterns", "Textures", "Rounded corners", "Curved shapes", "Organic forms", "Busy layouts", "Serif fonts", "Traditional layouts", "Cream colors", "Decorative flourishes", "Multiple accent colors", "Excessive text", "Complex graphics"]
+  },
+  modernPopArt: {
+    typography: "Bold condensed sans-serif for product name (Bebas Neue, Oswald, Impact). Modern geometric sans-serif for brand (Poppins Bold, Montserrat Black). Clean lightweight sans-serif for details. ALL-CAPS for headlines. Strong typographic hierarchy with dramatic size contrast.",
+    dynamicLayout: "Centered vertical composition with PHOTOREALISTIC INGREDIENT IMAGERY as the hero element. Ingredients appear DYNAMIC and IN MOTION - splashing, flying, cascading around the container. Layout: Brand logo top > Large bold product name > Flowing realistic ingredient photography > Thin-line benefit icons > Certification bar bottom. The realistic imagery should WRAP around and INTERACT with the container.",
+    colorApplication: "SOLID BLACK or DEEP DARK background (#000000 to #0D0D0D). ONE single VIBRANT POP COLOR derived from the primary ingredient/flavor - orange (#FF6B00) for citrus, purple (#9B30FF) for berry, red (#FF2D2D) for cherry, green (#00FF6A) for apple/mint, yellow (#FFD000) for tropical, blue (#00BFFF) for blue raspberry. Pop color used sparingly (10-15%) for accent text, icons, and certification bar. WHITE or light gray for primary text. HIGH CONTRAST is essential.",
+    finish: "MATTE DARK container (charcoal, black, or deep gray). Matte dark lid. Non-reflective premium surface. The container is understated - the PHOTOREALISTIC INGREDIENT IMAGERY is the star. No glossy or shiny surfaces.",
+    iconStyle: "Thin single-line geometric icons in white or the pop accent color. Simple universal symbols - lightning bolt, brain, muscle, shield. Small rectangular certification badge bar at bottom with pop-color background. Icons should be MINIMAL to not compete with the hero ingredient imagery.",
+    avoidList: ["Gradients", "Illustrated/cartoon ingredients", "Multiple accent colors", "Patterns of any kind", "Decorative borders", "Textured backgrounds", "Glossy/shiny containers", "Serif fonts", "Pastel colors", "White backgrounds", "Busy layouts", "Traditional label layouts", "Shadows on text", "Ornate typography"]
   }
 };
 

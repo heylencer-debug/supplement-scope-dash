@@ -267,11 +267,11 @@ const toneDesignSystems: Record<string, ToneDesignSystem> = {
   },
   modernPopArt: {
     typography: "Bold condensed sans-serif for product name (Bebas Neue, Oswald, Impact). Modern geometric sans-serif for brand (Poppins Bold, Montserrat Black). Clean lightweight sans-serif for details. ALL-CAPS for headlines. Strong typographic hierarchy with dramatic size contrast.",
-    dynamicLayout: "Centered vertical composition with PHOTOREALISTIC INGREDIENT IMAGERY as the hero element. Ingredients appear DYNAMIC and IN MOTION - splashing, flying, cascading around the container. Layout: Brand logo top > Large bold product name > Flowing realistic ingredient photography > Thin-line benefit icons > Certification bar bottom. The realistic imagery should WRAP around and INTERACT with the container.",
-    colorApplication: "SOLID BLACK or DEEP DARK background (#000000 to #0D0D0D). ONE single VIBRANT POP COLOR derived from the primary ingredient/flavor - orange (#FF6B00) for citrus, purple (#9B30FF) for berry, red (#FF2D2D) for cherry, green (#00FF6A) for apple/mint, yellow (#FFD000) for tropical, blue (#00BFFF) for blue raspberry. Pop color used sparingly (10-15%) for accent text, icons, and certification bar. WHITE or light gray for primary text. HIGH CONTRAST is essential.",
-    finish: "MATTE DARK container (charcoal, black, or deep gray). Matte dark lid. Non-reflective premium surface. The container is understated - the PHOTOREALISTIC INGREDIENT IMAGERY is the star. No glossy or shiny surfaces.",
+    dynamicLayout: "Centered vertical composition with PHOTOREALISTIC INGREDIENT IMAGERY as the hero element. Ingredients appear DYNAMIC and IN MOTION - splashing, flying, cascading around the container. Layout: Brand logo top > Large bold product name > Flowing realistic ingredient photography > Thin-line benefit icons > Certification bar bottom. The realistic imagery should WRAP around and INTERACT with the container. ALL EDGES MUST BE STRAIGHT AND ANGULAR - no curved shapes, no waves, no rounded elements.",
+    colorApplication: "SOLID FLAT BLACK background (#000000 to #0D0D0D) - NO GRADIENTS, NO GLOW EFFECTS, NO COLOR TRANSITIONS. The background MUST be uniform and flat. ONE single VIBRANT POP COLOR derived from the primary ingredient/flavor - orange (#FF6B00) for citrus, purple (#9B30FF) for berry, red (#FF2D2D) for cherry, green (#00FF6A) for apple/mint, yellow (#FFD000) for tropical, blue (#00BFFF) for blue raspberry. Pop color used sparingly (10-15%) for accent text, icons, and certification bar. WHITE or light gray for primary text. HIGH CONTRAST is essential.",
+    finish: "MATTE DARK container (charcoal, black, or deep gray). Matte dark lid. Non-reflective premium surface. The container is understated - the PHOTOREALISTIC INGREDIENT IMAGERY is the star. NO glossy or shiny surfaces. NO glow effects. NO ambient lighting effects.",
     iconStyle: "Thin single-line geometric icons in white or the pop accent color. Simple universal symbols - lightning bolt, brain, muscle, shield. Small rectangular certification badge bar at bottom with pop-color background. Icons should be MINIMAL to not compete with the hero ingredient imagery.",
-    avoidList: ["Gradients", "Illustrated/cartoon ingredients", "Multiple accent colors", "Patterns of any kind", "Decorative borders", "Textured backgrounds", "Glossy/shiny containers", "Serif fonts", "Pastel colors", "White backgrounds", "Busy layouts", "Traditional label layouts", "Shadows on text", "Ornate typography"]
+    avoidList: ["Gradients", "Glow effects", "Curved shapes", "Wave separators", "Curved banners", "Rounded corners", "Illustrated/cartoon ingredients", "Multiple accent colors", "Patterns of any kind", "Decorative borders", "Textured backgrounds", "Glossy/shiny containers", "Serif fonts", "Pastel colors", "White backgrounds", "Busy layouts", "Traditional label layouts", "Shadows on text", "Ornate typography", "Ambient lighting", "Color transitions", "Soft edges"]
   }
 };
 
@@ -639,18 +639,22 @@ serve(async (req) => {
       promptParts.push(`Design direction: ${labelAtmosphere.design_direction || 'Modern supplement aesthetic'}`);
       
       // GRADIENT STYLING - Respects user's brand colors when customized
-      promptParts.push("");
-      promptParts.push("🎨 GRADIENT STYLING:");
-      if (colorsCustomized) {
-        // User selected colors - generate gradient from their palette
-        promptParts.push(`   Apply gradient using YOUR SELECTED BRAND COLORS:`);
-        promptParts.push(`   Primary (${primaryColorHex}) → Secondary (${secondaryColorHex})`);
-        promptParts.push(`   Use accent (${accentColorHex}) for highlights in the gradient`);
-        promptParts.push("   → Create smooth transition between your brand colors on label background");
-      } else if (labelAtmosphere.gradient_description) {
-        // AI-suggested gradient when no customization
-        promptParts.push(`   Apply this gradient effect: ${labelAtmosphere.gradient_description}`);
-        promptParts.push("   → Use as subtle background transition or color flow across label");
+      // CONDITIONAL: Skip gradient styling for tones that explicitly avoid gradients
+      const skipGradients = shouldSkipForTone(toneSystem, ['gradient', 'gradients', 'color transitions']);
+      if (!skipGradients) {
+        promptParts.push("");
+        promptParts.push("🎨 GRADIENT STYLING:");
+        if (colorsCustomized) {
+          // User selected colors - generate gradient from their palette
+          promptParts.push(`   Apply gradient using YOUR SELECTED BRAND COLORS:`);
+          promptParts.push(`   Primary (${primaryColorHex}) → Secondary (${secondaryColorHex})`);
+          promptParts.push(`   Use accent (${accentColorHex}) for highlights in the gradient`);
+          promptParts.push("   → Create smooth transition between your brand colors on label background");
+        } else if (labelAtmosphere.gradient_description) {
+          // AI-suggested gradient when no customization
+          promptParts.push(`   Apply this gradient effect: ${labelAtmosphere.gradient_description}`);
+          promptParts.push("   → Use as subtle background transition or color flow across label");
+        }
       }
       
       // CONDITIONAL: Ambient pattern - skip for tones that avoid patterns/textures
@@ -744,7 +748,10 @@ serve(async (req) => {
       promptParts.push("• CORNER BURST: Asymmetric corner element drawing the eye");
     }
     promptParts.push("");
-    promptParts.push("⚠️ Choose ONLY ONE dynamic element. Multiple competing elements = cluttered.");
+    // Only show dynamic element hint when no tone-specific layout is defined
+    if (!toneSystem) {
+      promptParts.push("⚠️ Choose ONLY ONE dynamic element. Multiple competing elements = cluttered.");
+    }
     promptParts.push("");
     
     // PILLAR 3: TYPOGRAPHY (tone-specific override)

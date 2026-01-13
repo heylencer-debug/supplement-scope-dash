@@ -492,6 +492,8 @@ function MockupCard({
   const [flatLayoutUrl, setFlatLayoutUrl] = useState<string | null>(null);
   const [isFlatModalOpen, setIsFlatModalOpen] = useState(false);
   const [flatLayoutMode, setFlatLayoutMode] = useState<'full' | 'front_only'>('full');
+  const [flatEditPrompt, setFlatEditPrompt] = useState('');
+  const [isEditingFlatLayout, setIsEditingFlatLayout] = useState(false);
   
   // Mockup history
   const { 
@@ -687,6 +689,58 @@ function MockupCard({
       });
     } finally {
       setIsEditingImage(false);
+    }
+  };
+  
+  // Edit flat layout with AI prompt
+  const handleEditFlatLayout = async () => {
+    if (!flatLayoutUrl || !flatEditPrompt.trim()) return;
+    
+    setIsEditingFlatLayout(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('edit-product-mockup', {
+        body: {
+          sourceImageUrl: flatLayoutUrl,
+          editPrompt: flatEditPrompt.trim()
+        }
+      });
+
+      if (error) throw error;
+      
+      if (data?.editedImageUrl) {
+        // Save edited layout to history
+        await saveFlatLayoutToHistory(
+          data.editedImageUrl,
+          selectedFormat,
+          {
+            colors: {
+              primary: editedPrimaryColor,
+              accent: editedAccentColor,
+              secondary: editedSecondaryColor,
+            },
+            layout_mode: flatLayoutMode,
+          }
+        );
+        
+        // Update current flat layout
+        setFlatLayoutUrl(data.editedImageUrl);
+        
+        // Clear the prompt
+        setFlatEditPrompt('');
+        
+        toast({
+          title: 'Flat Layout Updated',
+          description: 'Your flat layout has been refined and saved to history.',
+        });
+      }
+    } catch (err) {
+      console.error('Edit flat layout error:', err);
+      handleApiError(err, {
+        fallbackTitle: 'Edit Failed',
+        fallbackDescription: 'Failed to edit flat layout'
+      });
+    } finally {
+      setIsEditingFlatLayout(false);
     }
   };
   
@@ -1951,28 +2005,64 @@ function MockupCard({
               </TabsList>
             </div>
             
-            <TabsContent value="preview" className="p-4 pt-3 mt-0">
+            <TabsContent value="preview" className="p-4 pt-3 mt-0 space-y-4">
               {flatLayoutUrl ? (
-                <div className="relative">
-                  <img 
-                    src={flatLayoutUrl} 
-                    alt={`${title} Flat Layout - Print Ready`}
-                    className="w-full h-auto rounded-lg shadow-lg bg-muted max-h-[60vh] object-contain"
-                  />
-                  <div className="absolute bottom-4 right-4 flex gap-2">
-                    <Button size="sm" variant="secondary" onClick={downloadFlatLayout} className="gap-1.5 shadow-lg">
-                      <Download className="w-4 h-4" />
-                      Download for Photoshop
+                <>
+                  <div className="relative">
+                    <img 
+                      src={flatLayoutUrl} 
+                      alt={`${title} Flat Layout - Print Ready`}
+                      className="w-full h-auto rounded-lg shadow-lg bg-muted max-h-[50vh] object-contain"
+                    />
+                    <div className="absolute bottom-4 right-4 flex gap-2">
+                      <Button size="sm" variant="secondary" onClick={downloadFlatLayout} className="gap-1.5 shadow-lg">
+                        <Download className="w-4 h-4" />
+                        Download for Photoshop
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  {/* Refine Design with AI */}
+                  <div className="space-y-2 p-3 rounded-lg bg-muted/30 border border-border/50">
+                    <Label className="text-xs font-medium flex items-center gap-1.5">
+                      <Sparkles className="w-3 h-3 text-primary" />
+                      Refine Design with AI
+                    </Label>
+                    <Textarea
+                      placeholder="Describe changes you'd like to make... (e.g., 'adjust colors to be more vibrant', 'add a subtle texture to the background', 'make the text more prominent')"
+                      value={flatEditPrompt}
+                      onChange={(e) => setFlatEditPrompt(e.target.value)}
+                      className="min-h-[60px] text-xs resize-none"
+                      disabled={isEditingFlatLayout}
+                    />
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={handleEditFlatLayout}
+                      disabled={isEditingFlatLayout || !flatEditPrompt.trim()}
+                      className="w-full gap-1.5 text-xs"
+                    >
+                      {isEditingFlatLayout ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          Refining...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-3.5 h-3.5" />
+                          Refine Design
+                        </>
+                      )}
                     </Button>
                   </div>
-                </div>
+                </>
               ) : (
                 <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                   <LayoutGrid className="w-10 h-10 mb-2 opacity-30" />
                   <p className="text-sm">No flat layout generated yet</p>
                 </div>
               )}
-              <p className="text-xs text-muted-foreground text-center mt-3">
+              <p className="text-xs text-muted-foreground text-center">
                 {flatLayoutMode === 'front_only' 
                   ? 'This shows the front panel only, ready for print production.'
                   : 'This flat layout shows all panels unwrapped and ready for print production or editing in Photoshop.'}

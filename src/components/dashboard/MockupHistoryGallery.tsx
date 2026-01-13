@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
-import { History, Trash2, Eye, RotateCcw, X } from 'lucide-react';
+import { History, Trash2, Eye, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import {
@@ -28,18 +28,33 @@ interface MockupHistoryGalleryProps {
   isLoading: boolean;
   onRestore: (imageUrl: string) => void;
   onDelete: (id: string) => void;
+  // Pagination props
+  currentPage?: number;
+  totalPages?: number;
+  totalCount?: number;
+  onNextPage?: () => void;
+  onPrevPage?: () => void;
+  hasNextPage?: boolean;
+  hasPrevPage?: boolean;
 }
 
 export function MockupHistoryGallery({
   history,
   isLoading,
   onRestore,
-  onDelete
+  onDelete,
+  currentPage = 1,
+  totalPages = 1,
+  totalCount = 0,
+  onNextPage,
+  onPrevPage,
+  hasNextPage = false,
+  hasPrevPage = false
 }: MockupHistoryGalleryProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [previewItem, setPreviewItem] = useState<MockupHistoryItem | null>(null);
 
-  if (history.length === 0 && !isLoading) {
+  if (totalCount === 0 && !isLoading) {
     return null;
   }
 
@@ -54,7 +69,7 @@ export function MockupHistoryGallery({
           >
             <span className="flex items-center gap-2">
               <History className="h-4 w-4" />
-              History ({history.length})
+              History ({totalCount})
             </span>
             <span className="text-xs">
               {isOpen ? 'Hide' : 'Show'}
@@ -160,6 +175,35 @@ export function MockupHistoryGallery({
             </div>
             <ScrollBar orientation="horizontal" />
           </ScrollArea>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-2 border-t border-border mt-2">
+              <span className="text-xs text-muted-foreground">
+                Page {currentPage} of {totalPages}
+              </span>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={onPrevPage}
+                  disabled={!hasPrevPage || isLoading}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={onNextPage}
+                  disabled={!hasNextPage || isLoading}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </CollapsibleContent>
       </Collapsible>
 

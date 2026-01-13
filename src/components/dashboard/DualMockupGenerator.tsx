@@ -498,7 +498,14 @@ function MockupCard({
     history, 
     isLoading: isHistoryLoading, 
     saveMockupToHistory, 
-    deleteMockupFromHistory 
+    deleteMockupFromHistory,
+    currentPage: historyPage,
+    totalPages: historyTotalPages,
+    totalCount: historyTotalCount,
+    nextPage: historyNextPage,
+    prevPage: historyPrevPage,
+    hasNextPage: historyHasNext,
+    hasPrevPage: historyHasPrev
   } = useMockupHistory({
     categoryId, 
     strategyType,
@@ -1861,6 +1868,13 @@ function MockupCard({
           isLoading={isHistoryLoading}
           onRestore={handleRestoreMockup}
           onDelete={deleteMockupFromHistory}
+          currentPage={historyPage}
+          totalPages={historyTotalPages}
+          totalCount={historyTotalCount}
+          onNextPage={historyNextPage}
+          onPrevPage={historyPrevPage}
+          hasNextPage={historyHasNext}
+          hasPrevPage={historyHasPrev}
         />
       )}
       

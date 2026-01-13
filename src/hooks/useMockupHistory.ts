@@ -36,8 +36,7 @@ export function useMockupHistory({ categoryId, strategyType, formulaVersionId }:
         .from('packaging_mockup_history')
         .select('*')
         .eq('category_id', categoryId)
-        .order('created_at', { ascending: false })
-        .limit(20);
+        .order('created_at', { ascending: false });
       
       if (strategyType) {
         query = query.eq('strategy_type', strategyType);

@@ -517,7 +517,14 @@ function MockupCard({
     history: flatHistory,
     isLoading: isFlatHistoryLoading,
     saveFlatLayoutToHistory,
-    deleteFlatLayoutFromHistory
+    deleteFlatLayoutFromHistory,
+    currentPage: flatHistoryPage,
+    totalPages: flatHistoryTotalPages,
+    totalCount: flatHistoryTotalCount,
+    nextPage: flatHistoryNextPage,
+    prevPage: flatHistoryPrevPage,
+    hasNextPage: flatHistoryHasNext,
+    hasPrevPage: flatHistoryHasPrev
   } = useFlatLayoutHistory({
     categoryId,
     strategyType,
@@ -1885,6 +1892,13 @@ function MockupCard({
           isLoading={isFlatHistoryLoading}
           onRestore={handleRestoreFlatLayout}
           onDelete={deleteFlatLayoutFromHistory}
+          currentPage={flatHistoryPage}
+          totalPages={flatHistoryTotalPages}
+          totalCount={flatHistoryTotalCount}
+          onNextPage={flatHistoryNextPage}
+          onPrevPage={flatHistoryPrevPage}
+          hasNextPage={flatHistoryHasNext}
+          hasPrevPage={flatHistoryHasPrev}
         />
       )}
 

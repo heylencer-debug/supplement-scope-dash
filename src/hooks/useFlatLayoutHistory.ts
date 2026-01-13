@@ -20,27 +20,49 @@ interface UseFlatLayoutHistoryOptions {
   categoryId: string | undefined;
   strategyType: 'match_leaders' | 'match_disruptors';
   formulaVersionId?: string | null;
+  pageSize?: number;
 }
 
-export function useFlatLayoutHistory({ categoryId, strategyType, formulaVersionId }: UseFlatLayoutHistoryOptions) {
+export function useFlatLayoutHistory({ categoryId, strategyType, formulaVersionId, pageSize = 20 }: UseFlatLayoutHistoryOptions) {
   const [history, setHistory] = useState<FlatLayoutHistoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   
   // Use flat_ prefix to differentiate from 3D mockups
   const flatStrategyType = `flat_${strategyType}`;
+  const totalPages = Math.ceil(totalCount / pageSize);
 
   const fetchHistory = useCallback(async () => {
     if (!categoryId) return;
     
     setIsLoading(true);
     try {
+      // First get total count
+      let countQuery = supabase
+        .from('packaging_mockup_history')
+        .select('*', { count: 'exact', head: true })
+        .eq('category_id', categoryId)
+        .eq('strategy_type', flatStrategyType);
+      
+      if (formulaVersionId) {
+        countQuery = countQuery.eq('formula_version_id', formulaVersionId);
+      }
+
+      const { count } = await countQuery;
+      setTotalCount(count || 0);
+
+      // Then fetch paginated data
+      const from = (currentPage - 1) * pageSize;
+      const to = from + pageSize - 1;
+
       let query = supabase
         .from('packaging_mockup_history')
         .select('*')
         .eq('category_id', categoryId)
         .eq('strategy_type', flatStrategyType)
         .order('created_at', { ascending: false })
-        .limit(20);
+        .range(from, to);
       
       if (formulaVersionId) {
         query = query.eq('formula_version_id', formulaVersionId);
@@ -55,11 +77,16 @@ export function useFlatLayoutHistory({ categoryId, strategyType, formulaVersionI
     } finally {
       setIsLoading(false);
     }
-  }, [categoryId, flatStrategyType, formulaVersionId]);
+  }, [categoryId, flatStrategyType, formulaVersionId, currentPage, pageSize]);
 
   useEffect(() => {
     fetchHistory();
   }, [fetchHistory]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [categoryId, strategyType, formulaVersionId]);
 
   const saveFlatLayoutToHistory = useCallback(async (
     imageUrl: string,
@@ -84,8 +111,11 @@ export function useFlatLayoutHistory({ categoryId, strategyType, formulaVersionI
 
       if (error) throw error;
       
-      // Add to local state immediately
-      setHistory(prev => [data as FlatLayoutHistoryItem, ...prev]);
+      // Add to local state immediately if on first page
+      if (currentPage === 1) {
+        setHistory(prev => [data as FlatLayoutHistoryItem, ...prev.slice(0, pageSize - 1)]);
+      }
+      setTotalCount(prev => prev + 1);
       
       return data;
     } catch (error) {
@@ -93,7 +123,7 @@ export function useFlatLayoutHistory({ categoryId, strategyType, formulaVersionI
       toast.error('Failed to save flat layout to history');
       return null;
     }
-  }, [categoryId, formulaVersionId, flatStrategyType]);
+  }, [categoryId, formulaVersionId, flatStrategyType, currentPage, pageSize]);
 
   const deleteFlatLayoutFromHistory = useCallback(async (id: string) => {
     try {
@@ -105,6 +135,7 @@ export function useFlatLayoutHistory({ categoryId, strategyType, formulaVersionI
       if (error) throw error;
       
       setHistory(prev => prev.filter(item => item.id !== id));
+      setTotalCount(prev => prev - 1);
       toast.success('Flat layout deleted');
     } catch (error) {
       console.error('Error deleting flat layout:', error);
@@ -112,11 +143,38 @@ export function useFlatLayoutHistory({ categoryId, strategyType, formulaVersionI
     }
   }, []);
 
+  const goToPage = useCallback((page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  }, [totalPages]);
+
+  const nextPage = useCallback(() => {
+    if (currentPage < totalPages) {
+      setCurrentPage(prev => prev + 1);
+    }
+  }, [currentPage, totalPages]);
+
+  const prevPage = useCallback(() => {
+    if (currentPage > 1) {
+      setCurrentPage(prev => prev - 1);
+    }
+  }, [currentPage]);
+
   return {
     history,
     isLoading,
     saveFlatLayoutToHistory,
     deleteFlatLayoutFromHistory,
-    refetch: fetchHistory
+    refetch: fetchHistory,
+    // Pagination
+    currentPage,
+    totalPages,
+    totalCount,
+    goToPage,
+    nextPage,
+    prevPage,
+    hasNextPage: currentPage < totalPages,
+    hasPrevPage: currentPage > 1
   };
 }

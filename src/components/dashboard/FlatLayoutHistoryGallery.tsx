@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { History, Trash2, Eye, RotateCcw, LayoutGrid, ChevronLeft, ChevronRight } from 'lucide-react';
+import { SkeletonShimmer } from '@/components/ui/loading-indicator';
 import { Button } from '@/components/ui/button';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import {
@@ -82,10 +83,11 @@ export function FlatLayoutHistoryGallery({
             <div className="flex gap-2 pb-2">
               {isLoading ? (
                 <div className="flex gap-2">
-                  {[1, 2, 3].map((i) => (
-                    <div
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <SkeletonShimmer
                       key={i}
-                      className="h-20 w-20 rounded-md bg-muted animate-pulse flex-shrink-0"
+                      className="h-20 w-20 flex-shrink-0"
+                      variant="rectangular"
                     />
                   ))}
                 </div>

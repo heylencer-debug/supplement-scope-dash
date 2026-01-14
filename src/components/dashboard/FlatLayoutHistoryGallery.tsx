@@ -52,7 +52,7 @@ export function FlatLayoutHistoryGallery({
   hasNextPage = false,
   hasPrevPage = false
 }: FlatLayoutHistoryGalleryProps) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
   const [previewItem, setPreviewItem] = useState<FlatLayoutHistoryItem | null>(null);
 
   if (totalCount === 0 && !isLoading) {

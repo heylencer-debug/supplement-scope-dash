@@ -52,7 +52,7 @@ export function MockupHistoryGallery({
   hasNextPage = false,
   hasPrevPage = false
 }: MockupHistoryGalleryProps) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
   const [previewItem, setPreviewItem] = useState<MockupHistoryItem | null>(null);
 
   if (totalCount === 0 && !isLoading) {

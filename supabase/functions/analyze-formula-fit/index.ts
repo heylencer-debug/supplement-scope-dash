@@ -589,12 +589,18 @@ Now provide your brutally honest analysis. Remember: the user wants to know if t
 
     const analysisResult: FormulaFitAnalysis = JSON.parse(jsonContent);
 
+    // Add the brands_analyzed metadata to the result so UI knows what was compared
+    const finalResult = {
+      ...analysisResult,
+      brands_analyzed: topBrandsData,
+    };
+
     // Update the analysis record with results
     await supabase
       .from("formula_fit_analyses")
       .update({
         status: "completed",
-        analysis: analysisResult,
+        analysis: finalResult,
       })
       .eq("id", analysisId);
 

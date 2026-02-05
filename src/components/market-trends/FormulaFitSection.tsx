@@ -6,6 +6,12 @@ import { ScrollAnimate } from "@/components/ui/scroll-animate";
 import { RadialGauge } from "@/components/ui/radial-gauge";
 import { AnimatedNumber } from "@/components/ui/animated-number";
 import {
+  Tooltip as UITooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   CheckCircle2,
   XCircle,
   TrendingUp,
@@ -16,6 +22,10 @@ import {
   Zap,
   Clock,
   ArrowRight,
+  Building2,
+  Package,
+  Star,
+  DollarSign,
 } from "lucide-react";
 import {
   BarChart,
@@ -27,7 +37,7 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts";
-import { useFormulaFitAnalysis, FormulaFitAnalysis } from "@/hooks/useFormulaFitAnalysis";
+import { useFormulaFitAnalysis, FormulaFitAnalysis, AnalyzedBrandData } from "@/hooks/useFormulaFitAnalysis";
 import { cn } from "@/lib/utils";
 
 interface FormulaFitSectionProps {
@@ -191,6 +201,13 @@ export function FormulaFitSection({ categoryId }: FormulaFitSectionProps) {
         <FormulaFitScoreCard analysis={analysis!} onRefresh={triggerAnalysis} />
       </ScrollAnimate>
 
+      {/* Brands Analyzed - Show which competitors were compared */}
+      {analysis!.brands_analyzed && Object.keys(analysis!.brands_analyzed).length > 0 && (
+        <ScrollAnimate variant="fade-up" delay={50}>
+          <BrandsAnalyzedCard brandsData={analysis!.brands_analyzed} />
+        </ScrollAnimate>
+      )}
+
       {/* Strengths & Weaknesses Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ScrollAnimate variant="fade-up" delay={100}>
@@ -226,6 +243,114 @@ export function FormulaFitSection({ categoryId }: FormulaFitSectionProps) {
         <RecommendationsCard recommendations={analysis!.recommendations} />
       </ScrollAnimate>
     </div>
+  );
+}
+
+// Brands Analyzed Card - Shows which competitor brands were compared
+function BrandsAnalyzedCard({
+  brandsData,
+}: {
+  brandsData: Record<string, AnalyzedBrandData>;
+}) {
+  const brands = Object.entries(brandsData);
+  const totalProducts = brands.reduce((sum, [_, data]) => sum + data.summary.product_count, 0);
+  const totalRevenue = brands.reduce((sum, [_, data]) => sum + data.summary.total_revenue, 0);
+
+  const formatRevenue = (value: number) => {
+    if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+    if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
+    return `$${value.toFixed(0)}`;
+  };
+
+  return (
+    <Card className="border-primary/20 bg-primary/5">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Building2 className="h-4 w-4 text-primary" />
+              Competitor Brands Analyzed
+            </CardTitle>
+            <CardDescription>
+              Your formula was compared against actual product data from these brands
+            </CardDescription>
+          </div>
+          <div className="flex items-center gap-4 text-sm">
+            <div className="text-right">
+              <p className="font-semibold text-primary">{brands.length}</p>
+              <p className="text-xs text-muted-foreground">Brands</p>
+            </div>
+            <div className="text-right">
+              <p className="font-semibold text-primary">{totalProducts}</p>
+              <p className="text-xs text-muted-foreground">Products</p>
+            </div>
+            <div className="text-right">
+              <p className="font-semibold text-primary">{formatRevenue(totalRevenue)}</p>
+              <p className="text-xs text-muted-foreground">Total Revenue</p>
+            </div>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="flex flex-wrap gap-2">
+          <TooltipProvider>
+            {brands.map(([brandName, data]) => (
+              <UITooltip key={brandName}>
+                <TooltipTrigger asChild>
+                  <div className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-background border hover:border-primary/50 transition-colors cursor-default">
+                    <span className="font-medium text-sm">{brandName}</span>
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Package className="h-3 w-3" />
+                      <span>{data.summary.product_count}</span>
+                      <span className="text-muted-foreground/50">•</span>
+                      <Star className="h-3 w-3" />
+                      <span>{data.summary.avg_rating.toFixed(1)}</span>
+                      <span className="text-muted-foreground/50">•</span>
+                      <DollarSign className="h-3 w-3" />
+                      <span>{formatRevenue(data.summary.total_revenue)}</span>
+                    </div>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-xs">
+                  <div className="space-y-2">
+                    <p className="font-semibold">{brandName}</p>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                      <span className="text-muted-foreground">Products:</span>
+                      <span>{data.summary.product_count}</span>
+                      <span className="text-muted-foreground">Avg Price:</span>
+                      <span>${data.summary.avg_price.toFixed(2)}</span>
+                      <span className="text-muted-foreground">Avg Rating:</span>
+                      <span>{data.summary.avg_rating.toFixed(1)} ★</span>
+                      <span className="text-muted-foreground">Total Reviews:</span>
+                      <span>{data.summary.total_reviews.toLocaleString()}</span>
+                      <span className="text-muted-foreground">Revenue:</span>
+                      <span>{formatRevenue(data.summary.total_revenue)}</span>
+                    </div>
+                    {data.summary.packaging_types.length > 0 && (
+                      <div className="pt-1 border-t">
+                        <span className="text-xs text-muted-foreground">
+                          Packaging: {data.summary.packaging_types.join(", ")}
+                        </span>
+                      </div>
+                    )}
+                    {data.top_products.length > 0 && (
+                      <div className="pt-1 border-t">
+                        <p className="text-xs font-medium mb-1">Top Products:</p>
+                        {data.top_products.slice(0, 2).map((product, idx) => (
+                          <p key={idx} className="text-xs text-muted-foreground truncate">
+                            • {product.title.slice(0, 40)}...
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </TooltipContent>
+              </UITooltip>
+            ))}
+          </TooltipProvider>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

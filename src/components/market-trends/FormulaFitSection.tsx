@@ -61,19 +61,84 @@ export function FormulaFitSection({ categoryId }: FormulaFitSectionProps) {
 
   // Processing state
   if (isProcessing || isTriggering) {
+    const progressPercent = pollingStatus.isPolling 
+      ? Math.min(Math.round((pollingStatus.attempt / pollingStatus.maxAttempts) * 95), 95)
+      : 5;
+    
+    const stages = [
+      { threshold: 0, label: "Initializing analysis..." },
+      { threshold: 15, label: "Fetching formula brief..." },
+      { threshold: 30, label: "Loading market trend data..." },
+      { threshold: 45, label: "Sending data to AI..." },
+      { threshold: 60, label: "Analyzing competitive position..." },
+      { threshold: 75, label: "Generating recommendations..." },
+      { threshold: 90, label: "Finalizing results..." },
+    ];
+    
+    const currentStage = [...stages].reverse().find(s => progressPercent >= s.threshold)?.label || stages[0].label;
+    const elapsedSeconds = pollingStatus.attempt * 10;
+    const estimatedRemaining = Math.max(0, (pollingStatus.maxAttempts - pollingStatus.attempt) * 10);
+    
+    const formatTime = (seconds: number) => {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+    };
+    
     return (
-      <Card>
-        <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-          <RefreshCw className="h-12 w-12 text-primary animate-spin mb-4" />
-          <h3 className="text-xl font-semibold mb-2">Analyzing Formula Fit...</h3>
-          <p className="text-muted-foreground mb-4">
-            AI is comparing your formula against market trends. This takes 2-4 minutes.
+      <Card className="overflow-hidden">
+        <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+          <div className="relative mb-6">
+            <div className="absolute inset-0 rounded-full bg-primary/20 animate-ping" style={{ animationDuration: '2s' }} />
+            <div className="relative h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
+              <RefreshCw className="h-8 w-8 text-primary animate-spin" />
+            </div>
+          </div>
+          
+          <h3 className="text-xl font-semibold mb-2">Analyzing Formula Fit</h3>
+          <p className="text-muted-foreground mb-6 max-w-md">
+            AI is comparing your formula against market trends, consumer demands, and competitive landscape.
           </p>
-          {pollingStatus.isPolling && (
-            <Badge variant="secondary" className="text-sm">
-              Checking... {Math.round((pollingStatus.attempt / pollingStatus.maxAttempts) * 100)}%
-            </Badge>
-          )}
+          
+          {/* Progress bar */}
+          <div className="w-full max-w-md mb-4">
+            <div className="h-2 bg-muted rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-primary via-primary to-primary/70 rounded-full transition-all duration-500 ease-out relative"
+                style={{ width: `${progressPercent}%` }}
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-[shimmer_2s_infinite]" 
+                  style={{ 
+                    backgroundSize: '200% 100%',
+                    animation: 'shimmer 2s infinite linear'
+                  }} 
+                />
+              </div>
+            </div>
+          </div>
+          
+          {/* Stage indicator */}
+          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
+            <span className="inline-block h-2 w-2 rounded-full bg-primary animate-pulse" />
+            {currentStage}
+          </div>
+          
+          {/* Stats row */}
+          <div className="flex items-center gap-6 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1.5">
+              <Clock className="h-3.5 w-3.5" />
+              <span>Elapsed: {formatTime(elapsedSeconds)}</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="font-medium text-primary">{progressPercent}%</span>
+              <span>complete</span>
+            </div>
+            {estimatedRemaining > 0 && (
+              <div className="flex items-center gap-1.5">
+                <span>~{formatTime(estimatedRemaining)} remaining</span>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
     );

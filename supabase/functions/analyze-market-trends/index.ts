@@ -252,11 +252,38 @@ Include 5-10 top products, 4-6 key trends, and 5-8 brand rankings. Be specific w
           const errorText = await grokResponse.text();
           console.error(`[analyze-market-trends] Grok API error: ${grokResponse.status} - ${errorText}`);
           
+          // Parse specific error messages
+          let errorMessage = `Grok API error: ${grokResponse.status}`;
+          try {
+            const errorJson = JSON.parse(errorText);
+            if (grokResponse.status === 404) {
+              if (errorJson.error?.includes('does not exist') || errorJson.error?.includes('not have access')) {
+                errorMessage = `Model not available: The requested Grok model is not accessible with your API key. Please check your xAI account permissions or try a different model.`;
+              } else {
+                errorMessage = `Resource not found: ${errorJson.error || errorJson.message || 'Unknown resource'}`;
+              }
+            } else if (grokResponse.status === 401) {
+              errorMessage = `Authentication failed: Your XAI_API_KEY is invalid or expired. Please update your API key in Supabase secrets.`;
+            } else if (grokResponse.status === 403) {
+              errorMessage = `Access denied: Your API key doesn't have permission to access this resource.`;
+            } else if (grokResponse.status === 429) {
+              errorMessage = `Rate limit exceeded: Too many requests to the Grok API. Please wait a moment and try again.`;
+            } else if (grokResponse.status === 402) {
+              errorMessage = `Payment required: Your xAI account may need additional credits or an active subscription.`;
+            } else if (grokResponse.status >= 500) {
+              errorMessage = `Grok API server error: The xAI service is temporarily unavailable. Please try again later.`;
+            } else if (errorJson.error) {
+              errorMessage = `Grok API error: ${errorJson.error}`;
+            }
+          } catch {
+            // Keep the default error message if parsing fails
+          }
+          
           await supabase
             .from('market_trend_analyses')
             .update({
               status: 'error',
-              error: `Grok API error: ${grokResponse.status}`,
+              error: errorMessage,
             })
             .eq('id', recordId);
           return;

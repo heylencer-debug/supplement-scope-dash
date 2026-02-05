@@ -47,3 +47,6 @@ verify_jwt = false
 
 [functions.ask-market-trends]
 verify_jwt = false
+
+[functions.analyze-formula-fit]
+verify_jwt = false

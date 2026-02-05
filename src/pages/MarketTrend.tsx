@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { RefreshCw, TrendingUp, Package, Users, Target, Rocket, Globe, MessageCircle } from "lucide-react";
+import { RefreshCw, TrendingUp, Package, Users, Target, Rocket, Globe, MessageCircle, Crosshair } from "lucide-react";
 import { format } from "date-fns";
 
 import { MarketOverviewSection } from "@/components/market-trends/MarketOverviewSection";
@@ -18,6 +18,7 @@ import { TopProductsSection } from "@/components/market-trends/TopProductsSectio
 import { CompetitiveLandscapeSection } from "@/components/market-trends/CompetitiveLandscapeSection";
 import { ConsumerInsightsSection } from "@/components/market-trends/ConsumerInsightsSection";
 import { FutureOutlookSection } from "@/components/market-trends/FutureOutlookSection";
+import { FormulaFitSection } from "@/components/market-trends/FormulaFitSection";
 import { MarketTrendsChat } from "@/components/market-trends/MarketTrendsChat";
 import { FloatingChatButton } from "@/components/ui/floating-chat-button";
 
@@ -207,7 +208,7 @@ export default function MarketTrend() {
 
       {/* Tabbed Sections */}
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid grid-cols-6 w-full">
+        <TabsList className="grid grid-cols-7 w-full">
           <TabsTrigger value="overview" className="flex items-center gap-2">
             <Globe className="h-4 w-4" />
             <span className="hidden sm:inline">Overview</span>
@@ -231,6 +232,10 @@ export default function MarketTrend() {
           <TabsTrigger value="outlook" className="flex items-center gap-2">
             <Rocket className="h-4 w-4" />
             <span className="hidden sm:inline">Outlook</span>
+          </TabsTrigger>
+          <TabsTrigger value="formula-fit" className="flex items-center gap-2">
+            <Crosshair className="h-4 w-4" />
+            <span className="hidden sm:inline">Formula Fit</span>
           </TabsTrigger>
         </TabsList>
 
@@ -256,6 +261,10 @@ export default function MarketTrend() {
 
         <TabsContent value="outlook">
           <FutureOutlookSection data={sections.futureOutlook} />
+        </TabsContent>
+
+        <TabsContent value="formula-fit">
+          <FormulaFitSection categoryId={category!.id} />
         </TabsContent>
       </Tabs>
 

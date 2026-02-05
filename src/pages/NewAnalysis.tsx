@@ -257,13 +257,29 @@ export default function NewAnalysis() {
     }
 
     try {
-      const response = await fetch(WEBHOOK_URL, {
+      // Run n8n webhook and market trend analysis in parallel
+      const n8nPromise = fetch(WEBHOOK_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(payload),
       });
+
+      // Trigger market trend analysis in parallel (fire and forget)
+      const marketTrendPromise = supabase.functions.invoke('analyze-market-trends', {
+        body: {
+          categoryId: null, // Will be created by n8n, edge function handles this
+          categoryName: displayCategoryName,
+          productType: analysisMode === "category" ? productForms.join(', ') : null,
+        }
+      }).catch(err => {
+        console.warn('Market trend analysis failed to start:', err);
+        // Don't fail the main flow if market trends fails
+      });
+
+      // Wait for n8n webhook (primary analysis)
+      const response = await n8nPromise;
 
       if (!response.ok) {
         throw new Error(`Request failed with status ${response.status}`);

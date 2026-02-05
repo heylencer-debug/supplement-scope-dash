@@ -856,6 +856,57 @@ export type Database = {
           },
         ]
       }
+      market_trend_analyses: {
+        Row: {
+          analysis: Json | null
+          category_id: string
+          category_name: string
+          created_at: string
+          error: string | null
+          id: string
+          product_type: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          analysis?: Json | null
+          category_id: string
+          category_name: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          product_type?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          analysis?: Json | null
+          category_id?: string
+          category_name?: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          product_type?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "market_trend_analyses_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "market_trend_analyses_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "v_category_dashboard"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nlp_aspects: {
         Row: {
           aspect: string

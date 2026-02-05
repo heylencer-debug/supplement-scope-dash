@@ -1,4 +1,4 @@
-import { Search, LayoutDashboard, Table, FileText, LucideIcon } from "lucide-react";
+import { Search, LayoutDashboard, Table, FileText, TrendingUp, LucideIcon } from "lucide-react";
 import { NavLink as RouterNavLink, useLocation } from "react-router-dom";
 import { useCategoryContext } from "@/contexts/CategoryContext";
 import { cn } from "@/lib/utils";
@@ -24,6 +24,7 @@ const menuItems: MenuItem[] = [
   { title: "New Analysis", url: "/", icon: Search, preserveCategory: false },
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, preserveCategory: true },
   { title: "Product Explorer", url: "/products", icon: Table, preserveCategory: true },
+  { title: "Market Trends", url: "/market-trends", icon: TrendingUp, preserveCategory: true },
   { title: "Strategy Brief", url: "/strategy", icon: FileText, preserveCategory: true },
 ];
 

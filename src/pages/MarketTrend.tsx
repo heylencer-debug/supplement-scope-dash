@@ -183,7 +183,7 @@ export default function MarketTrend() {
                 Ask AI
               </Button>
             </SheetTrigger>
-            <SheetContent className="w-full sm:w-[40vw] sm:max-w-none p-0 flex flex-col">
+            <SheetContent hideOverlay className="w-full sm:w-[40vw] sm:max-w-none p-0 flex flex-col">
               <SheetHeader className="px-4 py-3 border-b">
                 <SheetTitle className="flex items-center gap-2">
                   <MessageCircle className="h-5 w-5 text-primary" />

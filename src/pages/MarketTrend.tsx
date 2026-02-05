@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useCategoryContext } from "@/contexts/CategoryContext";
 import { useCategoryByName } from "@/hooks/useCategoryByName";
@@ -7,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { RefreshCw, TrendingUp, Package, Users, Target, Rocket, Globe } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { RefreshCw, TrendingUp, Package, Users, Target, Rocket, Globe, MessageCircle } from "lucide-react";
 import { format } from "date-fns";
 
 import { MarketOverviewSection } from "@/components/market-trends/MarketOverviewSection";
@@ -16,9 +18,11 @@ import { TopProductsSection } from "@/components/market-trends/TopProductsSectio
 import { CompetitiveLandscapeSection } from "@/components/market-trends/CompetitiveLandscapeSection";
 import { ConsumerInsightsSection } from "@/components/market-trends/ConsumerInsightsSection";
 import { FutureOutlookSection } from "@/components/market-trends/FutureOutlookSection";
+import { MarketTrendsChat } from "@/components/market-trends/MarketTrendsChat";
 
 export default function MarketTrend() {
   const [searchParams] = useSearchParams();
+  const [isChatOpen, setIsChatOpen] = useState(false);
   const { categoryName: contextCategoryName } = useCategoryContext();
   const urlCategoryName = searchParams.get("category");
   const activeCategoryName = urlCategoryName || contextCategoryName;
@@ -170,10 +174,34 @@ export default function MarketTrend() {
             )}
           </div>
         </div>
-        <Button onClick={handleRefresh} variant="outline" disabled={isLoading}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Sheet open={isChatOpen} onOpenChange={setIsChatOpen}>
+            <SheetTrigger asChild>
+              <Button variant="outline" className="gap-2">
+                <MessageCircle className="h-4 w-4" />
+                Ask AI
+              </Button>
+            </SheetTrigger>
+            <SheetContent className="w-full sm:w-[450px] p-0 flex flex-col">
+              <SheetHeader className="px-4 py-3 border-b">
+                <SheetTitle className="flex items-center gap-2">
+                  <MessageCircle className="h-5 w-5 text-primary" />
+                  Market Insights AI
+                </SheetTitle>
+              </SheetHeader>
+              <div className="flex-1 overflow-hidden">
+                <MarketTrendsChat
+                  categoryId={category!.id}
+                  categoryName={activeCategoryName}
+                />
+              </div>
+            </SheetContent>
+          </Sheet>
+          <Button onClick={handleRefresh} variant="outline" disabled={isLoading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Tabbed Sections */}

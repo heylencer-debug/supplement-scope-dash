@@ -12,6 +12,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { MarketTrendStatusIndicator } from "./MarketTrendStatusIndicator";
 
 interface MenuItem {
   title: string;
@@ -32,9 +33,10 @@ interface NavItemProps {
   item: MenuItem;
   isActive: boolean;
   href: string;
+  trailing?: React.ReactNode;
 }
 
-function NavItem({ item, isActive, href }: NavItemProps) {
+function NavItem({ item, isActive, href, trailing }: NavItemProps) {
   const Icon = item.icon;
   
   return (
@@ -74,6 +76,13 @@ function NavItem({ item, isActive, href }: NavItemProps) {
           )}>
             {item.title}
           </span>
+          
+          {/* Trailing indicator */}
+          {trailing && (
+            <span className="relative z-10">
+              {trailing}
+            </span>
+          )}
           
           {/* Hover glow effect for active items */}
           {isActive && (
@@ -130,6 +139,7 @@ export function AppSidebar() {
                   item={item}
                   isActive={isActive(item)}
                   href={getUrl(item)}
+                  trailing={item.title === "Market Trends" ? <MarketTrendStatusIndicator /> : undefined}
                 />
               ))}
             </SidebarMenu>

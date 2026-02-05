@@ -1,8 +1,8 @@
 
-# Update Grok Model to 4.1
+# Update Grok Model to grok-4-latest
 
 ## Change Summary
-Update the Grok API model from `grok-2-1212` to `grok-4.1` in the market trends edge function.
+Update the Grok API model from `grok-4.1` to `grok-4-latest` in the market trends edge function.
 
 ## File to Modify
 
@@ -11,11 +11,14 @@ Update the Grok API model from `grok-2-1212` to `grok-4.1` in the market trends 
 
 ```typescript
 // Before
-model: 'grok-2-1212',
+model: 'grok-4.1',
 
 // After
-model: 'grok-4.1',
+model: 'grok-4-latest',
 ```
 
+## Note
+The API key you shared will continue to be used from the `XAI_API_KEY` secret - no changes needed there.
+
 ## Post-Change
-The edge function will be automatically redeployed with the new model. You can then retry your Market Trend analysis to use Grok 4.1.
+The edge function will be automatically redeployed with the new model. You can then retry your Market Trend analysis.

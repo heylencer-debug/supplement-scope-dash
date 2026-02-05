@@ -41,3 +41,6 @@ verify_jwt = false
 
 [functions.edit-product-mockup]
 verify_jwt = false
+
+[functions.analyze-market-trends]
+verify_jwt = false

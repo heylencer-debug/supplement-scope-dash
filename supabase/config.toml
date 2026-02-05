@@ -44,3 +44,6 @@ verify_jwt = false
 
 [functions.analyze-market-trends]
 verify_jwt = false
+
+[functions.ask-market-trends]
+verify_jwt = false

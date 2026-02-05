@@ -1,85 +1,141 @@
 
-# Add Animated Progress Indicator to Market Trends Navigation
+# Add AI Q&A Chatbot for Market Trends Analysis
 
 ## Overview
-Add a modern animated progress indicator beside the "Market Trends" navigation item that shows the analysis status (processing, completed, or error) with smooth animations.
+Add a floating chatbot button on the Market Trends page that opens a slide-out panel where users can ask questions about the analysis. The chatbot uses Grok (same model as market trend analysis) to provide contextual answers.
 
 ## Visual Design
 
-The indicator will appear as a small badge/icon to the right of the "Market Trends" text:
-- **Processing**: Animated spinning circle with pulsing glow effect
-- **Completed**: Green checkmark with bounce-in animation
-- **Error**: Red warning icon with subtle shake
-- **No analysis**: No indicator shown
+```text
+┌──────────────────────────────────────────────────────────────────────┐
+│ Market Trends Page                                          [💬 ASK] │
+│ ┌──────────────────────────────────────────────────────────────────┐ │
+│ │ Tabs: Overview | Trends | Products | Competition | Consumers    │ │
+│ ├──────────────────────────────────────────────────────────────────┤ │
+│ │                                                                  │ │
+│ │  Analysis content...                                             │ │
+│ │                                                                  │ │
+│ └──────────────────────────────────────────────────────────────────┘ │
+│                                                                      │
+│                                                    ┌────────────────┐│
+│                                                    │ 💬 Ask About   ││
+│                                                    │    Analysis    ││
+│                                                    └────────────────┘│
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+When chat opens (slide-out panel from right):
+```text
+┌─────────────────────────────────────────┬────────────────────────────┐
+│ Market Trends Page                      │ 🤖 Market Insights AI     │
+│                                         │────────────────────────────│
+│                                         │ ┌────────────────────────┐ │
+│                                         │ │ 🤖 Hello! I can answer │ │
+│                                         │ │ questions about this   │ │
+│                                         │ │ market analysis.       │ │
+│                                         │ └────────────────────────┘ │
+│                                         │                            │
+│                                         │ ┌────────────────────────┐ │
+│                                         │ │ 👤 What are the top    │ │
+│                                         │ │ emerging trends?       │ │
+│                                         │ └────────────────────────┘ │
+│                                         │                            │
+│                                         │ ┌────────────────────────┐ │
+│                                         │ │ 🤖 Based on the        │ │
+│                                         │ │ analysis, the top      │ │
+│                                         │ │ trends are...          │ │
+│                                         │ └────────────────────────┘ │
+│                                         │────────────────────────────│
+│                                         │ [Type your question...]   │ │
+│                                         │                     [Send]│ │
+└─────────────────────────────────────────┴────────────────────────────┘
+```
 
 ## Implementation Steps
 
-### 1. Create MarketTrendStatusIndicator Component
-**New file**: `src/components/layout/MarketTrendStatusIndicator.tsx`
+### 1. Create Edge Function: `ask-market-trends`
+**New file**: `supabase/functions/ask-market-trends/index.ts`
 
-A compact component that:
-- Fetches market trend analysis status for the current category
-- Displays appropriate animated icon based on status
-- Uses existing tailwind animations (spinner-rotate, check-bounce, glow-pulse)
+- Accept `categoryId`, `question`, and `conversationHistory`
+- Fetch the market trend analysis from database
+- Build context from the analysis JSON
+- Call Grok API with streaming enabled
+- Stream responses back to client
 
-### 2. Update AppSidebar Component
-**File**: `src/components/layout/AppSidebar.tsx`
+Key features:
+- Uses same Grok model (`grok-4-latest`) as market trends analysis
+- Sends full analysis context for accurate answers
+- Supports multi-turn conversation with history
+- Streaming for real-time token display
 
-- Import the new status indicator component
-- Modify the NavItem component to accept an optional trailing element
-- Add the status indicator specifically for the "Market Trends" menu item
+### 2. Create Chat Component: `MarketTrendsChat`
+**New file**: `src/components/market-trends/MarketTrendsChat.tsx`
 
-### 3. Add New Animations
-**File**: `tailwind.config.ts`
+Lighter-weight version of FormulaChat, focused on Q&A:
+- Message list with user/assistant bubbles
+- Streaming response display
+- Markdown rendering for AI responses
+- Auto-scroll to latest message
+- Input field with send button
+- Example question suggestions
 
-Add a new "pulse-ring" keyframe for the processing indicator's outer ring effect
+### 3. Update Market Trends Page
+**Modified file**: `src/pages/MarketTrend.tsx`
+
+- Add floating action button when analysis is available
+- Add Sheet component for chat panel
+- Pass analysis context to chat component
+
+### 4. Update Supabase Config
+**Modified file**: `supabase/config.toml`
+
+- Add new edge function configuration
 
 ## Technical Details
 
-### Status Indicator States
+### Edge Function API Design
 
-```text
-┌─────────────┬─────────────────────────────────────────────┐
-│ Status      │ Visual                                      │
-├─────────────┼─────────────────────────────────────────────┤
-│ pending     │ Spinning loader with blue glow pulse        │
-│ processing  │ Spinning loader with blue glow pulse        │
-│ completed   │ Green checkmark with bounce animation       │
-│ error       │ Red alert triangle with subtle shake        │
-│ none        │ Hidden (no indicator)                       │
-└─────────────┴─────────────────────────────────────────────┘
+**Request:**
+```typescript
+{
+  categoryId: string;
+  question: string;
+  conversationHistory: Array<{
+    role: 'user' | 'assistant';
+    content: string;
+  }>;
+}
 ```
 
-### Component Structure
+**Response:**
+SSE stream with delta content tokens
 
-```tsx
-// MarketTrendStatusIndicator.tsx
-- Uses supabase to query market_trend_analyses table
-- Subscribes to real-time updates for live status changes
-- Returns appropriate animated icon or null
-```
+### Chat Component Features
 
-### Sidebar Integration
+| Feature | Implementation |
+|---------|----------------|
+| Streaming | SSE parsing with token-by-token rendering |
+| Markdown | ReactMarkdown with remark-gfm |
+| History | Local state, not persisted to DB |
+| Context | Full analysis JSON sent to edge function |
+| Animations | Fade-in for messages, typing indicator |
 
-The NavItem will be updated to render an optional trailing indicator:
-```tsx
-<NavItem item={item} isActive={...} href={...}>
-  {item.title === "Market Trends" && <MarketTrendStatusIndicator />}
-</NavItem>
-```
+### Suggested Questions (shown when chat opens)
+- "What are the top growth opportunities in this market?"
+- "Which brands are gaining market share?"
+- "What do consumers complain about most?"
+- "What innovations are emerging?"
 
-## Animations Used
+## Files to Create/Modify
 
-| Animation | Purpose |
-|-----------|---------|
-| `spinner-rotate` | Continuous rotation for loading state |
-| `glow-pulse` | Pulsing glow around the spinner |
-| `check-bounce` | Bounce effect when completed |
-| `shake` | Subtle shake for error state |
-| `fade-in` | Smooth appearance transition |
+1. **New**: `supabase/functions/ask-market-trends/index.ts` - Edge function for Q&A
+2. **New**: `src/components/market-trends/MarketTrendsChat.tsx` - Chat panel component
+3. **Modified**: `src/pages/MarketTrend.tsx` - Add chat button and sheet
+4. **Modified**: `supabase/config.toml` - Add edge function config
 
-## Files Changed
-
-1. **New**: `src/components/layout/MarketTrendStatusIndicator.tsx` - Status indicator component
-2. **Modified**: `src/components/layout/AppSidebar.tsx` - Integrate indicator into nav
-3. **Modified**: `tailwind.config.ts` - Add pulse-ring animation (if needed)
+## Animations
+- Floating button: pulse animation to draw attention
+- Chat panel: slide-in from right (existing Sheet behavior)
+- Messages: fade-in animation
+- Streaming text: cursor blink effect
+- Send button: scale on hover

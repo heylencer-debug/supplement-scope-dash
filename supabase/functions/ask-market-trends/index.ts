@@ -98,7 +98,7 @@ ${analysisContext}
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "grok-3-latest",
+        model: "grok-4-1-fast-reasoning",
         messages,
         stream: true,
         temperature: 0.7,

@@ -282,6 +282,33 @@ export default function MarketTrend() {
           </CardContent>
         </Card>
       )}
+
+      {/* Floating Chat Button */}
+      <Sheet open={isChatOpen} onOpenChange={setIsChatOpen}>
+        <SheetTrigger asChild>
+          <Button
+            size="lg"
+            className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg z-50 group"
+          >
+            <span className="absolute inset-0 rounded-full bg-primary/20 animate-ping" />
+            <MessageCircle className="h-6 w-6 relative z-10 group-hover:scale-110 transition-transform" />
+          </Button>
+        </SheetTrigger>
+        <SheetContent className="w-full sm:w-[450px] p-0 flex flex-col">
+          <SheetHeader className="px-4 py-3 border-b">
+            <SheetTitle className="flex items-center gap-2">
+              <MessageCircle className="h-5 w-5 text-primary" />
+              Market Insights AI
+            </SheetTitle>
+          </SheetHeader>
+          <div className="flex-1 overflow-hidden">
+            <MarketTrendsChat
+              categoryId={category!.id}
+              categoryName={activeCategoryName}
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

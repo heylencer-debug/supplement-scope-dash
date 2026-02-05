@@ -20,6 +20,12 @@ export interface AnalyzedBrandData {
     rating: number;
     reviews: number;
     monthly_revenue: number;
+    supplement_facts_complete?: Record<string, unknown>;
+    all_nutrients?: Array<Record<string, unknown>>;
+    claims_on_label?: string[];
+    other_ingredients?: string;
+    feature_bullets_text?: string;
+    packaging_type?: string;
   }>;
 }
 

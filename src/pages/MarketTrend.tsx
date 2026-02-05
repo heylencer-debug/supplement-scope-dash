@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { useCategoryContext } from "@/contexts/CategoryContext";
 import { useCategoryByName } from "@/hooks/useCategoryByName";
 import { useMarketTrendAnalysis } from "@/hooks/useMarketTrendAnalysis";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -19,6 +19,7 @@ import { CompetitiveLandscapeSection } from "@/components/market-trends/Competit
 import { ConsumerInsightsSection } from "@/components/market-trends/ConsumerInsightsSection";
 import { FutureOutlookSection } from "@/components/market-trends/FutureOutlookSection";
 import { MarketTrendsChat } from "@/components/market-trends/MarketTrendsChat";
+import { FloatingChatButton } from "@/components/ui/floating-chat-button";
 
 export default function MarketTrend() {
   const [searchParams] = useSearchParams();
@@ -284,31 +285,10 @@ export default function MarketTrend() {
       )}
 
       {/* Floating Chat Button */}
-      <Sheet open={isChatOpen} onOpenChange={setIsChatOpen}>
-        <SheetTrigger asChild>
-          <Button
-            size="lg"
-            className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg z-50 group"
-          >
-            <span className="absolute inset-0 rounded-full bg-primary/20 animate-ping" />
-            <MessageCircle className="h-6 w-6 relative z-10 group-hover:scale-110 transition-transform" />
-          </Button>
-        </SheetTrigger>
-        <SheetContent className="w-full sm:w-[450px] p-0 flex flex-col">
-          <SheetHeader className="px-4 py-3 border-b">
-            <SheetTitle className="flex items-center gap-2">
-              <MessageCircle className="h-5 w-5 text-primary" />
-              Market Insights AI
-            </SheetTitle>
-          </SheetHeader>
-          <div className="flex-1 overflow-hidden">
-            <MarketTrendsChat
-              categoryId={category!.id}
-              categoryName={activeCategoryName}
-            />
-          </div>
-        </SheetContent>
-      </Sheet>
+      <FloatingChatButton
+        onClick={() => setIsChatOpen(true)}
+        show={hasAnalysis}
+      />
     </div>
   );
 }

@@ -637,6 +637,51 @@ export type Database = {
           },
         ]
       }
+      formula_fit_analyses: {
+        Row: {
+          analysis: Json | null
+          category_id: string
+          created_at: string
+          error: string | null
+          id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          analysis?: Json | null
+          category_id: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          analysis?: Json | null
+          category_id?: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "formula_fit_analyses_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "formula_fit_analyses_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "v_category_dashboard"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       formula_generation_tasks: {
         Row: {
           category_id: string

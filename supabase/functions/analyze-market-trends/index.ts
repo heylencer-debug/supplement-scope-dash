@@ -238,7 +238,7 @@ Include 5-10 top products, 4-6 key trends, and 5-8 brand rankings. Be specific w
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'grok-4.1',
+            model: 'grok-4-latest',
             messages: [
               { role: 'system', content: systemPrompt },
               { role: 'user', content: userPrompt }

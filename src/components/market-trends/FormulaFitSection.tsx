@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -5,12 +6,20 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollAnimate } from "@/components/ui/scroll-animate";
 import { RadialGauge } from "@/components/ui/radial-gauge";
 import { AnimatedNumber } from "@/components/ui/animated-number";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Tooltip as UITooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import {
   CheckCircle2,
   XCircle,
@@ -26,6 +35,10 @@ import {
   Package,
   Star,
   DollarSign,
+  ChevronDown,
+  Pill,
+  FlaskConical,
+  Tag,
 } from "lucide-react";
 import {
   BarChart,
@@ -246,12 +259,13 @@ export function FormulaFitSection({ categoryId }: FormulaFitSectionProps) {
   );
 }
 
-// Brands Analyzed Card - Shows which competitor brands were compared
+// Brands Analyzed Card - Shows which competitor brands were compared with expandable product details
 function BrandsAnalyzedCard({
   brandsData,
 }: {
   brandsData: Record<string, AnalyzedBrandData>;
 }) {
+  const [expandedBrands, setExpandedBrands] = useState<string[]>([]);
   const brands = Object.entries(brandsData);
   const totalProducts = brands.reduce((sum, [_, data]) => sum + data.summary.product_count, 0);
   const totalRevenue = brands.reduce((sum, [_, data]) => sum + data.summary.total_revenue, 0);
@@ -260,6 +274,14 @@ function BrandsAnalyzedCard({
     if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
     if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
     return `$${value.toFixed(0)}`;
+  };
+
+  const toggleBrand = (brandName: string) => {
+    setExpandedBrands((prev) =>
+      prev.includes(brandName)
+        ? prev.filter((b) => b !== brandName)
+        : [...prev, brandName]
+    );
   };
 
   return (
@@ -272,7 +294,7 @@ function BrandsAnalyzedCard({
               Competitor Brands Analyzed
             </CardTitle>
             <CardDescription>
-              Your formula was compared against actual product data from these brands
+              Click any brand to view full product details and supplement facts
             </CardDescription>
           </div>
           <div className="flex items-center gap-4 text-sm">
@@ -291,66 +313,213 @@ function BrandsAnalyzedCard({
           </div>
         </div>
       </CardHeader>
-      <CardContent>
-        <div className="flex flex-wrap gap-2">
-          <TooltipProvider>
-            {brands.map(([brandName, data]) => (
-              <UITooltip key={brandName}>
-                <TooltipTrigger asChild>
-                  <div className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-background border hover:border-primary/50 transition-colors cursor-default">
-                    <span className="font-medium text-sm">{brandName}</span>
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Package className="h-3 w-3" />
-                      <span>{data.summary.product_count}</span>
-                      <span className="text-muted-foreground/50">•</span>
-                      <Star className="h-3 w-3" />
-                      <span>{data.summary.avg_rating.toFixed(1)}</span>
-                      <span className="text-muted-foreground/50">•</span>
-                      <DollarSign className="h-3 w-3" />
-                      <span>{formatRevenue(data.summary.total_revenue)}</span>
-                    </div>
+      <CardContent className="space-y-3">
+        {brands.map(([brandName, data]) => (
+          <Collapsible
+            key={brandName}
+            open={expandedBrands.includes(brandName)}
+            onOpenChange={() => toggleBrand(brandName)}
+          >
+            <CollapsibleTrigger asChild>
+              <div className="flex items-center justify-between w-full px-4 py-3 rounded-lg bg-background border hover:border-primary/50 transition-colors cursor-pointer group">
+                <div className="flex items-center gap-3">
+                  <span className="font-semibold">{brandName}</span>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Badge variant="secondary" className="text-xs">
+                      <Package className="h-3 w-3 mr-1" />
+                      {data.summary.product_count} products
+                    </Badge>
+                    <Badge variant="outline" className="text-xs">
+                      <Star className="h-3 w-3 mr-1" />
+                      {data.summary.avg_rating.toFixed(1)}
+                    </Badge>
+                    <Badge variant="outline" className="text-xs">
+                      <DollarSign className="h-3 w-3 mr-1" />
+                      {formatRevenue(data.summary.total_revenue)}
+                    </Badge>
                   </div>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="max-w-xs">
-                  <div className="space-y-2">
-                    <p className="font-semibold">{brandName}</p>
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                      <span className="text-muted-foreground">Products:</span>
-                      <span>{data.summary.product_count}</span>
-                      <span className="text-muted-foreground">Avg Price:</span>
-                      <span>${data.summary.avg_price.toFixed(2)}</span>
-                      <span className="text-muted-foreground">Avg Rating:</span>
-                      <span>{data.summary.avg_rating.toFixed(1)} ★</span>
-                      <span className="text-muted-foreground">Total Reviews:</span>
-                      <span>{data.summary.total_reviews.toLocaleString()}</span>
-                      <span className="text-muted-foreground">Revenue:</span>
-                      <span>{formatRevenue(data.summary.total_revenue)}</span>
-                    </div>
-                    {data.summary.packaging_types.length > 0 && (
-                      <div className="pt-1 border-t">
-                        <span className="text-xs text-muted-foreground">
-                          Packaging: {data.summary.packaging_types.join(", ")}
-                        </span>
-                      </div>
-                    )}
-                    {data.top_products.length > 0 && (
-                      <div className="pt-1 border-t">
-                        <p className="text-xs font-medium mb-1">Top Products:</p>
-                        {data.top_products.slice(0, 2).map((product, idx) => (
-                          <p key={idx} className="text-xs text-muted-foreground truncate">
-                            • {product.title.slice(0, 40)}...
-                          </p>
-                        ))}
-                      </div>
-                    )}
+                </div>
+                <ChevronDown
+                  className={cn(
+                    "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                    expandedBrands.includes(brandName) && "rotate-180"
+                  )}
+                />
+              </div>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="mt-2 ml-4 border-l-2 border-primary/20 pl-4 space-y-4">
+                {/* Brand Summary */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 rounded-lg bg-muted/50">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Avg Price</p>
+                    <p className="font-semibold">${data.summary.avg_price.toFixed(2)}</p>
                   </div>
-                </TooltipContent>
-              </UITooltip>
-            ))}
-          </TooltipProvider>
-        </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Total Reviews</p>
+                    <p className="font-semibold">{data.summary.total_reviews.toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Packaging</p>
+                    <p className="font-semibold text-sm">
+                      {data.summary.packaging_types.length > 0
+                        ? data.summary.packaging_types.join(", ")
+                        : "N/A"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Revenue</p>
+                    <p className="font-semibold text-primary">{formatRevenue(data.summary.total_revenue)}</p>
+                  </div>
+                </div>
+
+                {/* Products Accordion */}
+                {data.top_products.length > 0 && (
+                  <Accordion type="multiple" className="space-y-2">
+                    {data.top_products.map((product, idx) => (
+                      <AccordionItem
+                        key={idx}
+                        value={`${brandName}-${idx}`}
+                        className="border rounded-lg bg-background px-4"
+                      >
+                        <AccordionTrigger className="py-3 hover:no-underline">
+                          <div className="flex items-start gap-3 text-left pr-4">
+                            <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-semibold flex items-center justify-center">
+                              #{idx + 1}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm line-clamp-2">{product.title}</p>
+                              <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                                <span>${product.price.toFixed(2)}</span>
+                                <span>•</span>
+                                <span>{product.rating.toFixed(1)} ★</span>
+                                <span>•</span>
+                                <span>{product.reviews.toLocaleString()} reviews</span>
+                                <span>•</span>
+                                <span className="text-primary font-medium">
+                                  {formatRevenue(product.monthly_revenue)}/mo
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="pb-4">
+                          <ProductSupplementFacts product={product} />
+                        </AccordionContent>
+                      </AccordionItem>
+                    ))}
+                  </Accordion>
+                )}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        ))}
       </CardContent>
     </Card>
+  );
+}
+
+// Product Supplement Facts Display
+function ProductSupplementFacts({ product }: { product: AnalyzedBrandData["top_products"][0] }) {
+  const supplementFacts = product.supplement_facts_complete as Record<string, unknown> | null;
+  const allNutrients = product.all_nutrients as Array<Record<string, unknown>> | null;
+  const claimsOnLabel = product.claims_on_label as string[] | null;
+
+  // Extract active ingredients from supplement facts
+  const activeIngredients = supplementFacts?.active_ingredients as Array<{
+    name: string;
+    amount?: string;
+    daily_value?: string;
+  }> | null;
+
+  // Get serving info
+  const servingSize = supplementFacts?.serving_size as string | null;
+  const servingsPerContainer = supplementFacts?.servings_per_container as number | null;
+
+  return (
+    <div className="space-y-4">
+      {/* Serving Info */}
+      {(servingSize || servingsPerContainer) && (
+        <div className="flex items-center gap-4 text-sm">
+          {servingSize && (
+            <div className="flex items-center gap-1.5">
+              <Pill className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Serving:</span>
+              <span className="font-medium">{servingSize}</span>
+            </div>
+          )}
+          {servingsPerContainer && (
+            <div className="flex items-center gap-1.5">
+              <Package className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Servings:</span>
+              <span className="font-medium">{servingsPerContainer}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Active Ingredients / Nutrients Table */}
+      {(activeIngredients && activeIngredients.length > 0) || (allNutrients && allNutrients.length > 0) ? (
+        <div className="rounded-lg border overflow-hidden">
+          <div className="bg-muted/50 px-3 py-2 border-b flex items-center gap-2">
+            <FlaskConical className="h-4 w-4 text-primary" />
+            <span className="font-medium text-sm">Supplement Facts</span>
+          </div>
+          <ScrollArea className="max-h-64">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/30">
+                <tr>
+                  <th className="text-left px-3 py-2 font-medium">Ingredient</th>
+                  <th className="text-right px-3 py-2 font-medium">Amount</th>
+                  <th className="text-right px-3 py-2 font-medium">% DV</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {(activeIngredients || allNutrients || []).map((ingredient, idx) => {
+                  const name = ingredient.name || ingredient.nutrient || "Unknown";
+                  const amount = ingredient.amount || ingredient.amount_per_serving || "-";
+                  const dv = ingredient.daily_value || ingredient.percent_dv || "-";
+                  return (
+                    <tr key={idx} className="hover:bg-muted/20">
+                      <td className="px-3 py-2">{name}</td>
+                      <td className="px-3 py-2 text-right text-muted-foreground">{amount}</td>
+                      <td className="px-3 py-2 text-right text-muted-foreground">{dv}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </ScrollArea>
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground italic">No supplement facts available</p>
+      )}
+
+      {/* Claims on Label */}
+      {claimsOnLabel && claimsOnLabel.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Tag className="h-4 w-4 text-primary" />
+            <span className="font-medium text-sm">Claims on Label</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {claimsOnLabel.map((claim, idx) => (
+              <Badge key={idx} variant="outline" className="text-xs">
+                {claim}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Other Ingredients */}
+      {product.other_ingredients && (
+        <div className="space-y-1">
+          <p className="font-medium text-sm">Other Ingredients</p>
+          <p className="text-sm text-muted-foreground">{product.other_ingredients}</p>
+        </div>
+      )}
+    </div>
   );
 }
 

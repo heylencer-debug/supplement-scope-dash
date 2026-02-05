@@ -3,6 +3,26 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 
+export interface BrandSummary {
+  product_count: number;
+  avg_price: number;
+  avg_rating: number;
+  total_reviews: number;
+  total_revenue: number;
+  packaging_types: string[];
+}
+
+export interface AnalyzedBrandData {
+  summary: BrandSummary;
+  top_products: Array<{
+    title: string;
+    price: number;
+    rating: number;
+    reviews: number;
+    monthly_revenue: number;
+  }>;
+}
+
 export interface FormulaFitAnalysis {
   overall_score: number;
   score_label: string;
@@ -42,6 +62,8 @@ export interface FormulaFitAnalysis {
     gap: string;
     market_opportunity: string;
   }>;
+  // Metadata about what was analyzed
+  brands_analyzed?: Record<string, AnalyzedBrandData>;
 }
 
 interface FormulaFitRecord {

@@ -206,24 +206,24 @@ export function AIAnalysisResults({ analysis, onRefresh, isLoading, versionInfo 
       </div>
 
       {/* Ingredients Tab - NEW */}
-      {activeTab === 'ingredients' && analysis.ingredient_comparison_table && (
+      {activeTab === 'ingredients' && analysis.ingredient_comparison_table && analysis.ingredient_comparison_table.summary && (
         <div className="space-y-4">
           {/* Summary Stats */}
           <div className="grid grid-cols-6 gap-2">
             <div className="bg-card rounded-lg p-3 border border-border/50 text-center">
-              <div className="text-xl font-bold text-primary">{analysis.ingredient_comparison_table.summary.total_our_ingredients}</div>
+              <div className="text-xl font-bold text-primary">{analysis.ingredient_comparison_table.summary.total_our_ingredients || 0}</div>
               <div className="text-[9px] text-muted-foreground">Our Ingredients</div>
             </div>
             <div className="bg-card rounded-lg p-3 border border-border/50 text-center">
-              <div className="text-xl font-bold text-muted-foreground">{analysis.ingredient_comparison_table.summary.total_competitor_avg}</div>
+              <div className="text-xl font-bold text-muted-foreground">{analysis.ingredient_comparison_table.summary.total_competitor_avg || 0}</div>
               <div className="text-[9px] text-muted-foreground">Comp. Avg</div>
             </div>
             <div className="bg-chart-4/10 rounded-lg p-3 border border-chart-4/30 text-center">
-              <div className="text-xl font-bold text-chart-4">{analysis.ingredient_comparison_table.summary.overlap_count}</div>
+              <div className="text-xl font-bold text-chart-4">{analysis.ingredient_comparison_table.summary.overlap_count || 0}</div>
               <div className="text-[9px] text-chart-4">In All</div>
             </div>
             <div className="bg-primary/10 rounded-lg p-3 border border-primary/30 text-center">
-              <div className="text-xl font-bold text-primary">{analysis.ingredient_comparison_table.summary.unique_to_us_count}</div>
+              <div className="text-xl font-bold text-primary">{analysis.ingredient_comparison_table.summary.unique_to_us_count || 0}</div>
               <div className="text-[9px] text-primary">Unique to Us</div>
             </div>
             <div className="bg-chart-5/10 rounded-lg p-3 border border-chart-5/30 text-center">
@@ -231,14 +231,14 @@ export function AIAnalysisResults({ analysis, onRefresh, isLoading, versionInfo 
               <div className="text-[9px] text-chart-5">🔄 Alternatives</div>
             </div>
             <div className="bg-destructive/10 rounded-lg p-3 border border-destructive/30 text-center">
-              <div className="text-xl font-bold text-destructive">{analysis.ingredient_comparison_table.summary.missing_from_us_count}</div>
+              <div className="text-xl font-bold text-destructive">{analysis.ingredient_comparison_table.summary.missing_from_us_count || 0}</div>
               <div className="text-[9px] text-destructive">Missing</div>
             </div>
           </div>
 
           {/* Assessment */}
           <div className="bg-card rounded-lg p-3 border border-border/50">
-            <p className="text-xs text-muted-foreground">{analysis.ingredient_comparison_table.summary.overall_assessment}</p>
+            <p className="text-xs text-muted-foreground">{analysis.ingredient_comparison_table.summary.overall_assessment || 'Analysis in progress...'}</p>
           </div>
 
           {/* Comparison Table */}

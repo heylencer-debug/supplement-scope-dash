@@ -51,6 +51,35 @@ interface FormulaFitAnalysis {
   }>;
 }
 
+interface BrandSummary {
+  product_count: number;
+  avg_price: number;
+  avg_rating: number;
+  total_reviews: number;
+  total_revenue: number;
+  packaging_types: string[];
+}
+
+interface TopProduct {
+  title: string;
+  price: number;
+  rating: number;
+  reviews: number;
+  monthly_revenue: number;
+  supplement_facts_complete: unknown;
+  all_nutrients: unknown;
+  feature_bullets_text: string;
+  claims_on_label: string[];
+  other_ingredients: string;
+  packaging_type: string;
+  directions: string;
+}
+
+interface BrandData {
+  summary: BrandSummary;
+  top_products: TopProduct[];
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -134,6 +163,182 @@ Deno.serve(async (req) => {
   }
 });
 
+/**
+ * Extract brand names from market trend analysis
+ */
+function extractBrandNames(marketTrendAnalysis: unknown): string[] {
+  const brands = new Set<string>();
+
+  try {
+    const analysis = marketTrendAnalysis as Record<string, unknown>;
+    const sections = analysis?.sections as Record<string, unknown>;
+
+    // Extract from competitiveLandscape.brandRankings
+    const competitiveLandscape = sections?.competitiveLandscape as Record<string, unknown>;
+    const brandRankings = competitiveLandscape?.brandRankings as Array<{ brandName?: string }>;
+    if (Array.isArray(brandRankings)) {
+      for (const ranking of brandRankings) {
+        if (ranking.brandName) {
+          brands.add(ranking.brandName.trim());
+        }
+      }
+    }
+
+    // Extract from topProducts.products (format: "Brand - Product Name")
+    const topProducts = sections?.topProducts as Record<string, unknown>;
+    const products = topProducts?.products as Array<{ brandProductName?: string }>;
+    if (Array.isArray(products)) {
+      for (const product of products) {
+        if (product.brandProductName) {
+          // Extract brand from "Brand - Product" or "Brand: Product" format
+          const brandMatch = product.brandProductName.match(/^([^-:]+)[-:]/);
+          if (brandMatch) {
+            brands.add(brandMatch[1].trim());
+          } else {
+            // Try to get first 2-3 words as brand name
+            const words = product.brandProductName.split(' ').slice(0, 3).join(' ');
+            if (words.length > 2) {
+              brands.add(words.trim());
+            }
+          }
+        }
+      }
+    }
+
+    // Also check for any other brand mentions in the analysis
+    const marketLeaders = competitiveLandscape?.marketLeaders as Array<{ brand?: string; name?: string }>;
+    if (Array.isArray(marketLeaders)) {
+      for (const leader of marketLeaders) {
+        if (leader.brand) brands.add(leader.brand.trim());
+        if (leader.name) brands.add(leader.name.trim());
+      }
+    }
+
+  } catch (error) {
+    console.error("[analyze-formula-fit] Error extracting brand names:", error);
+  }
+
+  const brandList = Array.from(brands).filter(b => b.length > 1);
+  console.log(`[analyze-formula-fit] Extracted ${brandList.length} brand names:`, brandList);
+  return brandList;
+}
+
+/**
+ * Fetch and aggregate product data for mentioned brands
+ */
+async function fetchBrandProductData(
+  supabase: ReturnType<typeof createClient>,
+  categoryId: string,
+  brandNames: string[]
+): Promise<Record<string, BrandData>> {
+  if (brandNames.length === 0) {
+    console.log("[analyze-formula-fit] No brand names to fetch");
+    return {};
+  }
+
+  console.log(`[analyze-formula-fit] Fetching product data for ${brandNames.length} brands`);
+
+  // Fetch products for the mentioned brands
+  // Use ilike for case-insensitive matching
+  const { data: products, error } = await supabase
+    .from("products")
+    .select(`
+      brand,
+      title,
+      price,
+      rating,
+      reviews,
+      monthly_revenue,
+      supplement_facts_complete,
+      all_nutrients,
+      feature_bullets_text,
+      claims_on_label,
+      other_ingredients,
+      packaging_type,
+      directions
+    `)
+    .eq("category_id", categoryId)
+    .order("monthly_revenue", { ascending: false, nullsFirst: false });
+
+  if (error) {
+    console.error("[analyze-formula-fit] Error fetching products:", error);
+    return {};
+  }
+
+  if (!products || products.length === 0) {
+    console.log("[analyze-formula-fit] No products found for category");
+    return {};
+  }
+
+  console.log(`[analyze-formula-fit] Found ${products.length} total products in category`);
+
+  // Filter products that match our brand names (case-insensitive)
+  const lowerBrandNames = brandNames.map(b => b.toLowerCase());
+  const matchingProducts = products.filter(p => {
+    if (!p.brand) return false;
+    const productBrand = p.brand.toLowerCase();
+    return lowerBrandNames.some(b => 
+      productBrand.includes(b) || b.includes(productBrand)
+    );
+  });
+
+  console.log(`[analyze-formula-fit] Found ${matchingProducts.length} products matching mentioned brands`);
+
+  // Group products by brand
+  const brandMap: Record<string, typeof products> = {};
+  for (const product of matchingProducts) {
+    const brand = product.brand || "Unknown";
+    if (!brandMap[brand]) {
+      brandMap[brand] = [];
+    }
+    brandMap[brand].push(product);
+  }
+
+  // Build the brand data structure
+  const topBrandsData: Record<string, BrandData> = {};
+
+  for (const [brand, brandProducts] of Object.entries(brandMap)) {
+    // Calculate summary metrics
+    const prices = brandProducts.filter(p => p.price).map(p => p.price!);
+    const ratings = brandProducts.filter(p => p.rating).map(p => p.rating!);
+    const revenues = brandProducts.filter(p => p.monthly_revenue).map(p => p.monthly_revenue!);
+    const packagingTypes = [...new Set(brandProducts.filter(p => p.packaging_type).map(p => p.packaging_type!))];
+
+    const summary: BrandSummary = {
+      product_count: brandProducts.length,
+      avg_price: prices.length > 0 ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length * 100) / 100 : 0,
+      avg_rating: ratings.length > 0 ? Math.round(ratings.reduce((a, b) => a + b, 0) / ratings.length * 100) / 100 : 0,
+      total_reviews: brandProducts.reduce((sum, p) => sum + (p.reviews || 0), 0),
+      total_revenue: revenues.reduce((a, b) => a + b, 0),
+      packaging_types: packagingTypes,
+    };
+
+    // Get top 3 products by revenue (already sorted)
+    const topProducts: TopProduct[] = brandProducts.slice(0, 3).map(p => ({
+      title: p.title || "",
+      price: p.price || 0,
+      rating: p.rating || 0,
+      reviews: p.reviews || 0,
+      monthly_revenue: p.monthly_revenue || 0,
+      supplement_facts_complete: p.supplement_facts_complete,
+      all_nutrients: p.all_nutrients,
+      feature_bullets_text: p.feature_bullets_text || "",
+      claims_on_label: p.claims_on_label || [],
+      other_ingredients: p.other_ingredients || "",
+      packaging_type: p.packaging_type || "",
+      directions: p.directions || "",
+    }));
+
+    topBrandsData[brand] = {
+      summary,
+      top_products: topProducts,
+    };
+  }
+
+  console.log(`[analyze-formula-fit] Compiled data for ${Object.keys(topBrandsData).length} brands`);
+  return topBrandsData;
+}
+
 async function runAnalysis(
   supabase: ReturnType<typeof createClient>,
   categoryId: string,
@@ -196,6 +401,12 @@ async function runAnalysis(
       throw new Error("No formula brief found. Please create a formula brief first.");
     }
 
+    // Extract brand names from market trend analysis
+    const brandNames = extractBrandNames(marketTrend.analysis);
+
+    // Fetch detailed product data for mentioned brands
+    const topBrandsData = await fetchBrandProductData(supabase, categoryId, brandNames);
+
     console.log(`[analyze-formula-fit] Data fetched successfully. Calling Grok API...`);
 
     // Prepare the complete data payload for Grok
@@ -214,6 +425,7 @@ async function runAnalysis(
         criteria_scores: categoryAnalysis?.criteria_scores,
       },
       market_trend_analysis: marketTrend.analysis,
+      top_brands_data: topBrandsData,
     };
 
     const systemPrompt = `You are a brutally honest market analyst evaluating a supplement formula's competitive viability. Your job is to compare the formula brief against real market trend data and provide an unflinching assessment.
@@ -230,23 +442,38 @@ You will receive:
 - Complete formula brief with ingredients, positioning, pricing, etc.
 - Full market trend analysis with trends, consumer insights, competitive landscape
 - Category analysis with opportunity metrics
+- DETAILED PRODUCT DATA for top brands mentioned in the market trends
+
+CRITICAL: You now have access to ACTUAL competitor product data including:
+- Real supplement facts with exact ingredient amounts and dosages
+- Nutrient profiles with daily value percentages
+- Marketing claims and feature bullets used by competitors
+- Performance metrics (reviews, ratings, revenue)
+
+Use this real product data to:
+1. Compare the user's formula ingredients DIRECTLY against competitor formulations
+2. Identify SPECIFIC dosage differences (e.g., "Liquid I.V. uses 500mg sodium per serving, your formula has 400mg")
+3. Highlight claims competitors are making that the user's formula could support (or can't)
+4. Reference actual competitor pricing when evaluating price positioning
+5. Call out specific ingredients competitors include that the user's formula lacks
+6. Provide evidence-based recommendations like "Increase sodium to 500mg to match category leaders"
 
 Respond with a JSON object matching this exact structure:
 {
   "overall_score": <number 0-100>,
   "score_label": "<'Strong contender' if 80+, 'Needs improvement' if 50-79, 'Major gaps' if <50>",
-  "executive_summary": "<2-3 sentences summarizing the formula's market fit - be direct>",
+  "executive_summary": "<2-3 sentences summarizing the formula's market fit - be direct and reference specific competitor comparisons>",
   "strengths": [
     {
       "aspect": "<specific strength>",
       "explanation": "<why this matters>",
-      "market_evidence": "<cite specific market data>"
+      "market_evidence": "<cite specific market data or competitor comparison>"
     }
   ],
   "weaknesses": [
     {
       "aspect": "<specific weakness>",
-      "explanation": "<why this is a problem>",
+      "explanation": "<why this is a problem - compare to specific competitor formulations>",
       "impact": "<'high', 'medium', or 'low'>"
     }
   ],
@@ -254,38 +481,38 @@ Respond with a JSON object matching this exact structure:
     {
       "trend_name": "<trend from market analysis>",
       "alignment_score": <0-100>,
-      "notes": "<how well formula addresses this>"
+      "notes": "<how well formula addresses this - reference competitor approaches>"
     }
   ],
   "pain_point_coverage": [
     {
       "pain_point": "<consumer pain point from market analysis>",
       "addressed": <true/false>,
-      "how_addressed": "<explanation or why it's missing>"
+      "how_addressed": "<explanation with specific ingredient references>"
     }
   ],
   "competitive_position": {
-    "price_position": "<'Below market', 'At market', 'Premium', 'Super-premium'>",
+    "price_position": "<'Below market', 'At market', 'Premium', 'Super-premium' - with actual price comparisons>",
     "feature_position": "<'Basic', 'Competitive', 'Differentiated', 'Industry-leading'>",
-    "summary": "<1-2 sentences on competitive stance>"
+    "summary": "<1-2 sentences on competitive stance with specific brand comparisons>"
   },
   "recommendations": [
     {
       "priority": <1-5, lower is more urgent>,
-      "action": "<specific actionable recommendation>",
+      "action": "<specific actionable recommendation - include exact dosages when relevant>",
       "effort": "<'Easy', 'Medium', or 'Hard'>",
       "expected_impact": "<what improvement to expect>"
     }
   ],
   "gaps": [
     {
-      "gap": "<missing element>",
-      "market_opportunity": "<why this gap matters and the opportunity size>"
+      "gap": "<missing element - be specific about what competitors have>",
+      "market_opportunity": "<why this gap matters and reference successful competitor approaches>"
     }
   ]
 }
 
-Provide at least 3 strengths, 3 weaknesses, 5 trend alignments, 5 pain point coverages, 5 recommendations, and 2-3 gaps. Be thorough but not repetitive.`;
+Provide at least 3 strengths, 3 weaknesses, 5 trend alignments, 5 pain point coverages, 5 recommendations, and 2-3 gaps. Be thorough but not repetitive. Always reference specific competitor data when available.`;
 
     const userMessage = `Analyze this formula's competitive fit against the market data:
 
@@ -304,7 +531,22 @@ ${JSON.stringify(dataPayload.category_analysis, null, 2)}
 === MARKET TREND ANALYSIS (FULL) ===
 ${JSON.stringify(dataPayload.market_trend_analysis, null, 2)}
 
-Now provide your brutally honest analysis. Remember: the user wants to know if their formula will compete or fail. Reference specific data points. If there are major gaps, say so clearly.`;
+=== TOP BRANDS DETAILED DATA ===
+${JSON.stringify(dataPayload.top_brands_data, null, 2)}
+
+This TOP BRANDS DETAILED DATA contains ACTUAL product data from the mentioned brands including:
+- Complete supplement facts with exact ingredient amounts (supplement_facts_complete)
+- All nutrients with dosages and daily values (all_nutrients)
+- Marketing claims and feature bullets (feature_bullets_text, claims_on_label)
+- Other ingredients used (other_ingredients)
+- Performance metrics (reviews, ratings, revenue)
+
+USE THIS DATA to make SPECIFIC ingredient-by-ingredient comparisons. For example:
+- "Competitor X uses 500mg of ingredient Y, your formula has 300mg"
+- "Top performers all include ingredient Z which your formula lacks"
+- "Your sodium level matches Liquid I.V. but is lower than LMNT's premium positioning"
+
+Now provide your brutally honest analysis. Remember: the user wants to know if their formula will compete or fail. Reference specific data points from the competitor products. If there are major gaps, say so clearly.`;
 
     const response = await fetch("https://api.x.ai/v1/chat/completions", {
       method: "POST",

@@ -10,6 +10,7 @@ import { useFormulaBriefVersions } from "@/hooks/useFormulaBriefVersions";
 import { DocumentContainer } from "@/components/document/DocumentContainer";
 import { VersionSelector } from "@/components/document/VersionSelector";
 import { FormulaChat } from "@/components/document/FormulaChat";
+import { FloatingChatButton } from "@/components/ui/floating-chat-button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -181,6 +182,13 @@ export default function StrategyBrief() {
           )}
         </SheetContent>
       </Sheet>
+
+      {/* Floating Chat Button */}
+      <FloatingChatButton
+        onClick={() => setChatOpen(true)}
+        show={!!formulaBriefContent && !isLoading}
+        icon={<MessageSquare className="h-6 w-6" />}
+      />
     </div>
   );
 }

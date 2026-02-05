@@ -1,10 +1,7 @@
 import { useState, useRef, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, Bot, User, Sparkles, Loader2 } from "lucide-react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { Bot, Sparkles } from "lucide-react";
+import { ChatBubble, QuickReplies, ChatHeader, ChatInput } from "@/components/ui/chat-bubble";
 
 interface Message {
   id: string;
@@ -18,11 +15,11 @@ interface MarketTrendsChatProps {
 }
 
 const SUGGESTED_QUESTIONS = [
-  "What are the top growth opportunities in this market?",
-  "Which brands are gaining market share?",
-  "What do consumers complain about most?",
-  "What innovations are emerging?",
-  "How competitive is this market?",
+  "Top growth opportunities?",
+  "Trending brands?",
+  "Consumer complaints?",
+  "Market innovations?",
+  "Competitive analysis?",
 ];
 
 export function MarketTrendsChat({ categoryId, categoryName }: MarketTrendsChatProps) {
@@ -30,13 +27,12 @@ export function MarketTrendsChat({ categoryId, categoryName }: MarketTrendsChatP
     {
       id: "welcome",
       role: "assistant",
-      content: `👋 Hello! I'm your Market Insights AI. Ask me anything about the **${categoryName}** market analysis. I can help you understand trends, opportunities, competitive landscape, and more.`,
+      content: `👋 Hello! I'm your Market Insights AI.\n\nAsk me anything about the **${categoryName}** market analysis. I can help you understand trends, opportunities, competitive landscape, and more.`,
     },
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -150,108 +146,55 @@ export function MarketTrendsChat({ categoryId, categoryName }: MarketTrendsChatP
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
+  const showQuickReplies = messages.length === 1;
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-muted/20">
+      {/* Header */}
+      <ChatHeader
+        title="Market Insights AI"
+        subtitle="Online Now"
+        icon={<Bot className="w-5 h-5 text-primary-foreground" />}
+      />
+
       {/* Messages */}
       <ScrollArea ref={scrollAreaRef} className="flex-1 px-4 py-4">
         <div className="space-y-4">
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={`flex gap-3 animate-fade-in ${
-                message.role === "user" ? "flex-row-reverse" : ""
-              }`}
-            >
-              <div
-                className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                  message.role === "user"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted"
-                }`}
-              >
-                {message.role === "user" ? (
-                  <User className="w-4 h-4" />
-                ) : (
-                  <Bot className="w-4 h-4" />
-                )}
-              </div>
-              <div
-                className={`flex-1 max-w-[85%] rounded-2xl px-4 py-3 ${
-                  message.role === "user"
-                    ? "bg-primary text-primary-foreground ml-auto"
-                    : "bg-muted"
-                }`}
-              >
-                {message.role === "assistant" ? (
-                  <div className="prose prose-sm dark:prose-invert max-w-none">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {message.content || "..."}
-                    </ReactMarkdown>
-                  </div>
-                ) : (
-                  <p className="text-sm">{message.content}</p>
-                )}
-              </div>
+          {messages.map((message, index) => (
+            <div key={message.id}>
+              <ChatBubble
+                role={message.role}
+                content={message.content}
+                isLoading={isLoading && message.role === "assistant" && index === messages.length - 1}
+              />
+              {/* Show quick replies after welcome message */}
+              {message.id === "welcome" && showQuickReplies && (
+                <div className="mt-3">
+                  <p className="text-xs text-muted-foreground flex items-center gap-1.5 mb-2 ml-12">
+                    <Sparkles className="w-3 h-3" />
+                    Suggested questions:
+                  </p>
+                  <QuickReplies
+                    options={SUGGESTED_QUESTIONS}
+                    onSelect={handleSend}
+                    disabled={isLoading}
+                  />
+                </div>
+              )}
             </div>
           ))}
-
-          {/* Suggested questions - show only after welcome */}
-          {messages.length === 1 && (
-            <div className="space-y-2 mt-4">
-              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <Sparkles className="w-3 h-3" />
-                Try asking:
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {SUGGESTED_QUESTIONS.map((q, i) => (
-                  <button
-                    key={i}
-                    onClick={() => handleSend(q)}
-                    disabled={isLoading}
-                    className="text-xs px-3 py-1.5 rounded-full bg-secondary/50 hover:bg-secondary text-secondary-foreground transition-colors disabled:opacity-50"
-                  >
-                    {q}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </ScrollArea>
 
       {/* Input */}
-      <div className="border-t p-4">
-        <div className="flex gap-2">
-          <Textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Ask about the market analysis..."
-            className="min-h-[44px] max-h-[120px] resize-none"
-            disabled={isLoading}
-          />
-          <Button
-            size="icon"
-            onClick={() => handleSend()}
-            disabled={!input.trim() || isLoading}
-            className="flex-shrink-0"
-          >
-            {isLoading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Send className="w-4 h-4" />
-            )}
-          </Button>
-        </div>
-      </div>
+      <ChatInput
+        value={input}
+        onChange={setInput}
+        onSend={() => handleSend()}
+        placeholder="Ask about the market analysis..."
+        disabled={isLoading}
+        isLoading={isLoading}
+      />
     </div>
   );
 }

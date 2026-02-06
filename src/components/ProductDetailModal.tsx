@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useSupplementFactsAnalysis } from "@/hooks/useSupplementFactsAnalysis";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis } from "recharts";
+import HistoricalBSRSalesChart from "@/components/product/HistoricalBSRSalesChart";
 import type { Product } from "@/hooks/useProducts";
 
 interface ProductDetailModalProps {
@@ -514,6 +515,7 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                   {product.bsr_category && <p className="text-xs text-muted-foreground">Category: {product.bsr_category}</p>}
                 </CardContent>
               </Card>
+              <HistoricalBSRSalesChart historicalData={product.historical_data as any} />
               <Card>
                 <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><DollarSign className="w-4 h-4" />Price Metrics</CardTitle></CardHeader>
                 <CardContent className="space-y-4">

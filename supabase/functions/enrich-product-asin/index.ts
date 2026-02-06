@@ -579,15 +579,27 @@ serve(async (req) => {
       );
     }
 
-    // Merge: Jungle Scout as primary, Keepa fills gaps
+    // Merge: Keepa as primary for identity fields (title, price, images),
+    // JS provides sales/revenue/LQS calibration data
     const merged: EnrichedData = { ...emptyData() };
-    const primary = jsData || {};
-    const secondary = keepaData || {};
-
+    
+    // Fields where Keepa (child ASIN) should take priority
+    const keepaPriorityFields = new Set<keyof EnrichedData>([
+      'title', 'brand', 'price', 'rating', 'reviews',
+      'main_image_url', 'image_urls', 'product_url',
+      'feature_bullets', 'description_text', 'dimensions', 'weight',
+      'date_first_available', 'manufacturer', 'categories_flat',
+      'parent_asin', 'variations_count', 'is_fba', 'is_sns', 'fba_fees',
+    ]);
+    
     for (const key of Object.keys(merged) as (keyof EnrichedData)[]) {
-      const pVal = (primary as any)[key];
-      const sVal = (secondary as any)[key];
-      (merged as any)[key] = pVal != null ? pVal : sVal != null ? sVal : null;
+      const keepaVal = (keepaData as any)?.[key];
+      const jsVal = (jsData as any)?.[key];
+      if (keepaPriorityFields.has(key)) {
+        (merged as any)[key] = keepaVal != null ? keepaVal : jsVal != null ? jsVal : null;
+      } else {
+        (merged as any)[key] = jsVal != null ? jsVal : keepaVal != null ? keepaVal : null;
+      }
     }
 
     // Apply calibrated sales data (overrides raw values)

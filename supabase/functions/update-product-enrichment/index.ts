@@ -132,6 +132,29 @@ serve(async (req) => {
     if (d.variations_count != null) updatePayload.variations_count = d.variations_count;
     if (d.parent_asin) updatePayload.parent_asin = d.parent_asin;
 
+    // Store historical data (BSR + sales histories) in JSONB column
+    if (d.monthly_bsr_history || d.monthly_sales_history) {
+      updatePayload.historical_data = {
+        monthly_bsr_history: d.monthly_bsr_history || {},
+        monthly_sales_history: d.monthly_sales_history || {},
+      };
+    }
+
+    // FBA fees from Keepa (overrides JS fees if available)
+    if (d.fba_fees != null) {
+      updatePayload.fees_estimate = d.fba_fees;
+    }
+
+    // Calculate net_estimate: revenue - 30% COGS - (fees * monthly_sales)
+    const monthlyRevenue = d.monthly_revenue || 0;
+    const monthlySales = d.monthly_sales || 0;
+    const feesPerUnit = d.fba_fees || d.fees_estimate || 0;
+    if (monthlyRevenue > 0) {
+      const estimatedCogs = monthlyRevenue * 0.30;
+      const totalFees = feesPerUnit * monthlySales;
+      updatePayload.net_estimate = Math.round(monthlyRevenue - estimatedCogs - totalFees);
+    }
+
     updatePayload.updated_at = new Date().toISOString();
 
     console.log(`Update payload has ${Object.keys(updatePayload).length} fields`);

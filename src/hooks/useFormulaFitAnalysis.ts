@@ -89,6 +89,9 @@ export function useFormulaFitAnalysis(categoryId?: string) {
     attempt: 0,
     maxAttempts: 60, // 10 minutes with 10 second intervals
   });
+  
+  // Track the ID of a newly triggered analysis to avoid race conditions
+  const [triggeredAnalysisId, setTriggeredAnalysisId] = useState<string | null>(null);
 
   // Query for existing analysis
   const {
@@ -97,10 +100,24 @@ export function useFormulaFitAnalysis(categoryId?: string) {
     error: dbError,
     refetch,
   } = useQuery({
-    queryKey: ["formula_fit_analysis", categoryId],
+    queryKey: ["formula_fit_analysis", categoryId, triggeredAnalysisId],
     queryFn: async () => {
       if (!categoryId) return null;
 
+      // If we're waiting for a specific triggered analysis, fetch by ID
+      // This prevents the race condition where we get the old completed analysis
+      if (triggeredAnalysisId && pollingStatus.isPolling) {
+        const { data, error } = await supabase
+          .from("formula_fit_analyses")
+          .select("*")
+          .eq("id", triggeredAnalysisId)
+          .single();
+
+        if (error) throw error;
+        return data as FormulaFitRecord;
+      }
+
+      // Default: fetch the latest analysis for this category
       const { data, error } = await supabase
         .from("formula_fit_analyses")
         .select("*")
@@ -128,9 +145,20 @@ export function useFormulaFitAnalysis(categoryId?: string) {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
-      setPollingStatus({ isPolling: true, attempt: 0, maxAttempts: 60 });
-      refetch();
+    onSuccess: (data) => {
+      // Store the ID of the newly triggered analysis
+      if (data?.id) {
+        setTriggeredAnalysisId(data.id);
+      }
+      
+      // Invalidate the query cache to force fresh fetch
+      queryClient.invalidateQueries({ queryKey: ["formula_fit_analysis", categoryId] });
+      
+      // Start polling after a brief delay to let DB replicate
+      setTimeout(() => {
+        setPollingStatus({ isPolling: true, attempt: 0, maxAttempts: 60 });
+        refetch();
+      }, 500);
     },
   });
 
@@ -140,11 +168,14 @@ export function useFormulaFitAnalysis(categoryId?: string) {
 
     if (analysisRecord?.status === "completed" || analysisRecord?.status === "error") {
       setPollingStatus((prev) => ({ ...prev, isPolling: false }));
+      // Clear the triggered ID now that we have final results
+      setTriggeredAnalysisId(null);
       return;
     }
 
     if (pollingStatus.attempt >= pollingStatus.maxAttempts) {
       setPollingStatus((prev) => ({ ...prev, isPolling: false }));
+      setTriggeredAnalysisId(null);
       return;
     }
 

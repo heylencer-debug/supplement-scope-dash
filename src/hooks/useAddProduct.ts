@@ -22,6 +22,31 @@ export interface ProductFormData {
     unit: string;
     daily_value: string;
   }>;
+  // Enrichment fields from Jungle Scout / Keepa
+  monthly_sales?: number | null;
+  monthly_revenue?: number | null;
+  bsr_current?: number | null;
+  bsr_category?: string | null;
+  lqs?: number | null;
+  seller_name?: string | null;
+  seller_type?: string | null;
+  is_fba?: boolean | null;
+  date_first_available?: string | null;
+  main_image_url?: string | null;
+  image_urls?: string[] | null;
+  product_url?: string | null;
+  feature_bullets?: string[] | null;
+  dimensions?: string | null;
+  weight?: string | null;
+  price_30_days_avg?: number | null;
+  price_90_days_avg?: number | null;
+  bsr_30_days_avg?: number | null;
+  bsr_90_days_avg?: number | null;
+  estimated_revenue?: number | null;
+  estimated_monthly_sales?: number | null;
+  fees_estimate?: number | null;
+  variations_count?: number | null;
+  parent_asin?: string | null;
 }
 
 export function useAddProduct() {
@@ -73,6 +98,31 @@ export function useAddProduct() {
           ocr_extracted: false,
           ocr_confidence: "manual",
           is_available: true,
+          // Enrichment fields
+          monthly_sales: data.monthly_sales ?? null,
+          monthly_revenue: data.monthly_revenue ?? null,
+          bsr_current: data.bsr_current ?? null,
+          bsr_category: data.bsr_category ?? null,
+          lqs: data.lqs ?? null,
+          seller_name: data.seller_name ?? null,
+          seller_type: data.seller_type ?? null,
+          is_fba: data.is_fba ?? null,
+          date_first_available: data.date_first_available ?? null,
+          main_image_url: data.main_image_url ?? null,
+          image_urls: data.image_urls ?? null,
+          product_url: data.product_url ?? null,
+          feature_bullets: data.feature_bullets ?? null,
+          dimensions: data.dimensions ?? null,
+          weight: data.weight ?? null,
+          price_30_days_avg: data.price_30_days_avg ?? null,
+          price_90_days_avg: data.price_90_days_avg ?? null,
+          bsr_30_days_avg: data.bsr_30_days_avg ?? null,
+          bsr_90_days_avg: data.bsr_90_days_avg ?? null,
+          estimated_revenue: data.estimated_revenue ?? null,
+          estimated_monthly_sales: data.estimated_monthly_sales ?? null,
+          fees_estimate: data.fees_estimate ?? null,
+          variations_count: data.variations_count ?? null,
+          parent_asin: data.parent_asin ?? null,
         })
         .select()
         .single();

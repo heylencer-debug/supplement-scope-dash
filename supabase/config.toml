@@ -50,3 +50,6 @@ verify_jwt = false
 
 [functions.analyze-formula-fit]
 verify_jwt = false
+
+[functions.extract-supplement-image]
+verify_jwt = false

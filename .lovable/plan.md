@@ -1,127 +1,183 @@
 
 
-# Plan: Fix Formula Fit Analysis Not Updating After Adding New Products
+# Plan: Enrich Product Data with Jungle Scout & Keepa APIs
 
-## Problem Summary
+## Overview
 
-When a user adds a new product (like LMNT) and clicks "Refresh" on the Formula Fit tab, the new analysis is triggered but the UI immediately shows the old cached results instead of waiting for the new analysis to complete.
+Add an "Auto-Fill from ASIN" feature to the Add Product form. When the user enters an ASIN and clicks a button, a new edge function calls the Jungle Scout and Keepa APIs to fetch product details (title, brand, price, BSR, sales estimates, images, etc.) and auto-populates the form fields + saves the enriched data to the database.
 
-## Root Cause Analysis
+## Architecture
 
-The issue is a **race condition** in `src/hooks/useFormulaFitAnalysis.ts`:
+```text
+User enters ASIN → clicks "Lookup ASIN" button
+         │
+         ▼
+┌────────────────────────────────────┐
+│  enrich-product-asin               │
+│  (New Edge Function)               │
+├────────────────────────────────────┤
+│  1. Call Jungle Scout Product DB   │
+│     (include_keywords = ASIN)      │
+│     → title, brand, price, BSR,    │
+│       sales, revenue, category,    │
+│       fees, LQS, seller info,      │
+│       date first available, etc.   │
+│                                    │
+│  2. Call Keepa Product API         │
+│     → price history stats,         │
+│       BSR history, rating count,   │
+│       image URLs, product URL,     │
+│       date first available         │
+│                                    │
+│  3. Merge and return combined data │
+└────────────────────────────────────┘
+         │
+         ▼
+Form auto-fills: title, brand, price, rating, reviews
+Database insert includes: bsr_current, monthly_sales,
+  monthly_revenue, main_image_url, product_url, lqs,
+  date_first_available, seller_name, is_fba, etc.
+```
 
-1. User clicks "Refresh" button
-2. `triggerAnalysisMutation` calls the edge function
-3. Edge function creates a new record with `status: "pending"` and returns `{status: "processing", id: "new-id"}`
-4. `onSuccess` sets `isPolling: true` and calls `refetch()`
-5. **Problem**: `refetch()` immediately returns the OLD analysis record from cache/stale query
-6. The polling `useEffect` sees `status === "completed"` on the OLD record
-7. Polling stops immediately - user never sees new analysis
+## Step 1: Add API Key Secrets
 
-The mutation returns the new analysis ID, but this information is **not used** to query specifically for that new record.
+Two new secrets are needed:
+- **JUNGLE_SCOUT_API_KEY** -- The user's Jungle Scout API key (format: `KEY_NAME:API_KEY`)
+- **KEEPA_API_KEY** -- The user's Keepa API access key
 
-## Solution
+## Step 2: Create Edge Function
 
-Modify the hook to track the newly triggered analysis ID and ensure polling waits for that specific analysis to complete:
+**File: `supabase/functions/enrich-product-asin/index.ts`**
 
-### Step 1: Track the triggered analysis ID
+The function will:
+1. Accept `{ asin: string, marketplace?: string }` as input
+2. Call Jungle Scout Product Database endpoint:
+   - `POST https://developer.junglescout.com/api/product_database_query`
+   - Headers: `Content-Type: application/vnd.api+json`, `Accept: application/vnd.junglescout.v1+json`, `Authorization: KEY_NAME:API_KEY`
+   - Body: filter by `include_keywords` = ASIN
+   - Returns: title, brand, price, BSR, estimated units sold, revenue, LQS, fees, seller info, weight, dimensions, date first available, category
+3. Call Keepa Product API:
+   - `GET https://api.keepa.com/product?key=KEY&domain=1&asin=ASIN&stats=180&rating=1`
+   - Returns: price history stats (30/90-day averages), BSR history, rating/review count, image URLs, date first available
+4. Merge results with Jungle Scout as primary, Keepa filling gaps (images, historical averages, rating count)
+5. Return unified response
 
-Store the `id` returned from the edge function and use it to:
-- Query specifically for that analysis record during polling
-- OR invalidate the cache and ensure fresh data
+**Response shape:**
+```typescript
+{
+  success: boolean;
+  source: "jungle_scout" | "keepa" | "both" | "none";
+  data: {
+    // Form-fillable fields
+    title: string | null;
+    brand: string | null;
+    price: number | null;
+    rating: number | null;
+    reviews: number | null;
+    // Extended fields (saved directly to DB)
+    monthly_sales: number | null;
+    monthly_revenue: number | null;
+    bsr_current: number | null;
+    bsr_category: string | null;
+    lqs: number | null;
+    seller_name: string | null;
+    seller_type: string | null;
+    is_fba: boolean | null;
+    date_first_available: string | null;
+    main_image_url: string | null;
+    image_urls: string[] | null;
+    product_url: string | null;
+    feature_bullets: string[] | null;
+    dimensions: string | null;
+    weight: string | null;
+    price_30_days_avg: number | null;
+    price_90_days_avg: number | null;
+    bsr_30_days_avg: number | null;
+    bsr_90_days_avg: number | null;
+    estimated_revenue: number | null;
+    estimated_monthly_sales: number | null;
+    fees_estimate: number | null;
+    variations_count: number | null;
+    parent_asin: string | null;
+  };
+}
+```
 
-### Step 2: Invalidate React Query cache before refetching
+## Step 3: Create React Hook
 
-After triggering a new analysis, invalidate the query cache to force a fresh fetch from the database.
+**File: `src/hooks/useEnrichProduct.ts`**
 
-### Step 3: Add a small delay before first refetch
+A React Query mutation hook that:
+- Takes an ASIN string as input
+- Calls the `enrich-product-asin` edge function
+- Returns the enriched data with loading/error states
 
-Give the database time to replicate the new record before polling.
+## Step 4: Update AddProduct Form
 
-## Implementation Details
+**File: `src/pages/AddProduct.tsx`**
 
-### File: `src/hooks/useFormulaFitAnalysis.ts`
+Changes:
+1. Add a "Lookup" button next to the ASIN input field
+2. When clicked, call the enrichment hook
+3. Auto-fill form fields: title, brand, price, rating, reviews
+4. Store the extended data (BSR, sales, images, etc.) in component state
+5. Show a preview of the fetched product image if available
+6. Display a summary badge showing data sources used (e.g., "Jungle Scout + Keepa")
 
-**Changes:**
+## Step 5: Update useAddProduct Hook
 
-1. Add state to track the newly triggered analysis ID:
-   ```typescript
-   const [triggeredAnalysisId, setTriggeredAnalysisId] = useState<string | null>(null);
-   ```
+**File: `src/hooks/useAddProduct.ts`**
 
-2. Modify the query to fetch by ID when we have a triggered analysis:
-   ```typescript
-   queryFn: async () => {
-     if (!categoryId) return null;
-     
-     // If we're waiting for a specific triggered analysis, fetch by ID
-     if (triggeredAnalysisId && pollingStatus.isPolling) {
-       const { data, error } = await supabase
-         .from("formula_fit_analyses")
-         .select("*")
-         .eq("id", triggeredAnalysisId)
-         .single();
-       if (error) throw error;
-       return data;
-     }
+Extend `ProductFormData` interface with optional enrichment fields:
+```typescript
+// New optional fields from API enrichment
+monthly_sales?: number | null;
+monthly_revenue?: number | null;
+bsr_current?: number | null;
+bsr_category?: string | null;
+lqs?: number | null;
+seller_name?: string | null;
+seller_type?: string | null;
+is_fba?: boolean | null;
+date_first_available?: string | null;
+main_image_url?: string | null;
+image_urls?: string[] | null;
+product_url?: string | null;
+feature_bullets?: string[] | null;
+dimensions?: string | null;
+weight?: string | null;
+// ... etc
+```
 
-     // Default: fetch the latest analysis for this category
-     const { data, error } = await supabase
-       .from("formula_fit_analyses")
-       .select("*")
-       .eq("category_id", categoryId)
-       .order("created_at", { ascending: false })
-       .limit(1)
-       .maybeSingle();
+These fields get passed through to the Supabase insert so the product record matches the data richness of other products in the database.
 
-     if (error) throw error;
-     return data;
-   }
-   ```
+## Step 6: Update config.toml
 
-3. Update `onSuccess` to store the new analysis ID and invalidate cache:
-   ```typescript
-   onSuccess: (data) => {
-     // Store the ID of the newly triggered analysis
-     setTriggeredAnalysisId(data.id);
-     // Invalidate the query cache to force fresh fetch
-     queryClient.invalidateQueries({ queryKey: ["formula_fit_analysis", categoryId] });
-     // Start polling after a brief delay to let DB replicate
-     setTimeout(() => {
-       setPollingStatus({ isPolling: true, attempt: 0, maxAttempts: 60 });
-       refetch();
-     }, 500);
-   }
-   ```
+Add the new edge function entry.
 
-4. Clear the triggered ID when polling completes:
-   ```typescript
-   useEffect(() => {
-     if (!pollingStatus.isPolling) return;
+## Files Summary
 
-     if (analysisRecord?.status === "completed" || analysisRecord?.status === "error") {
-       setPollingStatus((prev) => ({ ...prev, isPolling: false }));
-       setTriggeredAnalysisId(null); // Clear the triggered ID
-       return;
-     }
-     // ...
-   }, [analysisRecord, pollingStatus.isPolling, ...]);
-   ```
+| File | Action | Description |
+|------|--------|-------------|
+| `supabase/functions/enrich-product-asin/index.ts` | Create | Edge function calling Jungle Scout + Keepa APIs |
+| `src/hooks/useEnrichProduct.ts` | Create | React Query mutation hook |
+| `src/pages/AddProduct.tsx` | Modify | Add ASIN lookup button and auto-fill logic |
+| `src/hooks/useAddProduct.ts` | Modify | Extend ProductFormData with enrichment fields |
+| `supabase/config.toml` | Modify | Register new edge function |
 
-## Files to Modify
+## Secrets Required
 
-| File | Change |
-|------|--------|
-| `src/hooks/useFormulaFitAnalysis.ts` | Add triggered analysis ID tracking, invalidate cache on trigger, fetch by ID during polling |
+- `JUNGLE_SCOUT_API_KEY` -- User will be prompted to add this
+- `KEEPA_API_KEY` -- User will be prompted to add this
 
-## Testing Steps
+Both are already confirmed by the user as available.
 
-1. Navigate to an Electrolyte Powder category
-2. Click the Formula Fit tab
-3. Note the current "Brands Analyzed" section
-4. Add a new product (e.g., via Add Product form) with a new brand
-5. Return to Formula Fit tab and click "Refresh"
-6. Verify the processing state shows (spinning indicator, progress bar)
-7. Wait for analysis to complete
-8. Verify the new brand appears in "Brands Analyzed" section
+## UI Flow
+
+1. User enters ASIN in the text field
+2. Clicks "Lookup" button (magnifying glass icon) next to the ASIN input
+3. Loading spinner appears on the button
+4. On success: form fields auto-populate, product image thumbnail appears, toast shows "Enriched from Jungle Scout + Keepa"
+5. User can still edit any field before saving
+6. On save, all enriched data is included in the database insert
 

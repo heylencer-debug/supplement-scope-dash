@@ -1,65 +1,95 @@
 
 
-## Update Keepa Parsing to Match Production Workflow
+## Fix JS Parent ASIN Fallback, Cap Sales Calibration, and Extract Additional Keepa Fields
 
-The current `enrich-product-asin` edge function uses Keepa's `stats` object for basic averages but misses the full historical data parsing and calibrated sales estimation that your production n8n workflow uses. This plan brings the edge function in line with that logic.
+### Problem
+
+1. **Jungle Scout fails on child variations** (e.g., LMNT `B0FTGJGPTM`), returning no data. The function never retries with the parent ASIN that Keepa provides.
+2. **Sales calibration explodes for low-rank products** when JS data is missing. The generic `k = 250,000,000` applied to rank 7 produces ~17 million estimated sales.
+3. **Keepa returns several useful fields** that we never extract: `description`, `manufacturer`, `packageWeight`, `packageHeight/Length/Width`, `buyBoxIsFBA`, `isSNS`, `variationCSV`.
 
 ---
 
-### What Changes
+### Changes
 
-**1. Update Keepa API call parameters**
-- Change from `history=0` to `days=730` to get 2 years of CSV history data
-- Remove `offers=20` (not needed, saves API tokens)
+#### 1. JS Parent ASIN Fallback (`enrich-product-asin/index.ts`)
 
-**2. Add historical BSR parsing (`getMonthlyBreakdown`)**
-- Port the `getMonthlyBreakdown` function that processes `csv[3]` (Sales Rank history) into monthly averages over 24 months
-- Uses the Keepa time offset (21564000 minutes) to convert Keepa timestamps to real dates
+In the main `serve` handler, after the initial JS call returns null:
+- Call Keepa first (lightweight, always works) to get `parentAsin`
+- If JS returned null and Keepa found a `parentAsin` different from the original ASIN, retry JS with the parent ASIN
+- Merge the parent JS data but keep the original child ASIN throughout
 
-**3. Add calibrated power-law sales estimation**
-- Implement the formula: `Sales = k * (Rank ^ CATEGORY_SLOPE)` where slope = -1.38
-- Calibrate `k` using current known sales from Jungle Scout + current rank
-- Generate a full `monthly_sales_history` object from BSR history
+Flow becomes:
+```text
+1. Fetch Keepa (always works, gives us parentAsin)
+2. Fetch JS with child ASIN
+3. If JS is null AND Keepa has parentAsin != child ASIN:
+   -> Retry JS with parentAsin
+4. Pass JS data (if any) into Keepa calibration logic
+```
 
-**4. Compute BSR averages from raw history (more accurate)**
-- Replace reliance on `stats.avg30`/`stats.avg90` for BSR with values computed directly from the CSV data (month_1 for 30-day, average of months 1-3 for 90-day)
-- Keep using `stats.avg30`/`stats.avg90` for price averages (those are fine)
+Since Keepa is called before JS now, the calibration step inside `fetchKeepa` needs to be separated -- we'll extract calibration into a post-processing step after both APIs return.
 
-**5. Extract FBA fees from Keepa**
-- Parse `product.fbaFees.pickAndPackFee` (in cents) as `fees_estimate`
+#### 2. Cap Sales Calibration for Uncalibrated Products
 
-**6. Add net estimate calculation**
-- In `update-product-enrichment`, compute `net_estimate` after enrichment: `monthly_revenue - (30% COGS) - (fees * monthly_sales)`
+When no JS sales data exists (generic `k`), add guardrails:
+- **Cap estimated monthly sales at 100,000 units** -- any estimate above this without calibration data is unrealistic
+- **Cap per-month estimates identically** in the sales history loop
+- Log a warning when the cap is applied
 
-**7. Store historical data in the `historical_data` JSONB column**
-- Save `monthly_bsr_history` and `monthly_sales_history` into the existing `historical_data` column on the products table
+#### 3. Extract Additional Keepa Fields
+
+Add new fields to `EnrichedData` interface and extract from the Keepa product object:
+
+| Keepa field | Maps to | DB column |
+|---|---|---|
+| `product.description` | `description_text` | `description_text` |
+| `product.manufacturer` | `manufacturer` | `manufacturer` |
+| `product.packageWeight` (grams) | `weight` | `weight` |
+| `product.packageHeight/Length/Width` (mm) | `dimensions` | `dimensions` |
+| `product.buyBoxIsFBA` | `is_fba` | `is_fba` |
+| `product.isSNS` (Subscribe & Save) | `is_sns` | stored in `historical_data` |
+| `product.variationCSV` (count pairs) | `variations_count` | `variations_count` |
+| `product.categoryTree` (full) | `categories_flat` | `categories_flat` |
+
+#### 4. Update `update-product-enrichment/index.ts`
+
+Map the new fields into the database update payload:
+- `description_text`, `manufacturer`, `categories_flat`
+- `is_fba` from Keepa's `buyBoxIsFBA`
+- Store `is_sns` inside the `historical_data` JSONB
+
+#### 5. Update `src/hooks/useEnrichProduct.ts`
+
+Add the new fields to the `EnrichedProductData` TypeScript interface so the frontend is type-aware.
 
 ---
 
 ### Technical Details
 
 **Files modified:**
-- `supabase/functions/enrich-product-asin/index.ts` -- Add `getMonthlyBreakdown`, calibrated sales estimation, FBA fees parsing, updated API params. Add new fields to `EnrichedData` interface: `monthly_bsr_history`, `monthly_sales_history`, `fba_fees`.
-- `supabase/functions/update-product-enrichment/index.ts` -- Map new fields (`historical_data`, `fees_estimate` from FBA, `net_estimate` calculation), store histories in `historical_data` JSONB column.
-- `src/hooks/useEnrichProduct.ts` -- Add new fields to the `EnrichedProductData` interface.
+- `supabase/functions/enrich-product-asin/index.ts` -- Reorder API calls (Keepa first), add parent ASIN retry for JS, extract new Keepa fields, separate calibration into post-processing, add sales cap
+- `supabase/functions/update-product-enrichment/index.ts` -- Map new fields (`description_text`, `manufacturer`, `categories_flat`, `is_fba`, `is_sns` in historical_data)
+- `src/hooks/useEnrichProduct.ts` -- Add `description_text`, `manufacturer`, `categories_flat`, `is_sns` to interface
 
-**No database migration needed** -- the `products` table already has `historical_data` (jsonb), `fees_estimate` (numeric), and `net_estimate` (numeric) columns.
+**No database migration needed** -- all target columns already exist on the `products` table.
 
-**Key constants (matching your workflow):**
+**Sales cap constant:**
 ```text
-CATEGORY_SLOPE = -1.38
-GENERIC_CONSTANT = 250000000
-KEEPA_OFFSET_MINUTES = 21564000
+MAX_UNCALIBRATED_MONTHLY_SALES = 100000
 ```
 
-**Sales calibration logic:**
-```text
-If Jungle Scout provides current_sales and current_rank:
-  k = current_sales / (current_rank ^ -1.38)
-Else:
-  k = 250000000 (generic fallback)
+Applied only when `k` equals the generic fallback (no JS calibration data).
 
-For each month's average BSR:
-  estimated_sales = k * (avg_rank ^ -1.38)
+**Keepa dimension/weight parsing:**
+```text
+weight: product.packageWeight in grams -> convert to "X.XX lbs"
+dimensions: packageHeight x packageLength x packageWidth in mm -> convert to "H x L x W inches"
+```
+
+**Variation count from `variationCSV`:**
+```text
+variationCSV is an array of [dimension, ASIN, ...] pairs
+variations_count = number of unique ASINs in the array
 ```
 

@@ -535,24 +535,25 @@ serve(async (req) => {
     const keepaResult = await fetchKeepaRaw(asin, keepaDomain);
 
     // ======================================================
-    // Step 2: Fetch Jungle Scout with child ASIN
+    // Step 2: Fetch Jungle Scout -- prefer parent ASIN when available
     // ======================================================
-    let jsData = await fetchJungleScout(asin, marketplace);
+    let jsData: Partial<EnrichedData> | null = null;
+    const parentAsin = keepaResult?.data?.parent_asin;
 
-    // ======================================================
-    // Step 3: If JS failed and Keepa found a parentAsin, retry JS with parent
-    // ======================================================
-    if (!jsData && keepaResult?.data?.parent_asin && keepaResult.data.parent_asin !== asin) {
-      const parentAsin = keepaResult.data.parent_asin;
-      console.log(`JS returned null for child ${asin}, retrying with parent ASIN: ${parentAsin}`);
+    if (parentAsin && parentAsin !== asin) {
+      // Try parent ASIN first (JS indexes parent-level data for variations)
+      console.log(`Trying JS with parent ASIN first: ${parentAsin}`);
       jsData = await fetchJungleScout(parentAsin, marketplace);
       if (jsData) {
-        console.log(`JS parent fallback succeeded for ${parentAsin}`);
-        // Keep the original child ASIN context but use parent's sales data
-        // Don't overwrite title/brand from parent as it may differ
+        console.log(`JS parent lookup succeeded for ${parentAsin}`);
       } else {
-        console.log(`JS parent fallback also returned null for ${parentAsin}`);
+        // Fall back to child ASIN
+        console.log(`JS parent failed, trying child ASIN: ${asin}`);
+        jsData = await fetchJungleScout(asin, marketplace);
       }
+    } else {
+      // No parent ASIN -- try the original ASIN directly
+      jsData = await fetchJungleScout(asin, marketplace);
     }
 
     // ======================================================

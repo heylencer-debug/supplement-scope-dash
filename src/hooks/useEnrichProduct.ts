@@ -32,6 +32,9 @@ export interface EnrichedProductData {
   fees_estimate: number | null;
   variations_count: number | null;
   parent_asin: string | null;
+  monthly_bsr_history: Record<string, number | null> | null;
+  monthly_sales_history: Record<string, number | null> | null;
+  fba_fees: number | null;
 }
 
 interface EnrichResponse {

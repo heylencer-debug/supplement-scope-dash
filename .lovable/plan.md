@@ -1,211 +1,162 @@
 
-# Enhanced Formula Fit Analysis with Brand Deep Dive
+
+# Plan: AI-Powered Supplement Facts Image Upload
 
 ## Overview
-Enhance the Formula Fit analysis edge function to include comprehensive data about the top brands mentioned in the Market Trend analysis. When Grok evaluates the formula's competitive fit, it will now also receive detailed product data from our database for each brand mentioned in the market analysis.
+Add an image upload feature to the Add Product form that uses **Google Gemini 3 Pro** via OpenRouter to analyze uploaded supplement facts images and auto-fill the ingredients form.
 
----
+## Architecture
 
-## Current State
-
-The `analyze-formula-fit` edge function currently sends to Grok:
-- Formula brief data
-- Formula brief version (full document)
-- Extended formula brief from category analysis
-- Category analysis metrics
-- Full market trend analysis
-
-**What's Missing**: The market trend analysis mentions brands (e.g., "Liquid I.V.", "LMNT", "Ultima Replenisher") but we're not sending the actual detailed product data we have about these brands.
-
----
-
-## Proposed Enhancement
-
-### Data to Add
-
-For each brand mentioned in the market trend analysis, fetch and include:
-
-**Brand-Level Aggregates:**
-- Product count in our database
-- Average price
-- Average rating
-- Total reviews
-- Total monthly revenue
-- Packaging types used
-
-**Product-Level Details (Top 3-5 per brand):**
-- Complete supplement facts (`supplement_facts_complete`)
-- All nutrients breakdown (`all_nutrients`)
-- Feature bullets / marketing claims (`feature_bullets_text`)
-- Claims on label (`claims_on_label`)
-- Other ingredients (`other_ingredients`)
-- Pricing and performance metrics
-
----
-
-## Technical Implementation
-
-### Edge Function Changes (`analyze-formula-fit/index.ts`)
-
-**New Data Fetching Logic:**
-
-1. Parse the market trend analysis to extract brand names from:
-   - `analysis.sections.competitiveLandscape.brandRankings[].brandName`
-   - `analysis.sections.topProducts.products[].brandProductName` (extract brand from "Brand - Product" format)
-
-2. Query products table for matching brands within the category:
 ```text
-SELECT brand, title, price, rating, reviews, monthly_revenue,
-       supplement_facts_complete, all_nutrients, feature_bullets_text,
-       claims_on_label, other_ingredients, packaging_type, directions
-FROM products
-WHERE category_id = :categoryId
-  AND brand IN (:extractedBrandNames)
-ORDER BY monthly_revenue DESC
+┌─────────────────────────────────────────────────────────────────┐
+│                     AddProduct.tsx (Frontend)                    │
+├─────────────────────────────────────────────────────────────────┤
+│  1. User uploads/drops image of supplement facts panel          │
+│  2. Image converted to base64                                   │
+│  3. Call edge function with base64 image data                   │
+│  4. Receive extracted data → auto-populate form fields          │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│         extract-supplement-image (New Edge Function)            │
+├─────────────────────────────────────────────────────────────────┤
+│  • Receives base64 image directly (no Supabase storage)         │
+│  • Sends to OpenRouter with google/gemini-3-pro-preview         │
+│  • Uses tool calling for structured extraction                  │
+│  • Returns parsed ingredients, serving size, claims, etc.       │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-3. Group products by brand and include both:
-   - Aggregated brand metrics
-   - Top 3 products per brand with full details
+## Implementation Steps
 
-**New Data Payload Section:**
+### Step 1: Create New Edge Function
+**File: `supabase/functions/extract-supplement-image/index.ts`**
+
+Create a new edge function that:
+- Accepts base64-encoded image data directly (avoids need for storage bucket setup)
+- Sends image to OpenRouter's `google/gemini-3-pro-preview` model
+- Uses structured tool calling (same pattern as existing `analyze-supplement-facts`)
+- Returns extracted data in a format matching the form's `Ingredient[]` interface
+
+Key differences from existing `analyze-supplement-facts`:
+- Takes base64 image input instead of productId
+- Returns data for form population instead of updating a database record
+- Lighter-weight response focused on form auto-fill
+
+### Step 2: Create Image Upload Hook
+**File: `src/hooks/useExtractSupplementImage.ts`**
+
+Create a React Query mutation hook that:
+- Converts uploaded File to base64
+- Calls the new edge function
+- Returns typed extraction results
+- Handles loading and error states
+
+### Step 3: Update AddProduct Form
+**File: `src/pages/AddProduct.tsx`**
+
+Add to the Supplement Facts card:
+1. **Drop zone / file input** for image upload (with visual feedback)
+2. **Image preview** showing the uploaded image
+3. **"Analyze with AI" button** to trigger extraction
+4. **Loading state** with spinner during analysis
+5. **Auto-population logic** to fill form fields from extraction results:
+   - `ingredients[]` → Active Ingredients table
+   - `serving_size` → Serving Size field
+   - `servings_per_container` → Servings Per Container field
+   - `other_ingredients` → Other Ingredients textarea
+   - `directions` → Directions textarea
+   - `warnings` → Warnings textarea
+   - `claims_on_label` → Claims badges
+
+### Step 4: Update config.toml
+Add the new edge function configuration with `verify_jwt = false`
+
+## UI/UX Design
+
 ```text
-top_brands_data: {
-  [brandName]: {
-    summary: {
-      product_count: number,
-      avg_price: number,
-      avg_rating: number,
-      total_reviews: number,
-      total_revenue: number,
-      packaging_types: string[]
-    },
-    top_products: [
-      {
-        title: string,
-        price: number,
-        rating: number,
-        reviews: number,
-        monthly_revenue: number,
-        supplement_facts_complete: object,
-        all_nutrients: array,
-        feature_bullets_text: string,
-        claims_on_label: array,
-        other_ingredients: string,
-        packaging_type: string
-      }
-    ]
-  }
+┌─────────────────────────────────────────────────────────────────┐
+│ Supplement Facts                                                 │
+│ Ingredients from the product label                              │
+├─────────────────────────────────────────────────────────────────┤
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │  📷 Upload Supplement Facts Image                           │ │
+│ │  ────────────────────────────────────────────────────────── │ │
+│ │  [   Drop image here or click to browse   ]  ← Dashed box  │ │
+│ │                                                             │ │
+│ │  [Preview Image]        [🔄 Analyze with AI]  ← When image │ │
+│ │                                              uploaded       │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│                                                                  │
+│ Serving Size: [1 stick (16g)]    Servings: [30]  ← Auto-filled  │
+│                                                                  │
+│ Active Ingredients:                     [+ Add Ingredient]       │
+│ ┌────────────────────────────────────────────────────────────┐  │
+│ │ 1. [Sodium]        [500] [mg] [22%]  [🗑]  ← Auto-filled   │  │
+│ │ 2. [Potassium]     [380] [mg] [8%]   [🗑]                  │  │
+│ │ 3. [Vitamin C]     [100] [mg] [111%] [🗑]                  │  │
+│ └────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## Technical Details
+
+### Edge Function Request/Response
+
+**Request:**
+```typescript
+{
+  imageBase64: string;  // Base64-encoded image data
+  mimeType: string;     // "image/jpeg" | "image/png" | "image/webp"
 }
 ```
 
-### System Prompt Updates
-
-Add to the existing system prompt:
-
-```text
-You will also receive detailed product data for the top brands mentioned in the market trends:
-- Actual ingredient formulations from their supplement facts
-- Nutrient profiles with dosages and daily values
-- Marketing claims and feature bullets
-- Performance metrics (reviews, ratings, revenue)
-
-Use this real product data to:
-1. Compare the user's formula ingredients directly against competitor formulations
-2. Identify specific dosage differences (e.g., "Liquid I.V. uses 500mg sodium, your formula has 400mg")
-3. Highlight claims competitors are making that the user's formula supports (or doesn't)
-4. Reference actual competitor pricing when evaluating price positioning
+**Response:**
+```typescript
+{
+  success: boolean;
+  confidence: "high" | "medium" | "low";
+  data: {
+    serving_size: string | null;
+    servings_per_container: number | null;
+    ingredients: Array<{
+      name: string;
+      amount: string;
+      unit: string;
+      daily_value: string | null;
+    }>;
+    other_ingredients: string | null;
+    directions: string | null;
+    warnings: string | null;
+    claims_on_label: string[];
+  };
+  extraction_notes: string;
+}
 ```
 
-### User Message Updates
+### Form Auto-Population Logic
 
-Add new section to the prompt:
+When extraction completes successfully:
+1. Replace existing ingredients array with extracted ingredients
+2. Fill serving size and container fields
+3. Populate other ingredients, directions, warnings textareas
+4. Add claims as badges
+5. Show toast notification with confidence level and ingredient count
 
-```text
-=== TOP BRANDS DETAILED DATA ===
-${JSON.stringify(topBrandsData, null, 2)}
+## Files to Create/Modify
 
-This contains actual product data from the mentioned brands including:
-- Complete supplement facts with exact ingredient amounts
-- Marketing claims and feature bullets
-- Performance metrics (reviews, ratings, revenue)
+| File | Action | Description |
+|------|--------|-------------|
+| `supabase/functions/extract-supplement-image/index.ts` | Create | New edge function for image analysis |
+| `src/hooks/useExtractSupplementImage.ts` | Create | React Query mutation for extraction |
+| `src/pages/AddProduct.tsx` | Modify | Add image upload UI and auto-fill logic |
+| `supabase/config.toml` | Modify | Add function configuration |
 
-Use this to make specific ingredient-by-ingredient comparisons.
-```
+## Dependencies
 
----
+- Uses existing `OPENROUTER_API_KEY` secret (already configured)
+- Uses `google/gemini-3-pro-preview` model (per user request)
+- No new npm packages needed (uses native File/FileReader APIs)
+- No storage bucket setup required (direct base64 transfer)
 
-## Data Flow
-
-```text
-Market Trend Analysis
-       │
-       ├─ Extract brand names from:
-       │   - brandRankings[].brandName
-       │   - topProducts[].brandProductName
-       │
-       ▼
-Query Products Table
-       │
-       ├─ Filter by category_id
-       ├─ Filter by brand IN (extracted names)
-       ├─ Order by monthly_revenue DESC
-       │
-       ▼
-Group by Brand
-       │
-       ├─ Calculate summary metrics
-       ├─ Select top 3 products per brand
-       │
-       ▼
-Send to Grok
-       │
-       ├─ Existing data (formula brief, market trends, etc.)
-       ├─ NEW: top_brands_data with real competitor formulations
-       │
-       ▼
-Enhanced Analysis
-       │
-       ├─ Direct ingredient comparisons
-       ├─ Specific dosage analysis
-       ├─ Claim gap identification
-       └─ Evidence-based positioning recommendations
-```
-
----
-
-## Expected Benefits
-
-1. **Ingredient-Level Comparisons**: Grok can compare exact sodium/potassium/vitamin dosages between the user's formula and competitors
-
-2. **Claim Analysis**: Identify which marketing claims competitors use that the user's formula could (or couldn't) support
-
-3. **Real Price Positioning**: Use actual competitor prices from the database rather than market trend estimates
-
-4. **Formulation Gaps**: Identify specific ingredients competitors include that the user's formula lacks
-
-5. **Evidence-Based Recommendations**: "Add 100mg more sodium to match Liquid I.V.'s 500mg" rather than generic advice
-
----
-
-## Files to Modify
-
-| File | Changes |
-|------|---------|
-| `supabase/functions/analyze-formula-fit/index.ts` | Add brand extraction, product queries, and enhanced prompts |
-
----
-
-## Example Output Enhancement
-
-**Before (generic):**
-> "Your sodium content is lower than some market leaders"
-
-**After (specific):**
-> "Your formula contains 350mg sodium per serving. Liquid I.V. leads with 500mg (22% DV), while LMNT positions as 'high sodium' with 1000mg. For the mainstream hydration market, consider increasing to 450-500mg to match category leaders. However, your lower sodium could differentiate for daily wellness use."
-
----
-
-## Summary
-
-This enhancement bridges the gap between market-level insights and product-level competitive intelligence. By sending actual competitor formulation data to Grok, the Formula Fit analysis can provide specific, actionable comparisons rather than generic assessments. This aligns with the "AI does the hard labor with raw data" philosophy - we send complete product data and let Grok extract meaningful competitive insights.

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { Search, Filter, Download, Star, TrendingUp, Loader2, Eye, ChevronDown, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Beaker, Plus, DatabaseZap } from "lucide-react";
+import { Search, Filter, Download, Star, TrendingUp, Loader2, Eye, ChevronDown, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Beaker, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -60,9 +60,6 @@ export default function ProductExplorer() {
   const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   
-  // Re-enrich state
-  const [isEnriching, setIsEnriching] = useState(false);
-  const [enrichProgress, setEnrichProgress] = useState({ current: 0, total: 0, failed: 0 });
   
   // Sorting state
   const [sortField, setSortField] = useState<SortField>(null);
@@ -167,42 +164,6 @@ export default function ProductExplorer() {
     await startBulkAnalysis(categoryIdToUse);
   };
 
-  const handleBulkEnrich = async () => {
-    if (!products?.length) return;
-    
-    setIsEnriching(true);
-    const total = products.length;
-    setEnrichProgress({ current: 0, total, failed: 0 });
-    let failed = 0;
-
-    // Process in batches of 3 to avoid overwhelming the API
-    const batchSize = 3;
-    for (let i = 0; i < total; i += batchSize) {
-      const batch = products.slice(i, i + batchSize);
-      const results = await Promise.allSettled(
-        batch.map(p =>
-          supabase.functions.invoke("update-product-enrichment", {
-            body: { product_id: p.id },
-          })
-        )
-      );
-      
-      for (const r of results) {
-        if (r.status === "rejected" || (r.status === "fulfilled" && r.value.error)) {
-          failed++;
-        }
-      }
-      
-      setEnrichProgress({ current: Math.min(i + batchSize, total), total, failed });
-    }
-
-    setIsEnriching(false);
-    queryClient.invalidateQueries({ queryKey: ['products'] });
-    toast({
-      title: "Enrichment complete",
-      description: `Updated ${total - failed} of ${total} products.${failed > 0 ? ` ${failed} failed.` : ""}`,
-    });
-  };
 
   // Sorting handler
   const handleSort = (field: SortField) => {
@@ -429,24 +390,6 @@ export default function ProductExplorer() {
               )}
             </Button>
           )}
-          <Button 
-            variant="outline" 
-            className="gap-2"
-            onClick={handleBulkEnrich}
-            disabled={isEnriching || !products?.length}
-          >
-            {isEnriching ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Enriching {enrichProgress.current}/{enrichProgress.total}
-              </>
-            ) : (
-              <>
-                <DatabaseZap className="w-4 h-4" />
-                Re-enrich All
-              </>
-            )}
-          </Button>
           <Button 
             variant="default" 
             className="gap-2"

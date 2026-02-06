@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Plus, Trash2, ArrowLeft, Save, Loader2 } from "lucide-react";
+import { Plus, Trash2, ArrowLeft, Save, Loader2, Upload, Sparkles, X, ImageIcon } from "lucide-react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,7 @@ import { useCategories } from "@/hooks/useCategories";
 import { useCategoryContext } from "@/contexts/CategoryContext";
 import { useCategoryByName } from "@/hooks/useCategoryByName";
 import { useAddProduct, ProductFormData } from "@/hooks/useAddProduct";
+import { useExtractSupplementImage } from "@/hooks/useExtractSupplementImage";
 import { toast } from "@/hooks/use-toast";
 
 interface Ingredient {
@@ -48,8 +49,10 @@ export default function AddProduct() {
   const { data: categoryFromName } = useCategoryByName(categoryName);
   const { data: categories } = useCategories();
   const addProduct = useAddProduct();
+  const extractImage = useExtractSupplementImage();
   
   const effectiveCategoryId = currentCategoryId || categoryFromName?.id || "";
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Form state
   const [asin, setAsin] = useState("");
@@ -68,6 +71,11 @@ export default function AddProduct() {
   const [warnings, setWarnings] = useState("");
   const [claimInput, setClaimInput] = useState("");
   const [claims, setClaims] = useState<string[]>([]);
+  
+  // Image upload state
+  const [uploadedImage, setUploadedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
   
   // Ingredients state
   const [ingredients, setIngredients] = useState<Ingredient[]>([
@@ -103,6 +111,102 @@ export default function AddProduct() {
 
   const removeClaim = (claim: string) => {
     setClaims(claims.filter(c => c !== claim));
+  };
+
+  // Image upload handlers
+  const handleFileSelect = useCallback((file: File) => {
+    const validTypes = ["image/jpeg", "image/png", "image/webp", "image/jpg"];
+    if (!validTypes.includes(file.type)) {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload a JPEG, PNG, or WebP image",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setUploadedImage(file);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setImagePreview(e.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleFileSelect(file);
+  }, [handleFileSelect]);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  }, []);
+
+  const clearImage = () => {
+    setUploadedImage(null);
+    setImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const handleExtractFromImage = async () => {
+    if (!uploadedImage) return;
+
+    try {
+      const result = await extractImage.mutateAsync(uploadedImage);
+      
+      // Auto-populate form fields
+      if (result.data.serving_size) {
+        setServingSize(result.data.serving_size);
+      }
+      if (result.data.servings_per_container) {
+        setServingsPerContainer(String(result.data.servings_per_container));
+      }
+      if (result.data.other_ingredients) {
+        setOtherIngredients(result.data.other_ingredients);
+      }
+      if (result.data.directions) {
+        setDirections(result.data.directions);
+      }
+      if (result.data.warnings) {
+        setWarnings(result.data.warnings);
+      }
+      if (result.data.claims_on_label?.length) {
+        setClaims(prev => [...new Set([...prev, ...result.data.claims_on_label])]);
+      }
+      
+      // Replace ingredients with extracted ones
+      if (result.data.ingredients?.length) {
+        const newIngredients = result.data.ingredients.map(ing => ({
+          id: crypto.randomUUID(),
+          name: ing.name,
+          amount: ing.amount,
+          unit: ing.unit,
+          daily_value: ing.daily_value?.replace("%", "") || "",
+        }));
+        setIngredients(newIngredients);
+      }
+
+      toast({
+        title: "Extraction Complete",
+        description: `Extracted ${result.data.ingredients?.length || 0} ingredients with ${result.confidence} confidence`,
+      });
+      
+      if (result.extraction_notes) {
+        console.log("Extraction notes:", result.extraction_notes);
+      }
+    } catch (error) {
+      // Error handled in hook
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -284,9 +388,107 @@ export default function AddProduct() {
         <Card>
           <CardHeader>
             <CardTitle>Supplement Facts</CardTitle>
-            <CardDescription>Ingredients from the product label</CardDescription>
+            <CardDescription>Upload an image or manually enter ingredients from the product label</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-6">
+            {/* Image Upload Section */}
+            <div className="space-y-3">
+              <Label className="flex items-center gap-2">
+                <ImageIcon className="h-4 w-4" />
+                Upload Supplement Facts Image
+              </Label>
+              
+              <div
+                className={`relative border-2 border-dashed rounded-xl p-6 transition-colors ${
+                  isDragOver
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:border-primary/50"
+                }`}
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleFileSelect(file);
+                  }}
+                />
+                
+                {!imagePreview ? (
+                  <div className="flex flex-col items-center justify-center gap-2 text-center">
+                    <Upload className="h-8 w-8 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium">
+                        Drop supplement facts image here or click to browse
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Supports JPEG, PNG, WebP (max 10MB)
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-start gap-4">
+                    <div className="relative">
+                      <img
+                        src={imagePreview}
+                        alt="Supplement facts preview"
+                        className="h-32 w-auto rounded-lg object-contain border border-border"
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        className="absolute -top-2 -right-2 h-6 w-6"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          clearImage();
+                        }}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <p className="text-sm font-medium truncate">{uploadedImage?.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {uploadedImage && `${(uploadedImage.size / 1024).toFixed(1)} KB`}
+                      </p>
+                      <Button
+                        type="button"
+                        onClick={handleExtractFromImage}
+                        disabled={extractImage.isPending}
+                        className="gap-2"
+                      >
+                        {extractImage.isPending ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Analyzing...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="h-4 w-4" />
+                            Analyze with AI
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-border" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-card px-2 text-muted-foreground">Or enter manually</span>
+              </div>
+            </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="servingSize">Serving Size</Label>

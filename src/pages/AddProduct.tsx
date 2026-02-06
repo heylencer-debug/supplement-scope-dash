@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Plus, Trash2, ArrowLeft, Save, Loader2, Upload, Sparkles, X, ImageIcon } from "lucide-react";
+import { Plus, Trash2, ArrowLeft, Save, Loader2, Upload, Sparkles, X, ImageIcon, Search } from "lucide-react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,7 @@ import { useCategoryContext } from "@/contexts/CategoryContext";
 import { useCategoryByName } from "@/hooks/useCategoryByName";
 import { useAddProduct, ProductFormData } from "@/hooks/useAddProduct";
 import { useExtractSupplementImage } from "@/hooks/useExtractSupplementImage";
+import { useEnrichProduct, EnrichedProductData } from "@/hooks/useEnrichProduct";
 import { toast } from "@/hooks/use-toast";
 
 interface Ingredient {
@@ -50,9 +51,14 @@ export default function AddProduct() {
   const { data: categories } = useCategories();
   const addProduct = useAddProduct();
   const extractImage = useExtractSupplementImage();
+  const enrichProduct = useEnrichProduct();
   
   const effectiveCategoryId = currentCategoryId || categoryFromName?.id || "";
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Enrichment state
+  const [enrichedData, setEnrichedData] = useState<EnrichedProductData | null>(null);
+  const [enrichSource, setEnrichSource] = useState<string | null>(null);
 
   // Form state
   const [asin, setAsin] = useState("");
@@ -216,6 +222,33 @@ export default function AddProduct() {
     }
   };
 
+  const handleAsinLookup = async () => {
+    if (!asin || asin.length < 10) {
+      toast({
+        title: "Invalid ASIN",
+        description: "Please enter a valid ASIN (10+ characters)",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const result = await enrichProduct.mutateAsync(asin);
+      const d = result.data;
+      setEnrichedData(d);
+      setEnrichSource(result.source === "both" ? "Jungle Scout + Keepa" : result.source === "jungle_scout" ? "Jungle Scout" : "Keepa");
+
+      // Auto-fill form fields (only if currently empty)
+      if (d.title && !title) setTitle(d.title);
+      if (d.brand && !brand) setBrand(d.brand);
+      if (d.price != null && !price) setPrice(String(d.price));
+      if (d.rating != null && !rating) setRating(String(d.rating));
+      if (d.reviews != null && !reviews) setReviews(String(d.reviews));
+    } catch (error) {
+      // Error handled in hook
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -275,6 +308,33 @@ export default function AddProduct() {
       claims_on_label: claims,
       category_id: selectedCategoryId,
       ingredients: validIngredients,
+      // Pass through enrichment data
+      ...(enrichedData ? {
+        monthly_sales: enrichedData.monthly_sales,
+        monthly_revenue: enrichedData.monthly_revenue,
+        bsr_current: enrichedData.bsr_current,
+        bsr_category: enrichedData.bsr_category,
+        lqs: enrichedData.lqs,
+        seller_name: enrichedData.seller_name,
+        seller_type: enrichedData.seller_type,
+        is_fba: enrichedData.is_fba,
+        date_first_available: enrichedData.date_first_available,
+        main_image_url: enrichedData.main_image_url,
+        image_urls: enrichedData.image_urls,
+        product_url: enrichedData.product_url,
+        feature_bullets: enrichedData.feature_bullets,
+        dimensions: enrichedData.dimensions,
+        weight: enrichedData.weight,
+        price_30_days_avg: enrichedData.price_30_days_avg,
+        price_90_days_avg: enrichedData.price_90_days_avg,
+        bsr_30_days_avg: enrichedData.bsr_30_days_avg,
+        bsr_90_days_avg: enrichedData.bsr_90_days_avg,
+        estimated_revenue: enrichedData.estimated_revenue,
+        estimated_monthly_sales: enrichedData.estimated_monthly_sales,
+        fees_estimate: enrichedData.fees_estimate,
+        variations_count: enrichedData.variations_count,
+        parent_asin: enrichedData.parent_asin,
+      } : {}),
     };
 
     try {
@@ -309,14 +369,46 @@ export default function AddProduct() {
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="asin">ASIN *</Label>
-              <Input
-                id="asin"
-                placeholder="B0XXXXXXXXX"
-                value={asin}
-                onChange={(e) => setAsin(e.target.value.toUpperCase())}
-                maxLength={12}
-              />
+              <div className="flex gap-2">
+                <Input
+                  id="asin"
+                  placeholder="B0XXXXXXXXX"
+                  value={asin}
+                  onChange={(e) => setAsin(e.target.value.toUpperCase())}
+                  maxLength={12}
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleAsinLookup}
+                  disabled={enrichProduct.isPending || asin.length < 10}
+                  className="gap-1.5 shrink-0"
+                >
+                  {enrichProduct.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Search className="h-4 w-4" />
+                  )}
+                  Lookup
+                </Button>
+              </div>
+              {enrichSource && (
+                <Badge variant="secondary" className="text-xs">
+                  ✓ {enrichSource}
+                </Badge>
+              )}
             </div>
+            {/* Enriched product image preview */}
+            {enrichedData?.main_image_url && (
+              <div className="flex items-center justify-center">
+                <img
+                  src={enrichedData.main_image_url}
+                  alt="Product"
+                  className="h-24 w-24 rounded-lg object-contain border border-border"
+                />
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="brand">Brand *</Label>
               <Input

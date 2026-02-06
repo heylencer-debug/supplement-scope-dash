@@ -35,6 +35,10 @@ export interface EnrichedProductData {
   monthly_bsr_history: Record<string, number | null> | null;
   monthly_sales_history: Record<string, number | null> | null;
   fba_fees: number | null;
+  description_text: string | null;
+  manufacturer: string | null;
+  categories_flat: string | null;
+  is_sns: boolean | null;
 }
 
 interface EnrichResponse {

@@ -56,3 +56,6 @@ verify_jwt = false
 
 [functions.enrich-product-asin]
 verify_jwt = false
+
+[functions.update-product-enrichment]
+verify_jwt = false

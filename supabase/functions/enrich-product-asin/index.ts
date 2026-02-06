@@ -210,7 +210,7 @@ async function fetchKeepa(asin: string, domain: number): Promise<Partial<Enriche
         const newPrice = keepaVal(stats.current[1]);
         const listPrice = keepaVal(stats.current[4]);
         const warehousePrice = keepaVal(stats.current[9]);
-        const priceInCents = amazonPrice || newPrice || warehousePrice || listPrice;
+        const priceInCents = amazonPrice || newPrice || listPrice || warehousePrice;
         if (priceInCents) currentPrice = priceInCents / 100;
         
         bsrCurrent = keepaVal(stats.current[3]);

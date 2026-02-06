@@ -13,6 +13,7 @@ const corsHeaders = {
 const CATEGORY_SLOPE = -1.38;
 const GENERIC_CONSTANT = 250000000;
 const KEEPA_OFFSET_MINUTES = 21564000;
+const MAX_UNCALIBRATED_MONTHLY_SALES = 100000;
 
 interface EnrichedData {
   title: string | null;
@@ -47,6 +48,11 @@ interface EnrichedData {
   monthly_bsr_history: Record<string, number | null> | null;
   monthly_sales_history: Record<string, number | null> | null;
   fba_fees: number | null;
+  // New fields
+  description_text: string | null;
+  manufacturer: string | null;
+  categories_flat: string | null;
+  is_sns: boolean | null;
 }
 
 function emptyData(): EnrichedData {
@@ -61,6 +67,7 @@ function emptyData(): EnrichedData {
     estimated_revenue: null, estimated_monthly_sales: null,
     fees_estimate: null, variations_count: null, parent_asin: null,
     monthly_bsr_history: null, monthly_sales_history: null, fba_fees: null,
+    description_text: null, manufacturer: null, categories_flat: null, is_sns: null,
   };
 }
 
@@ -114,6 +121,9 @@ function getSimpleAvg(arr: number[], days: number): number | null {
   return count > 0 ? (sum / count) : null;
 }
 
+// ======================================================
+// Jungle Scout API
+// ======================================================
 async function fetchJungleScout(asin: string, marketplace: string): Promise<Partial<EnrichedData> | null> {
   const apiKey = Deno.env.get("JUNGLE_SCOUT_API_KEY");
   if (!apiKey) {
@@ -196,7 +206,16 @@ async function fetchJungleScout(asin: string, marketplace: string): Promise<Part
   }
 }
 
-async function fetchKeepa(asin: string, domain: number, jsData: Partial<EnrichedData> | null): Promise<Partial<EnrichedData> | null> {
+// ======================================================
+// Keepa API — raw data fetch (no calibration yet)
+// ======================================================
+interface KeepaRawResult {
+  data: Partial<EnrichedData>;
+  bsrHistory: Record<string, number | null> | null;
+  bsrCsv: number[] | null;
+}
+
+async function fetchKeepaRaw(asin: string, domain: number): Promise<KeepaRawResult | null> {
   const apiKey = Deno.env.get("KEEPA_API_KEY");
   if (!apiKey) {
     console.log("KEEPA_API_KEY not set, skipping");
@@ -204,7 +223,6 @@ async function fetchKeepa(asin: string, domain: number, jsData: Partial<Enriched
   }
 
   try {
-    // Use days=730 to get 2 years of CSV history data (matching production workflow)
     const url = `https://api.keepa.com/product?key=${apiKey}&domain=${domain}&asin=${asin}&stats=180&rating=1&days=730&update=1`;
     
     console.log(`Calling Keepa for ASIN: ${asin} (with 730 days history)`);
@@ -228,74 +246,24 @@ async function fetchKeepa(asin: string, domain: number, jsData: Partial<Enriched
 
     const csv = product.csv || [];
 
-    // ======================================================
-    // 1. Parse Historical BSR from csv[3]
-    // ======================================================
+    // Parse BSR history
     const bsrHistory = getMonthlyBreakdown(csv[3], 24);
     console.log(`BSR history parsed: ${bsrHistory ? Object.keys(bsrHistory).length + ' months' : 'none'}`);
 
-    // ======================================================
-    // 2. Calibrate sales estimation model
-    // ======================================================
-    let currentSales = 0;
-    let currentRank = 0;
-
-    // Use Jungle Scout data for calibration if available
-    if (jsData) {
-      currentSales = jsData.monthly_sales || 0;
-      currentRank = jsData.bsr_current || 0;
-    }
-
-    // Fallback: use Keepa's latest BSR
-    if (currentRank === 0 && csv[3] && csv[3].length > 1) {
-      currentRank = csv[3][csv[3].length - 1];
-      if (currentRank === -1) currentRank = 0;
-    }
-
-    // Calculate calibrated 'k' constant
-    let k = GENERIC_CONSTANT;
-    if (currentSales > 0 && currentRank > 0) {
-      k = currentSales / Math.pow(currentRank, CATEGORY_SLOPE);
-      console.log(`Calibrated k=${Math.round(k)} from sales=${currentSales}, rank=${currentRank}`);
-    } else {
-      console.log(`Using generic k=${GENERIC_CONSTANT} (no calibration data)`);
-    }
-
-    // ======================================================
-    // 3. Generate monthly sales history from BSR history
-    // ======================================================
-    const salesHistory: Record<string, number | null> = {};
-    if (bsrHistory) {
-      for (const key of Object.keys(bsrHistory)) {
-        const avgRank = bsrHistory[key];
-        if (avgRank && avgRank > 0) {
-          salesHistory[key] = Math.round(k * Math.pow(avgRank, CATEGORY_SLOPE));
-        } else {
-          salesHistory[key] = null;
-        }
-      }
-    }
-
-    // ======================================================
-    // 4. Compute BSR averages from raw history (more accurate)
-    // ======================================================
+    // BSR averages
     const bsr30Avg = bsrHistory?.month_1 || null;
     const bsr90Avg = bsrHistory
       ? Math.round(((bsrHistory.month_1 || 0) + (bsrHistory.month_2 || 0) + (bsrHistory.month_3 || 0)) / 3)
       : null;
 
-    // ======================================================
-    // 5. Price averages from CSV (keep using simple avg)
-    // ======================================================
-    const priceCsv = csv[0] || csv[1]; // Amazon price or New 3P price
+    // Price averages
+    const priceCsv = csv[0] || csv[1];
     const price30Raw = getSimpleAvg(priceCsv, 30);
     const price90Raw = getSimpleAvg(priceCsv, 90);
     const price30Avg = price30Raw ? price30Raw / 100 : null;
     const price90Avg = price90Raw ? price90Raw / 100 : null;
 
-    // ======================================================
-    // 6. Current price and rating from stats
-    // ======================================================
+    // Current price and rating from stats
     const stats = product.stats;
     const keepaVal = (v: number | undefined | null): number | null =>
       (v != null && v > 0) ? v : null;
@@ -335,17 +303,13 @@ async function fetchKeepa(asin: string, domain: number, jsData: Partial<Enriched
       }
     }
 
-    // ======================================================
-    // 7. FBA fees from Keepa
-    // ======================================================
+    // FBA fees
     const fbaFees = product.fbaFees?.pickAndPackFee
       ? product.fbaFees.pickAndPackFee / 100
       : null;
     console.log(`FBA fees: ${fbaFees}`);
 
-    // ======================================================
-    // 8. Other fields
-    // ======================================================
+    // Images
     let imageUrls: string[] | null = null;
     let mainImageUrl: string | null = null;
     if (product.imagesCSV) {
@@ -354,11 +318,13 @@ async function fetchKeepa(asin: string, domain: number, jsData: Partial<Enriched
       mainImageUrl = imageUrls[0] || null;
     }
 
+    // Feature bullets
     let featureBullets: string[] | null = null;
     if (product.features && Array.isArray(product.features)) {
       featureBullets = product.features;
     }
 
+    // Date first available
     let dateFirstAvailable: string | null = null;
     if (product.listedSince > 0) {
       const unixMs = (product.listedSince + KEEPA_OFFSET_MINUTES) * 60000;
@@ -368,7 +334,64 @@ async function fetchKeepa(asin: string, domain: number, jsData: Partial<Enriched
     const productUrl = `https://www.amazon.com/dp/${asin}`;
     const parentAsin = product.parentAsin || null;
 
-    return {
+    // ======================================================
+    // NEW: Extract additional Keepa fields
+    // ======================================================
+
+    // Description
+    const descriptionText = product.description || null;
+
+    // Manufacturer
+    const manufacturer = product.manufacturer || null;
+
+    // Categories flat
+    let categoriesFlat: string | null = null;
+    if (product.categoryTree && Array.isArray(product.categoryTree)) {
+      categoriesFlat = product.categoryTree.map((c: any) => c.name).join(" > ");
+    }
+
+    // Weight (grams -> lbs)
+    let weightStr: string | null = null;
+    if (product.packageWeight != null && product.packageWeight > 0) {
+      const lbs = product.packageWeight / 453.592;
+      weightStr = `${lbs.toFixed(2)} lbs`;
+    }
+
+    // Dimensions (mm -> inches)
+    let dimensionsStr: string | null = null;
+    const pH = product.packageHeight;
+    const pL = product.packageLength;
+    const pW = product.packageWidth;
+    if (pH != null && pL != null && pW != null && pH > 0 && pL > 0 && pW > 0) {
+      const hIn = (pH / 25.4).toFixed(1);
+      const lIn = (pL / 25.4).toFixed(1);
+      const wIn = (pW / 25.4).toFixed(1);
+      dimensionsStr = `${lIn} x ${wIn} x ${hIn} inches`;
+    }
+
+    // is_fba from buyBoxIsFBA
+    const isFba = product.buyBoxIsFBA != null ? Boolean(product.buyBoxIsFBA) : null;
+
+    // is_sns (Subscribe & Save)
+    const isSns = product.isSNS != null ? Boolean(product.isSNS) : null;
+
+    // Variations count from variationCSV
+    let variationsCount: number | null = null;
+    if (product.variationCSV && Array.isArray(product.variationCSV)) {
+      // variationCSV alternates [dimension, ASIN, dimension, ASIN, ...]
+      const asins = new Set<string>();
+      for (let i = 1; i < product.variationCSV.length; i += 2) {
+        const val = product.variationCSV[i];
+        if (val && typeof val === "string" && val.length === 10) {
+          asins.add(val);
+        }
+      }
+      if (asins.size > 0) {
+        variationsCount = asins.size;
+      }
+    }
+
+    const data: Partial<EnrichedData> = {
       title: product.title || null,
       brand: product.brand || null,
       price: currentPrice,
@@ -386,15 +409,100 @@ async function fetchKeepa(asin: string, domain: number, jsData: Partial<Enriched
       bsr_30_days_avg: bsr30Avg,
       bsr_90_days_avg: bsr90Avg,
       parent_asin: parentAsin,
-      monthly_bsr_history: bsrHistory,
-      monthly_sales_history: Object.keys(salesHistory).length > 0 ? salesHistory : null,
       fba_fees: fbaFees,
       fees_estimate: fbaFees,
+      // New fields
+      description_text: descriptionText,
+      manufacturer,
+      categories_flat: categoriesFlat,
+      weight: weightStr,
+      dimensions: dimensionsStr,
+      is_fba: isFba,
+      is_sns: isSns,
+      variations_count: variationsCount,
+    };
+
+    return {
+      data,
+      bsrHistory,
+      bsrCsv: csv[3] || null,
     };
   } catch (error) {
     console.error("Keepa fetch error:", error);
     return null;
   }
+}
+
+// ======================================================
+// Post-processing: calibrate sales from BSR history
+// ======================================================
+function calibrateSales(
+  bsrHistory: Record<string, number | null> | null,
+  bsrCsv: number[] | null,
+  jsData: Partial<EnrichedData> | null,
+): { monthly_sales_history: Record<string, number | null> | null; monthly_sales: number | null; monthly_revenue: number | null } {
+  if (!bsrHistory) {
+    return { monthly_sales_history: null, monthly_sales: null, monthly_revenue: null };
+  }
+
+  let currentSales = 0;
+  let currentRank = 0;
+
+  if (jsData) {
+    currentSales = jsData.monthly_sales || 0;
+    currentRank = jsData.bsr_current || 0;
+  }
+
+  // Fallback: use Keepa's latest BSR
+  if (currentRank === 0 && bsrCsv && bsrCsv.length > 1) {
+    currentRank = bsrCsv[bsrCsv.length - 1];
+    if (currentRank === -1) currentRank = 0;
+  }
+
+  // Calculate calibrated 'k' constant
+  let k = GENERIC_CONSTANT;
+  let isGenericK = true;
+  if (currentSales > 0 && currentRank > 0) {
+    k = currentSales / Math.pow(currentRank, CATEGORY_SLOPE);
+    isGenericK = false;
+    console.log(`Calibrated k=${Math.round(k)} from sales=${currentSales}, rank=${currentRank}`);
+  } else {
+    console.log(`Using generic k=${GENERIC_CONSTANT} (no calibration data)`);
+  }
+
+  // Generate monthly sales history from BSR history
+  const salesHistory: Record<string, number | null> = {};
+  for (const key of Object.keys(bsrHistory)) {
+    const avgRank = bsrHistory[key];
+    if (avgRank && avgRank > 0) {
+      let estimated = Math.round(k * Math.pow(avgRank, CATEGORY_SLOPE));
+      if (isGenericK && estimated > MAX_UNCALIBRATED_MONTHLY_SALES) {
+        console.warn(`Capping uncalibrated sales estimate from ${estimated} to ${MAX_UNCALIBRATED_MONTHLY_SALES} for ${key} (rank=${avgRank})`);
+        estimated = MAX_UNCALIBRATED_MONTHLY_SALES;
+      }
+      salesHistory[key] = estimated;
+    } else {
+      salesHistory[key] = null;
+    }
+  }
+
+  // Current month sales
+  let monthlySales = salesHistory.month_1 || null;
+  if (monthlySales === null && currentSales > 0) {
+    monthlySales = currentSales;
+  }
+
+  // Monthly revenue estimate
+  let monthlyRevenue: number | null = null;
+  if (monthlySales && jsData?.price) {
+    monthlyRevenue = Math.round(monthlySales * jsData.price);
+  }
+
+  return {
+    monthly_sales_history: Object.keys(salesHistory).length > 0 ? salesHistory : null,
+    monthly_sales: monthlySales,
+    monthly_revenue: monthlyRevenue,
+  };
 }
 
 serve(async (req) => {
@@ -419,11 +527,41 @@ serve(async (req) => {
     };
     const keepaDomain = keepaDomainMap[marketplace.toLowerCase()] || 1;
 
-    // Fetch Jungle Scout first (needed for Keepa calibration)
-    const jsData = await fetchJungleScout(asin, marketplace);
-    
-    // Fetch Keepa with JS data for calibration
-    const keepaData = await fetchKeepa(asin, keepaDomain, jsData);
+    // ======================================================
+    // Step 1: Fetch Keepa FIRST (always works, gives parentAsin)
+    // ======================================================
+    const keepaResult = await fetchKeepaRaw(asin, keepaDomain);
+
+    // ======================================================
+    // Step 2: Fetch Jungle Scout with child ASIN
+    // ======================================================
+    let jsData = await fetchJungleScout(asin, marketplace);
+
+    // ======================================================
+    // Step 3: If JS failed and Keepa found a parentAsin, retry JS with parent
+    // ======================================================
+    if (!jsData && keepaResult?.data?.parent_asin && keepaResult.data.parent_asin !== asin) {
+      const parentAsin = keepaResult.data.parent_asin;
+      console.log(`JS returned null for child ${asin}, retrying with parent ASIN: ${parentAsin}`);
+      jsData = await fetchJungleScout(parentAsin, marketplace);
+      if (jsData) {
+        console.log(`JS parent fallback succeeded for ${parentAsin}`);
+        // Keep the original child ASIN context but use parent's sales data
+        // Don't overwrite title/brand from parent as it may differ
+      } else {
+        console.log(`JS parent fallback also returned null for ${parentAsin}`);
+      }
+    }
+
+    // ======================================================
+    // Step 4: Calibrate sales using both data sources
+    // ======================================================
+    const keepaData = keepaResult?.data || null;
+    const calibrated = calibrateSales(
+      keepaResult?.bsrHistory || null,
+      keepaResult?.bsrCsv || null,
+      jsData,
+    );
 
     // Determine source
     let source: string = "none";
@@ -449,8 +587,21 @@ serve(async (req) => {
       (merged as any)[key] = pVal != null ? pVal : sVal != null ? sVal : null;
     }
 
+    // Apply calibrated sales data (overrides raw values)
+    merged.monthly_bsr_history = keepaResult?.bsrHistory || null;
+    merged.monthly_sales_history = calibrated.monthly_sales_history;
+    if (calibrated.monthly_sales != null && (!merged.monthly_sales || !jsData?.monthly_sales)) {
+      merged.monthly_sales = calibrated.monthly_sales;
+      merged.estimated_monthly_sales = calibrated.monthly_sales;
+    }
+    if (calibrated.monthly_revenue != null && (!merged.monthly_revenue || !jsData?.monthly_revenue)) {
+      merged.monthly_revenue = calibrated.monthly_revenue;
+      merged.estimated_revenue = calibrated.monthly_revenue;
+    }
+
     console.log(`Enrichment complete. Source: ${source}. Title: ${merged.title}`);
     console.log(`Historical data: BSR history=${merged.monthly_bsr_history ? 'yes' : 'no'}, Sales history=${merged.monthly_sales_history ? 'yes' : 'no'}, FBA fees=${merged.fba_fees}`);
+    console.log(`New fields: description=${!!merged.description_text}, manufacturer=${merged.manufacturer}, categories=${!!merged.categories_flat}, is_fba=${merged.is_fba}, is_sns=${merged.is_sns}, variations=${merged.variations_count}`);
 
     return new Response(
       JSON.stringify({ success: true, source, data: merged }),

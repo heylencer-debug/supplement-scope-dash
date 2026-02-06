@@ -132,12 +132,19 @@ serve(async (req) => {
     if (d.variations_count != null) updatePayload.variations_count = d.variations_count;
     if (d.parent_asin) updatePayload.parent_asin = d.parent_asin;
 
-    // Store historical data (BSR + sales histories) in JSONB column
-    if (d.monthly_bsr_history || d.monthly_sales_history) {
-      updatePayload.historical_data = {
-        monthly_bsr_history: d.monthly_bsr_history || {},
-        monthly_sales_history: d.monthly_sales_history || {},
-      };
+    // New fields from enhanced Keepa extraction
+    if (d.description_text) updatePayload.description_text = d.description_text;
+    if (d.manufacturer) updatePayload.manufacturer = d.manufacturer;
+    if (d.categories_flat) updatePayload.categories_flat = d.categories_flat;
+    if (d.is_fba != null) updatePayload.is_fba = d.is_fba;
+
+    // Store historical data (BSR + sales histories + is_sns) in JSONB column
+    const historicalExtras: Record<string, any> = {};
+    if (d.monthly_bsr_history) historicalExtras.monthly_bsr_history = d.monthly_bsr_history;
+    if (d.monthly_sales_history) historicalExtras.monthly_sales_history = d.monthly_sales_history;
+    if (d.is_sns != null) historicalExtras.is_sns = d.is_sns;
+    if (Object.keys(historicalExtras).length > 0) {
+      updatePayload.historical_data = historicalExtras;
     }
 
     // FBA fees from Keepa (overrides JS fees if available)

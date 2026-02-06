@@ -202,11 +202,15 @@ async function fetchKeepa(asin: string, domain: number): Promise<Partial<Enriche
     let bsrCurrent: number | null = null;
 
     if (stats) {
-      // Current values - Keepa index: 0=Amazon, 1=New 3rd party, 3=Sales Rank, 16=Rating, 17=Review Count
+      // Keepa CSV type indices: 0=Amazon, 1=New 3P, 2=Used, 3=Sales Rank, 4=List Price,
+      // 7=New OFP, 9=Warehouse, 10=New FBM Shipping, 16=Rating, 17=Review Count, 18=Buy Box Shipping
       if (stats.current && Array.isArray(stats.current)) {
+        // Try multiple price sources in priority order
         const amazonPrice = keepaVal(stats.current[0]);
         const newPrice = keepaVal(stats.current[1]);
-        const priceInCents = amazonPrice || newPrice;
+        const listPrice = keepaVal(stats.current[4]);
+        const warehousePrice = keepaVal(stats.current[9]);
+        const priceInCents = amazonPrice || newPrice || warehousePrice || listPrice;
         if (priceInCents) currentPrice = priceInCents / 100;
         
         bsrCurrent = keepaVal(stats.current[3]);
@@ -228,16 +232,25 @@ async function fetchKeepa(asin: string, domain: number): Promise<Partial<Enriche
 
       // 30-day averages
       if (stats.avg30 && Array.isArray(stats.avg30)) {
-        const p30 = keepaVal(stats.avg30[0]) || keepaVal(stats.avg30[1]);
+        const p30 = keepaVal(stats.avg30[0]) || keepaVal(stats.avg30[1]) || keepaVal(stats.avg30[4]);
         if (p30) price30Avg = p30 / 100;
         bsr30Avg = keepaVal(stats.avg30[3]);
       }
 
       // 90-day averages
       if (stats.avg90 && Array.isArray(stats.avg90)) {
-        const p90 = keepaVal(stats.avg90[0]) || keepaVal(stats.avg90[1]);
+        const p90 = keepaVal(stats.avg90[0]) || keepaVal(stats.avg90[1]) || keepaVal(stats.avg90[4]);
         if (p90) price90Avg = p90 / 100;
         bsr90Avg = keepaVal(stats.avg90[3]);
+      }
+
+      // Final fallback: use avg30 or avg90 price as current price
+      if (!currentPrice && price30Avg) {
+        currentPrice = price30Avg;
+        console.log("Using 30-day avg as current price fallback");
+      } else if (!currentPrice && price90Avg) {
+        currentPrice = price90Avg;
+        console.log("Using 90-day avg as current price fallback");
       }
     }
 

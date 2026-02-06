@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Plus, Trash2, ArrowLeft, Save, Loader2, Upload, Sparkles, X, ImageIcon } from "lucide-react";
 import { z } from "zod";
@@ -62,6 +62,13 @@ export default function AddProduct() {
   const [rating, setRating] = useState("");
   const [reviews, setReviews] = useState("");
   const [selectedCategoryId, setSelectedCategoryId] = useState(effectiveCategoryId);
+
+  // Auto-select category when loaded from URL
+  useEffect(() => {
+    if (effectiveCategoryId && !selectedCategoryId) {
+      setSelectedCategoryId(effectiveCategoryId);
+    }
+  }, [effectiveCategoryId, selectedCategoryId]);
   
   // Supplement facts state
   const [servingSize, setServingSize] = useState("");

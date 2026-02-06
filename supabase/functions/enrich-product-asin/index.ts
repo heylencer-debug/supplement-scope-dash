@@ -440,6 +440,7 @@ function calibrateSales(
   bsrHistory: Record<string, number | null> | null,
   bsrCsv: number[] | null,
   jsData: Partial<EnrichedData> | null,
+  keepaPrice: number | null = null,
 ): { monthly_sales_history: Record<string, number | null> | null; monthly_sales: number | null; monthly_revenue: number | null } {
   if (!bsrHistory) {
     return { monthly_sales_history: null, monthly_sales: null, monthly_revenue: null };
@@ -494,8 +495,9 @@ function calibrateSales(
 
   // Monthly revenue estimate
   let monthlyRevenue: number | null = null;
-  if (monthlySales && jsData?.price) {
-    monthlyRevenue = Math.round(monthlySales * jsData.price);
+  const effectivePrice = jsData?.price || keepaPrice || null;
+  if (monthlySales && effectivePrice) {
+    monthlyRevenue = Math.round(monthlySales * effectivePrice);
   }
 
   return {
@@ -561,6 +563,7 @@ serve(async (req) => {
       keepaResult?.bsrHistory || null,
       keepaResult?.bsrCsv || null,
       jsData,
+      keepaData?.price || null,
     );
 
     // Determine source

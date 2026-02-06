@@ -1,162 +1,127 @@
 
 
-# Plan: AI-Powered Supplement Facts Image Upload
+# Plan: Fix Formula Fit Analysis Not Updating After Adding New Products
 
-## Overview
-Add an image upload feature to the Add Product form that uses **Google Gemini 3 Pro** via OpenRouter to analyze uploaded supplement facts images and auto-fill the ingredients form.
+## Problem Summary
 
-## Architecture
+When a user adds a new product (like LMNT) and clicks "Refresh" on the Formula Fit tab, the new analysis is triggered but the UI immediately shows the old cached results instead of waiting for the new analysis to complete.
 
-```text
-┌─────────────────────────────────────────────────────────────────┐
-│                     AddProduct.tsx (Frontend)                    │
-├─────────────────────────────────────────────────────────────────┤
-│  1. User uploads/drops image of supplement facts panel          │
-│  2. Image converted to base64                                   │
-│  3. Call edge function with base64 image data                   │
-│  4. Receive extracted data → auto-populate form fields          │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│         extract-supplement-image (New Edge Function)            │
-├─────────────────────────────────────────────────────────────────┤
-│  • Receives base64 image directly (no Supabase storage)         │
-│  • Sends to OpenRouter with google/gemini-3-pro-preview         │
-│  • Uses tool calling for structured extraction                  │
-│  • Returns parsed ingredients, serving size, claims, etc.       │
-└─────────────────────────────────────────────────────────────────┘
-```
+## Root Cause Analysis
 
-## Implementation Steps
+The issue is a **race condition** in `src/hooks/useFormulaFitAnalysis.ts`:
 
-### Step 1: Create New Edge Function
-**File: `supabase/functions/extract-supplement-image/index.ts`**
+1. User clicks "Refresh" button
+2. `triggerAnalysisMutation` calls the edge function
+3. Edge function creates a new record with `status: "pending"` and returns `{status: "processing", id: "new-id"}`
+4. `onSuccess` sets `isPolling: true` and calls `refetch()`
+5. **Problem**: `refetch()` immediately returns the OLD analysis record from cache/stale query
+6. The polling `useEffect` sees `status === "completed"` on the OLD record
+7. Polling stops immediately - user never sees new analysis
 
-Create a new edge function that:
-- Accepts base64-encoded image data directly (avoids need for storage bucket setup)
-- Sends image to OpenRouter's `google/gemini-3-pro-preview` model
-- Uses structured tool calling (same pattern as existing `analyze-supplement-facts`)
-- Returns extracted data in a format matching the form's `Ingredient[]` interface
+The mutation returns the new analysis ID, but this information is **not used** to query specifically for that new record.
 
-Key differences from existing `analyze-supplement-facts`:
-- Takes base64 image input instead of productId
-- Returns data for form population instead of updating a database record
-- Lighter-weight response focused on form auto-fill
+## Solution
 
-### Step 2: Create Image Upload Hook
-**File: `src/hooks/useExtractSupplementImage.ts`**
+Modify the hook to track the newly triggered analysis ID and ensure polling waits for that specific analysis to complete:
 
-Create a React Query mutation hook that:
-- Converts uploaded File to base64
-- Calls the new edge function
-- Returns typed extraction results
-- Handles loading and error states
+### Step 1: Track the triggered analysis ID
 
-### Step 3: Update AddProduct Form
-**File: `src/pages/AddProduct.tsx`**
+Store the `id` returned from the edge function and use it to:
+- Query specifically for that analysis record during polling
+- OR invalidate the cache and ensure fresh data
 
-Add to the Supplement Facts card:
-1. **Drop zone / file input** for image upload (with visual feedback)
-2. **Image preview** showing the uploaded image
-3. **"Analyze with AI" button** to trigger extraction
-4. **Loading state** with spinner during analysis
-5. **Auto-population logic** to fill form fields from extraction results:
-   - `ingredients[]` → Active Ingredients table
-   - `serving_size` → Serving Size field
-   - `servings_per_container` → Servings Per Container field
-   - `other_ingredients` → Other Ingredients textarea
-   - `directions` → Directions textarea
-   - `warnings` → Warnings textarea
-   - `claims_on_label` → Claims badges
+### Step 2: Invalidate React Query cache before refetching
 
-### Step 4: Update config.toml
-Add the new edge function configuration with `verify_jwt = false`
+After triggering a new analysis, invalidate the query cache to force a fresh fetch from the database.
 
-## UI/UX Design
+### Step 3: Add a small delay before first refetch
 
-```text
-┌─────────────────────────────────────────────────────────────────┐
-│ Supplement Facts                                                 │
-│ Ingredients from the product label                              │
-├─────────────────────────────────────────────────────────────────┤
-│ ┌─────────────────────────────────────────────────────────────┐ │
-│ │  📷 Upload Supplement Facts Image                           │ │
-│ │  ────────────────────────────────────────────────────────── │ │
-│ │  [   Drop image here or click to browse   ]  ← Dashed box  │ │
-│ │                                                             │ │
-│ │  [Preview Image]        [🔄 Analyze with AI]  ← When image │ │
-│ │                                              uploaded       │ │
-│ └─────────────────────────────────────────────────────────────┘ │
-│                                                                  │
-│ Serving Size: [1 stick (16g)]    Servings: [30]  ← Auto-filled  │
-│                                                                  │
-│ Active Ingredients:                     [+ Add Ingredient]       │
-│ ┌────────────────────────────────────────────────────────────┐  │
-│ │ 1. [Sodium]        [500] [mg] [22%]  [🗑]  ← Auto-filled   │  │
-│ │ 2. [Potassium]     [380] [mg] [8%]   [🗑]                  │  │
-│ │ 3. [Vitamin C]     [100] [mg] [111%] [🗑]                  │  │
-│ └────────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-```
+Give the database time to replicate the new record before polling.
 
-## Technical Details
+## Implementation Details
 
-### Edge Function Request/Response
+### File: `src/hooks/useFormulaFitAnalysis.ts`
 
-**Request:**
-```typescript
-{
-  imageBase64: string;  // Base64-encoded image data
-  mimeType: string;     // "image/jpeg" | "image/png" | "image/webp"
-}
-```
+**Changes:**
 
-**Response:**
-```typescript
-{
-  success: boolean;
-  confidence: "high" | "medium" | "low";
-  data: {
-    serving_size: string | null;
-    servings_per_container: number | null;
-    ingredients: Array<{
-      name: string;
-      amount: string;
-      unit: string;
-      daily_value: string | null;
-    }>;
-    other_ingredients: string | null;
-    directions: string | null;
-    warnings: string | null;
-    claims_on_label: string[];
-  };
-  extraction_notes: string;
-}
-```
+1. Add state to track the newly triggered analysis ID:
+   ```typescript
+   const [triggeredAnalysisId, setTriggeredAnalysisId] = useState<string | null>(null);
+   ```
 
-### Form Auto-Population Logic
+2. Modify the query to fetch by ID when we have a triggered analysis:
+   ```typescript
+   queryFn: async () => {
+     if (!categoryId) return null;
+     
+     // If we're waiting for a specific triggered analysis, fetch by ID
+     if (triggeredAnalysisId && pollingStatus.isPolling) {
+       const { data, error } = await supabase
+         .from("formula_fit_analyses")
+         .select("*")
+         .eq("id", triggeredAnalysisId)
+         .single();
+       if (error) throw error;
+       return data;
+     }
 
-When extraction completes successfully:
-1. Replace existing ingredients array with extracted ingredients
-2. Fill serving size and container fields
-3. Populate other ingredients, directions, warnings textareas
-4. Add claims as badges
-5. Show toast notification with confidence level and ingredient count
+     // Default: fetch the latest analysis for this category
+     const { data, error } = await supabase
+       .from("formula_fit_analyses")
+       .select("*")
+       .eq("category_id", categoryId)
+       .order("created_at", { ascending: false })
+       .limit(1)
+       .maybeSingle();
 
-## Files to Create/Modify
+     if (error) throw error;
+     return data;
+   }
+   ```
 
-| File | Action | Description |
-|------|--------|-------------|
-| `supabase/functions/extract-supplement-image/index.ts` | Create | New edge function for image analysis |
-| `src/hooks/useExtractSupplementImage.ts` | Create | React Query mutation for extraction |
-| `src/pages/AddProduct.tsx` | Modify | Add image upload UI and auto-fill logic |
-| `supabase/config.toml` | Modify | Add function configuration |
+3. Update `onSuccess` to store the new analysis ID and invalidate cache:
+   ```typescript
+   onSuccess: (data) => {
+     // Store the ID of the newly triggered analysis
+     setTriggeredAnalysisId(data.id);
+     // Invalidate the query cache to force fresh fetch
+     queryClient.invalidateQueries({ queryKey: ["formula_fit_analysis", categoryId] });
+     // Start polling after a brief delay to let DB replicate
+     setTimeout(() => {
+       setPollingStatus({ isPolling: true, attempt: 0, maxAttempts: 60 });
+       refetch();
+     }, 500);
+   }
+   ```
 
-## Dependencies
+4. Clear the triggered ID when polling completes:
+   ```typescript
+   useEffect(() => {
+     if (!pollingStatus.isPolling) return;
 
-- Uses existing `OPENROUTER_API_KEY` secret (already configured)
-- Uses `google/gemini-3-pro-preview` model (per user request)
-- No new npm packages needed (uses native File/FileReader APIs)
-- No storage bucket setup required (direct base64 transfer)
+     if (analysisRecord?.status === "completed" || analysisRecord?.status === "error") {
+       setPollingStatus((prev) => ({ ...prev, isPolling: false }));
+       setTriggeredAnalysisId(null); // Clear the triggered ID
+       return;
+     }
+     // ...
+   }, [analysisRecord, pollingStatus.isPolling, ...]);
+   ```
+
+## Files to Modify
+
+| File | Change |
+|------|--------|
+| `src/hooks/useFormulaFitAnalysis.ts` | Add triggered analysis ID tracking, invalidate cache on trigger, fetch by ID during polling |
+
+## Testing Steps
+
+1. Navigate to an Electrolyte Powder category
+2. Click the Formula Fit tab
+3. Note the current "Brands Analyzed" section
+4. Add a new product (e.g., via Add Product form) with a new brand
+5. Return to Formula Fit tab and click "Refresh"
+6. Verify the processing state shows (spinning indicator, progress bar)
+7. Wait for analysis to complete
+8. Verify the new brand appears in "Brands Analyzed" section
 

@@ -139,7 +139,6 @@ async function fetchJungleScout(asin: string, marketplace: string): Promise<Part
         type: "product_database_query",
         attributes: {
           include_keywords: [asin],
-          seller_type: "all",
         },
       },
     };

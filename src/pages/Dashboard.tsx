@@ -3,26 +3,14 @@ import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { ScrollAnimate, ScrollSection, ScrollCounter } from "@/components/ui/scroll-animate";
-import { 
-  Loader2, RefreshCw, CheckCircle2, Circle, Clock,
-  Building2, Package, Eye, MessageSquare, BarChart3, Sparkles, GitBranch, AlertTriangle
-} from "lucide-react";
+import { ScrollAnimate } from "@/components/ui/scroll-animate";
+import { Building2 } from "lucide-react";
 
 // Dashboard components
 import { HeroHeader } from "@/components/dashboard/HeroHeader";
 import { KPIMetricsGrid } from "@/components/dashboard/KPIMetricsGrid";
-import { DeepDiveSection } from "@/components/dashboard/DeepDiveSection";
 import { EnhancedBenchmarkComparison } from "@/components/dashboard/EnhancedBenchmarkComparison";
-import { FinancialProjections } from "@/components/dashboard/FinancialProjections";
-import { RiskAnalysis } from "@/components/dashboard/RiskAnalysis";
-import { LaunchPlanSection } from "@/components/dashboard/LaunchPlanSection";
-import CustomerIntelligence from "@/components/dashboard/CustomerIntelligence";
 import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
-import { PackagingIntelligence } from "@/components/dashboard/PackagingIntelligence";
-import { VersionBadge } from "@/components/dashboard/VersionBadge";
-import { VersionHistoryTimeline } from "@/components/dashboard/VersionHistoryTimeline";
-import { VersionComparisonView } from "@/components/dashboard/VersionComparisonView";
 import { LowConfidenceProducts } from "@/components/dashboard/LowConfidenceProducts";
 
 import {
@@ -43,48 +31,11 @@ import { useProducts } from "@/hooks/useProducts";
 import { useCategoryContext } from "@/contexts/CategoryContext";
 import { useCategoryScores } from "@/hooks/useCategoryScores";
 import { useCategorySales } from "@/hooks/useCategorySales";
-import { useFormulaBrief } from "@/hooks/useFormulaBrief";
-import { useAnalysisProgress } from "@/hooks/useAnalysisProgress";
-import { useFormulaBriefVersions } from "@/hooks/useFormulaBriefVersions";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { Target } from "lucide-react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
-interface CriteriaBreakdown {
-  name?: string;
-  criterion?: string;
-  category?: string;
-  raw_score?: number;
-  score?: number;
-  weight?: number;
-  weighted_score?: number;
-}
-
-interface PainPoint {
-  pain_point?: string;
-  issue?: string;
-  theme?: string;
-  frequency?: number | string;
-  evidence?: string;
-}
-
-interface ActionItem {
-  step?: number | string;
-  action?: string;
-  timeline?: string;
-  month?: string;
-  priority?: string;
-  status?: string;
-  description?: string;
-}
 
 export default function Dashboard() {
   const [searchParams] = useSearchParams();
@@ -93,24 +44,11 @@ export default function Dashboard() {
   const { setCategoryContext, categoryName: contextCategoryName } = useCategoryContext();
   const queryClient = useQueryClient();
   
-  // Formula version state
-  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
-  const [showComparison, setShowComparison] = useState(false);
   const [activeTab, setActiveTab] = useState("products");
 
   const categoryName = urlCategoryName || contextCategoryName;
 
   const { data: category, isLoading: categoryLoading } = useCategoryByName(categoryName || undefined);
-  
-  // Formula brief versions
-  const { versions, activeVersion, isLoading: versionsLoading } = useFormulaBriefVersions(category?.id);
-
-  // Set selected version to active version when loaded
-  useEffect(() => {
-    if (activeVersion && !selectedVersionId) {
-      setSelectedVersionId(activeVersion.id);
-    }
-  }, [activeVersion, selectedVersionId]);
 
   useEffect(() => {
     if (category) {
@@ -148,136 +86,18 @@ export default function Dashboard() {
   const { data: products, isLoading: productsLoading } = useProducts(category?.id);
   const { data: categoryScores } = useCategoryScores(category?.id);
   const { data: categorySales } = useCategorySales(categoryName || undefined);
-  const { data: formulaBrief } = useFormulaBrief(category?.id);
-  
-  // Get the formula version ID to pass to analysis components
-  // null means "original analysis" (no version), otherwise use the selected version
-  const formulaVersionId = selectedVersionId || null;
-  
-  // Get current selected version info for display
-  const selectedVersion = selectedVersionId 
-    ? versions.find(v => v.id === selectedVersionId) 
-    : null;
 
-  const hasCategory = !!category;
   const hasAnalysis = !!analysis;
   const hasProducts = products && products.length > 0;
-  const hasScores = !!categoryScores;
-  const hasFormulaBriefData = !!formulaBrief;
 
-  // Granular progress tracking
-  const { progress } = useAnalysisProgress(
-    category?.id,
-    hasCategory,
-    hasAnalysis,
-    hasScores,
-    hasFormulaBriefData
-  );
-
-  // Parse analysis data for components
+  // Parse analysis data for benchmark comparison component
   const dashboardData = useMemo(() => {
     const analysis1 = analysis?.analysis_1_category_scores as Record<string, unknown> | null;
-    const analysis2 = analysis?.analysis_2_opportunity_calculation as Record<string, unknown> | null;
     const analysis3 = analysis?.analysis_3_formula_brief as Record<string, unknown> | null;
     const keyInsights = analysis?.key_insights as Record<string, unknown> | null;
     const formulaBriefContent = (analysis3?.formula_brief_content as string) || null;
-    
-    // Customer insights for pain points and intelligence
-    const customerInsights = analysis1?.customer_insights as Record<string, unknown> | null;
-    const primaryPainPoints = (customerInsights?.primary_pain_points as PainPoint[]) || [];
-    const unmetNeeds = (customerInsights?.unmet_needs as string[]) || [];
-    const loveMost = (customerInsights?.love_most as string[]) || [];
-    const buyerProfile = customerInsights?.buyer_profile as string | null;
-    const decisionDrivers = (customerInsights?.decision_drivers as string[]) || [];
-
-    // Criteria breakdown for radar chart
-    const weightedScoring = analysis2?.weighted_scoring as Record<string, unknown> | null;
-    const criteriaBreakdown = (weightedScoring?.criteria_breakdown as CriteriaBreakdown[]) || [];
-    
-    // Transform criteria for radar chart
-    const criteriaScores = criteriaBreakdown.map(cb => ({
-      name: cb.name || cb.criterion || cb.category || "Unknown",
-      score: cb.raw_score || cb.score || 0,
-      weight: cb.weight || 1,
-      weighted_score: cb.weighted_score || 0,
-    }));
-
-    // Top strengths and weaknesses
-    const rawStrengths = (analysis2?.top_strengths as unknown[]) || (analysis?.top_strengths as unknown[]) || [];
-    const rawWeaknesses = (analysis2?.top_weaknesses as unknown[]) || (analysis?.top_weaknesses as unknown[]) || [];
-    
-    const extractStrings = (arr: unknown[]): string[] => {
-      return arr.map(item => {
-        if (typeof item === 'string') return item;
-        if (item && typeof item === 'object') {
-          const obj = item as Record<string, unknown>;
-          return (obj.criterion || obj.justification || obj.name || String(obj.score || '')) as string;
-        }
-        return String(item);
-      }).filter(Boolean);
-    };
-    
-    const topStrengths = extractStrings(rawStrengths);
-    const topWeaknesses = extractStrings(rawWeaknesses);
-    
-    // Risks
-    const risks = keyInsights?.risks as Record<string, unknown> | null;
-    const rawCategoryRisks = (risks?.category_challenges as unknown[]) || [];
-    const categoryRisks = extractStrings(rawCategoryRisks);
-    const criticalRisks = [...topWeaknesses.slice(0, 2), ...categoryRisks.slice(0, 2)];
-
-    // Financial data
-    const financials = keyInsights?.financials as Record<string, unknown> | null;
-    const investmentBreakdown = financials?.startup_investment as Record<string, unknown> | null;
-    const totalInvestment = (investmentBreakdown?.total as number) || null;
-    const revenueTargets = financials?.revenue_targets as Record<string, number> | null;
-    const margins = financials?.margins as Record<string, number> | null;
-
-    // Action items
-    const actionItems = (keyInsights?.action_items as ActionItem[]) || [];
-
-    // Competition data
-    const competitiveLandscape = analysis1?.competitive_landscape as Record<string, unknown> | null;
-    const competitionLevel = (competitiveLandscape?.market_concentration as string) || 
-                            (competitiveLandscape?.concentration as string) ||
-                            (analysis2?.competition_level as string) || null;
-    
-    // Risk score
-    const riskScore = (analysis2?.risk_score as number) || null;
-
-    // Go to market
-    const goToMarket = keyInsights?.go_to_market as Record<string, unknown> | null;
-
-    // For benchmark comparison
-    const recommendedPrice = analysis?.recommended_price;
-    const keyDifferentiators = (keyInsights?.key_differentiators as string[]) || 
-                               (analysis1?.key_differentiators as string[]) || [];
 
     return {
-      criteriaScores,
-      criteriaBreakdown,
-      topOpportunities: topStrengths,
-      criticalRisks,
-      primaryPainPoints,
-      unmetNeeds,
-      customerIntelligence: {
-        buyer_profile: buyerProfile || undefined,
-        primary_pain_points: primaryPainPoints,
-        unmet_needs: unmetNeeds,
-        love_most: loveMost,
-        decision_drivers: decisionDrivers,
-      },
-      investmentBreakdown: investmentBreakdown?.breakdown as Record<string, number> | null,
-      totalInvestment,
-      revenueTargets,
-      margins,
-      actionItems,
-      competitionLevel,
-      riskScore,
-      financials,
-      goToMarket,
-      risks,
-      // For benchmark - pass raw analysis objects
       benchmarkData: {
         key_insights: keyInsights as {
           go_to_market?: {
@@ -324,6 +144,24 @@ export default function Dashboard() {
   
   const uniqueBrands = products ? new Set(products.map(p => p.brand).filter(Boolean)).size : 0;
 
+  // Compute from products data (P1/P2)
+  const totalRevenueFromScout = products?.reduce((sum, p) => {
+    const sales = (p as any).monthly_sales_est ?? 0;
+    const price = p.price ?? 0;
+    return sum + (sales * price);
+  }, 0) ?? 0;
+
+  const effectiveTotalRevenue = totalRevenue || totalRevenueFromScout;
+
+  // Avg price
+  const validPrices = products?.map(p => p.price ?? 0).filter(p => p > 0) ?? [];
+  const avgPrice = validPrices.length ? validPrices.reduce((s, p) => s + p, 0) / validPrices.length : null;
+
+  // Opportunity score: inverse of competition (lower avg BSR = higher opportunity)
+  const avgBSRArr = products?.map(p => p.bsr_current ?? 0).filter(b => b > 0) ?? [];
+  const avgBSRValue = avgBSRArr.length ? avgBSRArr.reduce((s, b) => s + b, 0) / avgBSRArr.length : null;
+  const opportunityScore = avgBSRValue ? Math.min(100, Math.round(100 - (avgBSRValue / 500000) * 100)) : null;
+
   // Brand market share data
   const brandMarketShare = useMemo(() => {
     if (!products || products.length === 0) return [];
@@ -333,7 +171,9 @@ export default function Dashboard() {
 
     products.forEach(product => {
       const brand = product.brand || "Unknown";
-      const revenue = product.monthly_revenue || product.estimated_revenue || 0;
+      const revenue = product.monthly_revenue ||
+        ((product as any).monthly_sales_est ?? 0) * (product.price ?? 0) ||
+        product.estimated_revenue || 0;
       brandRevenue.set(brand, (brandRevenue.get(brand) || 0) + revenue);
       totalRev += revenue;
     });
@@ -368,6 +208,10 @@ export default function Dashboard() {
 
     return result;
   }, [products]);
+
+  // Competition level from brand concentration
+  const topBrandShare = brandMarketShare[0]?.value ?? 0;
+  const computedCompetitionLevel = topBrandShare > 30 ? 'High' : topBrandShare > 15 ? 'Medium' : 'Low';
 
   // Market analysis computations
   const marketAnalysisData = useMemo(() => {
@@ -499,179 +343,6 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Formula Version Selector */}
-      {versions.length > 0 && (
-        <div className="flex items-center justify-between gap-3 p-4 bg-muted/50 rounded-lg border border-border">
-          <div className="flex items-center gap-3">
-            <GitBranch className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium text-foreground">Formula Version:</span>
-            <Select
-              value={selectedVersionId || "original"}
-              onValueChange={(value) => setSelectedVersionId(value === "original" ? null : value)}
-            >
-              <SelectTrigger className="w-[200px] bg-background">
-                <SelectValue placeholder="Select version" />
-              </SelectTrigger>
-              <SelectContent className="bg-popover border border-border">
-                <SelectItem value="original">Original Analysis</SelectItem>
-                {versions.map((v) => (
-                  <SelectItem key={v.id} value={v.id}>
-                    Version {v.version_number} {v.is_active && "(Active)"}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {selectedVersionId && versions.find(v => v.id === selectedVersionId)?.change_summary && (
-              <Badge variant="secondary" className="text-xs max-w-[200px] truncate">
-                {versions.find(v => v.id === selectedVersionId)?.change_summary}
-              </Badge>
-            )}
-          </div>
-          <button
-            onClick={() => setShowComparison(!showComparison)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-              showComparison 
-                ? 'bg-primary text-primary-foreground' 
-                : 'bg-background border border-border hover:bg-muted'
-            }`}
-          >
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M16 3h5v5M8 3H3v5M3 16v5h5M21 16v5h-5M21 3l-7 7M3 21l7-7" />
-            </svg>
-            {showComparison ? 'Hide Comparison' : 'Compare Versions'}
-          </button>
-        </div>
-      )}
-
-      {/* Version Comparison View */}
-      {showComparison && versions.length > 0 && category?.id && (
-        <VersionComparisonView
-          categoryId={category.id}
-          versions={versions}
-          onClose={() => setShowComparison(false)}
-        />
-      )}
-
-      {/* Version History Timeline */}
-      {versions.length > 0 && !showComparison && (
-        <VersionHistoryTimeline
-          versions={versions}
-          selectedVersionId={selectedVersionId}
-          onSelectVersion={setSelectedVersionId}
-        />
-      )}
-
-      {/* Outdated Version Warning Banner */}
-      {selectedVersion && !selectedVersion.is_active && (
-        <div className="flex items-center gap-3 p-4 bg-warning/10 rounded-lg border border-warning/30">
-          <AlertTriangle className="h-5 w-5 text-warning shrink-0" />
-          <div className="flex-1">
-            <p className="font-medium text-foreground text-sm">
-              Viewing Outdated Formula Version
-            </p>
-            <p className="text-xs text-muted-foreground">
-              You are viewing analyses for Version {selectedVersion.version_number}, which is no longer active. 
-              {activeVersion && (
-                <> The current active version is Version {activeVersion.version_number}.</>
-              )}
-            </p>
-          </div>
-          {activeVersion && (
-            <button
-              onClick={() => setSelectedVersionId(activeVersion.id)}
-              className="text-xs font-medium text-primary hover:underline shrink-0"
-            >
-              Switch to Active
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Progress Banner */}
-      {!progress.isComplete && (
-        <Card className="border-primary/30 bg-primary/5">
-          <CardContent className="p-4 sm:p-6">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <RefreshCw className="h-5 w-5 text-primary animate-spin" />
-                  <div>
-                    <p className="font-medium text-foreground">Analysis in Progress</p>
-                    <p className="text-sm text-muted-foreground">
-                      {progress.overallPercentage}% Complete • Est. {progress.estimatedMinutesRemaining} min remaining
-                    </p>
-                  </div>
-                </div>
-                <Badge variant="outline" className="text-sm">
-                  {progress.overallPercentage}%
-                </Badge>
-              </div>
-              <Progress value={progress.overallPercentage} className="h-2" />
-              
-              {/* Phase-by-phase breakdown */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3 mt-4">
-                {progress.phases.map((phase, idx) => {
-                  const PhaseIcon = [CheckCircle2, Package, Eye, BarChart3, MessageSquare, Sparkles][idx] || Circle;
-                  const isComplete = phase.percentage >= 100;
-                  const isActive = phase.percentage > 0 && phase.percentage < 100;
-                  
-                  return (
-                    <div 
-                      key={idx} 
-                      className={`p-3 rounded-lg border ${
-                        isComplete 
-                          ? 'border-chart-4/30 bg-chart-4/5' 
-                          : isActive 
-                            ? 'border-primary/30 bg-primary/5' 
-                            : 'border-border bg-muted/30'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 mb-2">
-                        <PhaseIcon className={`w-4 h-4 ${
-                          isComplete 
-                            ? 'text-chart-4' 
-                            : isActive 
-                              ? 'text-primary' 
-                              : 'text-muted-foreground'
-                        }`} />
-                        <span className={`text-xs font-medium ${
-                          isComplete 
-                            ? 'text-chart-4' 
-                            : isActive 
-                              ? 'text-primary' 
-                              : 'text-muted-foreground'
-                        }`}>
-                          {phase.name}
-                        </span>
-                      </div>
-                      <Progress 
-                        value={phase.percentage} 
-                        className={`h-1.5 ${isComplete ? '[&>div]:bg-chart-4' : ''}`}
-                      />
-                      <div className="flex justify-between items-center mt-1.5">
-                        <span className="text-[10px] text-muted-foreground">
-                          {phase.completed}/{phase.total}
-                        </span>
-                        <span className={`text-[10px] font-medium ${
-                          isComplete ? 'text-chart-4' : 'text-muted-foreground'
-                        }`}>
-                          {phase.percentage}%
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              
-              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <Clock className="w-3 h-3" />
-                Auto-refreshing every 5 seconds
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="products">📦 Products Analysis</TabsTrigger>
@@ -682,11 +353,11 @@ export default function Dashboard() {
       {/* SECTION 2: KPI Metrics Grid (Scoreboards) */}
       <ScrollAnimate delay={100} variant="fade-up" duration={500}>
         <KPIMetricsGrid
-        marketSize={totalRevenue}
-        profitMargin={dashboardData.margins?.year_1 || null}
-        competitionLevel={dashboardData.competitionLevel}
+        marketSize={effectiveTotalRevenue}
+        avgPrice={avgPrice}
+        competitionLevel={computedCompetitionLevel}
         brandCount={uniqueBrands}
-        riskScore={dashboardData.riskScore}
+        opportunityScore={opportunityScore}
         isLoading={isDataLoading && !hasAnalysis}
         />
       </ScrollAnimate>
@@ -694,15 +365,9 @@ export default function Dashboard() {
       {/* SECTION 3: Benchmark Comparison - Top 5 Competitors */}
       <ScrollAnimate delay={50} variant="scale-up" duration={600}>
         <EnhancedBenchmarkComparison
-        categoryId={category?.id}
-        analysisData={dashboardData.benchmarkData}
-        isLoading={productsLoading}
-        formulaVersionId={formulaVersionId}
-        versionInfo={selectedVersion ? {
-          versionNumber: selectedVersion.version_number,
-          isActive: selectedVersion.is_active,
-          changeSummary: selectedVersion.change_summary
-        } : undefined}
+          categoryId={category?.id}
+          analysisData={dashboardData.benchmarkData}
+          isLoading={productsLoading}
         />
       </ScrollAnimate>
 
@@ -803,99 +468,6 @@ export default function Dashboard() {
         />
       </ScrollAnimate>
 
-      {/* SECTION 6: Packaging Intelligence */}
-      <ScrollAnimate delay={100} variant="fade-right" duration={600}>
-        <PackagingIntelligence
-          packagingData={(() => {
-            const analysis1 = analysis?.analysis_1_category_scores as Record<string, unknown> | null;
-            const productDev = analysis1?.product_development as Record<string, unknown> | null;
-            return productDev?.packaging as { type?: string; quantity?: string | number; design_elements?: string[] } | null;
-          })()}
-          productsClaims={products?.map(p => p.claims) || []}
-          productsData={products?.map(p => ({
-            packaging_type: p.packaging_type,
-            servings_per_container: p.servings_per_container,
-            price: p.price,
-            brand: p.brand,
-            title: p.title,
-            main_image_url: p.main_image_url,
-            claims: p.claims,
-            claims_on_label: p.claims_on_label,
-            monthly_revenue: p.monthly_revenue,
-            monthly_sales: p.monthly_sales,
-            marketing_analysis: p.marketing_analysis as {
-              design_blueprint?: {
-                trust_signals?: string;
-                color_strategy?: string;
-                visual_style?: string;
-              };
-            } | null,
-          })) || []}
-          isLoading={analysisLoading && !hasAnalysis}
-          categoryId={category?.id}
-          formulaVersionId={formulaVersionId}
-          versionInfo={selectedVersion ? {
-            versionNumber: selectedVersion.version_number,
-            isActive: selectedVersion.is_active,
-            changeSummary: selectedVersion.change_summary
-          } : undefined}
-          formulaBriefContent={selectedVersion?.formula_brief_content || (analysis?.analysis_3_formula_brief as Record<string, unknown> | null)?.formula_brief_content as string | null}
-        />
-      </ScrollAnimate>
-
-      {/* SECTION 6: 18-Point Analysis */}
-      <ScrollAnimate delay={100} variant="flip-up" duration={700}>
-        <DeepDiveSection
-        criteriaScores={dashboardData.criteriaScores}
-        criteriaBreakdown={dashboardData.criteriaBreakdown}
-        executiveSummary={analysis?.executive_summary || null}
-        topOpportunities={dashboardData.topOpportunities}
-        criticalRisks={dashboardData.criticalRisks}
-        isLoading={analysisLoading && !hasAnalysis}
-        />
-      </ScrollAnimate>
-
-      {/* SECTION 7: Customer Intelligence */}
-      <ScrollAnimate delay={100} variant="blur-in" duration={600}>
-        <CustomerIntelligence
-        customerInsights={dashboardData.customerIntelligence}
-        isLoading={analysisLoading && !hasAnalysis}
-        />
-      </ScrollAnimate>
-
-      {/* SECTION 8: Financial Projections */}
-      <ScrollAnimate delay={100} variant="scale-up" duration={600}>
-        <FinancialProjections 
-          financials={dashboardData.financials as Record<string, unknown> | null} 
-          isLoading={analysisLoading && !hasAnalysis}
-        />
-      </ScrollAnimate>
-
-      {/* SECTION 9: Launch Strategy + Action Plan */}
-      <ScrollAnimate delay={100} variant="fade-left" duration={600}>
-        <LaunchPlanSection
-        goToMarket={dashboardData.goToMarket as {
-          positioning?: string;
-          messaging?: string[];
-          differentiation?: string[];
-          launch_strategy?: {
-            pricing_approach?: string;
-            review_strategy?: string;
-            advertising?: string;
-          };
-        } | null}
-        actionItems={dashboardData.actionItems}
-        isLoading={analysisLoading && !hasAnalysis}
-        />
-      </ScrollAnimate>
-
-      {/* SECTION 10: Risk Analysis */}
-      <ScrollAnimate delay={100} variant="fade-right" duration={600}>
-        <RiskAnalysis
-          risks={dashboardData.risks as Record<string, unknown> | null}
-          isLoading={analysisLoading && !hasAnalysis}
-        />
-      </ScrollAnimate>
         </TabsContent>
 
         <TabsContent value="market" className="space-y-6 mt-4">

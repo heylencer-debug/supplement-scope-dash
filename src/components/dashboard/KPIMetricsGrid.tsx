@@ -1,23 +1,23 @@
-import { TrendingUp, DollarSign, Users, Shield } from "lucide-react";
+import { TrendingUp, DollarSign, Users, Zap } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LoadingPulse } from "@/components/ui/loading-indicator";
 
 interface KPIMetricsGridProps {
   marketSize: number | null;
-  profitMargin: number | null;
+  avgPrice: number | null;
   competitionLevel: string | null;
   brandCount: number | null;
-  riskScore: number | null;
+  opportunityScore: number | null;
   isLoading?: boolean;
 }
 
 export function KPIMetricsGrid({
   marketSize,
-  profitMargin,
+  avgPrice,
   competitionLevel,
   brandCount,
-  riskScore,
+  opportunityScore,
   isLoading = false,
 }: KPIMetricsGridProps) {
   const formatMarketSize = (value: number | null) => {
@@ -27,11 +27,11 @@ export function KPIMetricsGrid({
     return `$${value.toFixed(0)}`;
   };
 
-  const getRiskLevel = (score: number | null) => {
-    if (!score) return { label: "Unknown", color: "text-muted-foreground" };
-    if (score <= 30) return { label: "Low Risk", color: "text-chart-4" };
-    if (score <= 60) return { label: "Moderate", color: "text-chart-2" };
-    return { label: "High Risk", color: "text-destructive" };
+  const getOpportunityLevel = (score: number | null) => {
+    if (score === null) return { label: "Unknown", color: "text-muted-foreground" };
+    if (score >= 70) return { label: "High Opportunity", color: "text-chart-4" };
+    if (score >= 40) return { label: "Moderate", color: "text-chart-2" };
+    return { label: "Competitive", color: "text-destructive" };
   };
 
   const kpis = [
@@ -44,9 +44,9 @@ export function KPIMetricsGrid({
       iconColor: "text-primary",
     },
     {
-      label: "Profit Margin",
-      value: profitMargin ? `${profitMargin}%` : null,
-      subtext: profitMargin ? "Avg" : null,
+      label: "Avg Price",
+      value: avgPrice ? `$${avgPrice.toFixed(2)}` : null,
+      subtext: avgPrice ? "per unit" : null,
       icon: DollarSign,
       iconBg: "bg-chart-4/10",
       iconColor: "text-chart-4",
@@ -60,11 +60,11 @@ export function KPIMetricsGrid({
       iconColor: "text-chart-2",
     },
     {
-      label: "Risk Score",
-      value: riskScore !== null ? `${riskScore.toFixed(0)}/100` : null,
-      subtext: riskScore !== null ? getRiskLevel(riskScore).label : null,
-      subtextColor: getRiskLevel(riskScore).color,
-      icon: Shield,
+      label: "Opportunity Score",
+      value: opportunityScore !== null ? `${opportunityScore}/100` : null,
+      subtext: opportunityScore !== null ? getOpportunityLevel(opportunityScore).label : null,
+      subtextColor: getOpportunityLevel(opportunityScore).color,
+      icon: Zap,
       iconBg: "bg-chart-5/10",
       iconColor: "text-chart-5",
     },
@@ -73,8 +73,8 @@ export function KPIMetricsGrid({
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
       {kpis.map((kpi, idx) => (
-        <Card 
-          key={idx} 
+        <Card
+          key={idx}
           className="border-border/50 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-default opacity-0 animate-fade-in"
           style={{ animationDelay: `${idx * 100}ms`, animationFillMode: 'forwards' }}
         >
@@ -95,7 +95,7 @@ export function KPIMetricsGrid({
                     {kpi.value !== null ? kpi.value : <LoadingPulse />}
                   </p>
                   {kpi.subtext && (
-                    <p className={`text-[10px] sm:text-xs mt-1 ${kpi.subtextColor || "text-muted-foreground"}`}>
+                    <p className={`text-[10px] sm:text-xs mt-1 ${(kpi as any).subtextColor || "text-muted-foreground"}`}>
                       {kpi.subtext}
                     </p>
                   )}

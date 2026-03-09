@@ -304,29 +304,33 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
           </div>
         </DialogHeader>
 
-        <Tabs defaultValue="overview" className="flex-1 min-h-0 flex flex-col">
-          <TabsList className="grid w-full grid-cols-6 shrink-0">
-            <TabsTrigger value="overview" className="gap-1 text-xs">
+        <Tabs defaultValue="scout-overview" className="flex-1 min-h-0 flex flex-col">
+          <TabsList className="grid w-full grid-cols-5 shrink-0 h-auto">
+            <TabsTrigger value="scout-overview" className="gap-1 text-xs py-1.5">📊 Overview</TabsTrigger>
+            <TabsTrigger value="scout-formula" className="gap-1 text-xs py-1.5">🧪 Formula</TabsTrigger>
+            <TabsTrigger value="keepa" className="gap-1 text-xs py-1.5">📈 Keepa</TabsTrigger>
+            <TabsTrigger value="scout-reviews" className="gap-1 text-xs py-1.5">💬 Reviews</TabsTrigger>
+            <TabsTrigger value="overview" className="gap-1 text-xs py-1.5">
               <Image className="w-3 h-3" />
-              Overview
+              Detail
             </TabsTrigger>
-            <TabsTrigger value="sales" className="gap-1 text-xs">
+            <TabsTrigger value="sales" className="gap-1 text-xs py-1.5">
               <BarChart3 className="w-3 h-3" />
               Sales
             </TabsTrigger>
-            <TabsTrigger value="marketing" className="gap-1 text-xs">
+            <TabsTrigger value="marketing" className="gap-1 text-xs py-1.5">
               <Target className="w-3 h-3" />
               Marketing
             </TabsTrigger>
-            <TabsTrigger value="reviews" className="gap-1 text-xs">
+            <TabsTrigger value="reviews" className="gap-1 text-xs py-1.5">
               <Users className="w-3 h-3" />
               Reviews
             </TabsTrigger>
-            <TabsTrigger value="packaging" className="gap-1 text-xs">
+            <TabsTrigger value="packaging" className="gap-1 text-xs py-1.5">
               <Package className="w-3 h-3" />
               Packaging
             </TabsTrigger>
-            <TabsTrigger value="formula" className="gap-1 text-xs">
+            <TabsTrigger value="formula" className="gap-1 text-xs py-1.5">
               <Beaker className="w-3 h-3" />
               Formula
             </TabsTrigger>
@@ -1537,6 +1541,347 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                 </Card>
               )}
               {!product.ingredients && !product.serving_size && !allNutrients && <Card><CardContent className="py-8 text-center text-muted-foreground">No formula data available for this product.</CardContent></Card>}
+            </div>
+          </TabsContent>
+
+          {/* Scout Overview Tab */}
+          <TabsContent value="scout-overview" className={`mt-4 ${scrollableContentClass} ${maxContentHeight}`}>
+            <div className="space-y-4">
+              {/* Key Stats Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <Card><CardContent className="pt-4 pb-4 text-center">
+                  <p className="text-xl font-bold text-foreground">${(product.price ?? 0).toFixed(2)}</p>
+                  <p className="text-xs text-muted-foreground">Price</p>
+                </CardContent></Card>
+                <Card><CardContent className="pt-4 pb-4 text-center">
+                  <p className="text-xl font-bold text-foreground">{product.bsr_current ? `#${product.bsr_current.toLocaleString()}` : "-"}</p>
+                  <p className="text-xs text-muted-foreground">BSR</p>
+                </CardContent></Card>
+                <Card><CardContent className="pt-4 pb-4 text-center">
+                  <p className="text-xl font-bold text-foreground">{(product.rating ?? 0).toFixed(1)}★</p>
+                  <p className="text-xs text-muted-foreground">Rating</p>
+                </CardContent></Card>
+                <Card><CardContent className="pt-4 pb-4 text-center">
+                  <p className="text-xl font-bold text-foreground">{(product.reviews ?? 0).toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground">Reviews</p>
+                </CardContent></Card>
+              </div>
+
+              {/* Identity */}
+              <Card>
+                <CardContent className="pt-4 space-y-3">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">ASIN</span>
+                    <span className="font-mono font-medium flex items-center gap-1">
+                      {product.asin ?? "-"}
+                      {product.asin && (
+                        <button onClick={() => navigator.clipboard.writeText(product.asin!)} className="text-muted-foreground hover:text-primary transition-colors" title="Copy ASIN">
+                          <FileText className="w-3 h-3" />
+                        </button>
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Brand</span>
+                    <span className="font-medium">{product.brand ?? "-"}</span>
+                  </div>
+                  {product.asin && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Amazon Link</span>
+                      <a href={`https://amazon.com/dp/${product.asin}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-primary hover:underline text-xs">
+                        View on Amazon <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Badges */}
+              {(product.is_bestseller || product.is_amazons_choice) && (
+                <div className="flex gap-2 flex-wrap">
+                  {product.is_bestseller && <Badge className="bg-chart-2 text-white">🏆 Bestseller</Badge>}
+                  {product.is_amazons_choice && <Badge className="bg-chart-1 text-white">✓ Amazon's Choice</Badge>}
+                </div>
+              )}
+
+              {/* Image Gallery */}
+              {allImages.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Image Gallery ({allImages.length})</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="aspect-square rounded-lg overflow-hidden border bg-muted mb-3 max-h-48">
+                      <img src={allImages[selectedImage]} alt={product.title ?? "Product"} className="w-full h-full object-contain" />
+                    </div>
+                    {allImages.length > 1 && (
+                      <div className="flex gap-2 overflow-x-auto pb-1">
+                        {allImages.slice(0, 8).map((url, idx) => (
+                          <button key={idx} onClick={() => setSelectedImage(idx)} className={`w-12 h-12 rounded border overflow-hidden shrink-0 ${selectedImage === idx ? "ring-2 ring-primary" : ""}`}>
+                            <img src={url} alt="" className="w-full h-full object-contain bg-muted" />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Title */}
+              <Card>
+                <CardContent className="pt-4">
+                  <p className="text-sm text-muted-foreground mb-1">Title</p>
+                  <p className="text-sm font-medium leading-snug">{product.title ?? "-"}</p>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Scout Formula Tab */}
+          <TabsContent value="scout-formula" className={`mt-4 ${scrollableContentClass} ${maxContentHeight}`}>
+            <div className="space-y-4">
+              {/* OCR badge */}
+              <div className="flex flex-wrap gap-2 items-center">
+                {product.ocr_extracted && <Badge className="bg-green-600 text-white">✓ Text Extracted</Badge>}
+                {product.ocr_confidence && (
+                  <Badge variant={product.ocr_confidence === "high" ? "default" : product.ocr_confidence === "medium" ? "secondary" : "outline"}>
+                    {product.ocr_confidence} confidence
+                  </Badge>
+                )}
+              </div>
+
+              {/* Serving info */}
+              {(product.serving_size || product.servings_per_container) && (
+                <div className="grid grid-cols-2 gap-3">
+                  {product.serving_size && (
+                    <Card><CardContent className="pt-4 pb-4 text-center">
+                      <p className="text-base font-bold">{product.serving_size}</p>
+                      <p className="text-xs text-muted-foreground">Serving Size</p>
+                    </CardContent></Card>
+                  )}
+                  {product.servings_per_container && (
+                    <Card><CardContent className="pt-4 pb-4 text-center">
+                      <p className="text-base font-bold">{product.servings_per_container}</p>
+                      <p className="text-xs text-muted-foreground">Servings / Container</p>
+                    </CardContent></Card>
+                  )}
+                </div>
+              )}
+
+              {/* Supplement Facts Raw */}
+              {product.supplement_facts_raw && (
+                <Card>
+                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Supplement Facts (Raw)</CardTitle></CardHeader>
+                  <CardContent>
+                    <pre className="text-xs bg-muted p-3 rounded-lg overflow-x-auto whitespace-pre-wrap leading-relaxed">{product.supplement_facts_raw}</pre>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Nutrients Table */}
+              {allNutrients && allNutrients.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Nutrients ({allNutrients.length})</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-border">
+                            <th className="text-left py-1.5 pr-3 text-muted-foreground font-medium text-xs">Nutrient</th>
+                            <th className="text-right py-1.5 px-3 text-muted-foreground font-medium text-xs">Amount</th>
+                            <th className="text-right py-1.5 pl-3 text-muted-foreground font-medium text-xs">% DV</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {allNutrients.map((n, idx) => (
+                            <tr key={idx} className="border-b border-border/50">
+                              <td className="py-1.5 pr-3 text-xs">{n.name}</td>
+                              <td className="text-right py-1.5 px-3 text-xs text-muted-foreground">
+                                {n.amount != null ? `${n.amount}${n.unit ? ` ${n.unit}` : ""}` : "–"}
+                              </td>
+                              <td className="text-right py-1.5 pl-3 text-xs text-muted-foreground">
+                                {n.daily_value_percent != null ? `${n.daily_value_percent}%` : "–"}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Feature Bullets */}
+              {product.feature_bullets_text && (
+                <Card>
+                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Feature Bullets</CardTitle></CardHeader>
+                  <CardContent>
+                    <ul className="space-y-1.5">
+                      {product.feature_bullets_text.split('\n').filter(Boolean).map((bullet, idx) => (
+                        <li key={idx} className="flex gap-2 text-sm">
+                          <span className="text-primary mt-0.5 shrink-0">•</span>
+                          <span className="text-muted-foreground">{bullet.replace(/^[•\-\*]\s*/, '')}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                </Card>
+              )}
+
+              {!product.supplement_facts_raw && !allNutrients && (
+                <Card><CardContent className="py-8 text-center text-muted-foreground">No formula data extracted for this product.</CardContent></Card>
+              )}
+            </div>
+          </TabsContent>
+
+          {/* Keepa Tab */}
+          <TabsContent value="keepa" className={`mt-4 ${scrollableContentClass} ${maxContentHeight}`}>
+            <div className="space-y-4">
+              {/* BSR Stats */}
+              <div className="grid grid-cols-3 gap-3">
+                <Card><CardContent className="pt-4 pb-4 text-center">
+                  <p className="text-xl font-bold">{product.bsr_current ? `#${product.bsr_current.toLocaleString()}` : "-"}</p>
+                  <p className="text-xs text-muted-foreground">Current BSR</p>
+                </CardContent></Card>
+                <Card><CardContent className="pt-4 pb-4 text-center">
+                  <p className="text-xl font-bold">{product.bsr_30_days_avg ? `#${Math.round(product.bsr_30_days_avg).toLocaleString()}` : "-"}</p>
+                  <p className="text-xs text-muted-foreground">30-Day Avg BSR</p>
+                </CardContent></Card>
+                <Card><CardContent className="pt-4 pb-4 text-center">
+                  <p className="text-xl font-bold">{product.bsr_90_days_avg ? `#${Math.round(product.bsr_90_days_avg).toLocaleString()}` : "-"}</p>
+                  <p className="text-xs text-muted-foreground">90-Day Avg BSR</p>
+                </CardContent></Card>
+              </div>
+
+              {/* Sales Stats */}
+              <div className="grid grid-cols-2 gap-3">
+                <Card><CardContent className="pt-4 pb-4 text-center">
+                  <p className="text-xl font-bold">{product.monthly_sales ? product.monthly_sales.toLocaleString() : "-"}</p>
+                  <p className="text-xs text-muted-foreground">Monthly Sales</p>
+                </CardContent></Card>
+                <Card><CardContent className="pt-4 pb-4 text-center">
+                  <p className="text-xl font-bold">{product.monthly_revenue ? `$${Math.round(product.monthly_revenue).toLocaleString()}` : "-"}</p>
+                  <p className="text-xs text-muted-foreground">Monthly Revenue</p>
+                </CardContent></Card>
+              </div>
+
+              {/* Listing info */}
+              <Card>
+                <CardContent className="pt-4 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Listing Since</span>
+                    <span className="font-medium">{formatDate(product.listing_since)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Parent ASIN</span>
+                    <span className="font-mono text-xs">{product.parent_asin ?? "-"}</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Historical BSR Chart */}
+              {(() => {
+                const histData = product.historical_data as { bsr_history?: unknown[] } | null;
+                if (histData?.bsr_history && histData.bsr_history.length > 0) {
+                  return (
+                    <Card>
+                      <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">BSR / Sales History</CardTitle></CardHeader>
+                      <CardContent>
+                        <HistoricalBSRSalesChart product={product} />
+                      </CardContent>
+                    </Card>
+                  );
+                }
+                return (
+                  <Card><CardContent className="py-6 text-center text-sm text-muted-foreground">No historical BSR data available.</CardContent></Card>
+                );
+              })()}
+            </div>
+          </TabsContent>
+
+          {/* Scout Reviews Tab */}
+          <TabsContent value="scout-reviews" className={`mt-4 ${scrollableContentClass} ${maxContentHeight}`}>
+            <div className="space-y-4">
+              {(() => {
+                const ra = product.review_analysis as (ReviewAnalysis & {
+                  key_strengths?: string[];
+                  key_weaknesses?: string[];
+                  benefits?: string[];
+                  reddit_sentiment?: string;
+                  reddit_notes?: string;
+                  external_reviews?: string;
+                }) | null;
+                if (!ra) {
+                  return (
+                    <Card><CardContent className="py-12 text-center text-muted-foreground">No Phase 5 research data yet</CardContent></Card>
+                  );
+                }
+                return (
+                  <>
+                    {ra.key_strengths && ra.key_strengths.length > 0 && (
+                      <Card>
+                        <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-green-600">Key Strengths</CardTitle></CardHeader>
+                        <CardContent>
+                          <div className="flex flex-wrap gap-2">
+                            {ra.key_strengths.map((s, idx) => (
+                              <Badge key={idx} className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">{s}</Badge>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                    {ra.key_weaknesses && ra.key_weaknesses.length > 0 && (
+                      <Card>
+                        <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-destructive">Key Weaknesses</CardTitle></CardHeader>
+                        <CardContent>
+                          <div className="flex flex-wrap gap-2">
+                            {ra.key_weaknesses.map((w, idx) => (
+                              <Badge key={idx} variant="destructive" className="opacity-80">{w}</Badge>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                    {ra.benefits && ra.benefits.length > 0 && (
+                      <Card>
+                        <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Benefits</CardTitle></CardHeader>
+                        <CardContent>
+                          <ul className="space-y-1.5">
+                            {ra.benefits.map((b, idx) => (
+                              <li key={idx} className="flex gap-2 text-sm">
+                                <span className="text-primary shrink-0">•</span>
+                                <span>{b}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </CardContent>
+                      </Card>
+                    )}
+                    {(ra.reddit_sentiment || ra.reddit_notes) && (
+                      <Card>
+                        <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Reddit Sentiment</CardTitle></CardHeader>
+                        <CardContent className="space-y-2">
+                          {ra.reddit_sentiment && (
+                            <div className="flex items-center gap-2">
+                              <Badge variant="secondary">{ra.reddit_sentiment}</Badge>
+                            </div>
+                          )}
+                          {ra.reddit_notes && <p className="text-sm text-muted-foreground">{ra.reddit_notes}</p>}
+                        </CardContent>
+                      </Card>
+                    )}
+                    {ra.external_reviews && (
+                      <Card>
+                        <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">External Reviews</CardTitle></CardHeader>
+                        <CardContent>
+                          <p className="text-sm text-muted-foreground">{ra.external_reviews}</p>
+                        </CardContent>
+                      </Card>
+                    )}
+                    {!ra.key_strengths && !ra.key_weaknesses && !ra.benefits && !ra.reddit_sentiment && !ra.external_reviews && (
+                      <Card><CardContent className="py-12 text-center text-muted-foreground">No Phase 5 research data yet</CardContent></Card>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           </TabsContent>
         </Tabs>

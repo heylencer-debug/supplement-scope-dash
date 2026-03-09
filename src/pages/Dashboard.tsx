@@ -31,7 +31,12 @@ import {
   Pie,
   Cell,
   Tooltip,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
 } from "recharts";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useCategoryByName } from "@/hooks/useCategoryByName";
 import { useCategoryAnalysis } from "@/hooks/useCategoryAnalyses";
 import { useProducts } from "@/hooks/useProducts";
@@ -91,6 +96,7 @@ export default function Dashboard() {
   // Formula version state
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [showComparison, setShowComparison] = useState(false);
+  const [activeTab, setActiveTab] = useState("products");
 
   const categoryName = urlCategoryName || contextCategoryName;
 
@@ -363,6 +369,98 @@ export default function Dashboard() {
     return result;
   }, [products]);
 
+  // Market analysis computations
+  const marketAnalysisData = useMemo(() => {
+    if (!products || products.length === 0) return null;
+    const total = products.length;
+    const validPrices = products.map(p => p.price ?? 0).filter(p => p > 0);
+    const validBSRs = products.map(p => p.bsr_current ?? 0).filter(b => b > 0);
+    const avgPrice = validPrices.length ? validPrices.reduce((s, p) => s + p, 0) / validPrices.length : 0;
+    const avgRating = products.reduce((s, p) => s + (p.rating ?? 0), 0) / total;
+    const avgReviews = products.reduce((s, p) => s + (p.reviews ?? 0), 0) / total;
+    const minPrice = validPrices.length ? Math.min(...validPrices) : 0;
+    const maxPrice = validPrices.length ? Math.max(...validPrices) : 0;
+    const minBSR = validBSRs.length ? Math.min(...validBSRs) : 0;
+    const maxBSR = validBSRs.length ? Math.max(...validBSRs) : 0;
+
+    // Brand rankings
+    const brandMap = new Map<string, { count: number; bsrSum: number; bsrCount: number; ratingSum: number; reviewSum: number; priceSum: number; priceCount: number }>();
+    products.forEach(p => {
+      const brand = p.brand || "Unknown";
+      const e = brandMap.get(brand) ?? { count: 0, bsrSum: 0, bsrCount: 0, ratingSum: 0, reviewSum: 0, priceSum: 0, priceCount: 0 };
+      e.count++;
+      if (p.bsr_current) { e.bsrSum += p.bsr_current; e.bsrCount++; }
+      e.ratingSum += p.rating ?? 0;
+      e.reviewSum += p.reviews ?? 0;
+      if (p.price) { e.priceSum += p.price; e.priceCount++; }
+      brandMap.set(brand, e);
+    });
+    const brandRankings = Array.from(brandMap.entries())
+      .map(([name, d]) => ({
+        name,
+        productCount: d.count,
+        avgBSR: d.bsrCount > 0 ? Math.round(d.bsrSum / d.bsrCount) : null,
+        avgRating: (d.ratingSum / d.count).toFixed(1),
+        avgReviews: Math.round(d.reviewSum / d.count),
+        avgPrice: d.priceCount > 0 ? (d.priceSum / d.priceCount).toFixed(2) : null,
+      }))
+      .sort((a, b) => (a.avgBSR ?? 999999) - (b.avgBSR ?? 999999))
+      .slice(0, 15);
+
+    // Price vs BSR buckets
+    const priceBSRData = [
+      { label: "<$15", min: 0, max: 15 },
+      { label: "$15-25", min: 15, max: 25 },
+      { label: "$25-35", min: 25, max: 35 },
+      { label: "$35+", min: 35, max: Infinity },
+    ].map(bucket => {
+      const bp = products.filter(p => (p.price ?? 0) >= bucket.min && (p.price ?? 0) < bucket.max);
+      const bsrVals = bp.map(p => p.bsr_current ?? 0).filter(b => b > 0);
+      return {
+        label: bucket.label,
+        avgBSR: bsrVals.length > 0 ? Math.round(bsrVals.reduce((s, b) => s + b, 0) / bsrVals.length) : 0,
+        count: bp.length,
+      };
+    }).filter(d => d.count > 0);
+
+    // Formula intelligence
+    const withFacts = products.filter(p => p.supplement_facts_raw || p.all_nutrients).length;
+    const supplementFactsPercent = Math.round((withFacts / total) * 100);
+    const ingCounts = new Map<string, number>();
+    const keywords = ['vitamin c', 'vitamin d', 'vitamin b12', 'magnesium', 'zinc', 'calcium', 'iron', 'omega-3', 'protein', 'collagen', 'probiotics', 'fiber', 'creatine', 'biotin', 'folate'];
+    products.forEach(p => {
+      const text = ((p.feature_bullets_text ?? '') + ' ' + (p.title ?? '')).toLowerCase();
+      keywords.forEach(k => { if (text.includes(k)) ingCounts.set(k, (ingCounts.get(k) ?? 0) + 1); });
+    });
+    const topIngredients = Array.from(ingCounts.entries()).sort((a, b) => b[1] - a[1]).slice(0, 8);
+
+    // Rating distribution
+    const ratingDistribution = [5, 4, 3, 2, 1].map(star => ({
+      star: `${star}★`,
+      count: products.filter(p => Math.round(p.rating ?? 0) === star).length,
+    }));
+
+    // Opportunity gap
+    const opportunityGap = products
+      .filter(p => (p.bsr_current ?? Infinity) < 10000 && (p.reviews ?? Infinity) < 500)
+      .slice(0, 10)
+      .map(p => ({
+        asin: p.asin,
+        title: (p.title ?? '').substring(0, 50) + ((p.title?.length ?? 0) > 50 ? '...' : ''),
+        bsr: p.bsr_current,
+        reviews: p.reviews,
+        price: p.price,
+      }));
+
+    // Launch readiness score
+    const marketSizeScore = Math.min(40, (total * avgReviews) / 1000);
+    const competitionScore = avgReviews > 5000 ? 0 : avgReviews > 1000 ? 20 : 40;
+    const priceScore = avgPrice >= 25 ? 20 : 10;
+    const launchScore = Math.min(100, Math.round(marketSizeScore + competitionScore + priceScore));
+
+    return { total, avgPrice, avgRating, avgReviews, minPrice, maxPrice, minBSR, maxBSR, brandRankings, priceBSRData, supplementFactsPercent, topIngredients, ratingDistribution, opportunityGap, launchScore };
+  }, [products]);
+
   // Show full skeleton while initial data is loading
   const isInitialLoading = categoryLoading || (analysisLoading && !hasAnalysis && !hasProducts);
   
@@ -574,6 +672,13 @@ export default function Dashboard() {
         </Card>
       )}
 
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="products">📦 Products Analysis</TabsTrigger>
+          <TabsTrigger value="market">📈 Market Analysis</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="products" className="space-y-6 md:space-y-10 mt-4">
       {/* SECTION 2: KPI Metrics Grid (Scoreboards) */}
       <ScrollAnimate delay={100} variant="fade-up" duration={500}>
         <KPIMetricsGrid
@@ -786,11 +891,237 @@ export default function Dashboard() {
 
       {/* SECTION 10: Risk Analysis */}
       <ScrollAnimate delay={100} variant="fade-right" duration={600}>
-        <RiskAnalysis 
-          risks={dashboardData.risks as Record<string, unknown> | null} 
+        <RiskAnalysis
+          risks={dashboardData.risks as Record<string, unknown> | null}
           isLoading={analysisLoading && !hasAnalysis}
         />
       </ScrollAnimate>
+        </TabsContent>
+
+        <TabsContent value="market" className="space-y-6 mt-4">
+          {productsLoading && !marketAnalysisData ? (
+            <Card><CardContent className="py-12 text-center text-muted-foreground">Loading market data...</CardContent></Card>
+          ) : !marketAnalysisData ? (
+            <Card><CardContent className="py-12 text-center text-muted-foreground">No product data available for market analysis.</CardContent></Card>
+          ) : (
+            <>
+              {/* Market Overview */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg font-semibold">Market Overview</CardTitle>
+                  <CardDescription>Key metrics across {marketAnalysisData.total} products in this category</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                    <div className="text-center p-3 bg-secondary/50 rounded-lg">
+                      <p className="text-2xl font-bold">{marketAnalysisData.total}</p>
+                      <p className="text-xs text-muted-foreground">Total Products</p>
+                    </div>
+                    <div className="text-center p-3 bg-secondary/50 rounded-lg">
+                      <p className="text-2xl font-bold">${marketAnalysisData.avgPrice.toFixed(2)}</p>
+                      <p className="text-xs text-muted-foreground">Avg Price</p>
+                    </div>
+                    <div className="text-center p-3 bg-secondary/50 rounded-lg">
+                      <p className="text-2xl font-bold">{marketAnalysisData.avgRating.toFixed(1)}★</p>
+                      <p className="text-xs text-muted-foreground">Avg Rating</p>
+                    </div>
+                    <div className="text-center p-3 bg-secondary/50 rounded-lg">
+                      <p className="text-2xl font-bold">{Math.round(marketAnalysisData.avgReviews).toLocaleString()}</p>
+                      <p className="text-xs text-muted-foreground">Avg Reviews</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-3 bg-muted/50 rounded-lg">
+                      <p className="text-xs text-muted-foreground mb-1">Price Range</p>
+                      <p className="text-sm font-medium">${marketAnalysisData.minPrice.toFixed(2)} – ${marketAnalysisData.maxPrice.toFixed(2)}</p>
+                    </div>
+                    <div className="p-3 bg-muted/50 rounded-lg">
+                      <p className="text-xs text-muted-foreground mb-1">BSR Range</p>
+                      <p className="text-sm font-medium">{marketAnalysisData.minBSR.toLocaleString()} – {marketAnalysisData.maxBSR.toLocaleString()}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Brand Rankings */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg font-semibold">Brand Rankings</CardTitle>
+                  <CardDescription>Sorted by average BSR (lower = better rank)</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border">
+                          <th className="text-left py-2 pr-3 text-muted-foreground font-medium">Brand</th>
+                          <th className="text-right py-2 px-3 text-muted-foreground font-medium">Products</th>
+                          <th className="text-right py-2 px-3 text-muted-foreground font-medium">Avg BSR</th>
+                          <th className="text-right py-2 px-3 text-muted-foreground font-medium">Avg ★</th>
+                          <th className="text-right py-2 px-3 text-muted-foreground font-medium">Avg Reviews</th>
+                          <th className="text-right py-2 pl-3 text-muted-foreground font-medium">Avg Price</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {marketAnalysisData.brandRankings.map((brand, idx) => (
+                          <tr key={idx} className="border-b border-border/50 hover:bg-muted/30">
+                            <td className="py-2 pr-3 font-medium max-w-[150px] truncate">{brand.name}</td>
+                            <td className="text-right py-2 px-3 text-muted-foreground">{brand.productCount}</td>
+                            <td className="text-right py-2 px-3">
+                              {brand.avgBSR ? (
+                                <Badge variant={brand.avgBSR < 5000 ? "default" : "secondary"} className="text-xs">
+                                  #{brand.avgBSR.toLocaleString()}
+                                </Badge>
+                              ) : "-"}
+                            </td>
+                            <td className="text-right py-2 px-3">{brand.avgRating}</td>
+                            <td className="text-right py-2 px-3 text-muted-foreground">{brand.avgReviews.toLocaleString()}</td>
+                            <td className="text-right py-2 pl-3">{brand.avgPrice ? `$${brand.avgPrice}` : "-"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Price vs BSR */}
+              {marketAnalysisData.priceBSRData.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg font-semibold">Price vs BSR Insight</CardTitle>
+                    <CardDescription>Average BSR by price bucket (lower BSR = better rank)</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={220}>
+                      <BarChart data={marketAnalysisData.priceBSRData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                        <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                        <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => v.toLocaleString()} />
+                        <Tooltip formatter={(v: number) => [v.toLocaleString(), "Avg BSR"]} />
+                        <Bar dataKey="avgBSR" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Formula Intelligence */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg font-semibold">Formula Intelligence</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 bg-muted rounded-full h-3 overflow-hidden">
+                      <div className="h-full bg-primary rounded-full" style={{ width: `${marketAnalysisData.supplementFactsPercent}%` }} />
+                    </div>
+                    <span className="text-sm font-medium shrink-0">{marketAnalysisData.supplementFactsPercent}% have supplement facts</span>
+                  </div>
+                  {marketAnalysisData.topIngredients.length > 0 && (
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-2">Most common ingredients</p>
+                      <div className="flex flex-wrap gap-2">
+                        {marketAnalysisData.topIngredients.map(([name, count]) => (
+                          <Badge key={name} variant="secondary" className="capitalize">
+                            {name} <span className="ml-1 text-muted-foreground">({count})</span>
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Review Sentiment */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg font-semibold">Review Sentiment Summary</CardTitle>
+                  <CardDescription>Rating distribution across all products</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={180}>
+                    <BarChart data={marketAnalysisData.ratingDistribution} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                      <XAxis dataKey="star" tick={{ fontSize: 12 }} />
+                      <YAxis tick={{ fontSize: 12 }} />
+                      <Tooltip formatter={(v: number) => [v, "Products"]} />
+                      <Bar dataKey="count" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              {/* Opportunity Gap */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg font-semibold">Opportunity Gap</CardTitle>
+                  <CardDescription>Products with BSR &lt; 10,000 AND reviews &lt; 500 — potential breakout opportunities</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {marketAnalysisData.opportunityGap.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No products match the breakout criteria (BSR &lt; 10k, reviews &lt; 500).</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-border">
+                            <th className="text-left py-2 pr-3 text-muted-foreground font-medium">ASIN</th>
+                            <th className="text-left py-2 pr-3 text-muted-foreground font-medium">Title</th>
+                            <th className="text-right py-2 px-3 text-muted-foreground font-medium">BSR</th>
+                            <th className="text-right py-2 px-3 text-muted-foreground font-medium">Reviews</th>
+                            <th className="text-right py-2 pl-3 text-muted-foreground font-medium">Price</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {marketAnalysisData.opportunityGap.map((p, idx) => (
+                            <tr key={idx} className="border-b border-border/50 hover:bg-muted/30">
+                              <td className="py-2 pr-3 font-mono text-xs text-primary">{p.asin}</td>
+                              <td className="py-2 pr-3 text-xs max-w-[200px] truncate">{p.title}</td>
+                              <td className="text-right py-2 px-3"><Badge variant="default" className="text-xs">#{(p.bsr ?? 0).toLocaleString()}</Badge></td>
+                              <td className="text-right py-2 px-3 text-muted-foreground">{(p.reviews ?? 0).toLocaleString()}</td>
+                              <td className="text-right py-2 pl-3">{p.price ? `$${p.price.toFixed(2)}` : "-"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Launch Readiness */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg font-semibold">Launch Readiness Score</CardTitle>
+                  <CardDescription>Based on market size, competition level, and price opportunity</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-3xl font-bold">{marketAnalysisData.launchScore}</span>
+                    <Badge variant={marketAnalysisData.launchScore >= 70 ? "default" : marketAnalysisData.launchScore >= 40 ? "secondary" : "destructive"}>
+                      {marketAnalysisData.launchScore >= 70 ? "Ready" : marketAnalysisData.launchScore >= 40 ? "Moderate" : "Challenging"}
+                    </Badge>
+                  </div>
+                  <Progress value={marketAnalysisData.launchScore} className="h-3" />
+                  <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground mt-2">
+                    <div className="p-2 bg-muted/50 rounded">
+                      <p className="font-medium text-foreground">Market Size</p>
+                      <p>{marketAnalysisData.total} products · {Math.round(marketAnalysisData.avgReviews).toLocaleString()} avg reviews</p>
+                    </div>
+                    <div className="p-2 bg-muted/50 rounded">
+                      <p className="font-medium text-foreground">Competition</p>
+                      <p>{marketAnalysisData.avgReviews > 5000 ? "High" : marketAnalysisData.avgReviews > 1000 ? "Medium" : "Low"}</p>
+                    </div>
+                    <div className="p-2 bg-muted/50 rounded">
+                      <p className="font-medium text-foreground">Price Opportunity</p>
+                      <p>{marketAnalysisData.avgPrice >= 25 ? "Good margin" : "Tight margin"} · avg ${marketAnalysisData.avgPrice.toFixed(2)}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

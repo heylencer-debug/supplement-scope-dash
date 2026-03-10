@@ -1,7 +1,8 @@
 /**
  * usePipelineStatus
- * Queries Supabase to get REAL phase completion status for a given category.
- * No hardcoded values — all counts come from the DB.
+ * Live phase completion status for P1–P10.
+ * Auto-refreshes every 30s so running scripts show real-time progress.
+ * P1–P8 query real Supabase data. P9–P10 are placeholders (not built yet).
  */
 
 import { useQuery } from "@tanstack/react-query";
@@ -17,44 +18,54 @@ export interface PhaseStatus {
   pct: number;
 }
 
-async function fetchPipelineStatus(
-  categoryId: string,
-): Promise<PhaseStatus[]> {
-  // All queries against supplement-scope-dash Supabase only — no cross-DB secrets
-  const [p1, p2, p3, p4, p6] = await Promise.all([
-    // P1 — Amazon scrape: products in DB
+async function fetchPipelineStatus(categoryId: string): Promise<PhaseStatus[]> {
+  const [p1, p2, p3, p4, p6_pi, p6_pkg, p8] = await Promise.all([
+    // P1 — Amazon scrape
     supabase
       .from("products")
       .select("*", { count: "exact", head: true })
       .eq("category_id", categoryId),
 
-    // P2 — Keepa enrichment: has monthly_sales
+    // P2 — Keepa: has monthly_sales
     supabase
       .from("products")
       .select("*", { count: "exact", head: true })
       .eq("category_id", categoryId)
       .not("monthly_sales", "is", null),
 
-    // P3 — Reviews: has review_analysis JSON
+    // P3 — Reviews: has review_analysis
     supabase
       .from("products")
       .select("*", { count: "exact", head: true })
       .eq("category_id", categoryId)
       .not("review_analysis", "is", null),
 
-    // P4 — OCR: has supplement_facts_raw text
+    // P4 — OCR: has supplement_facts_raw
     supabase
       .from("products")
       .select("*", { count: "exact", head: true })
       .eq("category_id", categoryId)
       .not("supplement_facts_raw", "is", null),
 
-    // P6 — Product intelligence: has marketing_analysis JSON
+    // P6 — Product Intelligence: marketing_analysis has product_intelligence key
     supabase
       .from("products")
       .select("*", { count: "exact", head: true })
       .eq("category_id", categoryId)
-      .not("marketing_analysis", "is", null),
+      .filter("marketing_analysis->product_intelligence", "not.is", null),
+
+    // P7 — Packaging Intelligence: marketing_analysis has packaging_intelligence key
+    supabase
+      .from("products")
+      .select("*", { count: "exact", head: true })
+      .eq("category_id", categoryId)
+      .filter("marketing_analysis->packaging_intelligence", "not.is", null),
+
+    // P8 — Formula Brief: formula_briefs table
+    supabase
+      .from("formula_briefs")
+      .select("*", { count: "exact", head: true })
+      .eq("category_id", categoryId),
   ]);
 
   const total = p1.count ?? 0;
@@ -62,18 +73,21 @@ async function fetchPipelineStatus(
   const makeStatus = (
     complete: number,
     tot: number
-  ): "complete" | "partial" | "not_started" => {
+  ): "complete" | "partial" | "not_started" | "pending" => {
+    if (tot === 0) return "not_started";
     if (complete === 0) return "not_started";
     if (complete >= tot) return "complete";
     return "partial";
   };
 
-  // P5 is in Scout's separate DB — show as scout-side only, no frontend query
-  // It will show "complete" if P6 ran (since P6 requires P5 upstream)
-  // We'll derive P5 from context: if P6 has data, P5 ran
-  const p5Complete = (p6.count ?? 0) > 0 ? 10 : 0;
+  // P5 lives in dovive Supabase — infer from whether P6 has data
+  // If P6 ran, P5 deep research was completed upstream
+  const p5Complete = (p6_pi.count ?? 0) > 0 ? 10 : 0;
 
-  const phases: PhaseStatus[] = [
+  // P8: 1 brief = complete for this category
+  const p8Complete = p8.count ?? 0;
+
+  return [
     {
       phase: 1,
       label: "Amazon Scrape",
@@ -86,7 +100,7 @@ async function fetchPipelineStatus(
     {
       phase: 2,
       label: "Keepa Enrichment",
-      description: "BSR trend, monthly sales & revenue data",
+      description: "BSR trends, monthly sales & revenue data",
       total,
       complete: p2.count ?? 0,
       status: makeStatus(p2.count ?? 0, total),
@@ -94,8 +108,8 @@ async function fetchPipelineStatus(
     },
     {
       phase: 3,
-      label: "Reviews",
-      description: "Customer sentiment & review analysis",
+      label: "Review Analysis",
+      description: "Customer sentiment, pain points & review mining",
       total,
       complete: p3.count ?? 0,
       status: makeStatus(p3.count ?? 0, total),
@@ -122,24 +136,49 @@ async function fetchPipelineStatus(
     {
       phase: 6,
       label: "Product Intelligence",
-      description: "Formula scoring, extract types, bonus ingredients, market gaps",
+      description: "AI formula scoring, extract types, BSR velocity, market gaps",
       total,
-      complete: p6.count ?? 0,
-      status: makeStatus(p6.count ?? 0, total),
-      pct: total ? Math.round(((p6.count ?? 0) / total) * 100) : 0,
+      complete: p6_pi.count ?? 0,
+      status: makeStatus(p6_pi.count ?? 0, total),
+      pct: total ? Math.round(((p6_pi.count ?? 0) / total) * 100) : 0,
     },
     {
       phase: 7,
-      label: "Packaging Intelligence",
-      description: "AI vision analysis of competitor packaging & labels",
+      label: "Packaging Intel",
+      description: "Competitor packaging, label design & trust signals",
       total,
+      complete: p6_pkg.count ?? 0,
+      status: makeStatus(p6_pkg.count ?? 0, total),
+      pct: total ? Math.round(((p6_pkg.count ?? 0) / total) * 100) : 0,
+    },
+    {
+      phase: 8,
+      label: "Formula Brief",
+      description: "AI-generated CMO formula spec for contract manufacturer",
+      total: 1,
+      complete: p8Complete > 0 ? 1 : 0,
+      status: p8Complete > 0 ? "complete" : "not_started",
+      pct: p8Complete > 0 ? 100 : 0,
+    },
+    {
+      phase: 9,
+      label: "Market Trends",
+      description: "BSR velocity, price positioning, Google Trends, social signals",
+      total: 0,
+      complete: 0,
+      status: "pending",
+      pct: 0,
+    },
+    {
+      phase: 10,
+      label: "Launch Brief",
+      description: "Final CMO launch package: specs, pricing, go-to-market",
+      total: 0,
       complete: 0,
       status: "pending",
       pct: 0,
     },
   ];
-
-  return phases;
 }
 
 export function usePipelineStatus(categoryId?: string, _keyword?: string) {
@@ -147,6 +186,8 @@ export function usePipelineStatus(categoryId?: string, _keyword?: string) {
     queryKey: ["pipeline_status", categoryId],
     queryFn: () => fetchPipelineStatus(categoryId!),
     enabled: !!categoryId,
-    staleTime: 60_000,
+    staleTime: 15_000,          // data is stale after 15s
+    refetchInterval: 30_000,    // auto-refresh every 30s while component is mounted
+    refetchIntervalInBackground: false, // only refresh when tab is active
   });
 }

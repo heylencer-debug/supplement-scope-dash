@@ -15,6 +15,7 @@ import { LowConfidenceProducts } from "@/components/dashboard/LowConfidenceProdu
 import { PipelineStatus } from "@/components/dashboard/PipelineStatus";
 import { ScoutPackagingIntelligence } from "@/components/dashboard/ScoutPackagingIntelligence";
 import { ProductFormulaIntelligence } from "@/components/dashboard/ProductFormulaIntelligence";
+import { FormulaBriefTab } from "@/components/dashboard/FormulaBriefTab";
 
 import {
   ResponsiveContainer,
@@ -369,10 +370,11 @@ export default function Dashboard() {
       )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="products">📦 Products</TabsTrigger>
           <TabsTrigger value="market">📈 Market</TabsTrigger>
-          <TabsTrigger value="packaging">📦 Packaging</TabsTrigger>
+          <TabsTrigger value="packaging">🎨 Packaging</TabsTrigger>
+          <TabsTrigger value="formula">🧪 Formula Brief</TabsTrigger>
         </TabsList>
 
         <TabsContent value="products" className="space-y-6 md:space-y-10 mt-4">
@@ -732,9 +734,16 @@ export default function Dashboard() {
           {category?.id ? (
             <ScoutPackagingIntelligence categoryId={category.id} />
           ) : (
-            <div className="text-center py-12 text-slate-500">
-              Select a category to view packaging intelligence.
-            </div>
+            <div className="text-center py-12 text-slate-500">Select a category to view packaging intelligence.</div>
+          )}
+        </TabsContent>
+
+        {/* TAB 4: Formula Brief (P8 Scout) */}
+        <TabsContent value="formula" className="space-y-6 mt-4">
+          {category?.id ? (
+            <FormulaBriefTab categoryId={category.id} categoryName={categoryName} />
+          ) : (
+            <div className="text-center py-12 text-slate-500">Select a category to view the formula brief.</div>
           )}
         </TabsContent>
       </Tabs>

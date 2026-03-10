@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertCircle, FlaskConical, Target, ShieldCheck, Package,
-  DollarSign, AlertTriangle, Zap, Star, ChevronRight,
+  DollarSign, AlertTriangle, Zap, Star, ChevronRight, FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -101,6 +101,48 @@ export function FormulaBriefTab({ categoryId, categoryName }: Props) {
   const f = brief.ingredients;
   const mf = f?.master_formula_per_serving;
   const fs = mf?.formula_summary;
+  const aiMarkdown = f?.ai_generated_brief as string | undefined;
+
+  // If AI-generated markdown brief exists, render it as formatted text
+  if (aiMarkdown) {
+    return (
+      <div className="space-y-4">
+        {/* Header */}
+        <div className="p-4 rounded-xl border border-primary/20 bg-primary/5">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+                <FileText className="h-5 w-5 text-primary" />
+                DOVIVE Formula Brief
+              </h2>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                {categoryName} · AI-Generated · {f.generated_at ? new Date(f.generated_at).toLocaleDateString() : ""}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+              {f.data_sources && (
+                <>
+                  <span className="px-2 py-1 rounded bg-muted border border-border">{f.data_sources.top5_used} top performers</span>
+                  <span className="px-2 py-1 rounded bg-muted border border-border">{f.data_sources.new_winners_used} new winners</span>
+                  <span className="px-2 py-1 rounded bg-muted border border-border">{f.data_sources.ingredients_analyzed} ingredients analyzed</span>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+        {/* Markdown rendered as structured prose */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="prose prose-sm max-w-none dark:prose-invert prose-headings:text-foreground prose-p:text-muted-foreground prose-strong:text-foreground prose-table:text-sm prose-th:text-muted-foreground prose-td:text-foreground">
+              <pre className="whitespace-pre-wrap font-sans text-sm text-foreground leading-relaxed">
+                {aiMarkdown}
+              </pre>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

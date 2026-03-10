@@ -401,25 +401,8 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
   }
 
   const hasData = packagingData || topClaims.length > 0 || (packagingStats && packagingStats.mostCommonType);
-
-  if (!hasData) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
-            <Package className="w-5 h-5 text-primary" />
-            Winning Packaging Strategy
-          </CardTitle>
-          <CardDescription>Packaging intelligence not yet available</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Packaging analysis will appear here once the analysis is complete.
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
+  // Always render when categoryId is present so the Generator is accessible
+  // even if no analysis data exists yet
 
   return (
     <Card>

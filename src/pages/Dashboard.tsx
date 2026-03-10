@@ -12,6 +12,7 @@ import { KPIMetricsGrid } from "@/components/dashboard/KPIMetricsGrid";
 import { EnhancedBenchmarkComparison } from "@/components/dashboard/EnhancedBenchmarkComparison";
 import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
 import { LowConfidenceProducts } from "@/components/dashboard/LowConfidenceProducts";
+import { PipelineStatus } from "@/components/dashboard/PipelineStatus";
 
 import {
   ResponsiveContainer,
@@ -342,6 +343,28 @@ export default function Dashboard() {
         isLoading={analysisLoading && !hasAnalysis}
         />
       </div>
+
+      {/* SCOUT PIPELINE STATUS — live phase completion from Supabase */}
+      {category?.id && (
+        <ScrollAnimate delay={50} variant="fade-up" duration={400}>
+          <Card className="border-slate-700/40 bg-slate-900/40">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold text-slate-300 flex items-center gap-2">
+                <span>🔍</span> Scout Pipeline
+              </CardTitle>
+              <CardDescription className="text-xs text-slate-500">
+                Live phase completion for <span className="text-slate-300 font-medium">{categoryName}</span> — sourced from Supabase
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <PipelineStatus
+                categoryId={category.id}
+                keyword={categoryName || ""}
+              />
+            </CardContent>
+          </Card>
+        </ScrollAnimate>
+      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-2">

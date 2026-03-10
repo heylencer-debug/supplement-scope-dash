@@ -359,13 +359,13 @@ export default function Dashboard() {
       {/* SCOUT PIPELINE STATUS — live phase completion from Supabase */}
       {category?.id && (
         <ScrollAnimate delay={50} variant="fade-up" duration={400}>
-          <Card className="border-slate-700/40 bg-slate-900/40">
+          <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold text-slate-300 flex items-center gap-2">
+              <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
                 <span>🔍</span> Scout Pipeline
               </CardTitle>
-              <CardDescription className="text-xs text-slate-500">
-                Live phase completion for <span className="text-slate-300 font-medium">{categoryName}</span> — sourced from Supabase
+              <CardDescription className="text-xs">
+                Live phase completion for <span className="text-foreground font-medium">{categoryName}</span> — sourced from Supabase
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -791,7 +791,7 @@ export default function Dashboard() {
           {category?.id ? (
             <FormulaBriefTab categoryId={category.id} categoryName={categoryName} />
           ) : (
-            <div className="text-center py-12 text-slate-500">Select a category to view the formula brief.</div>
+            <div className="text-center py-12 text-muted-foreground">Select a category to view the formula brief.</div>
           )}
         </TabsContent>
       </Tabs>

@@ -16,6 +16,7 @@ import { PipelineStatus } from "@/components/dashboard/PipelineStatus";
 import { ScoutPackagingIntelligence } from "@/components/dashboard/ScoutPackagingIntelligence";
 import { ProductFormulaIntelligence } from "@/components/dashboard/ProductFormulaIntelligence";
 import { FormulaBriefTab } from "@/components/dashboard/FormulaBriefTab";
+import { PackagingIntelligence } from "@/components/dashboard/PackagingIntelligence";
 
 import {
   ResponsiveContainer,
@@ -35,6 +36,7 @@ import { useProducts } from "@/hooks/useProducts";
 import { useCategoryContext } from "@/contexts/CategoryContext";
 import { useCategoryScores } from "@/hooks/useCategoryScores";
 import { useCategorySales } from "@/hooks/useCategorySales";
+import { useFormulaBriefVersions } from "@/hooks/useFormulaBriefVersions";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -49,6 +51,7 @@ export default function Dashboard() {
   const queryClient = useQueryClient();
   
   const [activeTab, setActiveTab] = useState("products");
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
 
   const categoryName = urlCategoryName || contextCategoryName;
 
@@ -90,6 +93,12 @@ export default function Dashboard() {
   const { data: products, isLoading: productsLoading } = useProducts(category?.id);
   const { data: categoryScores } = useCategoryScores(category?.id);
   const { data: categorySales } = useCategorySales(categoryName || undefined);
+  const { versions, activeVersion } = useFormulaBriefVersions(category?.id);
+  useEffect(() => {
+    if (activeVersion && !selectedVersionId) setSelectedVersionId(activeVersion.id);
+  }, [activeVersion, selectedVersionId]);
+  const formulaVersionId = selectedVersionId || null;
+  const selectedVersion = selectedVersionId ? versions.find(v => v.id === selectedVersionId) : undefined;
 
   const hasAnalysis = !!analysis;
   const hasProducts = products && products.length > 0;
@@ -729,12 +738,51 @@ export default function Dashboard() {
           )}
         </TabsContent>
 
-        {/* TAB 3: Packaging Intelligence (P7 Scout) */}
+        {/* TAB 3: Packaging Intelligence — original Generator/Editor + Scout P7 data */}
         <TabsContent value="packaging" className="space-y-6 mt-4">
-          {category?.id ? (
-            <ScoutPackagingIntelligence categoryId={category.id} />
-          ) : (
-            <div className="text-center py-12 text-slate-500">Select a category to view packaging intelligence.</div>
+          {/* Original Packaging Generator & Editor (nano banana pro) */}
+          <PackagingIntelligence
+            packagingData={(() => {
+              const analysis1 = analysis?.analysis_1_category_scores as Record<string, unknown> | null;
+              const productDev = analysis1?.product_development as Record<string, unknown> | null;
+              return productDev?.packaging as { type?: string; quantity?: string | number; design_elements?: string[] } | null;
+            })()}
+            productsClaims={products?.map(p => p.claims) || []}
+            productsData={products?.map(p => ({
+              packaging_type: p.packaging_type,
+              servings_per_container: p.servings_per_container,
+              price: p.price,
+              brand: p.brand,
+              title: p.title,
+              main_image_url: p.main_image_url,
+              claims: p.claims,
+              claims_on_label: p.claims_on_label,
+              monthly_revenue: p.monthly_revenue,
+              monthly_sales: p.monthly_sales,
+              marketing_analysis: p.marketing_analysis as {
+                design_blueprint?: {
+                  trust_signals?: string;
+                  color_strategy?: string;
+                  visual_style?: string;
+                  conversion_triggers?: string;
+                };
+              } | null,
+            })) || []}
+            isLoading={analysisLoading && !hasAnalysis}
+            categoryId={category?.id}
+            formulaVersionId={formulaVersionId}
+            versionInfo={selectedVersion ? {
+              versionNumber: selectedVersion.version_number,
+              isActive: selectedVersion.is_active,
+              changeSummary: selectedVersion.change_summary
+            } : undefined}
+            formulaBriefContent={selectedVersion?.formula_brief_content || (analysis?.analysis_3_formula_brief as Record<string, unknown> | null)?.formula_brief_content as string | null}
+          />
+          {/* Scout P7 Packaging Intelligence (claim frequency, badges, color signals) */}
+          {category?.id && (
+            <div className="mt-8">
+              <ScoutPackagingIntelligence categoryId={category.id} />
+            </div>
           )}
         </TabsContent>
 

@@ -19,7 +19,7 @@ export interface PhaseStatus {
 }
 
 async function fetchPipelineStatus(categoryId: string): Promise<PhaseStatus[]> {
-  const [p1, p2, p3, p4, p6_pi, p6_pkg, p8] = await Promise.all([
+  const [p1, p2, p3, p4, p6_pi, p6_pkg, p8, p9raw] = await Promise.all([
     // P1 — Amazon scrape
     supabase
       .from("products")
@@ -66,6 +66,15 @@ async function fetchPipelineStatus(categoryId: string): Promise<PhaseStatus[]> {
       .from("formula_briefs")
       .select("*", { count: "exact", head: true })
       .eq("category_id", categoryId),
+
+    // P9 — Formula QA: formula_briefs.ingredients has qa_report key
+    supabase
+      .from("formula_briefs")
+      .select("ingredients")
+      .eq("category_id", categoryId)
+      .not("ingredients", "is", null)
+      .limit(1)
+      .single(),
   ]);
 
   const total = p1.count ?? 0;
@@ -86,6 +95,10 @@ async function fetchPipelineStatus(categoryId: string): Promise<PhaseStatus[]> {
 
   // P8: 1 brief = complete for this category
   const p8Complete = p8.count ?? 0;
+
+  // P9: complete if formula_briefs.ingredients has qa_report
+  const p9HasQA = !!(p9raw as any)?.data?.ingredients?.qa_report;
+  const p9Complete = p9HasQA ? 1 : 0;
 
   return [
     {
@@ -162,12 +175,12 @@ async function fetchPipelineStatus(categoryId: string): Promise<PhaseStatus[]> {
     },
     {
       phase: 9,
-      label: "Market Trends",
-      description: "BSR velocity, price positioning, Google Trends, social signals",
-      total: 0,
-      complete: 0,
-      status: "pending",
-      pct: 0,
+      label: "Formula QA",
+      description: "QA specialist: dose validation, competitor head-to-head, formula adjustments",
+      total: 1,
+      complete: p9Complete,
+      status: p9Complete > 0 ? "complete" : p8Complete > 0 ? "not_started" : "pending",
+      pct: p9Complete * 100,
     },
     {
       phase: 10,

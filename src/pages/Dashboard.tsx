@@ -16,6 +16,7 @@ import { PipelineStatus } from "@/components/dashboard/PipelineStatus";
 import { ScoutPackagingIntelligence } from "@/components/dashboard/ScoutPackagingIntelligence";
 import { ProductFormulaIntelligence } from "@/components/dashboard/ProductFormulaIntelligence";
 import { FormulaBriefTab } from "@/components/dashboard/FormulaBriefTab";
+import { FormulaQATab } from "@/components/dashboard/FormulaQATab";
 import { PackagingIntelligence } from "@/components/dashboard/PackagingIntelligence";
 
 import {
@@ -379,11 +380,12 @@ export default function Dashboard() {
       )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="products">📦 Products</TabsTrigger>
           <TabsTrigger value="market">📈 Market</TabsTrigger>
           <TabsTrigger value="packaging">🎨 Packaging</TabsTrigger>
           <TabsTrigger value="formula">🧪 Formula Brief</TabsTrigger>
+          <TabsTrigger value="qa">🔬 QA Review</TabsTrigger>
         </TabsList>
 
         <TabsContent value="products" className="space-y-6 md:space-y-10 mt-4">
@@ -792,6 +794,15 @@ export default function Dashboard() {
             <FormulaBriefTab categoryId={category.id} categoryName={categoryName} />
           ) : (
             <div className="text-center py-12 text-muted-foreground">Select a category to view the formula brief.</div>
+          )}
+        </TabsContent>
+
+        {/* TAB 5: QA Review (P9 Scout) */}
+        <TabsContent value="qa" className="space-y-6 mt-4">
+          {category?.id ? (
+            <FormulaQATab categoryId={category.id} categoryName={categoryName} />
+          ) : (
+            <div className="text-center py-12 text-muted-foreground">Select a category to run QA review.</div>
           )}
         </TabsContent>
       </Tabs>

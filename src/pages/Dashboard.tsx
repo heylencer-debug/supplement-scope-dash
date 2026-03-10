@@ -13,6 +13,7 @@ import { EnhancedBenchmarkComparison } from "@/components/dashboard/EnhancedBenc
 import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
 import { LowConfidenceProducts } from "@/components/dashboard/LowConfidenceProducts";
 import { PipelineStatus } from "@/components/dashboard/PipelineStatus";
+import { ScoutPackagingIntelligence } from "@/components/dashboard/ScoutPackagingIntelligence";
 
 import {
   ResponsiveContainer,
@@ -367,9 +368,10 @@ export default function Dashboard() {
       )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="products">📦 Products Analysis</TabsTrigger>
-          <TabsTrigger value="market">📈 Market Analysis</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="products">📦 Products</TabsTrigger>
+          <TabsTrigger value="market">📈 Market</TabsTrigger>
+          <TabsTrigger value="packaging">📦 Packaging</TabsTrigger>
         </TabsList>
 
         <TabsContent value="products" className="space-y-6 md:space-y-10 mt-4">
@@ -714,6 +716,17 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
             </>
+          )}
+        </TabsContent>
+
+        {/* TAB 3: Packaging Intelligence (P7 Scout) */}
+        <TabsContent value="packaging" className="space-y-6 mt-4">
+          {category?.id ? (
+            <ScoutPackagingIntelligence categoryId={category.id} />
+          ) : (
+            <div className="text-center py-12 text-slate-500">
+              Select a category to view packaging intelligence.
+            </div>
           )}
         </TabsContent>
       </Tabs>

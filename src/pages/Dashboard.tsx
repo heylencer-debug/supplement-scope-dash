@@ -14,6 +14,7 @@ import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
 import { LowConfidenceProducts } from "@/components/dashboard/LowConfidenceProducts";
 import { PipelineStatus } from "@/components/dashboard/PipelineStatus";
 import { ScoutPackagingIntelligence } from "@/components/dashboard/ScoutPackagingIntelligence";
+import { ProductFormulaIntelligence } from "@/components/dashboard/ProductFormulaIntelligence";
 
 import {
   ResponsiveContainer,
@@ -492,6 +493,13 @@ export default function Dashboard() {
           isLoading={productsLoading}
         />
       </ScrollAnimate>
+
+      {/* SECTION 6: P6 Product Formula Intelligence */}
+      {category?.id && (
+        <ScrollAnimate delay={100} variant="fade-up" duration={500}>
+          <ProductFormulaIntelligence categoryId={category.id} />
+        </ScrollAnimate>
+      )}
 
         </TabsContent>
 

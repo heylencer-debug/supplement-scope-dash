@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertCircle, CheckCircle2, AlertTriangle, FlaskConical,
-  Download, ShieldCheck, Beaker, Scale, Target, Wrench, FileText,
+  Download, ShieldCheck, Beaker, Scale, Target, Wrench, FileText, Zap, Star,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -250,6 +250,46 @@ export function FormulaQATab({ categoryId, categoryName }: Props) {
         ))}
       </div>
 
+      {/* Comprehensive Comparison + Flavor QA — full width panels */}
+      {qa.qa_report && (() => {
+        const comparisonMatch = qa.qa_report.match(/## COMPREHENSIVE INGREDIENT COMPARISON([\s\S]*?)(?:\n## DUAL FORMULA COMPARISON|$)/);
+        const flavorMatch     = qa.qa_report.match(/## FLAVOR & TASTE QA([\s\S]*?)(?:\n## FORMULA ADJUSTMENTS|$)/);
+        return (
+          <>
+            {comparisonMatch?.[1]?.trim() && (
+              <Card className="border-chart-1/30">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-sm">
+                    <Scale className="h-4 w-4 text-chart-1" />Comprehensive Ingredient Comparison — DOVIVE vs Competitors
+                  </CardTitle>
+                  <CardDescription className="text-xs">Every active compared head-to-head with exact doses · Why we win or where we need to adjust</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-1 overflow-x-auto">
+                    {renderMarkdownSection(comparisonMatch[1].trim())}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+            {flavorMatch?.[1]?.trim() && (
+              <Card className="border-chart-2/30">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-sm">
+                    <Star className="h-4 w-4 text-chart-2" />Flavor & Taste QA
+                  </CardTitle>
+                  <CardDescription className="text-xs">Taste strategy assessment · Bitterness masking · Sweetener system · Review-backed evidence</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-1">
+                    {renderMarkdownSection(flavorMatch[1].trim())}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </>
+        );
+      })()}
+
       {/* Two-panel layout: full report + adjusted formula */}
       <div className="grid grid-cols-1 xl:grid-cols-5 gap-5">
 
@@ -260,7 +300,7 @@ export function FormulaQATab({ categoryId, categoryName }: Props) {
               <Beaker className="h-4 w-4 text-primary" />Full QA Report
             </CardTitle>
             <CardDescription className="text-xs">
-              Dose analysis · Manufacturability · Competitor head-to-head · Adjustments
+              Dose analysis · Manufacturability · Dual formula comparison · All adjustments
             </CardDescription>
           </CardHeader>
           <CardContent>

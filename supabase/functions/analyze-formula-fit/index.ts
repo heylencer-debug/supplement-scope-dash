@@ -147,17 +147,17 @@ Deno.serve(async (req) => {
     console.log(`[analyze-formula-fit] Created analysis record: ${newAnalysis.id}`);
 
     // Run the analysis in the background
-    EdgeRuntime.waitUntil(runAnalysis(supabase, categoryId, newAnalysis.id, xaiApiKey));
+    EdgeRuntime.waitUntil(runAnalysis(supabase as any, categoryId, newAnalysis.id, xaiApiKey));
 
     return new Response(
       JSON.stringify({ status: "processing", id: newAnalysis.id }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("[analyze-formula-fit] Error:", error);
     return new Response(
-      JSON.stringify({ error: error.message || "Internal server error" }),
+      JSON.stringify({ error: error instanceof Error ? error.message : "Internal server error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
@@ -276,7 +276,7 @@ async function fetchBrandProductData(
   const lowerBrandNames = brandNames.map(b => b.toLowerCase());
   const matchingProducts = products.filter(p => {
     if (!p.brand) return false;
-    const productBrand = p.brand.toLowerCase();
+    const productBrand = String(p.brand).toLowerCase();
     return lowerBrandNames.some(b => 
       productBrand.includes(b) || b.includes(productBrand)
     );
@@ -287,7 +287,7 @@ async function fetchBrandProductData(
   // Group products by brand
   const brandMap: Record<string, typeof products> = {};
   for (const product of matchingProducts) {
-    const brand = product.brand || "Unknown";
+    const brand = String(product.brand || "Unknown");
     if (!brandMap[brand]) {
       brandMap[brand] = [];
     }
@@ -299,34 +299,34 @@ async function fetchBrandProductData(
 
   for (const [brand, brandProducts] of Object.entries(brandMap)) {
     // Calculate summary metrics
-    const prices = brandProducts.filter(p => p.price).map(p => p.price!);
-    const ratings = brandProducts.filter(p => p.rating).map(p => p.rating!);
-    const revenues = brandProducts.filter(p => p.monthly_revenue).map(p => p.monthly_revenue!);
-    const packagingTypes = [...new Set(brandProducts.filter(p => p.packaging_type).map(p => p.packaging_type!))];
+    const prices = brandProducts.filter(p => p.price).map(p => Number(p.price));
+    const ratings = brandProducts.filter(p => p.rating).map(p => Number(p.rating));
+    const revenues = brandProducts.filter(p => p.monthly_revenue).map(p => Number(p.monthly_revenue));
+    const packagingTypes = [...new Set(brandProducts.filter(p => p.packaging_type).map(p => String(p.packaging_type)))] as string[];
 
     const summary: BrandSummary = {
       product_count: brandProducts.length,
-      avg_price: prices.length > 0 ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length * 100) / 100 : 0,
-      avg_rating: ratings.length > 0 ? Math.round(ratings.reduce((a, b) => a + b, 0) / ratings.length * 100) / 100 : 0,
-      total_reviews: brandProducts.reduce((sum, p) => sum + (p.reviews || 0), 0),
-      total_revenue: revenues.reduce((a, b) => a + b, 0),
+      avg_price: prices.length > 0 ? Math.round(prices.reduce((a: number, b: number) => a + b, 0) / prices.length * 100) / 100 : 0,
+      avg_rating: ratings.length > 0 ? Math.round(ratings.reduce((a: number, b: number) => a + b, 0) / ratings.length * 100) / 100 : 0,
+      total_reviews: brandProducts.reduce((sum: number, p) => sum + (Number(p.reviews) || 0), 0),
+      total_revenue: revenues.reduce((a: number, b: number) => a + b, 0),
       packaging_types: packagingTypes,
     };
 
     // Get top 3 products by revenue (already sorted)
     const topProducts: TopProduct[] = brandProducts.slice(0, 3).map(p => ({
-      title: p.title || "",
-      price: p.price || 0,
-      rating: p.rating || 0,
-      reviews: p.reviews || 0,
-      monthly_revenue: p.monthly_revenue || 0,
+      title: String(p.title || ""),
+      price: Number(p.price) || 0,
+      rating: Number(p.rating) || 0,
+      reviews: Number(p.reviews) || 0,
+      monthly_revenue: Number(p.monthly_revenue) || 0,
       supplement_facts_complete: p.supplement_facts_complete,
       all_nutrients: p.all_nutrients,
-      feature_bullets_text: p.feature_bullets_text || "",
-      claims_on_label: p.claims_on_label || [],
-      other_ingredients: p.other_ingredients || "",
-      packaging_type: p.packaging_type || "",
-      directions: p.directions || "",
+      feature_bullets_text: String(p.feature_bullets_text || ""),
+      claims_on_label: (p.claims_on_label as string[]) || [],
+      other_ingredients: String(p.other_ingredients || ""),
+      packaging_type: String(p.packaging_type || ""),
+      directions: String(p.directions || ""),
     }));
 
     topBrandsData[brand] = {
@@ -614,7 +614,7 @@ Now provide your brutally honest analysis. Remember: the user wants to know if t
       .from("formula_fit_analyses")
       .update({
         status: "error",
-        error: error.message || "Unknown error occurred",
+        error: error instanceof Error ? error.message : "Unknown error occurred",
       })
       .eq("id", analysisId);
   }

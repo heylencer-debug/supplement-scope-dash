@@ -202,15 +202,16 @@ function SectionCard({ icon: Icon, title, description, children, accent }: {
 
 // ─── Expandable Formula Card ──────────────────────────────────────────────────
 
-function FormulaCard({ card, contentRef, downloadPDF, categoryName, generatedAt }: {
+function FormulaCard({ card, categoryName, generatedAt }: {
   card: { id: string; emoji: string; title: string; subtitle: string; badge: string; borderColor: string; bgColor: string; badgeColor: string; content: string };
-  contentRef: React.RefObject<HTMLDivElement>;
-  downloadPDF: () => void;
   categoryName?: string;
   generatedAt?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const isFirst = React.useRef(false);
+  // Each card has its own ref — download always prints THIS card's content only
+  const cardRef = useRef<HTMLDivElement>(null);
+  const download = usePDFDownload(cardRef, `${categoryName || 'dovive'}-${card.id}-formula`);
+
   return (
     <Card className={`border ${card.borderColor} transition-all duration-200`}>
       {/* Card header — always visible, click to toggle */}
@@ -235,11 +236,12 @@ function FormulaCard({ card, contentRef, downloadPDF, categoryName, generatedAt 
       {open && (
         <CardContent className="pt-4 pb-4">
           <div className="flex justify-end mb-3">
-            <Button variant="outline" size="sm" onClick={downloadPDF} className="flex items-center gap-2 text-xs">
+            <Button variant="outline" size="sm" onClick={download} className="flex items-center gap-2 text-xs">
               <Download className="h-3.5 w-3.5" /> Download PDF
             </Button>
           </div>
-          <div ref={contentRef} className="space-y-1 max-h-[900px] overflow-y-auto pr-1">
+          {/* cardRef scoped to THIS card only — download is isolated */}
+          <div ref={cardRef} className="space-y-1 max-h-[900px] overflow-y-auto pr-1">
             {renderMarkdown(card.content)}
           </div>
         </CardContent>
@@ -365,8 +367,6 @@ export function FormulaBriefTab({ categoryId, categoryName }: Props) {
           <FormulaCard
             key={card.id}
             card={card}
-            contentRef={contentRef}
-            downloadPDF={downloadPDF}
             categoryName={categoryName}
             generatedAt={generatedAt}
           />

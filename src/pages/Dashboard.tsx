@@ -19,8 +19,6 @@ import { FormulaBriefTab } from "@/components/dashboard/FormulaBriefTab";
 import { FormulaQATab } from "@/components/dashboard/FormulaQATab";
 import { PackagingIntelligence } from "@/components/dashboard/PackagingIntelligence";
 import { P9BenchmarkOverview } from "@/components/dashboard/P9BenchmarkOverview";
-import { P9DoseAnalysis } from "@/components/dashboard/P9DoseAnalysis";
-import { MarketIntelligenceReport } from "@/components/dashboard/MarketIntelligenceReport";
 
 import {
   ResponsiveContainer,
@@ -116,11 +114,6 @@ export default function Dashboard() {
 
     return {
       benchmarkData: {
-        recommended_price: (analysis?.recommended_price as number) || null,
-        opportunity_index: (analysis?.opportunity_index as number) || null,
-        top_strengths: analysis?.top_strengths as Array<{strength?: string; description?: string}> | null,
-        top_weaknesses: analysis?.top_weaknesses as Array<{weakness?: string; description?: string}> | null,
-        formula_brief: analysis?.formula_brief as { key_differentiators?: string[]; risk_factors?: string[]; target_price?: number } | null,
         key_insights: keyInsights as {
           go_to_market?: {
             positioning?: string;
@@ -302,7 +295,7 @@ export default function Dashboard() {
 
     // Rating distribution
     const ratingDistribution = [5, 4, 3, 2, 1].map(star => ({
-      star: `${star}ÃƒÆ’Ã‚Â¢Ãƒâ€¹Ã…â€œÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦`,
+      star: `${star}★`,
       count: products.filter(p => Math.round(p.rating ?? 0) === star).length,
     }));
 
@@ -365,16 +358,16 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* SCOUT PIPELINE STATUS ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â live phase completion from Supabase */}
+      {/* SCOUT PIPELINE STATUS — live phase completion from Supabase */}
       {category?.id && (
         <ScrollAnimate delay={50} variant="fade-up" duration={400}>
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
-                <span>ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€šÃ‚Â</span> Scout Pipeline
+                <span>🔍</span> Scout Pipeline
               </CardTitle>
               <CardDescription className="text-xs">
-                Live phase completion for <span className="text-foreground font-medium">{categoryName}</span> ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â sourced from Supabase
+                Live phase completion for <span className="text-foreground font-medium">{categoryName}</span> — sourced from Supabase
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -389,11 +382,11 @@ export default function Dashboard() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="products">ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€šÃ‚Â¦ Products</TabsTrigger>
-          <TabsTrigger value="market">ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€¹Ã¢â‚¬Â  Market</TabsTrigger>
-          <TabsTrigger value="packaging">ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â½Ãƒâ€šÃ‚Â¨ Packaging</TabsTrigger>
-          <TabsTrigger value="formula">ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚Â§Ãƒâ€šÃ‚Âª Formula Brief</TabsTrigger>
-          <TabsTrigger value="qa">ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€šÃ‚Â¬ QA Review</TabsTrigger>
+          <TabsTrigger value="products">📦 Products</TabsTrigger>
+          <TabsTrigger value="market">📈 Market</TabsTrigger>
+          <TabsTrigger value="packaging">🎨 Packaging</TabsTrigger>
+          <TabsTrigger value="formula">🧪 Formula Brief</TabsTrigger>
+          <TabsTrigger value="qa">🔬 QA Review</TabsTrigger>
         </TabsList>
 
         <TabsContent value="products" className="space-y-6 md:space-y-10 mt-4">
@@ -409,7 +402,7 @@ export default function Dashboard() {
         />
       </ScrollAnimate>
 
-      {/* SECTION 3: Benchmark Comparison */}
+      {/* SECTION 3: Benchmark Comparison - Top 5 Competitors */}
       <ScrollAnimate delay={50} variant="scale-up" duration={600}>
         <EnhancedBenchmarkComparison
           categoryId={category?.id}
@@ -422,13 +415,6 @@ export default function Dashboard() {
       {category?.id && (
         <ScrollAnimate delay={100} variant="fade-up" duration={500}>
           <P9BenchmarkOverview categoryId={category.id} />
-        </ScrollAnimate>
-      )}
-
-      {/* SECTION 3c: P9 Ingredients & Dosage Comparison */}
-      {category?.id && (
-        <ScrollAnimate delay={100} variant="fade-up" duration={500}>
-          <P9DoseAnalysis categoryId={category.id} />
         </ScrollAnimate>
       )}
 
@@ -529,17 +515,16 @@ export default function Dashboard() {
         />
       </ScrollAnimate>
 
-      {/* SECTION 6: P6 Product Formula Intelligence ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â hidden for now */}
+      {/* SECTION 6: P6 Product Formula Intelligence */}
+      {category?.id && (
+        <ScrollAnimate delay={100} variant="fade-up" duration={500}>
+          <ProductFormulaIntelligence categoryId={category.id} />
+        </ScrollAnimate>
+      )}
 
         </TabsContent>
 
         <TabsContent value="market" className="space-y-6 mt-4">
-
-          {/* P6 Grok Market Intelligence ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â always shown at top */}
-          {category?.id && (
-            <MarketIntelligenceReport categoryId={category.id} categoryName={categoryName || ""} />
-          )}
-
           {productsLoading && !marketAnalysisData ? (
             <Card><CardContent className="py-12 text-center text-muted-foreground">Loading market data...</CardContent></Card>
           ) : !marketAnalysisData ? (
@@ -563,7 +548,7 @@ export default function Dashboard() {
                       <p className="text-xs text-muted-foreground">Avg Price</p>
                     </div>
                     <div className="text-center p-3 bg-secondary/50 rounded-lg">
-                      <p className="text-2xl font-bold">{marketAnalysisData.avgRating.toFixed(1)}ÃƒÆ’Ã‚Â¢Ãƒâ€¹Ã…â€œÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦</p>
+                      <p className="text-2xl font-bold">{marketAnalysisData.avgRating.toFixed(1)}★</p>
                       <p className="text-xs text-muted-foreground">Avg Rating</p>
                     </div>
                     <div className="text-center p-3 bg-secondary/50 rounded-lg">
@@ -574,11 +559,11 @@ export default function Dashboard() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="p-3 bg-muted/50 rounded-lg">
                       <p className="text-xs text-muted-foreground mb-1">Price Range</p>
-                      <p className="text-sm font-medium">${marketAnalysisData.minPrice.toFixed(2)} ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ ${marketAnalysisData.maxPrice.toFixed(2)}</p>
+                      <p className="text-sm font-medium">${marketAnalysisData.minPrice.toFixed(2)} – ${marketAnalysisData.maxPrice.toFixed(2)}</p>
                     </div>
                     <div className="p-3 bg-muted/50 rounded-lg">
                       <p className="text-xs text-muted-foreground mb-1">BSR Range</p>
-                      <p className="text-sm font-medium">{marketAnalysisData.minBSR.toLocaleString()} ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ {marketAnalysisData.maxBSR.toLocaleString()}</p>
+                      <p className="text-sm font-medium">{marketAnalysisData.minBSR.toLocaleString()} – {marketAnalysisData.maxBSR.toLocaleString()}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -598,7 +583,7 @@ export default function Dashboard() {
                           <th className="text-left py-2 pr-3 text-muted-foreground font-medium">Brand</th>
                           <th className="text-right py-2 px-3 text-muted-foreground font-medium">Products</th>
                           <th className="text-right py-2 px-3 text-muted-foreground font-medium">Avg BSR</th>
-                          <th className="text-right py-2 px-3 text-muted-foreground font-medium">Avg ÃƒÆ’Ã‚Â¢Ãƒâ€¹Ã…â€œÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦</th>
+                          <th className="text-right py-2 px-3 text-muted-foreground font-medium">Avg ★</th>
                           <th className="text-right py-2 px-3 text-muted-foreground font-medium">Avg Reviews</th>
                           <th className="text-right py-2 pl-3 text-muted-foreground font-medium">Avg Price</th>
                         </tr>
@@ -695,7 +680,7 @@ export default function Dashboard() {
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg font-semibold">Opportunity Gap</CardTitle>
-                  <CardDescription>Products with BSR &lt; 10,000 AND reviews &lt; 500 ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â potential breakout opportunities</CardDescription>
+                  <CardDescription>Products with BSR &lt; 10,000 AND reviews &lt; 500 — potential breakout opportunities</CardDescription>
                 </CardHeader>
                 <CardContent>
                   {marketAnalysisData.opportunityGap.length === 0 ? (
@@ -746,7 +731,7 @@ export default function Dashboard() {
                   <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground mt-2">
                     <div className="p-2 bg-muted/50 rounded">
                       <p className="font-medium text-foreground">Market Size</p>
-                      <p>{marketAnalysisData.total} products ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {Math.round(marketAnalysisData.avgReviews).toLocaleString()} avg reviews</p>
+                      <p>{marketAnalysisData.total} products · {Math.round(marketAnalysisData.avgReviews).toLocaleString()} avg reviews</p>
                     </div>
                     <div className="p-2 bg-muted/50 rounded">
                       <p className="font-medium text-foreground">Competition</p>
@@ -754,7 +739,7 @@ export default function Dashboard() {
                     </div>
                     <div className="p-2 bg-muted/50 rounded">
                       <p className="font-medium text-foreground">Price Opportunity</p>
-                      <p>{marketAnalysisData.avgPrice >= 25 ? "Good margin" : "Tight margin"} ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· avg ${marketAnalysisData.avgPrice.toFixed(2)}</p>
+                      <p>{marketAnalysisData.avgPrice >= 25 ? "Good margin" : "Tight margin"} · avg ${marketAnalysisData.avgPrice.toFixed(2)}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -763,7 +748,7 @@ export default function Dashboard() {
           )}
         </TabsContent>
 
-        {/* TAB 3: Packaging Intelligence ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â original Generator/Editor + Scout P7 data */}
+        {/* TAB 3: Packaging Intelligence — original Generator/Editor + Scout P7 data */}
         <TabsContent value="packaging" className="space-y-6 mt-4">
           {/* Original Packaging Generator & Editor (nano banana pro) */}
           <PackagingIntelligence

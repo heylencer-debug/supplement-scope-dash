@@ -1,4 +1,4 @@
-import { Search, LayoutDashboard, Table, FileText, TrendingUp, LucideIcon } from "lucide-react";
+import { Search, LayoutDashboard, Table, LucideIcon } from "lucide-react";
 import { NavLink as RouterNavLink, useLocation } from "react-router-dom";
 import { useCategoryContext } from "@/contexts/CategoryContext";
 import { cn } from "@/lib/utils";

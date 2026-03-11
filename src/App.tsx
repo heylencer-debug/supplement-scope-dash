@@ -9,8 +9,6 @@ import NewAnalysis from "./pages/NewAnalysis";
 import Dashboard from "./pages/Dashboard";
 import ProductExplorer from "./pages/ProductExplorer";
 import AddProduct from "./pages/AddProduct";
-import StrategyBrief from "./pages/StrategyBrief";
-import MarketTrend from "./pages/MarketTrend";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,8 +26,6 @@ const App = () => (
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/products" element={<ProductExplorer />} />
               <Route path="/products/add" element={<AddProduct />} />
-              <Route path="/strategy" element={<StrategyBrief />} />
-              <Route path="/market-trends" element={<MarketTrend />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Layout>

@@ -203,14 +203,16 @@ function SectionCard({ icon: Icon, title, description, children, accent }: {
 // ─── Expandable Formula Card ──────────────────────────────────────────────────
 
 function FormulaCard({ card, categoryName, generatedAt }: {
-  card: { id: string; emoji: string; title: string; subtitle: string; badge: string; borderColor: string; bgColor: string; badgeColor: string; content: string };
+  card: { id: string; emoji: string; title: string; subtitle: string; badge: string; borderColor: string; bgColor: string; badgeColor: string; content: string; downloadContent?: string; downloadLabel?: string };
   categoryName?: string;
   generatedAt?: string;
 }) {
   const [open, setOpen] = useState(false);
-  // Each card has its own ref — download always prints THIS card's content only
+  // Display ref — scoped to this card's visible content
   const cardRef = useRef<HTMLDivElement>(null);
-  const download = usePDFDownload(cardRef, `${categoryName || 'dovive'}-${card.id}-formula`);
+  // Download ref — uses downloadContent (full package) if available, else display content
+  const downloadRef = useRef<HTMLDivElement>(null);
+  const download = usePDFDownload(downloadRef, `${categoryName || 'dovive'}-${card.id}-formula`);
 
   return (
     <Card className={`border ${card.borderColor} transition-all duration-200`}>
@@ -237,13 +239,22 @@ function FormulaCard({ card, categoryName, generatedAt }: {
         <CardContent className="pt-4 pb-4">
           <div className="flex justify-end mb-3">
             <Button variant="outline" size="sm" onClick={download} className="flex items-center gap-2 text-xs">
-              <Download className="h-3.5 w-3.5" /> Download PDF
+              <Download className="h-3.5 w-3.5" />
+              {card.downloadLabel || 'Download PDF'}
             </Button>
           </div>
-          {/* cardRef scoped to THIS card only — download is isolated */}
+          {/* Visible content */}
           <div ref={cardRef} className="space-y-1 max-h-[900px] overflow-y-auto pr-1">
             {renderMarkdown(card.content)}
           </div>
+          {/* Hidden full-package div for download (off-screen) */}
+          {card.downloadContent && (
+            <div ref={downloadRef} style={{ position: 'absolute', left: '-9999px', top: 0 }} aria-hidden="true">
+              {renderMarkdown(card.downloadContent)}
+            </div>
+          )}
+          {/* If no separate downloadContent, wire downloadRef to the visible content */}
+          {!card.downloadContent && <div ref={downloadRef} style={{ display: 'none' }}>{renderMarkdown(card.content)}</div>}
         </CardContent>
       )}
     </Card>
@@ -302,6 +313,21 @@ export function FormulaBriefTab({ categoryId, categoryName }: Props) {
   // Final Formula card shows full brief when available, falls back to adjustments
   const finalFormulaContent = finalFormulaBrief || adjustedFormula;
 
+  // Pull QA analysis sections for combined download
+  const comprehensiveComparison = (f?.comprehensive_comparison as string) || undefined;
+  const flavorQA = (f?.flavor_qa as string) || undefined;
+
+  // Complete P10 package: Final Brief + QA Verdict + All Analysis Sections
+  const fullP10Package = finalFormulaContent ? [
+    `# DOVIVE Formula — Final P10 QA Package`,
+    `## ${categoryName || 'Category'} | Generated ${generatedAt ? new Date(generatedAt).toLocaleDateString() : 'N/A'}`,
+    qaVerdict ? `\n### QA Verdict: ${qaVerdict.verdict} | Score: ${qaVerdict.score}/10\n${qaVerdict.summary}` : '',
+    `\n---\n\n## FINAL FORMULA BRIEF\n\n${finalFormulaContent}`,
+    comprehensiveComparison ? `\n---\n\n## COMPREHENSIVE INGREDIENT COMPARISON\n\n${comprehensiveComparison}` : '',
+    flavorQA ? `\n---\n\n## FLAVOR & TASTE QA\n\n${flavorQA}` : '',
+    adjustedFormula && adjustedFormula !== finalFormulaContent ? `\n---\n\n## ADJUSTED FORMULA SPECIFICATION\n\n${adjustedFormula}` : '',
+  ].filter(Boolean).join('\n') : undefined;
+
   // ── Formula cards (expandable) ──
   if (grokBrief || claudeBrief || legacyBrief) {
 
@@ -338,6 +364,9 @@ export function FormulaBriefTab({ categoryId, categoryName }: Props) {
         bgColor: 'bg-green-500/5',
         badgeColor: 'bg-green-500/10 text-green-400',
         content: finalFormulaContent,
+        // Download includes ALL P10 analysis: brief + verdict + comparison + flavor QA
+        downloadContent: fullP10Package,
+        downloadLabel: '⬇ Download Full P10 Package',
       },
       !grokBrief && !claudeBrief && legacyBrief && {
         id: 'legacy',

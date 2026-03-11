@@ -29,8 +29,10 @@ export function KPIMetricsGrid({
 
   const getOpportunityLevel = (score: number | null) => {
     if (score === null) return { label: "Unknown", color: "text-muted-foreground" };
-    if (score >= 70) return { label: "High Opportunity", color: "text-chart-4" };
-    if (score >= 40) return { label: "Moderate", color: "text-chart-2" };
+    // Normalize to 0-10 scale
+    const s10 = score > 10 ? score / 10 : score;
+    if (s10 >= 7) return { label: "High Opportunity", color: "text-chart-4" };
+    if (s10 >= 4) return { label: "Moderate", color: "text-chart-2" };
     return { label: "Competitive", color: "text-destructive" };
   };
 

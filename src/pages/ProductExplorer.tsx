@@ -76,7 +76,7 @@ export default function ProductExplorer() {
 
   const { currentCategoryId, categoryName: contextCategoryName, setCategoryContext } = useCategoryContext();
   const queryClient = useQueryClient();
-  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   // Use URL param or context as fallback
   const categoryName = urlCategoryName || contextCategoryName;

@@ -1785,7 +1785,7 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                     <Card>
                       <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">BSR / Sales History</CardTitle></CardHeader>
                       <CardContent>
-                        <HistoricalBSRSalesChart product={product} />
+                        <HistoricalBSRSalesChart historicalData={product.historical_data as { monthly_bsr_history?: Record<string, number | null>; monthly_sales_history?: Record<string, number | null> } | null} />
                       </CardContent>
                     </Card>
                   );

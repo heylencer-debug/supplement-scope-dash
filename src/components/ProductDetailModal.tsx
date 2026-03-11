@@ -1597,10 +1597,10 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
               </Card>
 
               {/* Badges */}
-              {(product.is_bestseller || product.is_amazons_choice) && (
+              {(product.bestseller || product.amazon_choice) && (
                 <div className="flex gap-2 flex-wrap">
-                  {product.is_bestseller && <Badge className="bg-chart-2 text-white">🏆 Bestseller</Badge>}
-                  {product.is_amazons_choice && <Badge className="bg-chart-1 text-white">✓ Amazon's Choice</Badge>}
+                  {product.bestseller && <Badge className="bg-chart-2 text-white">🏆 Bestseller</Badge>}
+                  {product.amazon_choice && <Badge className="bg-chart-1 text-white">✓ Amazon's Choice</Badge>}
                 </div>
               )}
 

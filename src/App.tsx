@@ -9,8 +9,6 @@ import NewAnalysis from "./pages/NewAnalysis";
 import Dashboard from "./pages/Dashboard";
 import ProductExplorer from "./pages/ProductExplorer";
 import AddProduct from "./pages/AddProduct";
-import StrategyBrief from "./pages/StrategyBrief";
-import MarketTrend from "./pages/MarketTrend";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();

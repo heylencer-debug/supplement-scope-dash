@@ -18,6 +18,9 @@ export interface FormulaQAData {
   adjustments_table: string | null;
   qa_generated_at: string;
   ai_generated_brief: string;
+  comprehensive_comparison: string | null;
+  flavor_qa: string | null;
+  final_formula_brief: string | null;
 }
 
 export function useFormulaQA(categoryId?: string) {

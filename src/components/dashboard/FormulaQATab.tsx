@@ -250,45 +250,43 @@ export function FormulaQATab({ categoryId, categoryName }: Props) {
         ))}
       </div>
 
-      {/* Comprehensive Comparison + Flavor QA — full width panels */}
-      {qa.qa_report && (() => {
-        const comparisonMatch = qa.qa_report.match(/## COMPREHENSIVE INGREDIENT COMPARISON([\s\S]*?)(?:\n## DUAL FORMULA COMPARISON|$)/);
-        const flavorMatch     = qa.qa_report.match(/## FLAVOR & TASTE QA([\s\S]*?)(?:\n## FORMULA ADJUSTMENTS|$)/);
-        return (
-          <>
-            {comparisonMatch?.[1]?.trim() && (
-              <Card className="border-chart-1/30">
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-sm">
-                    <Scale className="h-4 w-4 text-chart-1" />Comprehensive Ingredient Comparison — DOVIVE vs Competitors
-                  </CardTitle>
-                  <CardDescription className="text-xs">Every active compared head-to-head with exact doses · Why we win or where we need to adjust</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-1 overflow-x-auto">
-                    {renderMarkdownSection(comparisonMatch[1].trim())}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-            {flavorMatch?.[1]?.trim() && (
-              <Card className="border-chart-2/30">
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-sm">
-                    <Star className="h-4 w-4 text-chart-2" />Flavor & Taste QA
-                  </CardTitle>
-                  <CardDescription className="text-xs">Taste strategy assessment · Bitterness masking · Sweetener system · Review-backed evidence</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-1">
-                    {renderMarkdownSection(flavorMatch[1].trim())}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </>
-        );
-      })()}
+      {/* Comprehensive Comparison — full width */}
+      {qa.comprehensive_comparison && (
+        <Card className="border-chart-1/30">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <Scale className="h-4 w-4 text-chart-1" />Comprehensive Ingredient Comparison — DOVIVE vs Competitors
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Every active ingredient compared head-to-head with exact doses · Why we win or where we need to adjust
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto space-y-1">
+              {renderMarkdownSection(qa.comprehensive_comparison)}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Flavor & Taste QA — full width */}
+      {qa.flavor_qa && (
+        <Card className="border-chart-2/30">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <Star className="h-4 w-4 text-chart-2" />Flavor & Taste QA
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Taste strategy · Bitterness masking · Sweetener system · Competitor flavor profiles · Review-backed evidence
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-1">
+              {renderMarkdownSection(qa.flavor_qa)}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Two-panel layout: full report + adjusted formula */}
       <div className="grid grid-cols-1 xl:grid-cols-5 gap-5">

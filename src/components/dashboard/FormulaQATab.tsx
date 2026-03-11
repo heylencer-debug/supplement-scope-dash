@@ -212,7 +212,7 @@ export function FormulaQATab({ categoryId, categoryName }: Props) {
               {verdictCfg.label}
             </h2>
             <p className="text-sm text-foreground/80 mt-1 max-w-2xl">{qa.qa_verdict?.summary}</p>
-            {genDate && <p className="text-xs text-muted-foreground mt-1.5">QA run: {genDate} · Grok-3 formulator</p>}
+            {genDate && <p className="text-xs text-muted-foreground mt-1.5">QA run: {genDate} · Claude Opus 4.6 adjudicator</p>}
           </div>
         </div>
         <div className="flex items-center gap-4 flex-wrap">
@@ -235,7 +235,7 @@ export function FormulaQATab({ categoryId, categoryName }: Props) {
         {[
           { icon: ShieldCheck, label: "QA Gate", value: verdictCfg.label.split(" ").slice(-1)[0], color: verdictCfg.color },
           { icon: Scale,      label: "Scored Against", value: "Top 20 competitors", color: "text-foreground" },
-          { icon: FlaskConical, label: "Formulator AI", value: "Grok-3 (grok-3)", color: "text-foreground" },
+          { icon: FlaskConical, label: "QA Adjudicator", value: "Claude Opus 4.6", color: "text-foreground" },
           { icon: Target,     label: "Category", value: categoryName || "—", color: "text-foreground" },
         ].map(({ icon: Icon, label, value, color }) => (
           <Card key={label}>
@@ -281,15 +281,21 @@ export function FormulaQATab({ categoryId, categoryName }: Props) {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {qa.adjusted_formula ? (
-              <div ref={adjRef} className="space-y-1 max-h-[800px] overflow-y-auto pr-1 scrollbar-thin">
-                {renderMarkdownSection(qa.adjusted_formula)}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground text-sm">
-                No formula adjustments — P8 formula approved as-is.
-              </div>
-            )}
+            {(() => {
+              // Use explicit adjusted_formula field, or extract from QA report
+              const adjContent = qa.adjusted_formula ||
+                qa.qa_report?.match(/## MANUFACTURABILITY CHECK([\s\S]*?)(?:\n## COMPETITOR|$)/)?.[1]?.trim() ||
+                null;
+              return adjContent ? (
+                <div ref={adjRef} className="space-y-1 max-h-[800px] overflow-y-auto pr-1 scrollbar-thin">
+                  {renderMarkdownSection(adjContent)}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  No formula adjustments — P8 formula approved as-is.
+                </div>
+              );
+            })()}
           </CardContent>
         </Card>
 

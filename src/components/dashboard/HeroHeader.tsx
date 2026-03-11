@@ -52,14 +52,16 @@ export function HeroHeader({
       };
       return tierMap[opportunityTier] || opportunityTier;
     }
-    if (opportunityIndex >= 70) return "Tier A (Excellent)";
-    if (opportunityIndex >= 50) return "Tier B (Good)";
-    if (opportunityIndex >= 30) return "Tier C (Fair)";
+    // Use the normalized 0-10 value for tier thresholds
+    if (score10 >= 7) return "Tier A (Excellent)";
+    if (score10 >= 5) return "Tier B (Good)";
+    if (score10 >= 3) return "Tier C (Fair)";
     return "Tier D (Poor)";
   };
-  // opportunityIndex is on a 0-10 scale, convert to 0-100 for progress bar
-  const normalizedScore = Math.min(100, Math.max(0, opportunityIndex * 10));
-  const displayScore = opportunityIndex.toFixed(1);
+  // Auto-detect scale: values > 10 are on 0-100 scale, otherwise 0-10
+  const score10 = opportunityIndex > 10 ? opportunityIndex / 10 : opportunityIndex;
+  const normalizedScore = Math.min(100, Math.max(0, score10 * 10));
+  const displayScore = score10.toFixed(1);
   return <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-primary via-primary/90 to-primary p-4 sm:p-6 md:p-8 text-primary-foreground shadow-lg">
       {/* Subtle background pattern */}
       <div className="absolute inset-0 opacity-5">

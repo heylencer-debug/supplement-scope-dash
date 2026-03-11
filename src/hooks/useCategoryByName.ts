@@ -14,29 +14,17 @@ export function useCategoryByName(searchTerm?: string) {
       const cleaned = searchTerm.replace(/^=+/, "").trim();
       const escaped = cleaned.replace(/,/g, "\\,"); // supabase .or() uses comma separators
 
-      // Fetch all matching categories, then pick the one with the most products
-      const { data: matches, error } = await supabase
+      // oldest first = the real scraped category (not empty duplicates created later)
+      const { data, error } = await supabase
         .from("categories")
         .select("*")
         .or(`name.ilike.%${escaped}%,name.ilike.%=${escaped}%`)
-        .order("created_at", { ascending: true }); // oldest first = the real scraped one
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
 
       if (error) throw error;
-      if (!matches?.length) return null;
-      if (matches.length === 1) return matches[0] as Category;
-
-      // Multiple matches — pick the one with the most products
-      const counts = await Promise.all(
-        matches.map(async (cat) => {
-          const { count } = await supabase
-            .from("products")
-            .select("*", { count: "exact", head: true })
-            .eq("category_id", cat.id);
-          return { cat, count: count ?? 0 };
-        })
-      );
-      counts.sort((a, b) => b.count - a.count);
-      return counts[0].cat as Category;
+      return data as Category | null;
     },
     enabled: !!searchTerm,
     refetchInterval: (query) => (query.state.data ? false : 30000), // Auto-refetch every 30s if no data

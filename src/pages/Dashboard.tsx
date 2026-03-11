@@ -515,12 +515,7 @@ export default function Dashboard() {
         />
       </ScrollAnimate>
 
-      {/* SECTION 6: P6 Product Formula Intelligence */}
-      {category?.id && (
-        <ScrollAnimate delay={100} variant="fade-up" duration={500}>
-          <ProductFormulaIntelligence categoryId={category.id} />
-        </ScrollAnimate>
-      )}
+      {/* SECTION 6: P6 Product Formula Intelligence — hidden for now */}
 
         </TabsContent>
 

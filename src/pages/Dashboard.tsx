@@ -19,6 +19,7 @@ import { FormulaBriefTab } from "@/components/dashboard/FormulaBriefTab";
 import { FormulaQATab } from "@/components/dashboard/FormulaQATab";
 import { PackagingIntelligence } from "@/components/dashboard/PackagingIntelligence";
 import { P9BenchmarkOverview } from "@/components/dashboard/P9BenchmarkOverview";
+import { MarketIntelligenceReport } from "@/components/dashboard/MarketIntelligenceReport";
 
 import {
   ResponsiveContainer,
@@ -525,6 +526,12 @@ export default function Dashboard() {
         </TabsContent>
 
         <TabsContent value="market" className="space-y-6 mt-4">
+
+          {/* P6 Grok Market Intelligence — always at top */}
+          {category?.id && (
+            <MarketIntelligenceReport categoryId={category.id} categoryName={categoryName || ""} />
+          )}
+
           {productsLoading && !marketAnalysisData ? (
             <Card><CardContent className="py-12 text-center text-muted-foreground">Loading market data...</CardContent></Card>
           ) : !marketAnalysisData ? (

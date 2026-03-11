@@ -429,7 +429,7 @@ export function FormulaChat({
 
   // Real-time elapsed time counter
   useEffect(() => {
-    let timerId: NodeJS.Timeout | null = null;
+    let timerId: ReturnType<typeof setInterval> | null = null;
     
     if (isGenerating && generationProgress) {
       timerId = setInterval(() => {

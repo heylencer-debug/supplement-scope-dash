@@ -63,7 +63,7 @@ export function KPIMetricsGrid({
     },
     {
       label: "Opportunity Score",
-      value: opportunityScore !== null ? `${opportunityScore}/100` : null,
+      value: opportunityScore !== null ? `${(opportunityScore > 10 ? opportunityScore / 10 : opportunityScore).toFixed(1)}/10` : null,
       subtext: opportunityScore !== null ? getOpportunityLevel(opportunityScore).label : null,
       subtextColor: getOpportunityLevel(opportunityScore).color,
       icon: Zap,

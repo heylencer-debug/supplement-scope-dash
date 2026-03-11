@@ -66,14 +66,33 @@ function PipelineCollapsible({ categoryId, categoryName }: { categoryId: string;
               </CardTitle>
               {/* Compact summary visible when collapsed */}
               <div className="flex items-center gap-3 mt-2">
-                <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden max-w-xs">
+                {/* Phase emoji icons */}
+                {phases && phases.length > 0 && (
+                  <div className="flex items-center gap-0.5">
+                    {phases.map(phase => {
+                      const emoji = ({ 1: "🛒", 2: "📊", 3: "💬", 4: "🔬", 5: "🔎", 6: "🧬", 7: "📈", 8: "📦", 9: "📋", 10: "✅", 11: "🚀" } as Record<number, string>)[phase.phase] ?? "·";
+                      const isDone = phase.status === "complete";
+                      const isRunning = phase.status === "partial";
+                      return (
+                        <span
+                          key={phase.phase}
+                          className={`text-xs leading-none transition-opacity duration-300 ${isDone ? "opacity-100" : isRunning ? "opacity-80 animate-pulse" : "opacity-25 grayscale"}`}
+                          title={`P${phase.phase}: ${isDone ? "Done" : isRunning ? "Running" : "Pending"}`}
+                        >
+                          {emoji}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+                <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden max-w-[120px]">
                   <div
                     className="h-full bg-primary rounded-full transition-all duration-700"
                     style={{ width: `${overallPct}%` }}
                   />
                 </div>
                 <span className="text-xs font-medium text-muted-foreground tabular-nums whitespace-nowrap">
-                  {completedCount}/{totalCount} phases
+                  {completedCount}/{totalCount}
                 </span>
                 {runningCount > 0 && (
                   <span className="flex items-center gap-1 text-[10px] font-medium text-chart-2">

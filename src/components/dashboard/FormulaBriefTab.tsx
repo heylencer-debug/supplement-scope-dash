@@ -239,6 +239,12 @@ export function FormulaBriefTab({ categoryId, categoryName }: Props) {
   const legacyBrief = (f?.ai_generated_brief as string) || undefined;
   const dataSources = f?.data_sources as any;
   const generatedAt = (f?.generated_at as string) || undefined;
+  const qaReport = (f?.qa_report as string) || undefined;
+  const qaVerdict = f?.qa_verdict as any;
+  const adjustedFormula = (f?.adjusted_formula as string) ||
+    qaReport?.match(/## ADJUSTED FORMULA SPECIFICATION([\s\S]*?)(?:\n## |$)/)?.[1]?.trim() ||
+    qaReport?.match(/## MANUFACTURABILITY CHECK([\s\S]*?)(?:\n## COMPETITOR|$)/)?.[1]?.trim() ||
+    undefined;
 
   // ── Dual-model brief (Grok 4.2 + Claude Opus 4.6) ──
   if (grokBrief || claudeBrief || legacyBrief) {
@@ -322,6 +328,26 @@ export function FormulaBriefTab({ categoryId, categoryName }: Props) {
           <div id="panel-claude" className="pt-4 border-t border-border">
             <BriefPanel content={claudeBrief} model="🧠 Claude Opus 4.6 — Formula B" color="border-purple-500/20 bg-purple-500/5" />
           </div>
+
+          {/* Final Formula (from QA adjusted formula) */}
+          {adjustedFormula && (
+            <div className="mt-8">
+              <h2 className="text-lg font-bold text-foreground mb-2">Final Formula — QA Adjusted</h2>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="space-y-1" style={{ maxHeight: '800px', overflowY: 'auto' }}>
+                    {renderMarkdown(adjustedFormula)}
+                  </div>
+                </CardContent>
+
+                <CardFooter className="flex justify-end">
+                  <Button variant="outline" size="sm" onClick={() => downloadPDF()} className="flex items-center gap-2">
+                    <Download className="h-4 w-4" /> Download PDF
+                  </Button>
+                </CardFooter>
+              </Card>
+            </div>
+          )}
         </div>
       );
     }

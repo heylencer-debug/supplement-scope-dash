@@ -132,7 +132,7 @@ export function MarketIntelligenceReport({ categoryId, categoryName }: MarketInt
     );
   }
 
-  if (error || !mi?.ai_market_analysis) {
+  if (error || !mi?.ai_market_analysis || typeof mi.ai_market_analysis !== 'string') {
     return (
       <Card>
         <CardContent className="py-8">

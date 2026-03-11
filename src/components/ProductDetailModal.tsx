@@ -1597,10 +1597,10 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
               </Card>
 
               {/* Badges */}
-              {(product.is_bestseller || product.is_amazons_choice) && (
+              {(product.bestseller || product.amazon_choice) && (
                 <div className="flex gap-2 flex-wrap">
-                  {product.is_bestseller && <Badge className="bg-chart-2 text-white">🏆 Bestseller</Badge>}
-                  {product.is_amazons_choice && <Badge className="bg-chart-1 text-white">✓ Amazon's Choice</Badge>}
+                  {product.bestseller && <Badge className="bg-chart-2 text-white">🏆 Bestseller</Badge>}
+                  {product.amazon_choice && <Badge className="bg-chart-1 text-white">✓ Amazon's Choice</Badge>}
                 </div>
               )}
 
@@ -1785,7 +1785,7 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                     <Card>
                       <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">BSR / Sales History</CardTitle></CardHeader>
                       <CardContent>
-                        <HistoricalBSRSalesChart product={product} />
+                        <HistoricalBSRSalesChart historicalData={product.historical_data as { monthly_bsr_history?: Record<string, number | null>; monthly_sales_history?: Record<string, number | null> } | null} />
                       </CardContent>
                     </Card>
                   );

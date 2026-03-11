@@ -314,7 +314,7 @@ async function fetchKeepaRaw(asin: string, domain: number): Promise<KeepaRawResu
     if (product.imagesCSV) {
       const imageCodes = product.imagesCSV.split(",");
       imageUrls = imageCodes.map((code: string) => `https://images-na.ssl-images-amazon.com/images/I/${code}`);
-      mainImageUrl = imageUrls[0] || null;
+      mainImageUrl = imageUrls![0] || null;
     }
 
     // Feature bullets

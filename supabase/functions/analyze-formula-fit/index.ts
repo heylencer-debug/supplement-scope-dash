@@ -614,7 +614,7 @@ Now provide your brutally honest analysis. Remember: the user wants to know if t
       .from("formula_fit_analyses")
       .update({
         status: "error",
-        error: error.message || "Unknown error occurred",
+        error: error instanceof Error ? error.message : "Unknown error occurred",
       })
       .eq("id", analysisId);
   }

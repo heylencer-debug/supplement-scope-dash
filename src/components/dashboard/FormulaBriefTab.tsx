@@ -285,7 +285,7 @@ export function FormulaBriefTab({ categoryId, categoryName }: Props) {
   }
 
   // ── Legacy structured brief ──
-  const mf = f?.master_formula_per_serving;
+  const mf = (f as any)?.master_formula_per_serving;
   const fs = mf?.formula_summary;
 
   return (

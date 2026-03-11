@@ -15,6 +15,7 @@ import { EnhancedBenchmarkComparison } from "@/components/dashboard/EnhancedBenc
 import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
 import { LowConfidenceProducts } from "@/components/dashboard/LowConfidenceProducts";
 import { PipelineStatus } from "@/components/dashboard/PipelineStatus";
+import { usePipelineStatus } from "@/hooks/usePipelineStatus";
 import { ScoutPackagingIntelligence } from "@/components/dashboard/ScoutPackagingIntelligence";
 import { ProductFormulaIntelligence } from "@/components/dashboard/ProductFormulaIntelligence";
 import { FormulaBriefTab } from "@/components/dashboard/FormulaBriefTab";

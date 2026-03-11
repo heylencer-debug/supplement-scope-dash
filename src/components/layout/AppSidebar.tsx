@@ -12,7 +12,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { MarketTrendStatusIndicator } from "./MarketTrendStatusIndicator";
+
 
 interface MenuItem {
   title: string;

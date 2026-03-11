@@ -6,7 +6,7 @@
 
 import { useRef, useCallback, useState } from "react";
 import { useFormulaBrief, type IngredientRow } from "@/hooks/useFormulaBrief";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";

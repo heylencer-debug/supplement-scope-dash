@@ -23,7 +23,7 @@ const PHASE_META: Record<number, { icon: string; shortLabel: string }> = {
   6:  { icon: "🧬", shortLabel: "Product AI"  },
   7:  { icon: "📦", shortLabel: "Packaging"   },
   8:  { icon: "📋", shortLabel: "Formula"     },
-  9:  { icon: "📈", shortLabel: "Trends"      },
+  9:  { icon: "📈", shortLabel: "QA"      },
   10: { icon: "🚀", shortLabel: "Launch"      },
 };
 

@@ -287,7 +287,7 @@ async function fetchBrandProductData(
   // Group products by brand
   const brandMap: Record<string, typeof products> = {};
   for (const product of matchingProducts) {
-    const brand = product.brand || "Unknown";
+    const brand = String(product.brand || "Unknown");
     if (!brandMap[brand]) {
       brandMap[brand] = [];
     }

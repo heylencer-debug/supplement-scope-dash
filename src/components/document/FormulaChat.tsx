@@ -308,7 +308,7 @@ export function FormulaChat({
   const [expandedHardPrompts, setExpandedHardPrompts] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const { createVersion, activeVersion, versions, setActiveVersion, deleteVersion, isCreatingVersion, isSettingActive, isDeletingVersion } = useFormulaBriefVersions(categoryId);
   const { conversation, addMessage, updateMessages, clearConversation, isLoading } = useFormulaConversation(categoryId, activeVersion?.id);
@@ -429,7 +429,7 @@ export function FormulaChat({
 
   // Real-time elapsed time counter
   useEffect(() => {
-    let timerId: NodeJS.Timeout | null = null;
+    let timerId: ReturnType<typeof setInterval> | null = null;
     
     if (isGenerating && generationProgress) {
       timerId = setInterval(() => {

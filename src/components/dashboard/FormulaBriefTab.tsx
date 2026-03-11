@@ -234,9 +234,9 @@ export function FormulaBriefTab({ categoryId, categoryName }: Props) {
   }
 
   const f = brief.ingredients;
-  const aiMarkdown = f?.ai_generated_brief as string | undefined;
-  const dataSources = f?.data_sources as any;
-  const generatedAt = f?.generated_at as string | undefined;
+  const aiMarkdown = (f as any)?.ai_generated_brief as string | undefined;
+  const dataSources = (f as any)?.data_sources as any;
+  const generatedAt = (f as any)?.generated_at as string | undefined;
 
   // ── AI-generated markdown brief ──
   if (aiMarkdown) {

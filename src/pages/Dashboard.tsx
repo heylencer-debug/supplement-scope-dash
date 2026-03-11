@@ -19,6 +19,7 @@ import { FormulaBriefTab } from "@/components/dashboard/FormulaBriefTab";
 import { FormulaQATab } from "@/components/dashboard/FormulaQATab";
 import { PackagingIntelligence } from "@/components/dashboard/PackagingIntelligence";
 import { P9BenchmarkOverview } from "@/components/dashboard/P9BenchmarkOverview";
+import { P9DoseAnalysis } from "@/components/dashboard/P9DoseAnalysis";
 
 import {
   ResponsiveContainer,
@@ -415,6 +416,13 @@ export default function Dashboard() {
       {category?.id && (
         <ScrollAnimate delay={100} variant="fade-up" duration={500}>
           <P9BenchmarkOverview categoryId={category.id} />
+        </ScrollAnimate>
+      )}
+
+      {/* SECTION 3c: P9 Ingredients & Dosage Comparison */}
+      {category?.id && (
+        <ScrollAnimate delay={100} variant="fade-up" duration={500}>
+          <P9DoseAnalysis categoryId={category.id} />
         </ScrollAnimate>
       )}
 

@@ -15,6 +15,7 @@ import { EnhancedBenchmarkComparison } from "@/components/dashboard/EnhancedBenc
 import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
 import { LowConfidenceProducts } from "@/components/dashboard/LowConfidenceProducts";
 import { PipelineStatus } from "@/components/dashboard/PipelineStatus";
+import { usePipelineStatus } from "@/hooks/usePipelineStatus";
 import { ScoutPackagingIntelligence } from "@/components/dashboard/ScoutPackagingIntelligence";
 import { ProductFormulaIntelligence } from "@/components/dashboard/ProductFormulaIntelligence";
 import { FormulaBriefTab } from "@/components/dashboard/FormulaBriefTab";
@@ -46,6 +47,66 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { Target } from "lucide-react";
+
+function PipelineCollapsible({ categoryId, categoryName }: { categoryId: string; categoryName: string }) {
+  const { data: phases } = usePipelineStatus(categoryId, categoryName);
+  const completedCount = phases?.filter(p => p.status === "complete").length ?? 0;
+  const runningCount = phases?.filter(p => p.status === "partial").length ?? 0;
+  const totalCount = phases?.length ?? 0;
+  const overallPct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+  return (
+    <Collapsible>
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <span>🔍</span> Scout Pipeline
+              </CardTitle>
+              {/* Compact summary visible when collapsed */}
+              <div className="flex items-center gap-3 mt-2">
+                <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden max-w-xs">
+                  <div
+                    className="h-full bg-primary rounded-full transition-all duration-700"
+                    style={{ width: `${overallPct}%` }}
+                  />
+                </div>
+                <span className="text-xs font-medium text-muted-foreground tabular-nums whitespace-nowrap">
+                  {completedCount}/{totalCount} phases
+                </span>
+                {runningCount > 0 && (
+                  <span className="flex items-center gap-1 text-[10px] font-medium text-chart-2">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-chart-2 opacity-75" />
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-chart-2" />
+                    </span>
+                    {runningCount} running
+                  </span>
+                )}
+                {completedCount === totalCount && totalCount > 0 && (
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 border-chart-4/30 text-chart-4 bg-chart-4/10">
+                    ✓ Complete
+                  </Badge>
+                )}
+              </div>
+            </div>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 shrink-0">
+                <ChevronsUpDown className="h-4 w-4 text-muted-foreground" />
+              </Button>
+            </CollapsibleTrigger>
+          </div>
+        </CardHeader>
+        <CollapsibleContent>
+          <CardContent>
+            <PipelineStatus categoryId={categoryId} keyword={categoryName} />
+          </CardContent>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
+  );
+}
 
 
 export default function Dashboard() {
@@ -364,35 +425,7 @@ export default function Dashboard() {
       {/* SCOUT PIPELINE STATUS — live phase completion from Supabase */}
       {category?.id && (
         <ScrollAnimate delay={50} variant="fade-up" duration={400}>
-          <Collapsible>
-            <Card>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
-                      <span>🔍</span> Scout Pipeline
-                    </CardTitle>
-                    <CardDescription className="text-xs">
-                      Live phase completion for <span className="text-foreground font-medium">{categoryName}</span> — sourced from Supabase
-                    </CardDescription>
-                  </div>
-                  <CollapsibleTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
-                      <ChevronsUpDown className="h-4 w-4 text-muted-foreground" />
-                    </Button>
-                  </CollapsibleTrigger>
-                </div>
-              </CardHeader>
-              <CollapsibleContent>
-                <CardContent>
-                  <PipelineStatus
-                    categoryId={category.id}
-                    keyword={categoryName || ""}
-                  />
-                </CardContent>
-              </CollapsibleContent>
-            </Card>
-          </Collapsible>
+          <PipelineCollapsible categoryId={category.id} categoryName={categoryName || ""} />
         </ScrollAnimate>
       )}
 

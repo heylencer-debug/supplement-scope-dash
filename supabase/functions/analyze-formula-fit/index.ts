@@ -299,17 +299,17 @@ async function fetchBrandProductData(
 
   for (const [brand, brandProducts] of Object.entries(brandMap)) {
     // Calculate summary metrics
-    const prices = brandProducts.filter(p => p.price).map(p => p.price!);
-    const ratings = brandProducts.filter(p => p.rating).map(p => p.rating!);
-    const revenues = brandProducts.filter(p => p.monthly_revenue).map(p => p.monthly_revenue!);
-    const packagingTypes = [...new Set(brandProducts.filter(p => p.packaging_type).map(p => p.packaging_type!))];
+    const prices = brandProducts.filter(p => p.price).map(p => Number(p.price));
+    const ratings = brandProducts.filter(p => p.rating).map(p => Number(p.rating));
+    const revenues = brandProducts.filter(p => p.monthly_revenue).map(p => Number(p.monthly_revenue));
+    const packagingTypes = [...new Set(brandProducts.filter(p => p.packaging_type).map(p => String(p.packaging_type)))] as string[];
 
     const summary: BrandSummary = {
       product_count: brandProducts.length,
-      avg_price: prices.length > 0 ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length * 100) / 100 : 0,
-      avg_rating: ratings.length > 0 ? Math.round(ratings.reduce((a, b) => a + b, 0) / ratings.length * 100) / 100 : 0,
-      total_reviews: brandProducts.reduce((sum, p) => sum + (p.reviews || 0), 0),
-      total_revenue: revenues.reduce((a, b) => a + b, 0),
+      avg_price: prices.length > 0 ? Math.round(prices.reduce((a: number, b: number) => a + b, 0) / prices.length * 100) / 100 : 0,
+      avg_rating: ratings.length > 0 ? Math.round(ratings.reduce((a: number, b: number) => a + b, 0) / ratings.length * 100) / 100 : 0,
+      total_reviews: brandProducts.reduce((sum: number, p) => sum + (Number(p.reviews) || 0), 0),
+      total_revenue: revenues.reduce((a: number, b: number) => a + b, 0),
       packaging_types: packagingTypes,
     };
 

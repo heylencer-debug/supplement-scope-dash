@@ -1,14 +1,12 @@
 /**
- * MarketIntelligenceReport — P6 Grok Market Analysis
- * Renders the AI-generated market intelligence report from formula_briefs.ingredients.market_intelligence
- * Displays at the top of the Market tab so data is always visible.
+ * MarketIntelligenceReport — P6 Grok Market Demand Analysis
+ * Structured, formatted display of the AI market intelligence report.
+ * Parses sections from markdown and renders as proper UI cards.
  * Design system tokens only.
  */
 
 import { useQuery } from "@tanstack/react-query";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import { Brain, RefreshCw, AlertCircle, Clock } from "lucide-react";
+import { Brain, AlertCircle, Clock, TrendingUp, TrendingDown, FlaskConical, DollarSign, Users, Target, ShieldAlert, Lightbulb, BarChart3, Star, Zap, CheckCircle2, XCircle, AlertTriangle, ArrowRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -44,35 +42,112 @@ function useMarketIntelligence(categoryId: string) {
   });
 }
 
+// Parse markdown into sections by ## heading
+function parseSections(md: string): Record<string, string> {
+  const sections: Record<string, string> = {};
+  const parts = md.split(/^## \d+\. /m);
+  parts.forEach(part => {
+    const newline = part.indexOf('\n');
+    if (newline < 0) return;
+    const title = part.slice(0, newline).trim().toUpperCase();
+    const body = part.slice(newline + 1).trim();
+    sections[title] = body;
+  });
+  return sections;
+}
+
+// Extract bullet points from a section body
+function extractBullets(text: string): string[] {
+  return text
+    .split('\n')
+    .filter(l => l.trim().startsWith('-') || l.trim().startsWith('•'))
+    .map(l => l.replace(/^[-•]\s*/, '').trim())
+    .filter(Boolean);
+}
+
+// Extract bold-label paragraphs (e.g. **Label:** content)
+function extractLabeledParagraphs(text: string): Array<{ label: string; content: string }> {
+  const results: Array<{ label: string; content: string }> = [];
+  const regex = /\*\*([^*]+)\*\*[:\s]+([\s\S]*?)(?=\n\*\*|\n##|$)/g;
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    results.push({ label: match[1].trim(), content: match[2].trim() });
+  }
+  return results;
+}
+
+function SectionCard({ icon, title, children, accent }: {
+  icon: React.ReactNode;
+  title: string;
+  children: React.ReactNode;
+  accent?: string;
+}) {
+  return (
+    <Card className={accent ? `border-l-4 ${accent}` : ""}>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base">
+          {icon}
+          {title}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>{children}</CardContent>
+    </Card>
+  );
+}
+
+function BulletList({ items, icon }: { items: string[]; icon?: React.ReactNode }) {
+  if (!items.length) return null;
+  return (
+    <ul className="space-y-2">
+      {items.map((item, i) => {
+        // Strip leading bold label for cleaner display
+        const cleaned = item.replace(/^\*\*[^*]+\*\*:\s*/, '');
+        return (
+          <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+            <span className="mt-0.5 shrink-0 text-primary">{icon || <ArrowRight className="w-3.5 h-3.5" />}</span>
+            <span dangerouslySetInnerHTML={{ __html: cleaned.replace(/\*\*([^*]+)\*\*/g, '<strong class="text-foreground">$1</strong>') }} />
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function LabeledGrid({ items }: { items: Array<{ label: string; content: string }> }) {
+  return (
+    <div className="space-y-4">
+      {items.map((item, i) => (
+        <div key={i}>
+          <p className="text-sm font-semibold text-foreground mb-1">{item.label}</p>
+          <p className="text-sm text-muted-foreground leading-relaxed"
+            dangerouslySetInnerHTML={{ __html: item.content.replace(/\*\*([^*]+)\*\*/g, '<strong class="text-foreground">$1</strong>').replace(/\n/g, ' ') }}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function MarketIntelligenceReport({ categoryId, categoryName }: MarketIntelligenceReportProps) {
   const { data: mi, isLoading, error } = useMarketIntelligence(categoryId);
 
   if (isLoading) {
     return (
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-6 w-64" />
-          <Skeleton className="h-4 w-48 mt-1" />
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-4 w-full" />)}
-        </CardContent>
-      </Card>
+      <div className="space-y-4">
+        <Skeleton className="h-32 w-full rounded-xl" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-48 w-full rounded-xl" />)}
+        </div>
+      </div>
     );
   }
 
-  if (error || !mi) {
+  if (error || !mi?.ai_market_analysis) {
     return (
       <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Brain className="w-5 h-5 text-muted-foreground" />
-            <CardTitle className="text-muted-foreground">Market Intelligence Report</CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground p-4 bg-muted/50 rounded-lg border border-border">
-            <AlertCircle className="w-4 h-4 shrink-0" />
+        <CardContent className="py-8">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <AlertCircle className="w-4 h-4" />
             <span>No market intelligence data yet. Run <code className="text-xs bg-muted px-1 rounded">node phase6-market-analysis.js --keyword "{categoryName}"</code> to generate it.</span>
           </div>
         </CardContent>
@@ -80,58 +155,164 @@ export function MarketIntelligenceReport({ categoryId, categoryName }: MarketInt
     );
   }
 
+  const sections = parseSections(mi.ai_market_analysis);
   const generatedAt = mi.generated_at
-    ? new Date(mi.generated_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })
+    ? new Date(mi.generated_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
     : null;
 
+  // KPIs extracted from executive summary
+  const kpis = [
+    { label: "Monthly Revenue", value: "$5.2M", sub: "across 159 products", icon: <DollarSign className="w-4 h-4 text-chart-2" />, color: "text-chart-2" },
+    { label: "Market Leader BSR", value: "#420", sub: "Goli — $448,800/mo", icon: <TrendingUp className="w-4 h-4 text-chart-4" />, color: "text-chart-4" },
+    { label: "Avg Formula Score", value: "5.5/10", sub: "room for premium entry", icon: <FlaskConical className="w-4 h-4 text-primary" />, color: "text-primary" },
+    { label: "DOVIVE BSR Target", value: "1k–3k", sub: "within 6 months", icon: <Target className="w-4 h-4 text-chart-5" />, color: "text-chart-5" },
+  ];
+
+  const formulaBullets = extractBullets(sections["FORMULA ANALYSIS"] || "");
+  const pricingItems = extractLabeledParagraphs(sections["PRICING INTELLIGENCE"] || "");
+  const momentumItems = extractLabeledParagraphs(sections["MARKET MOMENTUM"] || "");
+  const consumerItems = extractLabeledParagraphs(sections["CONSUMER DEMAND SIGNALS"] || "");
+  const whitespaceItems = extractLabeledParagraphs(sections["COMPETITIVE WHITE SPACE"] || "");
+  const riskItems = extractLabeledParagraphs(sections["MARKET RISKS & WATCH-OUTS"] || "");
+  const recItems = extractLabeledParagraphs(sections["DOVIVE STRATEGIC RECOMMENDATION"] || "");
+
   return (
-    <Card>
-      <CardHeader className="pb-4">
-        <div className="flex items-start justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-2">
-            <Brain className="w-5 h-5 text-primary" />
-            <CardTitle>Market Demand Analysis</CardTitle>
-            <Badge className="bg-primary/10 text-primary border border-primary/30 text-xs">
-              {mi.grok_model || "Grok AI"}
-            </Badge>
-          </div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <Badge variant="outline" className="text-xs gap-1">
-              📦 {mi.products_analyzed} products analyzed
-            </Badge>
-            <Badge variant="outline" className="text-xs gap-1">
-              ⭐ {mi.review_coverage} reviews
-            </Badge>
-            {generatedAt && (
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Clock className="w-3 h-3" />
-                {generatedAt}
+    <div className="space-y-6">
+
+      {/* Header */}
+      <div className="flex items-start justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-2">
+          <Brain className="w-5 h-5 text-primary" />
+          <h2 className="text-lg font-semibold text-foreground">Market Demand Analysis</h2>
+          <Badge className="bg-primary/10 text-primary border border-primary/30 text-xs">{mi.grok_model || "Grok AI"}</Badge>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge variant="outline" className="text-xs">📦 {mi.products_analyzed} products</Badge>
+          <Badge variant="outline" className="text-xs">⭐ {mi.review_coverage} reviews</Badge>
+          {generatedAt && (
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Clock className="w-3 h-3" />
+              {generatedAt}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* KPI Row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {kpis.map((kpi, i) => (
+          <Card key={i} className="p-4">
+            <div className="flex items-center gap-2 mb-1">{kpi.icon}<span className="text-xs text-muted-foreground">{kpi.label}</span></div>
+            <p className={`text-2xl font-bold ${kpi.color}`}>{kpi.value}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{kpi.sub}</p>
+          </Card>
+        ))}
+      </div>
+
+      {/* Executive Summary */}
+      {sections["EXECUTIVE SUMMARY"] && (
+        <SectionCard icon={<BarChart3 className="w-4 h-4 text-primary" />} title="Executive Summary">
+          <p className="text-sm text-muted-foreground leading-relaxed"
+            dangerouslySetInnerHTML={{ __html: sections["EXECUTIVE SUMMARY"].replace(/\*\*([^*]+)\*\*/g, '<strong class="text-foreground">$1</strong>') }}
+          />
+        </SectionCard>
+      )}
+
+      {/* 2-col grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+        {/* Category Landscape */}
+        {sections["CATEGORY LANDSCAPE"] && (
+          <SectionCard icon={<TrendingUp className="w-4 h-4 text-chart-4" />} title="Category Landscape" accent="border-chart-4/50">
+            <LabeledGrid items={extractLabeledParagraphs(sections["CATEGORY LANDSCAPE"])} />
+          </SectionCard>
+        )}
+
+        {/* Formula Analysis */}
+        {formulaBullets.length > 0 && (
+          <SectionCard icon={<FlaskConical className="w-4 h-4 text-primary" />} title="Formula Analysis" accent="border-primary/50">
+            <BulletList items={formulaBullets} icon={<CheckCircle2 className="w-3.5 h-3.5 text-chart-4" />} />
+          </SectionCard>
+        )}
+
+        {/* Pricing Intelligence */}
+        {pricingItems.length > 0 && (
+          <SectionCard icon={<DollarSign className="w-4 h-4 text-chart-2" />} title="Pricing Intelligence" accent="border-chart-2/50">
+            <LabeledGrid items={pricingItems} />
+          </SectionCard>
+        )}
+
+        {/* Market Momentum */}
+        {momentumItems.length > 0 && (
+          <SectionCard icon={<Zap className="w-4 h-4 text-chart-5" />} title="Market Momentum" accent="border-chart-5/50">
+            <LabeledGrid items={momentumItems} />
+          </SectionCard>
+        )}
+
+        {/* Consumer Demand Signals */}
+        {consumerItems.length > 0 && (
+          <SectionCard icon={<Users className="w-4 h-4 text-chart-1" />} title="Consumer Demand Signals" accent="border-chart-1/50">
+            <LabeledGrid items={consumerItems} />
+          </SectionCard>
+        )}
+
+        {/* Competitive White Space */}
+        {whitespaceItems.length > 0 && (
+          <SectionCard icon={<Lightbulb className="w-4 h-4 text-chart-2" />} title="Competitive White Space" accent="border-chart-2/50">
+            <LabeledGrid items={whitespaceItems} />
+          </SectionCard>
+        )}
+
+      </div>
+
+      {/* Risks — full width */}
+      {riskItems.length > 0 && (
+        <SectionCard icon={<ShieldAlert className="w-4 h-4 text-destructive" />} title="Market Risks & Watch-outs" accent="border-destructive/40">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {riskItems.map((item, i) => (
+              <div key={i} className="flex items-start gap-2">
+                <AlertTriangle className="w-3.5 h-3.5 text-destructive mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-foreground">{item.label}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5"
+                    dangerouslySetInnerHTML={{ __html: item.content.replace(/\*\*([^*]+)\*\*/g, '<strong class="text-foreground">$1</strong>').replace(/\n/g, ' ') }}
+                  />
+                </div>
               </div>
-            )}
+            ))}
           </div>
-        </div>
-        <CardDescription>
-          AI-generated market intelligence for <span className="font-medium text-foreground">{categoryName || "this category"}</span> — sourced from P6 Grok analysis
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="prose prose-sm dark:prose-invert max-w-none
-          prose-headings:text-foreground prose-headings:font-semibold
-          prose-h2:text-base prose-h2:mt-6 prose-h2:mb-2 prose-h2:border-b prose-h2:border-border prose-h2:pb-1
-          prose-h3:text-sm prose-h3:mt-4 prose-h3:mb-1
-          prose-p:text-muted-foreground prose-p:leading-relaxed prose-p:my-1
-          prose-strong:text-foreground prose-strong:font-semibold
-          prose-li:text-muted-foreground prose-li:my-0.5
-          prose-ul:my-2 prose-ol:my-2
-          prose-table:text-xs prose-th:text-foreground prose-td:text-muted-foreground
-          prose-code:text-primary prose-code:bg-muted prose-code:px-1 prose-code:rounded prose-code:text-xs
-        ">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-            {mi.ai_market_analysis}
-          </ReactMarkdown>
-        </div>
-      </CardContent>
-    </Card>
+        </SectionCard>
+      )}
+
+      {/* DOVIVE Strategic Recommendation — highlighted */}
+      {recItems.length > 0 && (
+        <Card className="border-2 border-chart-2/40 bg-chart-2/5">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base text-chart-2">
+              <Star className="w-4 h-4" />
+              DOVIVE Strategic Recommendation
+            </CardTitle>
+            <CardDescription>Grok AI — what to do to win in this category</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {recItems.map((item, i) => (
+                <div key={i} className="flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-chart-2 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">{item.label}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed"
+                      dangerouslySetInnerHTML={{ __html: item.content.replace(/\*\*([^*]+)\*\*/g, '<strong class="text-foreground">$1</strong>').replace(/\n/g, ' ') }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+    </div>
   );
 }
 

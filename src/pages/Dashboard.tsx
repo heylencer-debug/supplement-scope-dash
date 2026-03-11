@@ -4,7 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { ScrollAnimate } from "@/components/ui/scroll-animate";
-import { Building2 } from "lucide-react";
+import { Building2, ChevronsUpDown } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Button } from "@/components/ui/button";
 
 // Dashboard components
 import { HeroHeader } from "@/components/dashboard/HeroHeader";

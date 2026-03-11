@@ -147,7 +147,7 @@ Deno.serve(async (req) => {
     console.log(`[analyze-formula-fit] Created analysis record: ${newAnalysis.id}`);
 
     // Run the analysis in the background
-    EdgeRuntime.waitUntil(runAnalysis(supabase, categoryId, newAnalysis.id, xaiApiKey));
+    EdgeRuntime.waitUntil(runAnalysis(supabase as any, categoryId, newAnalysis.id, xaiApiKey));
 
     return new Response(
       JSON.stringify({ status: "processing", id: newAnalysis.id }),

@@ -404,7 +404,12 @@ export default function Dashboard() {
         />
       </ScrollAnimate>
 
-      {/* SECTION 3: Benchmark Comparison — hidden for now */}
+      {/* SECTION 3: Benchmark Comparison */}
+      {category?.id && (
+        <ScrollAnimate delay={100} variant="fade-up" duration={500}>
+          <EnhancedBenchmarkComparison categoryId={category.id} />
+        </ScrollAnimate>
+      )}
 
       {/* SECTION 3b: P9 Benchmark Overview */}
       {category?.id && (

@@ -362,22 +362,35 @@ export default function Dashboard() {
       {/* SCOUT PIPELINE STATUS — live phase completion from Supabase */}
       {category?.id && (
         <ScrollAnimate delay={50} variant="fade-up" duration={400}>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
-                <span>🔍</span> Scout Pipeline
-              </CardTitle>
-              <CardDescription className="text-xs">
-                Live phase completion for <span className="text-foreground font-medium">{categoryName}</span> — sourced from Supabase
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <PipelineStatus
-                categoryId={category.id}
-                keyword={categoryName || ""}
-              />
-            </CardContent>
-          </Card>
+          <Collapsible>
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
+                      <span>🔍</span> Scout Pipeline
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      Live phase completion for <span className="text-foreground font-medium">{categoryName}</span> — sourced from Supabase
+                    </CardDescription>
+                  </div>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                      <ChevronsUpDown className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                  </CollapsibleTrigger>
+                </div>
+              </CardHeader>
+              <CollapsibleContent>
+                <CardContent>
+                  <PipelineStatus
+                    categoryId={category.id}
+                    keyword={categoryName || ""}
+                  />
+                </CardContent>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
         </ScrollAnimate>
       )}
 

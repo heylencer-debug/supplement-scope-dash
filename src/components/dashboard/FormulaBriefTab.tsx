@@ -4,7 +4,7 @@
  * Handles both ai_generated_brief (markdown string) and legacy structured data.
  */
 
-import { useRef, useCallback, useState } from "react";
+import React, { useRef, useCallback, useState } from "react";
 import { useFormulaBrief, type IngredientRow } from "@/hooks/useFormulaBrief";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -200,6 +200,54 @@ function SectionCard({ icon: Icon, title, description, children, accent }: {
   );
 }
 
+// ─── Expandable Formula Card ──────────────────────────────────────────────────
+
+function FormulaCard({ card, contentRef, downloadPDF, categoryName, generatedAt }: {
+  card: { id: string; emoji: string; title: string; subtitle: string; badge: string; borderColor: string; bgColor: string; badgeColor: string; content: string };
+  contentRef: React.RefObject<HTMLDivElement>;
+  downloadPDF: () => void;
+  categoryName?: string;
+  generatedAt?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const isFirst = React.useRef(false);
+  return (
+    <Card className={`border ${card.borderColor} transition-all duration-200`}>
+      {/* Card header — always visible, click to toggle */}
+      <button
+        className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-t-lg ${card.bgColor} hover:brightness-105 transition-all`}
+        onClick={() => setOpen(o => !o)}
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="text-2xl shrink-0">{card.emoji}</span>
+          <div className="text-left min-w-0">
+            <p className="text-sm font-semibold text-foreground truncate">{card.title}</p>
+            <p className="text-xs text-muted-foreground truncate">{card.subtitle}{generatedAt ? ` · ${new Date(generatedAt).toLocaleDateString()}` : ''}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${card.badgeColor}`}>{card.badge}</span>
+          <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${open ? 'rotate-90' : ''}`} />
+        </div>
+      </button>
+
+      {/* Expanded content */}
+      {open && (
+        <CardContent className="pt-4 pb-4">
+          <div className="flex justify-end mb-3">
+            <Button variant="outline" size="sm" onClick={downloadPDF} className="flex items-center gap-2 text-xs">
+              <Download className="h-3.5 w-3.5" /> Download PDF
+            </Button>
+          </div>
+          <div ref={contentRef} className="space-y-1 max-h-[900px] overflow-y-auto pr-1">
+            {renderMarkdown(card.content)}
+          </div>
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function FormulaBriefTab({ categoryId, categoryName }: Props) {
@@ -246,116 +294,85 @@ export function FormulaBriefTab({ categoryId, categoryName }: Props) {
     qaReport?.match(/## MANUFACTURABILITY CHECK([\s\S]*?)(?:\n## COMPETITOR|$)/)?.[1]?.trim() ||
     undefined;
 
-  // ── Dual-model brief (Grok 4.2 + Claude Opus 4.6) ──
+  // ── Formula cards (expandable) ──
   if (grokBrief || claudeBrief || legacyBrief) {
-    const hasDual = !!(grokBrief && claudeBrief);
 
-    const BriefPanel = ({ content, model, color }: { content: string; model: string; color: string }) => (
-      <div className="space-y-4">
-        <div className={`flex items-start justify-between gap-4 flex-wrap p-4 rounded-xl border ${color}`}>
-          <div>
-            <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
-              <FileText className="h-5 w-5 text-primary" />
-              DOVIVE Formula Brief
-            </h2>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              {categoryName} · {model}{generatedAt ? ` · ${new Date(generatedAt).toLocaleDateString()}` : ""}
-            </p>
-          </div>
-          <div className="flex items-center gap-3 flex-wrap">
-            {dataSources && (
-              <div className="flex gap-1.5 flex-wrap">
-                {[
-                  `${dataSources.top5_used} top performers`,
-                  `${dataSources.new_winners_used} new winners`,
-                  `${dataSources.ingredients_analyzed} ingredients`,
-                ].map(s => (
-                  <span key={s} className="text-[11px] px-2 py-1 rounded bg-muted border border-border text-muted-foreground">{s}</span>
-                ))}
-              </div>
-            )}
-            <Button variant="outline" size="sm" onClick={downloadPDF} className="flex items-center gap-2">
-              <Download className="h-4 w-4" />
-              Download PDF
-            </Button>
-          </div>
-        </div>
-        <Card>
-          <CardContent className="pt-6">
-            <div ref={contentRef} className="space-y-1">
-              {renderMarkdown(content)}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    const cards = [
+      grokBrief && {
+        id: 'grok',
+        emoji: '🤖',
+        title: 'Formula A — Grok 4.2',
+        subtitle: 'Deep scientific reasoning',
+        badge: `${Math.round(grokBrief.length / 1000)}k chars`,
+        borderColor: 'border-blue-500/40',
+        bgColor: 'bg-blue-500/5',
+        badgeColor: 'bg-blue-500/10 text-blue-400',
+        content: grokBrief,
+      },
+      claudeBrief && {
+        id: 'claude',
+        emoji: '🧠',
+        title: 'Formula B — Claude Opus 4.6',
+        subtitle: '1M context synthesis',
+        badge: `${Math.round(claudeBrief.length / 1000)}k chars`,
+        borderColor: 'border-purple-500/40',
+        bgColor: 'bg-purple-500/5',
+        badgeColor: 'bg-purple-500/10 text-purple-400',
+        content: claudeBrief,
+      },
+      adjustedFormula && {
+        id: 'final',
+        emoji: '✅',
+        title: 'Final Formula — QA Adjusted',
+        subtitle: 'Claude Opus 4.6 adjudication · ' + (qaVerdict?.verdict || 'Reviewed'),
+        badge: qaVerdict?.score ? `${qaVerdict.score}/10` : 'QA',
+        borderColor: 'border-green-500/40',
+        bgColor: 'bg-green-500/5',
+        badgeColor: 'bg-green-500/10 text-green-400',
+        content: adjustedFormula,
+      },
+      !grokBrief && !claudeBrief && legacyBrief && {
+        id: 'legacy',
+        emoji: '📄',
+        title: 'Formula Brief',
+        subtitle: 'AI-Generated',
+        badge: `${Math.round(legacyBrief.length / 1000)}k chars`,
+        borderColor: 'border-primary/30',
+        bgColor: 'bg-primary/5',
+        badgeColor: 'bg-primary/10 text-primary',
+        content: legacyBrief,
+      },
+    ].filter(Boolean) as any[];
 
-    if (hasDual) {
-      return (
-        <div className="space-y-4">
-          {/* Dual model header */}
-          <div className="p-3 rounded-lg bg-muted/50 border border-border flex items-center gap-2 text-sm text-muted-foreground">
-            <FlaskConical className="h-4 w-4 text-primary shrink-0" />
-            <span><strong className="text-foreground">Dual-Model Formulation</strong> — Grok 4.2 (deep reasoning) + Claude Opus 4.6 (1M context) ran in parallel. QA adjudicates below.</span>
-          </div>
-
-          {/* Side-by-side model switcher */}
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <button
-              id="tab-grok"
-              onClick={() => { document.getElementById('panel-grok')?.scrollIntoView({ behavior: 'smooth' }); }}
-              className="flex items-center gap-2 p-3 rounded-lg border border-blue-500/30 bg-blue-500/5 hover:bg-blue-500/10 text-left"
-            >
-              <span className="text-lg">🤖</span>
-              <div><p className="text-sm font-semibold text-foreground">Formula A — Grok 4.2</p><p className="text-xs text-muted-foreground">Deep scientific reasoning · {Math.round(grokBrief.length / 1000)}k chars</p></div>
-            </button>
-            <button
-              id="tab-claude"
-              onClick={() => { document.getElementById('panel-claude')?.scrollIntoView({ behavior: 'smooth' }); }}
-              className="flex items-center gap-2 p-3 rounded-lg border border-purple-500/30 bg-purple-500/5 hover:bg-purple-500/10 text-left"
-            >
-              <span className="text-lg">🧠</span>
-              <div><p className="text-sm font-semibold text-foreground">Formula B — Claude Opus 4.6</p><p className="text-xs text-muted-foreground">1M context synthesis · {Math.round(claudeBrief.length / 1000)}k chars</p></div>
-            </button>
-          </div>
-
-          {/* Grok panel */}
-          <div id="panel-grok">
-            <BriefPanel content={grokBrief} model="🤖 Grok 4.2 — Formula A" color="border-blue-500/20 bg-blue-500/5" />
-          </div>
-
-          {/* Claude panel */}
-          <div id="panel-claude" className="pt-4 border-t border-border">
-            <BriefPanel content={claudeBrief} model="🧠 Claude Opus 4.6 — Formula B" color="border-purple-500/20 bg-purple-500/5" />
-          </div>
-
-          {/* Final Formula (from QA adjusted formula) */}
-          {adjustedFormula && (
-            <div className="mt-8">
-              <h2 className="text-lg font-bold text-foreground mb-2">Final Formula — QA Adjusted</h2>
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="space-y-1" style={{ maxHeight: '800px', overflowY: 'auto' }}>
-                    {renderMarkdown(adjustedFormula)}
-                  </div>
-                </CardContent>
-
-                <CardFooter className="flex justify-end">
-                  <Button variant="outline" size="sm" onClick={() => downloadPDF()} className="flex items-center gap-2">
-                    <Download className="h-4 w-4" /> Download PDF
-                  </Button>
-                </CardFooter>
-              </Card>
-            </div>
+    return (
+      <div className="space-y-3">
+        {/* Header */}
+        <div className="p-3 rounded-lg bg-muted/50 border border-border flex items-center gap-2 text-sm text-muted-foreground">
+          <FlaskConical className="h-4 w-4 text-primary shrink-0" />
+          <span>
+            <strong className="text-foreground">Formula Brief</strong>
+            {grokBrief && claudeBrief ? ' — Dual-model: Grok 4.2 + Claude Opus 4.6 ran in parallel. Click a card to expand.' : ' — Click a card to expand.'}
+          </span>
+          {dataSources && (
+            <span className="ml-auto text-xs hidden sm:block">
+              {dataSources.ingredients_analyzed} ingredients · {dataSources.top5_used} top performers
+            </span>
           )}
         </div>
-      );
-    }
 
-    // Single model fallback
-    const content = grokBrief || claudeBrief || legacyBrief!;
-    const model = grokBrief ? "🤖 Grok 4.2" : claudeBrief ? "🧠 Claude Opus 4.6" : "AI-Generated";
-    return <BriefPanel content={content} model={model} color="border-primary/20 bg-primary/5" />;
+        {/* Expandable cards */}
+        {cards.map((card) => (
+          <FormulaCard
+            key={card.id}
+            card={card}
+            contentRef={contentRef}
+            downloadPDF={downloadPDF}
+            categoryName={categoryName}
+            generatedAt={generatedAt}
+          />
+        ))}
+      </div>
+    );
   }
 
   // ── Legacy structured brief ──

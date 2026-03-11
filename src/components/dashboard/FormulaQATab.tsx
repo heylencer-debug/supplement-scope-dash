@@ -56,8 +56,8 @@ function renderInline(text: string): React.ReactNode {
   );
 }
 
-function renderMarkdownSection(text: string): React.ReactNode {
-  if (!text) return null;
+function renderMarkdownSection(text: unknown): React.ReactNode {
+  if (!text || typeof text !== 'string') return null;
   const lines = text.split('\n');
   const elements: React.ReactNode[] = [];
   let i = 0;

@@ -25,8 +25,6 @@ const menuItems: MenuItem[] = [
   { title: "New Analysis", url: "/", icon: Search, preserveCategory: false },
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, preserveCategory: true },
   { title: "Product Explorer", url: "/products", icon: Table, preserveCategory: true },
-  { title: "Market Trends", url: "/market-trends", icon: TrendingUp, preserveCategory: true },
-  { title: "Strategy Brief", url: "/strategy", icon: FileText, preserveCategory: true },
 ];
 
 interface NavItemProps {

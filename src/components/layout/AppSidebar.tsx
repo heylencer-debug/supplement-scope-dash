@@ -137,7 +137,7 @@ export function AppSidebar() {
                   item={item}
                   isActive={isActive(item)}
                   href={getUrl(item)}
-                  trailing={item.title === "Market Trends" ? <MarketTrendStatusIndicator /> : undefined}
+                  trailing={undefined}
                 />
               ))}
             </SidebarMenu>

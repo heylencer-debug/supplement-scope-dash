@@ -315,18 +315,18 @@ async function fetchBrandProductData(
 
     // Get top 3 products by revenue (already sorted)
     const topProducts: TopProduct[] = brandProducts.slice(0, 3).map(p => ({
-      title: p.title || "",
-      price: p.price || 0,
-      rating: p.rating || 0,
-      reviews: p.reviews || 0,
-      monthly_revenue: p.monthly_revenue || 0,
+      title: String(p.title || ""),
+      price: Number(p.price) || 0,
+      rating: Number(p.rating) || 0,
+      reviews: Number(p.reviews) || 0,
+      monthly_revenue: Number(p.monthly_revenue) || 0,
       supplement_facts_complete: p.supplement_facts_complete,
       all_nutrients: p.all_nutrients,
-      feature_bullets_text: p.feature_bullets_text || "",
-      claims_on_label: p.claims_on_label || [],
-      other_ingredients: p.other_ingredients || "",
-      packaging_type: p.packaging_type || "",
-      directions: p.directions || "",
+      feature_bullets_text: String(p.feature_bullets_text || ""),
+      claims_on_label: (p.claims_on_label as string[]) || [],
+      other_ingredients: String(p.other_ingredients || ""),
+      packaging_type: String(p.packaging_type || ""),
+      directions: String(p.directions || ""),
     }));
 
     topBrandsData[brand] = {

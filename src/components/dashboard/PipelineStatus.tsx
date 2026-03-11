@@ -15,16 +15,17 @@ interface PipelineStatusProps {
 }
 
 const PHASE_META: Record<number, { icon: string; shortLabel: string }> = {
-  1:  { icon: "🛒", shortLabel: "Scrape"      },
-  2:  { icon: "📊", shortLabel: "Keepa"       },
-  3:  { icon: "💬", shortLabel: "Reviews"     },
-  4:  { icon: "🔬", shortLabel: "OCR"         },
-  5:  { icon: "🔎", shortLabel: "Research"    },
-  6:  { icon: "🧬", shortLabel: "Product AI"  },
-  7:  { icon: "📦", shortLabel: "Packaging"   },
-  8:  { icon: "📋", shortLabel: "Formula"     },
-  9:  { icon: "📈", shortLabel: "QA"      },
-  10: { icon: "🚀", shortLabel: "Launch"      },
+  1:  { icon: "🛒", shortLabel: "Scrape"        },
+  2:  { icon: "📊", shortLabel: "Keepa"         },
+  3:  { icon: "💬", shortLabel: "Reviews"       },
+  4:  { icon: "🔬", shortLabel: "OCR"           },
+  5:  { icon: "🔎", shortLabel: "Research"      },
+  6:  { icon: "🧬", shortLabel: "Product AI"    },
+  7:  { icon: "📈", shortLabel: "Market Intel"  },
+  8:  { icon: "📦", shortLabel: "Packaging"     },
+  9:  { icon: "📋", shortLabel: "Formula Brief" },
+  10: { icon: "✅", shortLabel: "Formula QA"    },
+  11: { icon: "🚀", shortLabel: "Launch"        },
 };
 
 type StatusKey = "complete" | "partial" | "not_started" | "pending";
@@ -113,8 +114,8 @@ export function PipelineStatus({ categoryId, keyword }: PipelineStatusProps) {
         </div>
       )}
 
-      {/* Phase cards — 2 rows of 5 on desktop, 5 rows of 2 on mobile */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+      {/* Phase cards — 2 rows of 6 on desktop (P1-P11), 2 cols on mobile */}
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
         {phases.map(phase => {
           const cfg  = STATUS_CFG[phase.status];
           const meta = PHASE_META[phase.phase];

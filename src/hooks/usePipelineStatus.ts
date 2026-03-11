@@ -19,7 +19,7 @@ export interface PhaseStatus {
 }
 
 async function fetchPipelineStatus(categoryId: string): Promise<PhaseStatus[]> {
-  const [p1, p2, p3, p4, p6_pi, p6_pkg, p8, p9raw] = await Promise.all([
+  const [p1, p2, p3, p4, p6_pi, p7_market, p6_pkg, p8, p9raw] = await Promise.all([
     // P1 — Amazon scrape
     supabase
       .from("products")
@@ -54,7 +54,16 @@ async function fetchPipelineStatus(categoryId: string): Promise<PhaseStatus[]> {
       .eq("category_id", categoryId)
       .filter("marketing_analysis->product_intelligence", "not.is", null),
 
-    // P7 — Packaging Intelligence: marketing_analysis has packaging_intelligence key
+    // P7 — Market Intelligence: formula_briefs.ingredients.market_intelligence.ai_market_analysis
+    supabase
+      .from("formula_briefs")
+      .select("ingredients")
+      .eq("category_id", categoryId)
+      .not("ingredients", "is", null)
+      .limit(1)
+      .maybeSingle(),
+
+    // P8 — Packaging Intelligence: marketing_analysis has packaging_intelligence key
     supabase
       .from("products")
       .select("*", { count: "exact", head: true })
@@ -90,15 +99,20 @@ async function fetchPipelineStatus(categoryId: string): Promise<PhaseStatus[]> {
   };
 
   // P5 lives in dovive Supabase — infer from whether P6 has data
-  // If P6 ran, P5 deep research was completed upstream
   const p5Complete = (p6_pi.count ?? 0) > 0 ? 10 : 0;
 
-  // P8: 1 brief = complete for this category
-  const p8Complete = p8.count ?? 0;
+  // P7: Market Intelligence — check for ai_market_analysis in formula_briefs.ingredients
+  const p7HasMarket = !!(p7_market as any)?.data?.ingredients?.market_intelligence?.ai_market_analysis;
+  const p7Complete = p7HasMarket ? 1 : 0;
 
-  // P9: complete if formula_briefs.ingredients has qa_report
-  const p9HasQA = !!(p9raw as any)?.data?.ingredients?.qa_report;
-  const p9Complete = p9HasQA ? 1 : 0;
+  // P9: Formula Brief (was P8)
+  const p8Complete = p8.count ?? 0;
+  const p8fb = (p8 as any);
+  const p9HasBrief = p8Complete > 0;
+
+  // P10: QA — complete if formula_briefs.ingredients has qa_report
+  const p10HasQA = !!(p9raw as any)?.data?.ingredients?.qa_report;
+  const p10Complete = p10HasQA ? 1 : 0;
 
   return [
     {
@@ -149,7 +163,7 @@ async function fetchPipelineStatus(categoryId: string): Promise<PhaseStatus[]> {
     {
       phase: 6,
       label: "Product Intelligence",
-      description: "AI formula scoring, extract types, BSR velocity, market gaps",
+      description: "Per-product AI scoring — Formula Landscape, Extract Types, Dosage, Certs, Threat Levels, Top 10",
       total,
       complete: p6_pi.count ?? 0,
       status: makeStatus(p6_pi.count ?? 0, total),
@@ -157,6 +171,15 @@ async function fetchPipelineStatus(categoryId: string): Promise<PhaseStatus[]> {
     },
     {
       phase: 7,
+      label: "Market Intel",
+      description: "Category-level Grok market report — powers Market tab analysis",
+      total: 1,
+      complete: p7Complete,
+      status: p7Complete > 0 ? "complete" : (p6_pi.count ?? 0) > 0 ? "not_started" : "pending",
+      pct: p7Complete * 100,
+    },
+    {
+      phase: 8,
       label: "Packaging Intel",
       description: "Competitor packaging, label design & trust signals",
       total,
@@ -165,7 +188,7 @@ async function fetchPipelineStatus(categoryId: string): Promise<PhaseStatus[]> {
       pct: total ? Math.round(((p6_pkg.count ?? 0) / total) * 100) : 0,
     },
     {
-      phase: 8,
+      phase: 9,
       label: "Formula Brief",
       description: "AI-generated CMO formula spec for contract manufacturer",
       total: 1,
@@ -174,16 +197,16 @@ async function fetchPipelineStatus(categoryId: string): Promise<PhaseStatus[]> {
       pct: p8Complete > 0 ? 100 : 0,
     },
     {
-      phase: 9,
+      phase: 10,
       label: "Formula QA",
       description: "QA specialist: dose validation, competitor head-to-head, formula adjustments",
       total: 1,
-      complete: p9Complete,
-      status: p9Complete > 0 ? "complete" : p8Complete > 0 ? "not_started" : "pending",
-      pct: p9Complete * 100,
+      complete: p10Complete,
+      status: p10Complete > 0 ? "complete" : p8Complete > 0 ? "not_started" : "pending",
+      pct: p10Complete * 100,
     },
     {
-      phase: 10,
+      phase: 11,
       label: "Launch Brief",
       description: "Final CMO launch package: specs, pricing, go-to-market",
       total: 0,

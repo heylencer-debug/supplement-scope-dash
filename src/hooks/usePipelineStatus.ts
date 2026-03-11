@@ -70,20 +70,23 @@ async function fetchPipelineStatus(categoryId: string): Promise<PhaseStatus[]> {
       .eq("category_id", categoryId)
       .filter("marketing_analysis->packaging_intelligence", "not.is", null),
 
-    // P8 — Formula Brief: formula_briefs table
-    supabase
-      .from("formula_briefs")
-      .select("*", { count: "exact", head: true })
-      .eq("category_id", categoryId),
-
-    // P9 — Formula QA: formula_briefs.ingredients has qa_report key
+    // P9 — Formula Brief: check ingredients has actual AI content (grok or primary brief)
     supabase
       .from("formula_briefs")
       .select("ingredients")
       .eq("category_id", categoryId)
       .not("ingredients", "is", null)
       .limit(1)
-      .single(),
+      .maybeSingle(),
+
+    // P10 — Formula QA: formula_briefs.ingredients has qa_report key
+    supabase
+      .from("formula_briefs")
+      .select("ingredients")
+      .eq("category_id", categoryId)
+      .not("ingredients", "is", null)
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   const total = p1.count ?? 0;
@@ -98,20 +101,33 @@ async function fetchPipelineStatus(categoryId: string): Promise<PhaseStatus[]> {
     return "partial";
   };
 
-  // P5 lives in dovive Supabase — infer from whether P6 has data
-  const p5Complete = (p6_pi.count ?? 0) > 0 ? 10 : 0;
+  // P5 — Deep Research: check products.marketing_analysis.p5_research (saved by phase5-deep-research.js)
+  // Each researched product has p5_research key in marketing_analysis
+  // We target 20 total (10 BSR + 10 new brands). Use p6_pi as a proxy for total products.
+  const p5CountRaw = await supabase
+    .from("products")
+    .select("*", { count: "exact", head: true })
+    .eq("category_id", categoryId)
+    .filter("marketing_analysis->p5_research", "not.is", null);
+  const p5Count = p5CountRaw.count ?? 0;
+  const P5_TARGET = 20;
 
   // P7: Market Intelligence — check for ai_market_analysis in formula_briefs.ingredients
   const p7HasMarket = !!(p7_market as any)?.data?.ingredients?.market_intelligence?.ai_market_analysis;
   const p7Complete = p7HasMarket ? 1 : 0;
 
-  // P9: Formula Brief (was P8)
-  const p8Complete = p8.count ?? 0;
-  const p8fb = (p8 as any);
-  const p9HasBrief = p8Complete > 0;
+  // P9: Formula Brief — check actual AI content exists (grok brief OR primary brief), not just record
+  const p9Ingredients = (p8 as any)?.data?.ingredients as Record<string, unknown> | null;
+  const p9HasBrief = !!(
+    (p9Ingredients?.ai_generated_brief_grok as string)?.length > 100 ||
+    (p9Ingredients?.ai_generated_brief as string)?.length > 100
+  );
+  const p9HasClaude = !!(p9Ingredients?.ai_generated_brief_claude as string)?.length;
+  const p9BriefComplete = p9HasBrief ? 1 : 0;
 
-  // P10: QA — complete if formula_briefs.ingredients has qa_report
-  const p10HasQA = !!(p9raw as any)?.data?.ingredients?.qa_report;
+  // P10: QA — complete if formula_briefs.ingredients has qa_report with content
+  const p10Ingredients = (p9raw as any)?.data?.ingredients as Record<string, unknown> | null;
+  const p10HasQA = !!(p10Ingredients?.qa_report as string)?.length;
   const p10Complete = p10HasQA ? 1 : 0;
 
   return [
@@ -139,7 +155,8 @@ async function fetchPipelineStatus(categoryId: string): Promise<PhaseStatus[]> {
       description: "Customer sentiment, pain points & review mining",
       total,
       complete: p3.count ?? 0,
-      status: makeStatus(p3.count ?? 0, total),
+      // P3 is CAPTCHA-limited — partial is expected. Complete = 80%+ coverage.
+      status: (p3.count ?? 0) >= total * 0.8 ? "complete" : (p3.count ?? 0) > 0 ? "partial" : "not_started",
       pct: total ? Math.round(((p3.count ?? 0) / total) * 100) : 0,
     },
     {
@@ -154,11 +171,11 @@ async function fetchPipelineStatus(categoryId: string): Promise<PhaseStatus[]> {
     {
       phase: 5,
       label: "Deep Research",
-      description: "Top-10 deep dives: Reddit, certs, competitor angle",
-      total: 10,
-      complete: p5Complete,
-      status: makeStatus(p5Complete, 10),
-      pct: Math.round((p5Complete / 10) * 100),
+      description: "Top 10 BSR + Top 10 New Brands — Grok 4.1 fast competitive intelligence",
+      total: P5_TARGET,
+      complete: p5Count,
+      status: p5Count >= P5_TARGET ? "complete" : p5Count >= 10 ? "partial" : p5Count > 0 ? "partial" : "not_started",
+      pct: Math.round((p5Count / P5_TARGET) * 100),
     },
     {
       phase: 6,
@@ -190,19 +207,19 @@ async function fetchPipelineStatus(categoryId: string): Promise<PhaseStatus[]> {
     {
       phase: 9,
       label: "Formula Brief",
-      description: "AI-generated CMO formula spec for contract manufacturer",
+      description: `AI formula spec — Grok 4.2 deep reasoning + Claude Opus 4.6${p9HasClaude ? " ✓ dual" : p9HasBrief ? " ✓ single" : ""}`,
       total: 1,
-      complete: p8Complete > 0 ? 1 : 0,
-      status: p8Complete > 0 ? "complete" : "not_started",
-      pct: p8Complete > 0 ? 100 : 0,
+      complete: p9BriefComplete,
+      status: p9BriefComplete > 0 ? "complete" : "not_started",
+      pct: p9BriefComplete * 100,
     },
     {
       phase: 10,
       label: "Formula QA",
-      description: "QA specialist: dose validation, competitor head-to-head, formula adjustments",
+      description: "QA: dose validation, dual-formula comparison, final adjudicated formula",
       total: 1,
       complete: p10Complete,
-      status: p10Complete > 0 ? "complete" : p8Complete > 0 ? "not_started" : "pending",
+      status: p10Complete > 0 ? "complete" : p9BriefComplete > 0 ? "not_started" : "pending",
       pct: p10Complete * 100,
     },
     {

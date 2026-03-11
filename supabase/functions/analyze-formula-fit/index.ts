@@ -276,7 +276,7 @@ async function fetchBrandProductData(
   const lowerBrandNames = brandNames.map(b => b.toLowerCase());
   const matchingProducts = products.filter(p => {
     if (!p.brand) return false;
-    const productBrand = p.brand.toLowerCase();
+    const productBrand = String(p.brand).toLowerCase();
     return lowerBrandNames.some(b => 
       productBrand.includes(b) || b.includes(productBrand)
     );

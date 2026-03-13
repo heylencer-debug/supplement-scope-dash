@@ -19,6 +19,11 @@ export interface ProductIntelligenceItem {
   main_image_url: string | null;
   rating_value: number | null;
   intel: {
+    // Generic primary active fields (all categories)
+    primary_active_ingredient: string | null;
+    primary_active_amount_mg: number | null;
+    primary_active_form: string | null;
+    // Ashwagandha-specific (backward compat, null for non-ashwagandha)
     ashwagandha_amount_mg: number | null;
     ashwagandha_extract_type: string;
     withanolide_percentage: string | null;
@@ -93,8 +98,8 @@ function buildSummary(products: ProductIntelligenceItem[]): ProductIntelligenceS
 
   for (const p of products) {
     const i = p.intel;
-    // Extract
-    const et = i.ashwagandha_extract_type || "Unknown";
+    // Extract/form — use generic primary_active_form first, fallback to ashwagandha_extract_type
+    const et = i.primary_active_form || i.ashwagandha_extract_type || "Unknown";
     extractMap[et] = (extractMap[et] || 0) + 1;
     // Certs
     for (const c of i.certifications || []) certMap[c] = (certMap[c] || 0) + 1;
@@ -103,8 +108,9 @@ function buildSummary(products: ProductIntelligenceItem[]): ProductIntelligenceS
     // Threat
     const t = i.competitor_threat_level || "Low";
     threatMap[t] = (threatMap[t] || 0) + 1;
-    // Dosage
-    if (i.ashwagandha_amount_mg) amounts.push(i.ashwagandha_amount_mg);
+    // Dosage — use generic primary_active_amount_mg first, fallback to ashwagandha_amount_mg
+    const activeAmt = i.primary_active_amount_mg || i.ashwagandha_amount_mg;
+    if (activeAmt) amounts.push(activeAmt);
     // Price per serving
     if (i.price_per_serving) prices.push(i.price_per_serving);
     // Quality
@@ -162,8 +168,12 @@ function buildSummary(products: ProductIntelligenceItem[]): ProductIntelligenceS
     .sort((a, b) => (b.intel.formula_quality_score || 0) - (a.intel.formula_quality_score || 0))
     .slice(0, 10);
 
+  // Top products with identified extract/form (any category)
   const ksm66 = products
-    .filter(p => p.intel.ashwagandha_extract_type === "KSM-66")
+    .filter(p => {
+      const form = p.intel.primary_active_form || p.intel.ashwagandha_extract_type;
+      return form && form !== "Unknown";
+    })
     .sort((a, b) => (a.bsr_current || 99999) - (b.bsr_current || 99999))
     .slice(0, 10);
 

@@ -586,7 +586,7 @@ export default function Dashboard() {
       {/* SECTION 6: P6 Product Formula Intelligence */}
       {category?.id && (
         <ScrollAnimate delay={100} variant="fade-up" duration={500}>
-          <ProductFormulaIntelligence categoryId={category.id} />
+          <ProductFormulaIntelligence categoryId={category.id} categoryName={category.name} />
         </ScrollAnimate>
       )}
 

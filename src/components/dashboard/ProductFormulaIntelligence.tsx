@@ -3,6 +3,7 @@
  * Displays P6 product intelligence — formula landscape, dosages,
  * certifications, threats, bonus ingredients, and top formula products.
  * Data from products.marketing_analysis.product_intelligence
+ * DYNAMIC: All labels derived from categoryName prop — not hardcoded for Ashwagandha.
  */
 
 import { useProductIntelligence } from "@/hooks/useProductIntelligence";
@@ -16,19 +17,47 @@ import {
 } from "recharts";
 import { cn } from "@/lib/utils";
 
-interface Props { categoryId: string; }
+interface Props { categoryId: string; categoryName?: string; }
 
-// Extract type colors — keep distinct, use chart tokens where meaningful
-const EXTRACT_COLORS: Record<string, string> = {
-  "KSM-66":          "hsl(var(--chart-1))",
-  "Sensoril":        "hsl(var(--chart-5))",
-  "Shoden":          "hsl(var(--primary))",
-  "Organic Extract": "hsl(var(--chart-4))",
-  "Generic Extract": "hsl(var(--chart-2))",
-  "10:1 Extract":    "hsl(var(--chart-3))",
-  "Root Powder":     "hsl(var(--muted-foreground))",
-  "Unknown":         "hsl(var(--muted-foreground)/0.5)",
-};
+// ── Derive primary ingredient from category name ──────────────────────────────
+function getPrimaryIngredient(categoryName?: string): string {
+  if (!categoryName) return "Primary Active";
+  const name = categoryName.toLowerCase();
+  if (name.includes("vitamin c")) return "Vitamin C";
+  if (name.includes("vitamin d3") || name.includes("vitamin d")) return "Vitamin D";
+  if (name.includes("vitamin b12") || name.includes("b12")) return "Vitamin B12";
+  if (name.includes("melatonin")) return "Melatonin";
+  if (name.includes("collagen")) return "Collagen";
+  if (name.includes("elderberry")) return "Elderberry";
+  if (name.includes("magnesium")) return "Magnesium";
+  if (name.includes("ashwagandha")) return "Ashwagandha";
+  if (name.includes("creatine")) return "Creatine";
+  if (name.includes("berberine")) return "Berberine";
+  if (name.includes("lion")) return "Lion's Mane";
+  if (name.includes("turmeric") || name.includes("curcumin")) return "Turmeric";
+  if (name.includes("zinc")) return "Zinc";
+  if (name.includes("iron")) return "Iron";
+  if (name.includes("biotin")) return "Biotin";
+  if (name.includes("probiotic")) return "Probiotic";
+  if (name.includes("omega") || name.includes("fish oil")) return "Omega-3";
+  // Fallback: strip "gummies/supplement/powder/capsule" and return remainder
+  const stripped = categoryName
+    .replace(/\s*(gummies?|supplement|powder|capsule|tablet|chewable)s?\s*/gi, "")
+    .trim();
+  return stripped || "Primary Active";
+}
+
+// ── Dynamic chart colors (not hardcoded to KSM-66/Sensoril) ──────────────────
+const CHART_PALETTE = [
+  "hsl(var(--chart-1))",
+  "hsl(var(--chart-5))",
+  "hsl(var(--primary))",
+  "hsl(var(--chart-4))",
+  "hsl(var(--chart-2))",
+  "hsl(var(--chart-3))",
+  "hsl(var(--muted-foreground))",
+  "hsl(var(--muted-foreground)/0.5)",
+];
 
 const THREAT_COLORS: Record<string, string> = {
   "Very High": "hsl(var(--destructive))",
@@ -57,8 +86,9 @@ function StatBox({ label, value, sub, accent = false }: {
   );
 }
 
-export function ProductFormulaIntelligence({ categoryId }: Props) {
+export function ProductFormulaIntelligence({ categoryId, categoryName }: Props) {
   const { data, isLoading, error } = useProductIntelligence(categoryId);
+  const primaryIngredient = getPrimaryIngredient(categoryName);
 
   if (isLoading) {
     return (
@@ -81,6 +111,17 @@ export function ProductFormulaIntelligence({ categoryId }: Props) {
 
   const { summary: s } = data;
 
+  // Top extract type (dynamic — whatever the #1 extract is for this category)
+  const topExtract = s.extract_distribution[0];
+  const topExtractPct = topExtract?.pct || 0;
+  const topExtractLabel = topExtract?.label || "Unknown";
+
+  // Premium extract products (top extract type, sorted by BSR)
+  const premiumProducts = data.products
+    .filter(p => p.intel.ashwagandha_extract_type && p.intel.ashwagandha_extract_type !== "Unknown")
+    .sort((a, b) => (a.bsr_current || 99999) - (b.bsr_current || 99999))
+    .slice(0, 8);
+
   return (
     <div className="space-y-6">
 
@@ -92,15 +133,25 @@ export function ProductFormulaIntelligence({ categoryId }: Props) {
             Formula Landscape — {s.total} Products Analyzed
           </CardTitle>
           <CardDescription className="text-xs">
-            Ashwagandha dosage, extract quality, and pricing benchmarks
+            {primaryIngredient} dosage, extract/form quality, and pricing benchmarks
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-            <StatBox label="Avg Ashwagandha Dose" value={s.dosage_stats.avg ? `${s.dosage_stats.avg}mg` : "—"} sub={`Range: ${s.dosage_stats.min}–${s.dosage_stats.max}mg`} accent />
-            <StatBox label="Median Price/Serving" value={s.price_stats.median ? `$${s.price_stats.median.toFixed(2)}` : "—"} sub={`Range: $${s.price_stats.min?.toFixed(2)}–$${s.price_stats.max?.toFixed(2)}`} />
-            <StatBox label="Avg Formula Score" value={s.avg_quality_score ? `${s.avg_quality_score}/10` : "—"} sub="Based on extract + dose + testing" />
-            <StatBox label="Products w/ KSM-66" value={`${s.ksm66_products.length}`} sub={`${Math.round(s.ksm66_products.length / s.total * 100)}% of category`} accent />
+            <StatBox
+              label={`Avg ${primaryIngredient} Dose`}
+              value={s.dosage_stats.avg ? `${s.dosage_stats.avg}mg` : "—"}
+              sub={s.dosage_stats.min && s.dosage_stats.max ? `Range: ${s.dosage_stats.min}–${s.dosage_stats.max}mg` : "No dosage data"}
+              accent
+            />
+            <StatBox label="Median Price/Serving" value={s.price_stats.median ? `$${s.price_stats.median.toFixed(2)}` : "—"} sub={s.price_stats.min && s.price_stats.max ? `Range: $${s.price_stats.min.toFixed(2)}–$${s.price_stats.max.toFixed(2)}` : undefined} />
+            <StatBox label="Avg Formula Score" value={s.avg_quality_score ? `${s.avg_quality_score}/10` : "—"} sub="Based on form, dose & testing" />
+            <StatBox
+              label={`Top Extract/Form`}
+              value={topExtractPct > 0 ? `${topExtractPct}%` : "—"}
+              sub={topExtractPct > 0 ? `use ${topExtractLabel}` : "No form data"}
+              accent
+            />
           </div>
 
           {/* Formula attributes */}
@@ -125,40 +176,50 @@ export function ProductFormulaIntelligence({ categoryId }: Props) {
         </CardContent>
       </Card>
 
-      {/* Extract Type + Dosage Distribution */}
+      {/* Extract/Form Type + Dosage Distribution */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm">
               <FlaskConical className="h-4 w-4 text-primary" />
-              Extract Type Distribution
+              Extract / Form Distribution
             </CardTitle>
             <CardDescription className="text-xs">
-              Quality of ashwagandha used across the category
+              Types and forms of {primaryIngredient} used across the category
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={200}>
-              <PieChart>
-                <Pie data={s.extract_distribution} dataKey="count" nameKey="label" cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={2}>
-                  {s.extract_distribution.map((entry) => (
-                    <Cell key={entry.label} fill={EXTRACT_COLORS[entry.label] || "hsl(var(--muted-foreground))"} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  formatter={(val: number, name: string) => [`${val} products (${Math.round(val / s.total * 100)}%)`, name]}
-                  contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "var(--radius)", fontSize: 12, color: "hsl(var(--foreground))" }}
-                />
-                <Legend formatter={(value) => <span style={{ fontSize: 11, color: "hsl(var(--foreground))" }}>{value}</span>} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="mt-2 p-2 rounded-lg bg-primary/10 border border-primary/20">
-              <p className="text-xs text-foreground">
-                <span className="font-semibold">KSM-66</span> is the gold standard — only{" "}
-                {s.extract_distribution.find(e => e.label === "KSM-66")?.pct || 0}% of products use it.
-                Dovive should lead with KSM-66 as a primary differentiator.
-              </p>
-            </div>
+            {s.extract_distribution.length > 0 ? (
+              <>
+                <ResponsiveContainer width="100%" height={200}>
+                  <PieChart>
+                    <Pie data={s.extract_distribution} dataKey="count" nameKey="label" cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={2}>
+                      {s.extract_distribution.map((entry, i) => (
+                        <Cell key={entry.label} fill={CHART_PALETTE[i % CHART_PALETTE.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(val: number, name: string) => [`${val} products (${Math.round(val / s.total * 100)}%)`, name]}
+                      contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "var(--radius)", fontSize: 12, color: "hsl(var(--foreground))" }}
+                    />
+                    <Legend formatter={(value) => <span style={{ fontSize: 11, color: "hsl(var(--foreground))" }}>{value}</span>} />
+                  </PieChart>
+                </ResponsiveContainer>
+                {topExtractPct > 0 && (
+                  <div className="mt-2 p-2 rounded-lg bg-primary/10 border border-primary/20">
+                    <p className="text-xs text-foreground">
+                      <span className="font-semibold">{topExtractLabel}</span> is the most common form —{" "}
+                      {topExtractPct}% of products use it.
+                      {topExtractPct < 30 && " Market is fragmented — differentiation opportunity."}
+                    </p>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="flex items-center justify-center h-[200px] text-sm text-muted-foreground">
+                No extract/form data detected for {primaryIngredient}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -166,36 +227,41 @@ export function ProductFormulaIntelligence({ categoryId }: Props) {
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm">
               <TrendingUp className="h-4 w-4 text-primary" />
-              Ashwagandha Dosage Distribution
+              {primaryIngredient} Dosage Distribution
             </CardTitle>
             <CardDescription className="text-xs">
-              Clinical dose is 300–600mg/day of KSM-66 (standardized 5% withanolides)
+              How much {primaryIngredient} competitors include per serving
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={s.dosage_buckets} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
-                <XAxis dataKey="label" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
-                <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
-                <Tooltip
-                  formatter={(val: number) => [`${val} products`, "Count"]}
-                  contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "var(--radius)", fontSize: 12, color: "hsl(var(--foreground))" }}
-                />
-                <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                  {s.dosage_buckets.map((b) => (
-                    <Cell
-                      key={b.label}
-                      fill={b.min >= 300 && b.max <= 999 ? "hsl(var(--chart-1))" : b.min >= 1000 ? "hsl(var(--chart-4))" : "hsl(var(--muted-foreground)/0.5)"}
+            {s.dosage_buckets.length > 0 ? (
+              <>
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={s.dosage_buckets} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+                    <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+                    <Tooltip
+                      formatter={(val: number) => [`${val} products`, "Count"]}
+                      contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "var(--radius)", fontSize: 12, color: "hsl(var(--foreground))" }}
                     />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-            <div className="flex gap-3 mt-2 text-[10px] text-muted-foreground">
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-chart-1 inline-block" />Clinical range</span>
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-chart-4 inline-block" />High dose</span>
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-muted-foreground/40 inline-block" />Below clinical</span>
-            </div>
+                    <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                      {s.dosage_buckets.map((b, i) => (
+                        <Cell key={b.label} fill={CHART_PALETTE[i % CHART_PALETTE.length]} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+                <div className="flex gap-3 mt-2 text-[10px] text-muted-foreground">
+                  <span>Avg: <strong className="text-foreground">{s.dosage_stats.avg}mg</strong></span>
+                  <span>Median: <strong className="text-foreground">{s.dosage_stats.median}mg</strong></span>
+                  <span>Max: <strong className="text-foreground">{s.dosage_stats.max}mg</strong></span>
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center justify-center h-[200px] text-sm text-muted-foreground">
+                No specific dosage data detected for {primaryIngredient}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -211,17 +277,21 @@ export function ProductFormulaIntelligence({ categoryId }: Props) {
             <CardDescription className="text-xs">% of products with each certification</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              {s.cert_frequency.slice(0, 10).map((c) => (
-                <div key={c.label} className="flex items-center gap-2">
-                  <span className="text-xs text-foreground w-36 shrink-0 truncate">{c.label}</span>
-                  <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                    <div className="h-full bg-chart-4 rounded-full" style={{ width: `${c.pct}%` }} />
+            {s.cert_frequency.length > 0 ? (
+              <div className="space-y-2">
+                {s.cert_frequency.slice(0, 10).map((c) => (
+                  <div key={c.label} className="flex items-center gap-2">
+                    <span className="text-xs text-foreground w-36 shrink-0 truncate">{c.label}</span>
+                    <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                      <div className="h-full bg-chart-4 rounded-full" style={{ width: `${c.pct}%` }} />
+                    </div>
+                    <span className="text-xs text-muted-foreground w-10 text-right tabular-nums">{c.pct}%</span>
                   </div>
-                  <span className="text-xs text-muted-foreground w-10 text-right tabular-nums">{c.pct}%</span>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No certification data available</p>
+            )}
           </CardContent>
         </Card>
 
@@ -229,24 +299,28 @@ export function ProductFormulaIntelligence({ categoryId }: Props) {
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm">
               <Zap className="h-4 w-4 text-chart-2" />
-              Bonus Ingredients
+              Bonus / Co-Ingredients
             </CardTitle>
             <CardDescription className="text-xs">
-              Most common active ingredients paired with ashwagandha
+              Most common active ingredients paired with {primaryIngredient}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={s.bonus_frequency.slice(0, 10)} layout="vertical" margin={{ top: 0, right: 30, left: 10, bottom: 0 }}>
-                <XAxis type="number" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
-                <YAxis type="category" dataKey="label" width={150} tick={{ fontSize: 11, fill: "hsl(var(--foreground))" }} />
-                <Tooltip
-                  formatter={(val: number) => [`${val} products`, "Count"]}
-                  contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "var(--radius)", fontSize: 12, color: "hsl(var(--foreground))" }}
-                />
-                <Bar dataKey="count" fill="hsl(var(--chart-2))" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            {s.bonus_frequency.length > 0 ? (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={s.bonus_frequency.slice(0, 10)} layout="vertical" margin={{ top: 0, right: 30, left: 10, bottom: 0 }}>
+                  <XAxis type="number" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+                  <YAxis type="category" dataKey="label" width={150} tick={{ fontSize: 11, fill: "hsl(var(--foreground))" }} />
+                  <Tooltip
+                    formatter={(val: number) => [`${val} products`, "Count"]}
+                    contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "var(--radius)", fontSize: 12, color: "hsl(var(--foreground))" }}
+                  />
+                  <Bar dataKey="count" fill="hsl(var(--chart-2))" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="text-sm text-muted-foreground">No bonus ingredient data available</p>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -260,7 +334,7 @@ export function ProductFormulaIntelligence({ categoryId }: Props) {
               Formula Quality Distribution
             </CardTitle>
             <CardDescription className="text-xs">
-              Scored 1–10 based on extract quality, dose, and third-party testing
+              Scored 1–10 based on form quality, dose, and third-party testing
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -308,7 +382,7 @@ export function ProductFormulaIntelligence({ categoryId }: Props) {
               ))}
             </div>
             <p className="text-xs text-muted-foreground mt-3">
-              Most competitors are Medium/Low threat — Dovive can compete with a solid formula + KSM-66
+              Most competitors are Medium/Low threat — Dovive can compete with a premium formula
             </p>
           </CardContent>
         </Card>
@@ -328,85 +402,100 @@ export function ProductFormulaIntelligence({ categoryId }: Props) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border">
-                  {["#", "Brand", "Extract", "Dose", "Score", "BSR", "$/Serving", "Threat"].map((h, i) => (
+                  {["#", "Brand", "Form/Extract", "Dose", "Score", "BSR", "$/Serving", "Threat"].map((h, i) => (
                     <th key={h} className={cn("py-2 text-xs text-muted-foreground font-medium", i > 2 ? "text-right px-3" : "text-left pr-3")}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {s.top_by_formula.map((p, i) => (
-                  <tr key={p.asin} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
-                    <td className="py-2 pr-3 text-xs text-muted-foreground">{i + 1}</td>
-                    <td className="py-2 pr-3">
-                      <div className="flex items-center gap-2">
-                        {p.main_image_url && <img src={p.main_image_url} alt="" className="w-7 h-7 rounded object-cover shrink-0" />}
-                        <span className="text-xs font-medium text-foreground truncate max-w-[100px]">{p.brand || "—"}</span>
-                      </div>
-                    </td>
-                    <td className="py-2 pr-3">
-                      <Badge variant="outline" className="text-[10px] px-1.5" style={{ color: EXTRACT_COLORS[p.intel.ashwagandha_extract_type], borderColor: EXTRACT_COLORS[p.intel.ashwagandha_extract_type] }}>
-                        {p.intel.ashwagandha_extract_type}
-                      </Badge>
-                    </td>
-                    <td className="text-right py-2 px-3 text-xs text-foreground tabular-nums">
-                      {p.intel.ashwagandha_amount_mg ? `${p.intel.ashwagandha_amount_mg}mg` : "—"}
-                    </td>
-                    <td className="text-right py-2 px-3">
-                      <span className="text-xs font-bold tabular-nums" style={{ color: p.intel.formula_quality_score >= 8 ? "hsl(var(--chart-4))" : p.intel.formula_quality_score >= 6 ? "hsl(var(--chart-2))" : "hsl(var(--destructive))" }}>
-                        {p.intel.formula_quality_score}/10
-                      </span>
-                    </td>
-                    <td className="text-right py-2 px-3 text-xs text-muted-foreground tabular-nums">
-                      #{p.bsr_current?.toLocaleString() || "—"}
-                    </td>
-                    <td className="text-right py-2 px-3 text-xs text-foreground tabular-nums">
-                      {p.intel.price_per_serving ? `$${p.intel.price_per_serving.toFixed(2)}` : "—"}
-                    </td>
-                    <td className="py-2 pl-3">
-                      <span className="text-[10px] font-semibold" style={{ color: THREAT_COLORS[p.intel.competitor_threat_level] }}>
-                        {p.intel.competitor_threat_level}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                {s.top_by_formula.map((p, i) => {
+                  const extractIdx = s.extract_distribution.findIndex(e => e.label === p.intel.ashwagandha_extract_type);
+                  const extractColor = CHART_PALETTE[extractIdx >= 0 ? extractIdx : 0];
+                  return (
+                    <tr key={p.asin} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                      <td className="py-2 pr-3 text-xs text-muted-foreground">{i + 1}</td>
+                      <td className="py-2 pr-3">
+                        <div className="flex items-center gap-2">
+                          {p.main_image_url && <img src={p.main_image_url} alt="" className="w-7 h-7 rounded object-cover shrink-0" />}
+                          <span className="text-xs font-medium text-foreground truncate max-w-[100px]">{p.brand || "—"}</span>
+                        </div>
+                      </td>
+                      <td className="py-2 pr-3">
+                        <Badge variant="outline" className="text-[10px] px-1.5" style={{ color: extractColor, borderColor: extractColor }}>
+                          {p.intel.ashwagandha_extract_type || "Unknown"}
+                        </Badge>
+                      </td>
+                      <td className="text-right py-2 px-3 text-xs text-foreground tabular-nums">
+                        {p.intel.ashwagandha_amount_mg ? `${p.intel.ashwagandha_amount_mg}mg` : "—"}
+                      </td>
+                      <td className="text-right py-2 px-3">
+                        <span className="text-xs font-bold tabular-nums" style={{ color: p.intel.formula_quality_score >= 8 ? "hsl(var(--chart-4))" : p.intel.formula_quality_score >= 6 ? "hsl(var(--chart-2))" : "hsl(var(--destructive))" }}>
+                          {p.intel.formula_quality_score}/10
+                        </span>
+                      </td>
+                      <td className="text-right py-2 px-3 text-xs text-muted-foreground tabular-nums">
+                        #{p.bsr_current?.toLocaleString() || "—"}
+                      </td>
+                      <td className="text-right py-2 px-3 text-xs text-foreground tabular-nums">
+                        {p.intel.price_per_serving ? `$${p.intel.price_per_serving.toFixed(2)}` : "—"}
+                      </td>
+                      <td className="py-2 pl-3">
+                        <span className="text-[10px] font-semibold" style={{ color: THREAT_COLORS[p.intel.competitor_threat_level] }}>
+                          {p.intel.competitor_threat_level}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </CardContent>
       </Card>
 
-      {/* KSM-66 Products */}
-      {s.ksm66_products.length > 0 && (
+      {/* Premium / Top Extract Products — dynamic, not KSM-66 specific */}
+      {premiumProducts.length > 0 && (
         <Card className="border-primary/20 bg-primary/5">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm text-primary">
               <FlaskConical className="h-4 w-4" />
-              KSM-66 Competitors to Beat
+              Top {primaryIngredient} Competitors by BSR
             </CardTitle>
             <CardDescription className="text-xs">
-              These use the same premium extract Dovive should use — direct competition
+              Products with identified extract/form data — direct benchmark competitors
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              {s.ksm66_products.map((p) => (
-                <div key={p.asin} className="flex items-center gap-3 p-2.5 rounded-lg border border-primary/15 bg-primary/5">
-                  {p.main_image_url && <img src={p.main_image_url} alt="" className="w-10 h-10 rounded object-cover shrink-0" />}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{p.brand}</p>
-                    <p className="text-xs text-muted-foreground">{p.intel.ashwagandha_amount_mg}mg · {p.intel.withanolide_percentage || "?"} withanolides</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-[10px] text-muted-foreground">BSR #{p.bsr_current?.toLocaleString()}</span>
-                      {p.intel.price_per_serving && <span className="text-[10px] text-muted-foreground">${p.intel.price_per_serving.toFixed(2)}/serving</span>}
+              {premiumProducts.map((p) => {
+                const extractIdx = s.extract_distribution.findIndex(e => e.label === p.intel.ashwagandha_extract_type);
+                const extractColor = CHART_PALETTE[extractIdx >= 0 ? extractIdx : 0];
+                return (
+                  <div key={p.asin} className="flex items-center gap-3 p-2.5 rounded-lg border border-primary/15 bg-primary/5">
+                    {p.main_image_url && <img src={p.main_image_url} alt="" className="w-10 h-10 rounded object-cover shrink-0" />}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{p.brand}</p>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <Badge variant="outline" className="text-[9px] px-1" style={{ color: extractColor, borderColor: extractColor }}>
+                          {p.intel.ashwagandha_extract_type}
+                        </Badge>
+                        {p.intel.ashwagandha_amount_mg && (
+                          <span className="text-[10px] text-muted-foreground">{p.intel.ashwagandha_amount_mg}mg</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[10px] text-muted-foreground">BSR #{p.bsr_current?.toLocaleString()}</span>
+                        {p.intel.price_per_serving && <span className="text-[10px] text-muted-foreground">${p.intel.price_per_serving.toFixed(2)}/serving</span>}
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className="text-xs font-bold" style={{ color: p.intel.formula_quality_score >= 8 ? "hsl(var(--chart-4))" : "hsl(var(--chart-2))" }}>
+                        {p.intel.formula_quality_score}/10
+                      </span>
                     </div>
                   </div>
-                  <div className="text-right shrink-0">
-                    <span className="text-xs font-bold" style={{ color: p.intel.formula_quality_score >= 8 ? "hsl(var(--chart-4))" : "hsl(var(--chart-2))" }}>
-                      {p.intel.formula_quality_score}/10
-                    </span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </CardContent>
         </Card>

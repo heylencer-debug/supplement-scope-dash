@@ -116,9 +116,14 @@ export function ProductFormulaIntelligence({ categoryId, categoryName }: Props) 
   const topExtractPct = topExtract?.pct || 0;
   const topExtractLabel = topExtract?.label || "Unknown";
 
-  // Premium extract products (top extract type, sorted by BSR)
+  // Premium extract products (top extract type, sorted by BSR) — generic, works for any category
+  const getActiveForm = (intel: any) =>
+    intel.primary_active_form || intel.ashwagandha_extract_type || null;
+  const getActiveMg = (intel: any) =>
+    intel.primary_active_amount_mg ?? intel.ashwagandha_amount_mg ?? null;
+
   const premiumProducts = data.products
-    .filter(p => p.intel.ashwagandha_extract_type && p.intel.ashwagandha_extract_type !== "Unknown")
+    .filter(p => { const f = getActiveForm(p.intel); return f && f !== "Unknown"; })
     .sort((a, b) => (a.bsr_current || 99999) - (b.bsr_current || 99999))
     .slice(0, 8);
 
@@ -409,7 +414,9 @@ export function ProductFormulaIntelligence({ categoryId, categoryName }: Props) 
               </thead>
               <tbody>
                 {s.top_by_formula.map((p, i) => {
-                  const extractIdx = s.extract_distribution.findIndex(e => e.label === p.intel.ashwagandha_extract_type);
+                  const activeForm = getActiveForm(p.intel);
+                  const activeMg = getActiveMg(p.intel);
+                  const extractIdx = s.extract_distribution.findIndex(e => e.label === activeForm);
                   const extractColor = CHART_PALETTE[extractIdx >= 0 ? extractIdx : 0];
                   return (
                     <tr key={p.asin} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
@@ -422,11 +429,11 @@ export function ProductFormulaIntelligence({ categoryId, categoryName }: Props) 
                       </td>
                       <td className="py-2 pr-3">
                         <Badge variant="outline" className="text-[10px] px-1.5" style={{ color: extractColor, borderColor: extractColor }}>
-                          {p.intel.ashwagandha_extract_type || "Unknown"}
+                          {activeForm || "Unknown"}
                         </Badge>
                       </td>
                       <td className="text-right py-2 px-3 text-xs text-foreground tabular-nums">
-                        {p.intel.ashwagandha_amount_mg ? `${p.intel.ashwagandha_amount_mg}mg` : "—"}
+                        {activeMg ? `${activeMg}mg` : "—"}
                       </td>
                       <td className="text-right py-2 px-3">
                         <span className="text-xs font-bold tabular-nums" style={{ color: p.intel.formula_quality_score >= 8 ? "hsl(var(--chart-4))" : p.intel.formula_quality_score >= 6 ? "hsl(var(--chart-2))" : "hsl(var(--destructive))" }}>
@@ -468,7 +475,9 @@ export function ProductFormulaIntelligence({ categoryId, categoryName }: Props) 
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               {premiumProducts.map((p) => {
-                const extractIdx = s.extract_distribution.findIndex(e => e.label === p.intel.ashwagandha_extract_type);
+                const pForm = getActiveForm(p.intel);
+                const pMg = getActiveMg(p.intel);
+                const extractIdx = s.extract_distribution.findIndex(e => e.label === pForm);
                 const extractColor = CHART_PALETTE[extractIdx >= 0 ? extractIdx : 0];
                 return (
                   <div key={p.asin} className="flex items-center gap-3 p-2.5 rounded-lg border border-primary/15 bg-primary/5">
@@ -477,10 +486,10 @@ export function ProductFormulaIntelligence({ categoryId, categoryName }: Props) 
                       <p className="text-sm font-medium text-foreground truncate">{p.brand}</p>
                       <div className="flex items-center gap-1 mt-0.5">
                         <Badge variant="outline" className="text-[9px] px-1" style={{ color: extractColor, borderColor: extractColor }}>
-                          {p.intel.ashwagandha_extract_type}
+                          {pForm || "Unknown"}
                         </Badge>
-                        {p.intel.ashwagandha_amount_mg && (
-                          <span className="text-[10px] text-muted-foreground">{p.intel.ashwagandha_amount_mg}mg</span>
+                        {pMg && (
+                          <span className="text-[10px] text-muted-foreground">{pMg}mg</span>
                         )}
                       </div>
                       <div className="flex items-center gap-2 mt-1">

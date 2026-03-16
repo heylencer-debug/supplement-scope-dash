@@ -109,8 +109,19 @@ async function fetchPipelineStatus(categoryId: string): Promise<PhaseStatus[]> {
     .select("*", { count: "exact", head: true })
     .eq("category_id", categoryId)
     .filter("marketing_analysis->p5_research", "not.is", null);
-  const p5Count = p5CountRaw.count ?? 0;
+  let p5Count = p5CountRaw.count ?? 0;
   const P5_TARGET = 20;
+
+  // Fallback: if product-level p5_research is empty, infer P5 complete when formula brief has deep-research data sources.
+  // This avoids false 0/20 when P5 wrote to source table but product mirror lagged/missed.
+  if (p5Count === 0) {
+    const p5Fallback = ((p8 as any)?.data?.ingredients?.data_sources?.p5_deep_research ||
+      (p8 as any)?.data?.ingredients?.data_sources?.deep_research ||
+      []) as unknown[];
+    if (Array.isArray(p5Fallback) && p5Fallback.length > 0) {
+      p5Count = Math.min(P5_TARGET, p5Fallback.length);
+    }
+  }
 
   // P7: Market Intelligence - check for ai_market_analysis in formula_briefs.ingredients
   const p7HasMarket = !!(p7_market as any)?.data?.ingredients?.market_intelligence?.ai_market_analysis;

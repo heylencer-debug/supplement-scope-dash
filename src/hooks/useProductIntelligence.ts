@@ -71,8 +71,8 @@ export interface ProductIntelligenceSummary {
   price_stats: { avg: number | null; min: number | null; max: number | null; median: number | null };
   // Top 10 by formula score
   top_by_formula: ProductIntelligenceItem[];
-  // Products with KSM-66
-  ksm66_products: ProductIntelligenceItem[];
+  // Products with identified primary form/extract (generic for any category)
+  primary_form_products: ProductIntelligenceItem[];
   // % booleans
   pct_sugar_free: number;
   pct_vegan: number;
@@ -169,7 +169,7 @@ function buildSummary(products: ProductIntelligenceItem[]): ProductIntelligenceS
     .slice(0, 10);
 
   // Top products with identified extract/form (any category)
-  const ksm66 = products
+  const primaryFormProducts = products
     .filter(p => {
       const form = p.intel.primary_active_form || p.intel.ashwagandha_extract_type;
       return form && form !== "Unknown";
@@ -210,7 +210,7 @@ function buildSummary(products: ProductIntelligenceItem[]): ProductIntelligenceS
       median: median(sortedPrices),
     },
     top_by_formula: topByFormula,
-    ksm66_products: ksm66,
+    primary_form_products: primaryFormProducts,
     pct_sugar_free: pct(products, p => p.intel.is_sugar_free),
     pct_vegan: pct(products, p => p.intel.is_vegan),
     pct_non_gmo: pct(products, p => p.intel.is_non_gmo),
@@ -233,7 +233,7 @@ function emptyS(): ProductIntelligenceSummary {
     avg_quality_score: null,
     price_stats: { avg: null, min: null, max: null, median: null },
     top_by_formula: [],
-    ksm66_products: [],
+    primary_form_products: [],
     pct_sugar_free: 0,
     pct_vegan: 0,
     pct_non_gmo: 0,

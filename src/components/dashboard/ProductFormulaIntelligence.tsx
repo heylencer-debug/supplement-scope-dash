@@ -181,13 +181,13 @@ export function ProductFormulaIntelligence({ categoryId, categoryName }: Props) 
         </CardContent>
       </Card>
 
-      {/* Extract/Form Type + Dosage Distribution */}
+      {/* Primary Active Form + Dosage Distribution (category-dynamic) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm">
               <FlaskConical className="h-4 w-4 text-primary" />
-              Extract / Form Distribution
+              Primary Active Form Distribution
             </CardTitle>
             <CardDescription className="text-xs">
               Types and forms of {primaryIngredient} used across the category
@@ -232,7 +232,7 @@ export function ProductFormulaIntelligence({ categoryId, categoryName }: Props) 
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm">
               <TrendingUp className="h-4 w-4 text-primary" />
-              {primaryIngredient} Dosage Distribution
+              Primary Active Dosage Distribution
             </CardTitle>
             <CardDescription className="text-xs">
               How much {primaryIngredient} competitors include per serving

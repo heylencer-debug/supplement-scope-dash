@@ -5,6 +5,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
+export interface IngredientRow {
+  name: string;
+  amount_mg: number;
+  raw: string;
+}
+
 export interface FormulaBriefData {
   category_id: string;
   positioning: string | null;
@@ -13,6 +19,8 @@ export interface FormulaBriefData {
   flavor_profile: string | null;
   servings_per_container: number | null;
   target_price: number | null;
+  certifications: string[] | null;
+  key_differentiators: string[] | null;
   ingredients: {
     ai_generated_brief?: string;
     ai_generated_brief_grok?: string;

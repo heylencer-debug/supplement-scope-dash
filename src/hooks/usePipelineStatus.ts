@@ -1,8 +1,8 @@
 /**
  * usePipelineStatus
- * Live phase completion status for P1-P10.
+ * Live phase completion status for P1-P12.
  * Auto-refreshes every 30s so running scripts show real-time progress.
- * P1-P8 query real Supabase data. P9-P10 are placeholders (not built yet).
+ * P1-P10 query real Supabase data. P11-P12 check formula_briefs.ingredients.
  */
 
 import { useQuery } from "@tanstack/react-query";
@@ -141,6 +141,19 @@ async function fetchPipelineStatus(categoryId: string): Promise<PhaseStatus[]> {
   const p10HasQA = !!(p10Ingredients?.qa_report as string)?.length;
   const p10Complete = p10HasQA ? 1 : 0;
 
+  // P11: Competitive Benchmarking - check for sonnet_draft (or legacy grok_draft)
+  const p11Benchmarking = p10Ingredients?.competitive_benchmarking as Record<string, unknown> | null;
+  const p11HasBenchmarking = !!((p11Benchmarking?.sonnet_draft as string)?.length > 100 ||
+    (p11Benchmarking?.grok_draft as string)?.length > 100);
+  const p11Complete = p11HasBenchmarking ? 1 : 0;
+  const p11Score = (p11Benchmarking?.formula_score as number) ?? null;
+
+  // P12: FDA Compliance - check for opus_analysis
+  const p12Compliance = p10Ingredients?.fda_compliance as Record<string, unknown> | null;
+  const p12HasCompliance = !!((p12Compliance?.opus_analysis as string)?.length > 100);
+  const p12Complete = p12HasCompliance ? 1 : 0;
+  const p12Score = (p12Compliance?.compliance_score as number) ?? null;
+
   return [
     {
       phase: 1,
@@ -235,12 +248,21 @@ async function fetchPipelineStatus(categoryId: string): Promise<PhaseStatus[]> {
     },
     {
       phase: 11,
-      label: "Launch Brief",
-      description: "Final CMO launch package: specs, pricing, go-to-market",
-      total: 0,
-      complete: 0,
-      status: "pending",
-      pct: 0,
+      label: "Competitive Benchmark",
+      description: `Ingredient-by-ingredient vs competitors — Claude Sonnet 4.6 draft + Opus validation${p11Score !== null ? ` · Score: ${p11Score}/10` : ""}`,
+      total: 1,
+      complete: p11Complete,
+      status: p11Complete > 0 ? "complete" : p10Complete > 0 ? "not_started" : "pending",
+      pct: p11Complete * 100,
+    },
+    {
+      phase: 12,
+      label: "FDA Compliance",
+      description: `NIH ODS live data · DSHEA claim validation · Claude Opus 4.6${p12Score !== null ? ` · Score: ${p12Score}/100` : ""}`,
+      total: 1,
+      complete: p12Complete,
+      status: p12Complete > 0 ? "complete" : p11Complete > 0 ? "not_started" : "pending",
+      pct: p12Complete * 100,
     },
   ];
 }

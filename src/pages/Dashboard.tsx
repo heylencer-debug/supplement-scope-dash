@@ -20,6 +20,7 @@ import { ScoutPackagingIntelligence } from "@/components/dashboard/ScoutPackagin
 import { ProductFormulaIntelligence } from "@/components/dashboard/ProductFormulaIntelligence";
 import { FormulaBriefTab } from "@/components/dashboard/FormulaBriefTab";
 import { FormulaQATab } from "@/components/dashboard/FormulaQATab";
+import { FormulaValidationTab } from "@/components/dashboard/FormulaValidationTab";
 import { PackagingIntelligence } from "@/components/dashboard/PackagingIntelligence";
 import { P9BenchmarkOverview } from "@/components/dashboard/P9BenchmarkOverview";
 import { MarketIntelligenceReport } from "@/components/dashboard/MarketIntelligenceReport";
@@ -70,7 +71,7 @@ function PipelineCollapsible({ categoryId, categoryName }: { categoryId: string;
                 {phases && phases.length > 0 && (
                   <div className="flex items-center gap-0.5">
                     {phases.map(phase => {
-                      const emoji = ({ 1: "🛒", 2: "📊", 3: "💬", 4: "🔬", 5: "🔎", 6: "🧬", 7: "📈", 8: "📦", 9: "📋", 10: "✅", 11: "🚀" } as Record<number, string>)[phase.phase] ?? "·";
+                      const emoji = ({ 1: "🛒", 2: "📊", 3: "💬", 4: "🔬", 5: "🔎", 6: "🧬", 7: "📈", 8: "📦", 9: "📋", 10: "✅", 11: "📊", 12: "⚖️" } as Record<number, string>)[phase.phase] ?? "·";
                       const isDone = phase.status === "complete";
                       const isRunning = phase.status === "partial";
                       return (
@@ -455,6 +456,7 @@ export default function Dashboard() {
           <TabsTrigger value="packaging">🎨 Packaging</TabsTrigger>
           <TabsTrigger value="formula">🧪 Formula Brief</TabsTrigger>
           <TabsTrigger value="qa">🔬 QA Review</TabsTrigger>
+          <TabsTrigger value="validation">⚖️ Compliance</TabsTrigger>
         </TabsList>
 
         <TabsContent value="products" className="space-y-6 md:space-y-10 mt-4">
@@ -885,6 +887,15 @@ export default function Dashboard() {
             <FormulaQATab categoryId={category.id} categoryName={categoryName} />
           ) : (
             <div className="text-center py-12 text-muted-foreground">Select a category to run QA review.</div>
+          )}
+        </TabsContent>
+
+        {/* TAB 6: Compliance — P11 Competitive Benchmarking + P12 FDA */}
+        <TabsContent value="validation" className="space-y-6 mt-4">
+          {category?.id ? (
+            <FormulaValidationTab categoryId={category.id} categoryName={categoryName} />
+          ) : (
+            <div className="text-center py-12 text-muted-foreground">Select a category to view compliance data.</div>
           )}
         </TabsContent>
       </Tabs>

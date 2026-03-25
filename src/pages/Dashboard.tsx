@@ -21,6 +21,7 @@ import { ProductFormulaIntelligence } from "@/components/dashboard/ProductFormul
 import { FormulaBriefTab } from "@/components/dashboard/FormulaBriefTab";
 import { FormulaQATab } from "@/components/dashboard/FormulaQATab";
 import { FormulaValidationTab } from "@/components/dashboard/FormulaValidationTab";
+import { OcrCoveragePanel } from "@/components/dashboard/OcrCoveragePanel";
 import { PackagingIntelligence } from "@/components/dashboard/PackagingIntelligence";
 import { P9BenchmarkOverview } from "@/components/dashboard/P9BenchmarkOverview";
 import { MarketIntelligenceReport } from "@/components/dashboard/MarketIntelligenceReport";
@@ -119,8 +120,9 @@ function PipelineCollapsible({ categoryId, categoryName }: { categoryId: string;
           </div>
         </CardHeader>
         <CollapsibleContent>
-          <CardContent>
+          <CardContent className="space-y-2">
             <PipelineStatus categoryId={categoryId} keyword={categoryName} />
+            <OcrCoveragePanel categoryId={categoryId} keyword={categoryName} />
           </CardContent>
         </CollapsibleContent>
       </Card>

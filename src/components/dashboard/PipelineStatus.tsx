@@ -25,7 +25,8 @@ const PHASE_META: Record<number, { icon: string; shortLabel: string }> = {
   8:  { icon: "📦", shortLabel: "Packaging"     },
   9:  { icon: "📋", shortLabel: "Formula Brief" },
   10: { icon: "✅", shortLabel: "Formula QA"    },
-  11: { icon: "🚀", shortLabel: "Launch"        },
+  11: { icon: "📊", shortLabel: "Benchmark"     },
+  12: { icon: "🛡️", shortLabel: "FDA"           },
 };
 
 type StatusKey = "complete" | "partial" | "not_started" | "pending";

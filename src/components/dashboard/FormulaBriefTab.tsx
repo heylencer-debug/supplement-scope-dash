@@ -15,6 +15,7 @@ import {
   DollarSign, AlertTriangle, Zap, Star, ChevronRight, Download, FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { generateManufacturerPDF } from "@/lib/manufacturerPDF";
 
 interface Props { categoryId: string; categoryName?: string; }
 
@@ -202,10 +203,11 @@ function SectionCard({ icon: Icon, title, description, children, accent }: {
 
 // ─── Expandable Formula Card ──────────────────────────────────────────────────
 
-function FormulaCard({ card, categoryName, generatedAt }: {
+function FormulaCard({ card, categoryName, generatedAt, onManufacturerPDF }: {
   card: { id: string; emoji: string; title: string; subtitle: string; badge: string; borderColor: string; bgColor: string; badgeColor: string; content: string; downloadContent?: string; downloadLabel?: string };
   categoryName?: string;
   generatedAt?: string;
+  onManufacturerPDF?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   // Display ref — scoped to this card's visible content
@@ -237,7 +239,13 @@ function FormulaCard({ card, categoryName, generatedAt }: {
       {/* Expanded content */}
       {open && (
         <CardContent className="pt-4 pb-4">
-          <div className="flex justify-end mb-3">
+          <div className="flex justify-end mb-3 gap-2 flex-wrap">
+            {onManufacturerPDF && (
+              <Button variant="default" size="sm" onClick={onManufacturerPDF} className="flex items-center gap-2 text-xs">
+                <FileText className="h-3.5 w-3.5" />
+                Manufacturer PDF
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={download} className="flex items-center gap-2 text-xs">
               <Download className="h-3.5 w-3.5" />
               {card.downloadLabel || 'Download PDF'}
@@ -404,6 +412,17 @@ export function FormulaBriefTab({ categoryId, categoryName }: Props) {
             card={card}
             categoryName={categoryName}
             generatedAt={generatedAt}
+            onManufacturerPDF={card.id === "final" ? () => generateManufacturerPDF({
+              categoryName: categoryName || "Formula",
+              formType: brief.form_type,
+              servingsPerContainer: brief.servings_per_container,
+              targetPrice: brief.target_price,
+              positioning: brief.positioning,
+              finalFormulaBrief: finalFormulaBrief,
+              adjustedFormula: adjustedFormula,
+              flavorQA: flavorQA,
+              qaVerdict: qaVerdict,
+            }) : undefined}
           />
         ))}
       </div>

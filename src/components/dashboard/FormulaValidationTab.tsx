@@ -5,31 +5,39 @@
  * Dual-model: Claude Sonnet 4.6 (draft/validation) + Claude Opus 4.6 (primary).
  */
 
-import { useRef, useCallback, useState } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  AlertCircle, CheckCircle2, AlertTriangle, FlaskConical,
-  Download, ShieldCheck, Scale, ChevronRight, FileText,
+  AlertCircle, CheckCircle2, AlertTriangle,
+  ShieldCheck, Scale, ChevronRight, FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { generateManufacturerPDF } from "@/lib/manufacturerPDF";
 
 interface Props { categoryId: string; categoryName?: string; }
 
 // ─── Data fetcher ──────────────────────────────────────────────────────────────
 
-async function fetchValidationData(categoryId: string) {
+interface ValidationRow {
+  form_type: string | null;
+  servings_per_container: number | null;
+  target_price: number | null;
+  positioning: string | null;
+  ingredients: Record<string, any> | null;
+}
+
+async function fetchValidationData(categoryId: string): Promise<ValidationRow | null> {
   const { data, error } = await supabase
     .from("formula_briefs")
-    .select("ingredients")
+    .select("form_type, servings_per_container, target_price, positioning, ingredients")
     .eq("category_id", categoryId)
     .maybeSingle();
   if (error) throw error;
-  return data?.ingredients as Record<string, any> | null;
+  return data as ValidationRow | null;
 }
 
 function useValidationData(categoryId: string) {
@@ -125,22 +133,6 @@ function renderMarkdown(text: unknown): React.ReactNode {
   return <>{elements}</>;
 }
 
-// ─── Markdown download (Blob) ─────────────────────────────────────────────────
-
-function useMarkdownDownload(filename: string) {
-  return useCallback((content: string) => {
-    const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }, [filename]);
-}
-
 // ─── Expandable section card ──────────────────────────────────────────────────
 
 function ExpandableCard({
@@ -190,8 +182,8 @@ function ScoreStat({ label, score, max, color }: { label: string; score: number;
 // ─── Main component ────────────────────────────────────────────────────────────
 
 export function FormulaValidationTab({ categoryId, categoryName }: Props) {
-  const { data: ing, isLoading, error } = useValidationData(categoryId);
-  const downloadMd = useMarkdownDownload(`${(categoryName || "formula").replace(/\s+/g, "-").toLowerCase()}-validation.md`);
+  const { data, isLoading, error } = useValidationData(categoryId);
+  const ing = data?.ingredients ?? null;
 
   if (isLoading) return (
     <div className="space-y-4">
@@ -242,25 +234,26 @@ export function FormulaValidationTab({ categoryId, categoryName }: Props) {
     : p12Status === "COMPLIANT" ? "text-chart-4 bg-chart-4/10 border-chart-4/30"
     : "text-destructive bg-destructive/10 border-destructive/30";
 
-  // ── Build download content ────────────────────────────────────────────────
-  const buildDownloadContent = () => {
-    const lines = [
-      `# DOVIVE Formula Validation — ${categoryName}`,
-      `Generated: ${new Date().toISOString()}`,
-      "",
-      `## Scores`,
-      `- P11 Competitive Benchmarking: ${p11Score != null ? `${p11Score}/10 (${p11Result})` : "Not run"}`,
-      `- P12 FDA Compliance: ${p12Score != null ? `${p12Score}/100 (${p12Status})` : "Not run"}`,
-      "",
-      "---",
-    ];
-    if (finalBrief) lines.push("", "## Final Formula Brief", "", finalBrief, "", "---");
-    if (adjustedFormula) lines.push("", "## Adjusted Formula", "", adjustedFormula, "", "---");
-    if (benchmarking?.opus_validation) lines.push("", "## P11 — Claude Opus 4.6 Validation", "", benchmarking.opus_validation, "", "---");
-    if (benchmarking?.sonnet_draft || benchmarking?.grok_draft) lines.push("", "## P11 — Claude Sonnet 4.6 Draft", "", benchmarking.sonnet_draft || benchmarking.grok_draft, "", "---");
-    if (fda?.opus_analysis) lines.push("", "## P12 — FDA Compliance Analysis (Claude Opus 4.6)", "", fda.opus_analysis, "", "---");
-    if (fda?.sonnet_validation || fda?.grok_validation) lines.push("", "## P12 — Validation (Claude Sonnet 4.6)", "", fda.sonnet_validation || fda.grok_validation);
-    return lines.join("\n");
+  // ── Manufacturer PDF ──────────────────────────────────────────────────────
+  const handleManufacturerPDF = () => {
+    generateManufacturerPDF({
+      categoryName: categoryName || "Formula",
+      formType: data?.form_type,
+      servingsPerContainer: data?.servings_per_container,
+      targetPrice: data?.target_price,
+      positioning: data?.positioning,
+      finalFormulaBrief: ing?.final_formula_brief,
+      adjustedFormula: ing?.adjusted_formula,
+      flavorQA: ing?.flavor_qa,
+      qaVerdict: ing?.qa_verdict,
+      p11Score,
+      p11ValidationResult: p11Result,
+      p11OpusValidation: benchmarking?.opus_validation,
+      p12Score,
+      p12Status,
+      p12OpusAnalysis: fda?.opus_analysis,
+      p12NihFetched: fda?.nih_coverage?.fetched ?? null,
+    });
   };
 
   return (
@@ -299,18 +292,19 @@ export function FormulaValidationTab({ categoryId, categoryName }: Props) {
         )}
 
         {/* Download card */}
-        <Card className="border-border">
+        <Card className="border-blue-500/30 bg-blue-500/5">
           <CardContent className="py-4 px-5 flex flex-col justify-center gap-2">
-            <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Export</p>
+            <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Manufacturer Brief</p>
             <Button
-              variant="outline"
+              variant="default"
               size="sm"
               className="flex items-center gap-2 w-full"
-              onClick={() => downloadMd(buildDownloadContent())}
+              onClick={handleManufacturerPDF}
             >
-              <Download className="h-3.5 w-3.5" />
-              Download Full Report (.md)
+              <FileText className="h-3.5 w-3.5" />
+              Download Manufacturer PDF
             </Button>
+            <p className="text-[10px] text-muted-foreground text-center">Full brief · P11 · P12 · Print-ready</p>
           </CardContent>
         </Card>
       </div>

@@ -112,7 +112,7 @@ Apply ALL of the selected changes to the formula brief. The user has overridden 
 
 1. Apply each selected change to the formula brief
 2. Mark each change with [UPDATED] inline
-3. Maintain the overall structure and format of the formula brief
+3. **CRITICAL — PRESERVE EXACT FORMAT AND STRUCTURE**: The output MUST use the EXACT same markdown structure, heading hierarchy, table formats, section ordering, and layout as the current formula brief above. Do NOT reorganize, rename sections, merge tables, or change the document structure in any way. Only modify the specific content affected by the selected changes.
 4. Write the complete updated formula brief
 
 **CRITICAL — FLAVOR PRESERVATION:**
@@ -121,10 +121,17 @@ Apply ALL of the selected changes to the formula brief. The user has overridden 
 - If manufacturer feedback mentions flavor changes, incorporate those while keeping the full flavor lineup visible.
 - The "Recommended Flavors" or "Flavor Profile" section should always be present in the output.
 
+**FORMAT RULES:**
+- Keep the same heading levels (##, ###, ####)
+- Keep the same table column structure
+- Keep the same bullet point and numbering style
+- Keep the same section order
+- Do NOT add new sections or remove existing ones unless a selected change specifically requires it
+
 Respond in this structure:
 
 ## UPDATED FORMULA BRIEF
-[Complete updated formula brief with all selected changes applied, marked with [UPDATED]]
+[Complete updated formula brief preserving the exact structure of the original, with only the selected changes applied and marked with [UPDATED]]
 
 ## CHANGE SUMMARY
 [One sentence describing what was changed]`;

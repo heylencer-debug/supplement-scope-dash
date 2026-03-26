@@ -86,7 +86,7 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
           body: { feedbackId },
         }).catch(() => {/* silent — status will show in history */});
       }
-      }).catch(() => {/* silent — status will show in history */});
+    },
     },
     onSuccess: () => {
       setFeedbackText("");

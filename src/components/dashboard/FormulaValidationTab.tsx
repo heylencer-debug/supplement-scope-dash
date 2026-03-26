@@ -18,7 +18,11 @@ import {
 import { cn } from "@/lib/utils";
 import { generateManufacturerPDF } from "@/lib/manufacturerPDF";
 
-interface Props { categoryId: string; categoryName?: string; }
+interface Props {
+  categoryId: string;
+  categoryName?: string;
+  activeVersionInfo?: { versionNumber: number; changeSummary: string | null } | null;
+}
 
 // ─── Data fetcher ──────────────────────────────────────────────────────────────
 
@@ -181,7 +185,7 @@ function ScoreStat({ label, score, max, color }: { label: string; score: number;
 
 // ─── Main component ────────────────────────────────────────────────────────────
 
-export function FormulaValidationTab({ categoryId, categoryName }: Props) {
+export function FormulaValidationTab({ categoryId, categoryName, activeVersionInfo }: Props) {
   const { data, isLoading, error } = useValidationData(categoryId);
   const ing = data?.ingredients ?? null;
 
@@ -258,6 +262,14 @@ export function FormulaValidationTab({ categoryId, categoryName }: Props) {
 
   return (
     <div className="space-y-5">
+      {/* Active version indicator */}
+      {activeVersionInfo && (
+        <div className="flex items-center gap-2 text-xs bg-primary/10 border border-primary/20 rounded-lg px-3 py-2 text-primary">
+          <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+          <span>Analyzing against <strong>Active Version {activeVersionInfo.versionNumber}</strong></span>
+          {activeVersionInfo.changeSummary && <span className="text-muted-foreground">— {activeVersionInfo.changeSummary}</span>}
+        </div>
+      )}
 
       {/* Score banner */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

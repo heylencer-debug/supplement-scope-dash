@@ -16,7 +16,11 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-interface Props { categoryId: string; categoryName?: string; }
+interface Props {
+  categoryId: string;
+  categoryName?: string;
+  activeVersionInfo?: { versionNumber: number; changeSummary: string | null } | null;
+}
 
 // ─── Verdict config ────────────────────────────────────────────────────────────
 
@@ -164,7 +168,7 @@ function ScoreRing({ score }: { score: number | null }) {
 
 // ─── Main component ────────────────────────────────────────────────────────────
 
-export function FormulaQATab({ categoryId, categoryName }: Props) {
+export function FormulaQATab({ categoryId, categoryName, activeVersionInfo }: Props) {
   const { data: qa, isLoading, error } = useFormulaQA(categoryId);
   const fullRef = useRef<HTMLDivElement>(null);
   const adjRef  = useRef<HTMLDivElement>(null);
@@ -202,6 +206,14 @@ export function FormulaQATab({ categoryId, categoryName }: Props) {
 
   return (
     <div className="space-y-5">
+      {/* Active version indicator */}
+      {activeVersionInfo && (
+        <div className="flex items-center gap-2 text-xs bg-primary/10 border border-primary/20 rounded-lg px-3 py-2 text-primary">
+          <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+          <span>Analyzing against <strong>Active Version {activeVersionInfo.versionNumber}</strong></span>
+          {activeVersionInfo.changeSummary && <span className="text-muted-foreground">— {activeVersionInfo.changeSummary}</span>}
+        </div>
+      )}
 
       {/* Verdict banner */}
       <div className={cn("flex items-start justify-between gap-4 p-5 rounded-xl border flex-wrap", verdictCfg.bg)}>

@@ -487,7 +487,15 @@ export default function Dashboard() {
       {/* SECTION 3b: P9 Benchmark Overview */}
       {category?.id && (
         <ScrollAnimate delay={100} variant="fade-up" duration={500}>
-          <P9BenchmarkOverview categoryId={category.id} />
+          <P9BenchmarkOverview
+            categoryId={category.id}
+            activeVersionContent={activeVersion?.formula_brief_content}
+            activeVersionInfo={activeVersion ? {
+              versionNumber: activeVersion.version_number,
+              changeSummary: activeVersion.change_summary,
+              createdAt: activeVersion.created_at,
+            } : null}
+          />
         </ScrollAnimate>
       )}
 
@@ -865,7 +873,7 @@ export default function Dashboard() {
               isActive: selectedVersion.is_active,
               changeSummary: selectedVersion.change_summary
             } : undefined}
-            formulaBriefContent={selectedVersion?.formula_brief_content || (analysis?.analysis_3_formula_brief as Record<string, unknown> | null)?.formula_brief_content as string | null}
+            formulaBriefContent={activeVersion?.formula_brief_content || selectedVersion?.formula_brief_content || (analysis?.analysis_3_formula_brief as Record<string, unknown> | null)?.formula_brief_content as string | null}
           />
           {/* Scout P7 Packaging Intelligence (claim frequency, badges, color signals) */}
           {category?.id && (
@@ -880,7 +888,7 @@ export default function Dashboard() {
         {/* TAB 5: QA Review (P9 Scout) */}
         <TabsContent value="qa" className="space-y-6 mt-4">
           {category?.id ? (
-            <FormulaQATab categoryId={category.id} categoryName={categoryName} />
+            <FormulaQATab categoryId={category.id} categoryName={categoryName} activeVersionInfo={activeVersion ? { versionNumber: activeVersion.version_number, changeSummary: activeVersion.change_summary } : null} />
           ) : (
             <div className="text-center py-12 text-muted-foreground">Select a category to run QA review.</div>
           )}
@@ -889,7 +897,7 @@ export default function Dashboard() {
         {/* TAB 6: Compliance — P11 Competitive Benchmarking + P12 FDA */}
         <TabsContent value="validation" className="space-y-6 mt-4">
           {category?.id ? (
-            <FormulaValidationTab categoryId={category.id} categoryName={categoryName} />
+            <FormulaValidationTab categoryId={category.id} categoryName={categoryName} activeVersionInfo={activeVersion ? { versionNumber: activeVersion.version_number, changeSummary: activeVersion.change_summary } : null} />
           ) : (
             <div className="text-center py-12 text-muted-foreground">Select a category to view compliance data.</div>
           )}

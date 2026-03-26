@@ -56,7 +56,7 @@ async function callClaudeSonnet(prompt, maxTokens = 12000) {
         'X-Title': 'DOVIVE Scout P11 Benchmarking',
       },
       body: JSON.stringify({
-        model: 'anthropic/claude-sonnet-4-6',
+        model: 'anthropic/claude-sonnet-4.6',
         max_tokens: maxTokens,
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -90,7 +90,7 @@ async function callClaudeOpus(prompt, maxTokens = 12000) {
         'X-Title': 'DOVIVE Scout P11 Benchmarking',
       },
       body: JSON.stringify({
-        model: 'anthropic/claude-opus-4-6',
+        model: 'anthropic/claude-opus-4.6',
         max_tokens: maxTokens,
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -397,7 +397,7 @@ async function run() {
     competitors_with_formula: withFormula.length,
     competitors_without_formula: withoutFormula.length,
     generated_at: new Date().toISOString(),
-    models_used: { draft: 'anthropic/claude-sonnet-4-6', validation: 'anthropic/claude-opus-4-6' },
+    models_used: { draft: 'anthropic/claude-sonnet-4.6', validation: 'anthropic/claude-opus-4.6' },
   };
 
   const updatedIngredients = {

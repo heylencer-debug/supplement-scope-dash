@@ -53,7 +53,7 @@ async function callClaude(prompt, maxTokens = 8000) {
       'HTTP-Referer': 'https://dovive.com',
     },
     body: JSON.stringify({
-      model: 'anthropic/claude-sonnet-4-6',
+      model: 'anthropic/claude-sonnet-4.6',
       max_tokens: maxTokens,
       messages: [{ role: 'user', content: prompt }],
     }),
@@ -84,7 +84,7 @@ async function callClaudeWithImages(textPrompt, imageUrls, maxTokens = 8000) {
       'HTTP-Referer': 'https://dovive.com',
     },
     body: JSON.stringify({
-      model: 'anthropic/claude-sonnet-4-6',
+      model: 'anthropic/claude-sonnet-4.6',
       max_tokens: maxTokens,
       messages: [{ role: 'user', content }],
     }),

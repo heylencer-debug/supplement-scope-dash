@@ -52,23 +52,42 @@ async function callClaudeSonnetQA(prompt, maxTokens = 12000) {
   const key = getOpenRouterKey();
   if (!key) throw new Error('No OpenRouter key');
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 300000); // 5 min hard timeout
+  const timeout = setTimeout(() => controller.abort(), 600000); // 10 min hard timeout
   try {
+    // Use streaming to avoid OpenRouter's non-streaming gateway timeout on large prompts
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       signal: controller.signal,
       headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://dovive.com', 'X-Title': 'DOVIVE Scout P10 QA' },
-      body: JSON.stringify({ model: 'anthropic/claude-sonnet-4-6', max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] }),
+      body: JSON.stringify({ model: 'anthropic/claude-sonnet-4.6', max_tokens: maxTokens, stream: true, messages: [{ role: 'user', content: prompt }] }),
     });
-    const raw = await res.text();
-    let j;
-    try { j = JSON.parse(raw); } catch (e) { throw new Error(`Bad JSON from OpenRouter (${raw.length} chars): ${raw.slice(0, 200)}`); }
-    if (j.error) throw new Error(`Claude Sonnet QA error: ${j.error.message || JSON.stringify(j.error)}`);
-    if (j.usage) {
-      console.log(`  Tokens: ${j.usage.prompt_tokens}→${j.usage.completion_tokens} (total: ${j.usage.total_tokens})`);
-      tokenLog.push({ call: tokenLog.length + 1, prompt_tokens: j.usage.prompt_tokens, completion_tokens: j.usage.completion_tokens, total_tokens: j.usage.total_tokens, ts: new Date().toISOString() });
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`OpenRouter HTTP ${res.status}: ${errText.slice(0, 200)}`);
     }
-    return j.choices?.[0]?.message?.content || null;
+    // Collect streaming SSE chunks
+    let content = '';
+    let promptTokens = 0, completionTokens = 0;
+    const text = await res.text();
+    for (const line of text.split('\n')) {
+      if (!line.startsWith('data: ')) continue;
+      const data = line.slice(6).trim();
+      if (data === '[DONE]') break;
+      try {
+        const j = JSON.parse(data);
+        if (j.error) throw new Error(`Claude Sonnet QA error: ${j.error.message || JSON.stringify(j.error)}`);
+        const delta = j.choices?.[0]?.delta?.content;
+        if (delta) content += delta;
+        if (j.usage) { promptTokens = j.usage.prompt_tokens || 0; completionTokens = j.usage.completion_tokens || 0; }
+      } catch (e) {
+        if (e.message.startsWith('Claude Sonnet QA error')) throw e;
+      }
+    }
+    if (promptTokens || completionTokens) {
+      console.log(`  Tokens: ${promptTokens}→${completionTokens} (total: ${promptTokens + completionTokens})`);
+      tokenLog.push({ call: tokenLog.length + 1, prompt_tokens: promptTokens, completion_tokens: completionTokens, total_tokens: promptTokens + completionTokens, ts: new Date().toISOString() });
+    }
+    return content || null;
   } finally {
     clearTimeout(timeout);
   }
@@ -132,7 +151,7 @@ This is a CRITICAL QA gate. P8 AI may have over-engineered the formula. Be the e
 ### FORMULA A - Grok 4.2 Deep Reasoning (grok-4.20-beta-0309-reasoning)
 ${grokBrief || "Not available"}
 
-### FORMULA B - Claude Sonnet 4.6 (anthropic/claude-sonnet-4-6)
+### FORMULA B - Claude Sonnet 4.6 (anthropic/claude-sonnet-4.6)
 
 ${claudeBrief || "Claude Sonnet brief not available (single-model run)"}
 
@@ -408,7 +427,7 @@ No other text. Pure JSON only.`;
       method: 'POST', signal: controller.signal,
       headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'anthropic/claude-sonnet-4-6',
+        model: 'anthropic/claude-sonnet-4.6',
         max_tokens: 2000,
         messages: [{ role: 'user', content: prompt }]
       })
@@ -767,7 +786,7 @@ Replace each "one sentence" with your comparison. Focus on the most important di
       method: 'POST', signal: controller.signal,
       headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'anthropic/claude-sonnet-4-6',
+        model: 'anthropic/claude-sonnet-4.6',
         max_tokens: 1500,
         messages: [{ role: 'user', content: prompt }]
       })
@@ -1121,7 +1140,7 @@ async function run() {
     const runAuditMd = buildRunAuditMarkdown({
       timestamp: pipelineMetadata.generated_at,
       keyword: KEYWORD,
-      model: 'anthropic/claude-sonnet-4-6',
+      model: 'anthropic/claude-sonnet-4.6',
       call1Status: pipelineMetadata.call1_status,
       call1Elapsed: elapsed,
       call2Status,
@@ -1148,7 +1167,7 @@ async function run() {
           qa_pipeline_metadata: pipelineMetadata,
           qa_run_audit: {
             timestamp: pipelineMetadata.generated_at,
-            model: 'anthropic/claude-sonnet-4-6',
+            model: 'anthropic/claude-sonnet-4.6',
             call1_status: pipelineMetadata.call1_status,
             call2_status: call2Status,
             call2_parse_status: call2ParseStatus,

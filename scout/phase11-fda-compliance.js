@@ -118,7 +118,7 @@ async function callClaudeOpus(prompt, maxTokens = 12000) {
         'X-Title': 'DOVIVE Scout P12 FDA Compliance',
       },
       body: JSON.stringify({
-        model: 'anthropic/claude-opus-4-6',
+        model: 'anthropic/claude-opus-4.6',
         max_tokens: maxTokens,
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -152,7 +152,7 @@ async function callClaudeSonnet(prompt, maxTokens = 8000) {
         'X-Title': 'DOVIVE Scout P12 FDA Compliance',
       },
       body: JSON.stringify({
-        model: 'anthropic/claude-sonnet-4-6',
+        model: 'anthropic/claude-sonnet-4.6',
         max_tokens: maxTokens,
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -567,7 +567,7 @@ async function run() {
     nih_coverage: { fetched: nihHits, no_page: nihMiss, failed: nihFail, total: ingredientNames.length },
     ingredients_reviewed: ingredientNames,
     generated_at: new Date().toISOString(),
-    models_used: { primary: 'anthropic/claude-opus-4-6', validation: 'anthropic/claude-sonnet-4-6' },
+    models_used: { primary: 'anthropic/claude-opus-4.6', validation: 'anthropic/claude-sonnet-4.6' },
     data_sources: Object.fromEntries(
       Object.entries(nihData).filter(([,d]) => d.url).map(([name, d]) => [name, d.url])
     ),

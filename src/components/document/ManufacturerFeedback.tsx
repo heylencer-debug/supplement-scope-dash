@@ -13,7 +13,7 @@ import remarkGfm from "remark-gfm";
 import { pdf } from "@react-pdf/renderer";
 import { StrategyBriefPDF } from "@/components/document/StrategyBriefPDF";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { extractFlavorFromFormulaBrief } from "@/lib/extractFlavor";
+import { extractFlavorsFromFormulaBrief } from "@/lib/extractFlavor";
 
 interface ManufacturerFeedbackProps {
   categoryId: string;

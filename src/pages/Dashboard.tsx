@@ -487,7 +487,15 @@ export default function Dashboard() {
       {/* SECTION 3b: P9 Benchmark Overview */}
       {category?.id && (
         <ScrollAnimate delay={100} variant="fade-up" duration={500}>
-          <P9BenchmarkOverview categoryId={category.id} />
+          <P9BenchmarkOverview
+            categoryId={category.id}
+            activeVersionContent={activeVersion?.formula_brief_content}
+            activeVersionInfo={activeVersion ? {
+              versionNumber: activeVersion.version_number,
+              changeSummary: activeVersion.change_summary,
+              createdAt: activeVersion.created_at,
+            } : null}
+          />
         </ScrollAnimate>
       )}
 

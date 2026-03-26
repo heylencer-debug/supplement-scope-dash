@@ -30,37 +30,98 @@ function parseMarkdownTable(md: string): { headers: string[]; rows: string[][] }
 
 function ComparisonTable({ markdown }: { markdown: string }) {
   const { headers, rows } = parseMarkdownTable(markdown);
-  if (headers.length === 0) {
+  
+  // If it's a pure table, render structured
+  if (headers.length > 0 && !markdown.trim().startsWith("#")) {
     return (
-      <pre className="text-xs text-foreground whitespace-pre-wrap font-mono leading-relaxed bg-muted/30 p-3 rounded-lg border border-border max-h-[400px] overflow-y-auto">
-        {markdown}
-      </pre>
-    );
-  }
-  return (
-    <div className="max-h-[500px] overflow-y-auto rounded-lg border border-border">
-      <Table className="table-auto">
-        <TableHeader>
-          <TableRow className="bg-muted/50">
-            {headers.map((h, i) => (
-              <TableHead key={i} className="text-[11px] font-semibold whitespace-nowrap px-3 py-2">
-                {h}
-              </TableHead>
-            ))}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((row, ri) => (
-            <TableRow key={ri} className={ri % 2 === 0 ? "" : "bg-muted/20"}>
-              {row.map((cell, ci) => (
-                <TableCell key={ci} className="text-[11px] px-3 py-2 whitespace-normal">
-                  {cell}
-                </TableCell>
+      <div className="max-h-[500px] overflow-y-auto rounded-lg border border-border">
+        <Table className="table-auto">
+          <TableHeader>
+            <TableRow className="bg-muted/50">
+              {headers.map((h, i) => (
+                <TableHead key={i} className="text-[11px] font-semibold whitespace-nowrap px-3 py-2">
+                  {h}
+                </TableHead>
               ))}
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {rows.map((row, ri) => (
+              <TableRow key={ri} className={ri % 2 === 0 ? "" : "bg-muted/20"}>
+                {row.map((cell, ci) => (
+                  <TableCell key={ci} className="text-[11px] px-3 py-2 whitespace-normal">
+                    {cell}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    );
+  }
+
+  // Mixed content (headings + tables + text) — use ReactMarkdown
+  return (
+    <div className="max-h-[600px] overflow-y-auto space-y-3">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          h1: ({ children }) => (
+            <h1 className="text-lg font-bold text-foreground border-b border-border pb-2 mb-3">{children}</h1>
+          ),
+          h2: ({ children }) => (
+            <h2 className="text-base font-semibold text-foreground mt-4 mb-2">{children}</h2>
+          ),
+          h3: ({ children }) => (
+            <h3 className="text-sm font-semibold text-foreground mt-3 mb-2">{children}</h3>
+          ),
+          h4: ({ children }) => (
+            <h4 className="text-xs font-semibold text-foreground mt-2 mb-1">{children}</h4>
+          ),
+          p: ({ children }) => (
+            <p className="text-xs text-muted-foreground leading-relaxed mb-2">{children}</p>
+          ),
+          ul: ({ children }) => (
+            <ul className="list-disc list-outside ml-4 space-y-1 text-xs text-muted-foreground mb-2">{children}</ul>
+          ),
+          ol: ({ children }) => (
+            <ol className="list-decimal list-outside ml-4 space-y-1 text-xs text-muted-foreground mb-2">{children}</ol>
+          ),
+          li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+          strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
+          em: ({ children }) => <em className="italic">{children}</em>,
+          table: ({ children }) => (
+            <div className="overflow-x-auto rounded-lg border border-border my-2">
+              <table className="w-full text-[11px]">{children}</table>
+            </div>
+          ),
+          thead: ({ children }) => (
+            <thead className="bg-primary/10">{children}</thead>
+          ),
+          th: ({ children }) => (
+            <th className="px-3 py-2 text-left font-semibold text-foreground border-b border-border whitespace-nowrap">{children}</th>
+          ),
+          tbody: ({ children }) => (
+            <tbody className="divide-y divide-border">{children}</tbody>
+          ),
+          tr: ({ children }) => (
+            <tr className="even:bg-muted/30 hover:bg-muted/50 transition-colors">{children}</tr>
+          ),
+          td: ({ children }) => (
+            <td className="px-3 py-2 text-muted-foreground whitespace-normal">{children}</td>
+          ),
+          blockquote: ({ children }) => (
+            <blockquote className="border-l-3 border-primary pl-3 py-1 my-2 bg-primary/5 rounded-r-lg text-xs">{children}</blockquote>
+          ),
+          code: ({ children }) => (
+            <code className="bg-muted px-1 py-0.5 rounded text-[10px] font-mono text-foreground">{children}</code>
+          ),
+          hr: () => <hr className="my-3 border-border" />,
+        }}
+      >
+        {markdown}
+      </ReactMarkdown>
     </div>
   );
 }

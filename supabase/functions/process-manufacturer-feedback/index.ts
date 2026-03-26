@@ -61,34 +61,29 @@ ${feedbackText}
 
 ## YOUR DELIVERABLE
 
-Respond in this exact structure:
+Respond in this exact structure. Be CONCISE — max 2-3 sentences per reasoning cell. No essays.
 
 ## OVERALL VERDICT
 [ACCEPTED / PARTIALLY ACCEPTED / QUESTIONED / REJECTED]
 
+[Write 2-3 sentences summarizing the overall evaluation. Keep it brief.]
+
 ## FEEDBACK EVALUATION
-For each distinct feedback point from the manufacturer:
 | # | Feedback Point | Verdict | Reasoning |
 |---|---------------|---------|-----------|
-[One row per feedback point with ACCEPTED/QUESTIONED/REJECTED verdict and specific reasoning]
-
-## UPDATED FORMULA
-[If any changes were ACCEPTED or PARTIALLY ACCEPTED: write the complete updated formula brief with all accepted changes applied. Mark each change with [UPDATED] inline. If nothing was accepted, write "No changes applied — see counter-arguments below."]
-
-## COUNTER-ARGUMENTS / QUESTIONS FOR MANUFACTURER
-[For each QUESTIONED or REJECTED point: write a specific, respectful, evidence-based response. If questioning, ask a precise question. If rejecting, cite the clinical or manufacturing reason.]
+[One row per feedback point. Verdict: ACCEPTED/QUESTIONED/REJECTED. Reasoning MUST be 1-3 sentences max — cite the key clinical/manufacturing fact, not a paragraph. Be direct.]
 
 ## MANUFACTURER REPLY
-[Write a complete, professional, ready-to-send reply addressed to the manufacturer. This should be in first person ("We/I"), be respectful and collaborative in tone, and cover:
-- Thank them for their feedback
-- Summarize which changes we've accepted and why
-- For questioned points, ask clear follow-up questions
-- For rejected points, explain our reasoning concisely with clinical/strategic evidence
-- End with a collaborative next-step statement
-Keep it concise but thorough — this should be copy-pasteable into an email.]
+[Write a professional, ready-to-send reply to the manufacturer. First person ("We/I"), respectful and collaborative. Cover:
+- Thank them briefly
+- Which changes accepted and why (1 line each)
+- Questioned points: ask ONE clear follow-up question each
+- Rejected points: give the key reason in 1-2 sentences
+- End with next-step statement
+Keep the entire reply under 300 words.]
 
 ## CHANGE SUMMARY
-[One sentence describing what changed in this version, suitable for the version history label. Example: "Applied CMO's zinc form change to bisglycinate; rejected biotin dose reduction (below clinical floor)."]`;
+[One sentence for the version history label.]`;
 }
 
 async function processInBackground(feedbackId: string) {

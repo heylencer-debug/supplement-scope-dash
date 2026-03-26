@@ -453,11 +453,10 @@ export default function Dashboard() {
       )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="products">📦 Products</TabsTrigger>
           <TabsTrigger value="market">📈 Market</TabsTrigger>
           <TabsTrigger value="packaging">🎨 Packaging</TabsTrigger>
-          <TabsTrigger value="formula">🧪 Formula Brief</TabsTrigger>
           <TabsTrigger value="qa">🔬 QA Review</TabsTrigger>
           <TabsTrigger value="validation">⚖️ Compliance</TabsTrigger>
           <TabsTrigger value="manufacturer">🏭 Manufacturer</TabsTrigger>
@@ -876,14 +875,7 @@ export default function Dashboard() {
           )}
         </TabsContent>
 
-        {/* TAB 4: Formula Brief (P8 Scout) */}
-        <TabsContent value="formula" className="space-y-6 mt-4">
-          {category?.id ? (
-            <FormulaBriefTab categoryId={category.id} categoryName={categoryName} />
-          ) : (
-            <div className="text-center py-12 text-muted-foreground">Select a category to view the formula brief.</div>
-          )}
-        </TabsContent>
+        {/* Formula Brief tab removed — versions now shown in Manufacturer tab */}
 
         {/* TAB 5: QA Review (P9 Scout) */}
         <TabsContent value="qa" className="space-y-6 mt-4">

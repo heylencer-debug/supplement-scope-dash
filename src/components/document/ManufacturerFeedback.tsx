@@ -84,6 +84,41 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
   const [generatingVersion, setGeneratingVersion] = useState<string | null>(null);
   const [replyEdits, setReplyEdits] = useState<Record<string, string>>({});
   const [copiedReply, setCopiedReply] = useState<string | null>(null);
+  const [viewingVersionId, setViewingVersionId] = useState<string | null>(null);
+
+  // Load all formula brief versions for this category
+  const { data: allVersions = [] } = useQuery({
+    queryKey: ["formula_brief_versions", categoryId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("formula_brief_versions")
+        .select("*")
+        .eq("category_id", categoryId)
+        .order("version_number", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!categoryId,
+  });
+
+  // Load original formula brief from formula_briefs table
+  const { data: originalBrief } = useQuery({
+    queryKey: ["original_formula_brief", categoryId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("formula_briefs")
+        .select("ingredients, created_at")
+        .eq("category_id", categoryId)
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      const content = (data?.ingredients as any)?.final_formula_brief || (data?.ingredients as any)?.adjusted_formula || null;
+      return content ? { content, created_at: data?.created_at } : null;
+    },
+    enabled: !!categoryId,
+  });
+
+  const viewingVersion = viewingVersionId ? allVersions.find(v => v.id === viewingVersionId) : null;
   const handleDownloadVersion = useCallback(async (versionId: string) => {
     setDownloadingVersion(versionId);
     try {

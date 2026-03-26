@@ -101,9 +101,9 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
     enabled: !!categoryId,
   });
 
-  // Load original formula brief from formula_briefs table
-  const { data: originalBrief } = useQuery({
-    queryKey: ["original_formula_brief", categoryId],
+  // Load original formula briefs (Grok, Sonnet, QA) from formula_briefs table
+  const { data: pipelineBriefs } = useQuery({
+    queryKey: ["pipeline_formula_briefs", categoryId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("formula_briefs")
@@ -112,8 +112,23 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
         .limit(1)
         .maybeSingle();
       if (error) throw error;
-      const content = (data?.ingredients as any)?.final_formula_brief || (data?.ingredients as any)?.adjusted_formula || null;
-      return content ? { content, created_at: data?.created_at } : null;
+      if (!data) return null;
+      const ing = data.ingredients as any;
+      const briefs: { id: string; label: string; emoji: string; subtitle: string; content: string; created_at: string | null }[] = [];
+      if (ing?.ai_generated_brief_grok) {
+        briefs.push({ id: "grok", label: "Formula A — Grok", emoji: "🤖", subtitle: "Deep scientific reasoning", content: ing.ai_generated_brief_grok, created_at: data.created_at });
+      }
+      if (ing?.ai_generated_brief_claude) {
+        briefs.push({ id: "claude", label: "Formula B — Sonnet", emoji: "🧠", subtitle: "1M context synthesis", content: ing.ai_generated_brief_claude, created_at: data.created_at });
+      } else if (ing?.ai_generated_brief) {
+        briefs.push({ id: "legacy", label: "AI Generated Brief", emoji: "🧠", subtitle: "Initial AI brief", content: ing.ai_generated_brief, created_at: data.created_at });
+      }
+      if (ing?.final_formula_brief) {
+        briefs.push({ id: "qa-final", label: "QA Approved Final", emoji: "✅", subtitle: `${ing?.qa_verdict?.verdict || 'Reviewed'} · Score: ${ing?.qa_verdict?.score || '—'}/10`, content: ing.final_formula_brief, created_at: data.created_at });
+      } else if (ing?.adjusted_formula) {
+        briefs.push({ id: "qa-adjusted", label: "QA Adjusted", emoji: "⚖️", subtitle: "Adjustments from QA review", content: ing.adjusted_formula, created_at: data.created_at });
+      }
+      return briefs.length > 0 ? briefs : null;
     },
     enabled: !!categoryId,
   });
@@ -335,7 +350,7 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
             <div>
               <p className="text-sm font-semibold text-foreground">Formula Brief Versions</p>
               <p className="text-xs text-muted-foreground">
-                {allVersions.length + (originalBrief ? 1 : 0)} version{allVersions.length + (originalBrief ? 1 : 0) !== 1 ? 's' : ''} · Active version is used for all analyses
+                {allVersions.length + (pipelineBriefs?.length || 0)} version{allVersions.length + (pipelineBriefs?.length || 0) !== 1 ? 's' : ''} · Active version is used for all analyses
               </p>
             </div>
           </div>
@@ -413,22 +428,22 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
                   </td>
                 </tr>
               ))}
-              {/* Original formula brief from Compliance/AI analysis */}
-              {originalBrief && (
-                <tr className="hover:bg-muted/30 transition-colors">
+              {/* Pipeline briefs: Grok, Sonnet, QA */}
+              {pipelineBriefs?.map(pb => (
+                <tr key={pb.id} className="hover:bg-muted/30 transition-colors bg-muted/5">
                   <td className="py-2.5 px-4">
-                    <span className="font-medium text-foreground">Original</span>
+                    <span className="font-medium text-foreground">{pb.emoji}</span>
                   </td>
                   <td className="py-2.5 px-4">
-                    <Badge variant="outline" className="text-[10px]">⚖️ Compliance</Badge>
+                    <Badge variant="outline" className="text-[10px]">{pb.label}</Badge>
                   </td>
                   <td className="py-2.5 px-4 max-w-[300px]">
-                    <p className="text-xs text-muted-foreground">Initial formula brief from market analysis pipeline</p>
+                    <p className="text-xs text-muted-foreground line-clamp-2">{pb.subtitle}</p>
                   </td>
                   <td className="py-2.5 px-4 whitespace-nowrap">
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
                       <Clock className="w-3 h-3" />
-                      {originalBrief.created_at ? format(new Date(originalBrief.created_at), "MMM d, yyyy · h:mm a") : "—"}
+                      {pb.created_at ? format(new Date(pb.created_at), "MMM d, yyyy · h:mm a") : "—"}
                     </div>
                   </td>
                   <td className="py-2.5 px-4">
@@ -437,7 +452,7 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
                         size="sm"
                         variant="ghost"
                         className="h-7 text-xs gap-1"
-                        onClick={() => setViewingVersionId("original")}
+                        onClick={() => setViewingVersionId(pb.id)}
                       >
                         <Eye className="w-3 h-3" />
                         View
@@ -445,8 +460,8 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
                     </div>
                   </td>
                 </tr>
-              )}
-              {allVersions.length === 0 && !originalBrief && (
+              ))}
+              {allVersions.length === 0 && !pipelineBriefs?.length && (
                 <tr>
                   <td colSpan={5} className="py-8 text-center text-sm text-muted-foreground">
                     No formula versions yet. Submit manufacturer feedback to generate versions.
@@ -476,9 +491,12 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
             prose-td:px-3 prose-td:py-2 prose-td:border-t prose-td:border-border/50 prose-td:text-muted-foreground
           ">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {viewingVersionId === "original"
-                ? (originalBrief?.content || "No content available")
-                : (viewingVersion?.formula_brief_content || "No content available")}
+              {(() => {
+                const pipelineBrief = pipelineBriefs?.find(pb => pb.id === viewingVersionId);
+                if (pipelineBrief) return pipelineBrief.content;
+                if (viewingVersion) return viewingVersion.formula_brief_content;
+                return "No content available";
+              })()}
             </ReactMarkdown>
           </div>
         </DialogContent>

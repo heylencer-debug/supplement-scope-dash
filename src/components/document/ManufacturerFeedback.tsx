@@ -377,12 +377,29 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
                             </div>
                           )}
                           {fb.claude_response && (
-                            <div>
-                              <p className="text-xs font-medium text-muted-foreground mb-1">Scout's Response</p>
-                              <div className="text-xs prose prose-sm max-w-none dark:prose-invert prose-headings:text-sm prose-headings:font-semibold prose-headings:mt-3 prose-headings:mb-1 prose-p:my-1 prose-table:text-xs prose-th:px-2 prose-th:py-1 prose-th:bg-muted prose-th:text-left prose-th:font-medium prose-td:px-2 prose-td:py-1 prose-td:border-t prose-td:border-border prose-tr:border-border overflow-x-auto">
-                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                  {fb.claude_response}
-                                </ReactMarkdown>
+                            <div className="space-y-2">
+                              <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                                <Sparkles className="w-3.5 h-3.5 text-primary" />
+                                Scout's Evaluation
+                              </p>
+                              <div className="rounded-lg border border-border bg-background p-4 overflow-x-auto">
+                                <div className="prose prose-sm max-w-none dark:prose-invert
+                                  prose-headings:font-semibold prose-headings:text-foreground
+                                  prose-h1:text-base prose-h1:mt-0 prose-h1:mb-3 prose-h1:pb-2 prose-h1:border-b prose-h1:border-border
+                                  prose-h2:text-sm prose-h2:mt-5 prose-h2:mb-2 prose-h2:pb-1.5 prose-h2:border-b prose-h2:border-border/50
+                                  prose-h3:text-sm prose-h3:mt-4 prose-h3:mb-1.5
+                                  prose-p:text-xs prose-p:leading-relaxed prose-p:my-2 prose-p:text-muted-foreground
+                                  prose-li:text-xs prose-li:leading-relaxed prose-li:text-muted-foreground
+                                  prose-strong:text-foreground prose-strong:font-semibold
+                                  prose-table:text-xs prose-table:my-3
+                                  prose-th:px-3 prose-th:py-2 prose-th:bg-muted/50 prose-th:text-left prose-th:font-semibold prose-th:text-foreground prose-th:border-b prose-th:border-border
+                                  prose-td:px-3 prose-td:py-2.5 prose-td:border-t prose-td:border-border/50 prose-td:text-muted-foreground prose-td:align-top
+                                  prose-tr:border-border
+                                ">
+                                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                    {fb.claude_response}
+                                  </ReactMarkdown>
+                                </div>
                               </div>
                             </div>
                           )}

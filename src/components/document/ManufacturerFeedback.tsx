@@ -311,7 +311,7 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
                 {feedbackList.map((fb) => {
                   const verdict = fb.claude_verdict ? VERDICT_CONFIG[fb.claude_verdict] : null;
                   const isOpen = expandedFeedback === fb.id;
-                  const parsedChanges = useMemo(() => parseChangesFromResponse(fb.claude_response), [fb.claude_response]);
+                  const parsedChanges = parseChangesFromResponse(fb.claude_response);
                   const selected = selectedChanges[fb.id] || new Set<number>();
                   const isGenerating = generatingVersion === fb.id;
 

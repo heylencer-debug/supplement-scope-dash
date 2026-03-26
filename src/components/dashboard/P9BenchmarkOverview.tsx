@@ -77,9 +77,7 @@ export function P9BenchmarkOverview({ categoryId }: P9BenchmarkOverviewProps) {
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
-              <pre className="text-xs text-foreground whitespace-pre-wrap font-mono leading-relaxed bg-muted/30 p-3 rounded-lg border border-border max-h-[400px] overflow-y-auto">
-                {comparison}
-              </pre>
+              <ComparisonTable markdown={comparison} />
             </div>
           </CardContent>
         </Card>

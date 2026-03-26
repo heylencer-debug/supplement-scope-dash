@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from "react";
-import { Factory, Upload, Send, CheckCircle, XCircle, HelpCircle, AlertCircle, ChevronDown, ChevronUp, X, Image, Download, Sparkles, Copy, Check, MessageSquare, Clock, ExternalLink, FileText, Eye } from "lucide-react";
+import { Factory, Upload, Send, CheckCircle, XCircle, HelpCircle, AlertCircle, ChevronDown, ChevronUp, X, Image, Download, Sparkles, Copy, Check, MessageSquare, Clock, ExternalLink, FileText, Eye, Star } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -116,6 +116,30 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
       return content ? { content, created_at: data?.created_at } : null;
     },
     enabled: !!categoryId,
+  });
+
+  // Mutation to set a version as active
+  const setActiveMutation = useMutation({
+    mutationFn: async (versionId: string) => {
+      const { error: deactivateError } = await supabase
+        .from("formula_brief_versions")
+        .update({ is_active: false })
+        .eq("category_id", categoryId);
+      if (deactivateError) throw deactivateError;
+      const { error: activateError } = await supabase
+        .from("formula_brief_versions")
+        .update({ is_active: true })
+        .eq("id", versionId);
+      if (activateError) throw activateError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["formula_brief_versions"] });
+      queryClient.invalidateQueries({ queryKey: ["formulaBrief"] });
+      toast({ title: "Active version updated", description: "All analyses will now use this version." });
+    },
+    onError: () => {
+      toast({ title: "Failed to update", description: "Could not set active version.", variant: "destructive" });
+    },
   });
 
   const viewingVersion = viewingVersionId ? allVersions.find(v => v.id === viewingVersionId) : null;
@@ -356,6 +380,18 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
                   </td>
                   <td className="py-2.5 px-4">
                     <div className="flex items-center gap-1.5 justify-end">
+                      {!v.is_active && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs gap-1 border-primary/30 text-primary hover:bg-primary/10"
+                          disabled={setActiveMutation.isPending}
+                          onClick={() => setActiveMutation.mutate(v.id)}
+                        >
+                          <Star className="w-3 h-3" />
+                          Set Active
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         variant="ghost"

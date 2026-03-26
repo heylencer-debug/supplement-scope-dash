@@ -253,8 +253,8 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
                             )}
                             {fb.claude_response && (
                               <div>
-                                <p className="text-xs font-medium text-gray-500 mb-1">Scout's Response</p>
-                                <div className="text-xs prose prose-xs max-w-none">
+                                <p className="text-xs font-medium text-muted-foreground mb-1">Scout's Response</p>
+                                <div className="text-xs prose prose-sm max-w-none dark:prose-invert prose-headings:text-sm prose-headings:font-semibold prose-headings:mt-3 prose-headings:mb-1 prose-p:my-1 prose-table:text-xs prose-th:px-2 prose-th:py-1 prose-th:bg-muted prose-th:text-left prose-th:font-medium prose-td:px-2 prose-td:py-1 prose-td:border-t prose-td:border-border prose-tr:border-border overflow-x-auto">
                                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                     {fb.claude_response}
                                   </ReactMarkdown>

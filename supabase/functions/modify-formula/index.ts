@@ -460,7 +460,7 @@ IMPORTANT RULES:
           'X-Title': 'Noodle Search Formula Modifier'
         },
         body: JSON.stringify({
-          model: 'google/gemini-3-pro-preview',
+          model: 'anthropic/claude-sonnet-4-6',
           messages,
           stream: true,
           max_tokens: 16000

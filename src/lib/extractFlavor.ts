@@ -100,7 +100,28 @@ export function extractFlavorsFromFormulaBrief(content: string | null | undefine
     addFlavor(m[1]);
   }
 
-  // 5. Format/pricing table: "| 45-Serving Blueberry Lavender |"
+  // 5. "Natural X flavor" in excipient/Flavors & Colors sections
+  //    e.g., "Natural tropical mango flavor", "Natural strawberry flavor"
+  const naturalFlavorIngredient = /Natural\s+([\w\s]+?)\s+flavou?r\s*(?:\(|[:\-–—|])/gi;
+  for (const m of content.matchAll(naturalFlavorIngredient)) {
+    const f = m[1].trim();
+    if (f.length > 2 && f.length < 40 && !/other|artificial/i.test(f)) {
+      addFlavor(f);
+    }
+  }
+
+  // 6. Flavor Profile description: "Recommended: Sour Blue Raspberry or Sour Watermelon"
+  //    or standalone: "Flavor Profile: Tropical Mango"
+  const flavorProfilePattern2 = /(?:recommended|suggested)\s*(?:flavou?rs?)?:\s*(.+?)(?:\)|\.|\n)/gi;
+  for (const m of content.matchAll(flavorProfilePattern2)) {
+    const items = m[1].split(/\s+or\s+|\s*,\s*/i);
+    items.forEach(item => {
+      const cleaned = item.trim().replace(/[*_`]/g, '');
+      if (cleaned.length > 2 && cleaned.length < 40) addFlavor(cleaned);
+    });
+  }
+
+  // 7. Format/pricing table: "| 45-Serving Blueberry Lavender |"
   const formatPattern = /\|\s*\d+[-\s]*(?:Serving|Count|ct)\s+(.+?)\s*\|/gi;
   for (const m of content.matchAll(formatPattern)) {
     const name = m[1].trim().replace(/[—–-]+.*$/, '').trim();
@@ -109,7 +130,7 @@ export function extractFlavorsFromFormulaBrief(content: string | null | undefine
     }
   }
 
-  // 6. Flavor-specific sections: bullet points under "Flavor Strategy" etc.
+  // 8. Flavor-specific sections: bullet points under "Flavor Strategy" etc.
   const flavorSections = content.matchAll(/#{1,4}\s*(?:Flavou?r\s*(?:Strategy|Variants?|Options?|Lineup|Roadmap|Development))[^\n]*\n([\s\S]*?)(?=\n#{1,4}\s|\n---)/gi);
   for (const section of flavorSections) {
     const bullets = section[1].matchAll(/[-•*]\s+\*?\*?([^*\n:]+)/g);

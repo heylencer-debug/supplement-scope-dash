@@ -78,6 +78,15 @@ For each distinct feedback point from the manufacturer:
 ## COUNTER-ARGUMENTS / QUESTIONS FOR MANUFACTURER
 [For each QUESTIONED or REJECTED point: write a specific, respectful, evidence-based response. If questioning, ask a precise question. If rejecting, cite the clinical or manufacturing reason.]
 
+## MANUFACTURER REPLY
+[Write a complete, professional, ready-to-send reply addressed to the manufacturer. This should be in first person ("We/I"), be respectful and collaborative in tone, and cover:
+- Thank them for their feedback
+- Summarize which changes we've accepted and why
+- For questioned points, ask clear follow-up questions
+- For rejected points, explain our reasoning concisely with clinical/strategic evidence
+- End with a collaborative next-step statement
+Keep it concise but thorough — this should be copy-pasteable into an email.]
+
 ## CHANGE SUMMARY
 [One sentence describing what changed in this version, suitable for the version history label. Example: "Applied CMO's zinc form change to bisglycinate; rejected biotin dose reduction (below clinical floor)."]`;
 }

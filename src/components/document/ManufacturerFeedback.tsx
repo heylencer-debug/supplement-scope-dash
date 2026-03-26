@@ -86,7 +86,7 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
     },
   });
 
-  // Image upload handler
+  // Image upload handler — converts to base64 and stores inline (no storage bucket needed)
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
@@ -94,11 +94,13 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
     try {
       const uploaded: { file: File; url: string }[] = [];
       for (const file of files) {
-        const path = `manufacturer-feedback/${categoryId}/${Date.now()}-${file.name}`;
-        const { error } = await supabase.storage.from("formula-assets").upload(path, file);
-        if (error) throw error;
-        const { data: urlData } = supabase.storage.from("formula-assets").getPublicUrl(path);
-        uploaded.push({ file, url: urlData.publicUrl });
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        uploaded.push({ file, url: base64 });
       }
       setUploadedImages((prev) => [...prev, ...uploaded]);
     } catch (e: any) {

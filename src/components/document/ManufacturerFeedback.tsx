@@ -101,9 +101,9 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
     enabled: !!categoryId,
   });
 
-  // Load original formula brief from formula_briefs table
-  const { data: originalBrief } = useQuery({
-    queryKey: ["original_formula_brief", categoryId],
+  // Load original formula briefs (Grok, Sonnet, QA) from formula_briefs table
+  const { data: pipelineBriefs } = useQuery({
+    queryKey: ["pipeline_formula_briefs", categoryId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("formula_briefs")
@@ -112,8 +112,23 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
         .limit(1)
         .maybeSingle();
       if (error) throw error;
-      const content = (data?.ingredients as any)?.final_formula_brief || (data?.ingredients as any)?.adjusted_formula || null;
-      return content ? { content, created_at: data?.created_at } : null;
+      if (!data) return null;
+      const ing = data.ingredients as any;
+      const briefs: { id: string; label: string; emoji: string; subtitle: string; content: string; created_at: string | null }[] = [];
+      if (ing?.ai_generated_brief_grok) {
+        briefs.push({ id: "grok", label: "Formula A — Grok", emoji: "🤖", subtitle: "Deep scientific reasoning", content: ing.ai_generated_brief_grok, created_at: data.created_at });
+      }
+      if (ing?.ai_generated_brief_claude) {
+        briefs.push({ id: "claude", label: "Formula B — Sonnet", emoji: "🧠", subtitle: "1M context synthesis", content: ing.ai_generated_brief_claude, created_at: data.created_at });
+      } else if (ing?.ai_generated_brief) {
+        briefs.push({ id: "legacy", label: "AI Generated Brief", emoji: "🧠", subtitle: "Initial AI brief", content: ing.ai_generated_brief, created_at: data.created_at });
+      }
+      if (ing?.final_formula_brief) {
+        briefs.push({ id: "qa-final", label: "QA Approved Final", emoji: "✅", subtitle: `${ing?.qa_verdict?.verdict || 'Reviewed'} · Score: ${ing?.qa_verdict?.score || '—'}/10`, content: ing.final_formula_brief, created_at: data.created_at });
+      } else if (ing?.adjusted_formula) {
+        briefs.push({ id: "qa-adjusted", label: "QA Adjusted", emoji: "⚖️", subtitle: "Adjustments from QA review", content: ing.adjusted_formula, created_at: data.created_at });
+      }
+      return briefs.length > 0 ? briefs : null;
     },
     enabled: !!categoryId,
   });

@@ -80,7 +80,8 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
   const [downloadingVersion, setDownloadingVersion] = useState<string | null>(null);
   const [selectedChanges, setSelectedChanges] = useState<Record<string, Set<number>>>({});
   const [generatingVersion, setGeneratingVersion] = useState<string | null>(null);
-
+  const [replyEdits, setReplyEdits] = useState<Record<string, string>>({});
+  const [copiedReply, setCopiedReply] = useState<string | null>(null);
   const handleDownloadVersion = useCallback(async (versionId: string) => {
     setDownloadingVersion(versionId);
     try {

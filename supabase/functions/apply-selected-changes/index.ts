@@ -115,6 +115,12 @@ Apply ALL of the selected changes to the formula brief. The user has overridden 
 3. Maintain the overall structure and format of the formula brief
 4. Write the complete updated formula brief
 
+**CRITICAL — FLAVOR PRESERVATION:**
+- You MUST preserve and include ALL recommended flavors and the Flavor Strategy / Flavor Profile section from the current formula brief.
+- If the current brief lists specific flavors (e.g., in SKU tables, Flavor Strategy sections, or Natural Flavors rows), they MUST appear in the updated brief.
+- If manufacturer feedback mentions flavor changes, incorporate those while keeping the full flavor lineup visible.
+- The "Recommended Flavors" or "Flavor Profile" section should always be present in the output.
+
 Respond in this structure:
 
 ## UPDATED FORMULA BRIEF

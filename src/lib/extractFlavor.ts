@@ -47,19 +47,18 @@ export function extractFlavorsFromFormulaBrief(content: string | null | undefine
     }
   };
 
-  // 1. SKU table rows: "| SKU-XX | Description — FlavorName |" or "| SKU-XX | Description — FlavorName [UPDATED]** |"
-  const skuPattern = /\|\s*SKU[- ]?\d+\s*\|[^|]*?[—–-]\s+([^|]+?)\s*\|/gi;
+  // 1. SKU table rows: "| SKU-01 | Brand — Tropical Mango [UPDATED]** | size | price |"
+  //    The flavor is between the dash and the next pipe
+  const skuPattern = /\|\s*SKU[- ]?\d+\s*\|[^|]*?[—–-]\s+([^|*\[\n]+)/gi;
   for (const m of content.matchAll(skuPattern)) {
-    const desc = m[1].trim();
-    // Could be "Tropical Mango [UPDATED]**" or "3-Month Supply (180ct) [UPDATED]**"
-    const cleaned = desc
+    let desc = m[1].trim()
       .replace(/\[UPDATED\]/gi, '')
       .replace(/\*+/g, '')
       .replace(/\s*\(.*?\)/g, '')
       .trim();
     // Skip size/supply variants
-    if (/^\d+[-\s]*month|supply|count|ct\b/i.test(cleaned)) continue;
-    if (cleaned) addFlavor(cleaned);
+    if (/^\d+[-\s]*month|supply|count|ct\b/i.test(desc)) continue;
+    if (desc) addFlavor(desc);
   }
 
   // 2. Natural Flavors row in excipient table: "| Natural Flavors | XXmg | Sour Blue Raspberry / Watermelon |"
@@ -95,8 +94,8 @@ export function extractFlavorsFromFormulaBrief(content: string | null | undefine
     }
   }
 
-  // 4. "X as the lead flavor" or "lead flavor: X"
-  const leadFlavorPattern = /(\w[\w\s&]+?)\s+as\s+the\s+(?:lead|primary|main)\s+flavou?r/gi;
+  // 4. "X as the lead flavor" — capture just the flavor name (1-3 words before "as the")
+  const leadFlavorPattern = /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})\s+as\s+the\s+(?:lead|primary|main)\s+flavou?r/g;
   for (const m of content.matchAll(leadFlavorPattern)) {
     addFlavor(m[1]);
   }

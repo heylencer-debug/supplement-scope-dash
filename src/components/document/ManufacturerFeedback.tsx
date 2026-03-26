@@ -63,6 +63,12 @@ function parseChangesFromResponse(response: string | null): ParsedChange[] {
   }).filter(c => c.feedbackPoint && c.feedbackPoint !== "---");
 }
 
+function parseManufacturerReply(response: string | null): string {
+  if (!response) return "";
+  const match = response.match(/##\s*MANUFACTURER REPLY\s*\n+([\s\S]*?)(?=\n##\s*CHANGE SUMMARY|$)/i);
+  return match?.[1]?.trim() || "";
+}
+
 export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = false }: ManufacturerFeedbackProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();

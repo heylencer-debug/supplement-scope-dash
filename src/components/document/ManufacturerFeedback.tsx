@@ -123,10 +123,13 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
       } else if (ing?.ai_generated_brief) {
         briefs.push({ id: "legacy", label: "AI Generated Brief", emoji: "🧠", subtitle: "Initial AI brief", content: ing.ai_generated_brief, created_at: data.created_at });
       }
+      // Compliance / QA final version
+      const complianceContent = ing?.final_formula_brief || ing?.adjusted_formula;
+      if (complianceContent) {
+        briefs.push({ id: "compliance", label: "⚖️ Compliance", emoji: "⚖️", subtitle: "Initial formula brief from market analysis pipeline", content: complianceContent, created_at: data.created_at });
+      }
       if (ing?.final_formula_brief) {
-        briefs.push({ id: "qa-final", label: "QA Approved Final", emoji: "✅", subtitle: `${ing?.qa_verdict?.verdict || 'Reviewed'} · Score: ${ing?.qa_verdict?.score || '—'}/10`, content: ing.final_formula_brief, created_at: data.created_at });
-      } else if (ing?.adjusted_formula) {
-        briefs.push({ id: "qa-adjusted", label: "QA Adjusted", emoji: "⚖️", subtitle: "Adjustments from QA review", content: ing.adjusted_formula, created_at: data.created_at });
+        briefs.push({ id: "qa-final", label: "✅ QA Approved Final", emoji: "✅", subtitle: `${ing?.qa_verdict?.verdict || 'Reviewed'} · Score: ${ing?.qa_verdict?.score || '—'}/10`, content: ing.final_formula_brief, created_at: data.created_at });
       }
       return briefs.length > 0 ? briefs : null;
     },

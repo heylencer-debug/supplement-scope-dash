@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Factory, Upload, Send, CheckCircle, XCircle, HelpCircle, AlertCircle, ChevronDown, ChevronUp, X, Image } from "lucide-react";
+import { useState, useCallback } from "react";
+import { Factory, Upload, Send, CheckCircle, XCircle, HelpCircle, AlertCircle, ChevronDown, ChevronUp, X, Image, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { pdf } from "@react-pdf/renderer";
+import { StrategyBriefPDF } from "@/components/document/StrategyBriefPDF";
 
 interface ManufacturerFeedbackProps {
   categoryId: string;

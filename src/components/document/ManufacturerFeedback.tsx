@@ -45,6 +45,41 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
   const [uploadedImages, setUploadedImages] = useState<{ file: File; url: string }[]>([]);
   const [uploading, setUploading] = useState(false);
   const [expandedFeedback, setExpandedFeedback] = useState<string | null>(null);
+  const [downloadingVersion, setDownloadingVersion] = useState<string | null>(null);
+
+  const handleDownloadVersion = useCallback(async (versionId: string) => {
+    setDownloadingVersion(versionId);
+    try {
+      const { data: version, error } = await supabase
+        .from("formula_brief_versions")
+        .select("formula_brief_content, version_number, created_at")
+        .eq("id", versionId)
+        .single();
+      if (error || !version) throw new Error("Version not found");
+
+      const blob = await pdf(
+        <StrategyBriefPDF
+          content={version.formula_brief_content}
+          categoryName={keyword}
+          createdAt={version.created_at}
+        />
+      ).toBlob();
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${keyword.replace(/\s+/g, "_")}_Formula_v${version.version_number}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast({ title: "PDF downloaded", description: `Formula Brief v${version.version_number}` });
+    } catch (e: any) {
+      toast({ title: "Download failed", description: e.message, variant: "destructive" });
+    } finally {
+      setDownloadingVersion(null);
+    }
+  }, [keyword, toast]);
 
   // Load existing feedback — poll every 4s while any row is processing
   const { data: feedbackList = [] } = useQuery({

@@ -82,30 +82,10 @@ For each distinct feedback point from the manufacturer:
 [One sentence describing what changed in this version, suitable for the version history label. Example: "Applied CMO's zinc form change to bisglycinate; rejected biotin dose reduction (below clinical floor)."]`;
 }
 
-serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+async function processInBackground(feedbackId: string) {
+  const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
   try {
-    const { feedbackId } = await req.json();
-
-    if (!feedbackId) {
-      return new Response(JSON.stringify({ error: "feedbackId is required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    if (!OPENROUTER_API_KEY) {
-      return new Response(JSON.stringify({ error: "OpenRouter API key not configured" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
-
     // Load the feedback row
     const { data: fb, error: fbErr } = await supabase
       .from("manufacturer_feedback")
@@ -114,10 +94,8 @@ serve(async (req) => {
       .single();
 
     if (fbErr || !fb) {
-      return new Response(JSON.stringify({ error: "Feedback not found" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      console.error("Feedback not found:", feedbackId);
+      return;
     }
 
     // Mark as processing
@@ -158,10 +136,7 @@ serve(async (req) => {
         .from("manufacturer_feedback")
         .update({ status: "pending", claude_response: "No formula brief found. Run P8 + P9 first." })
         .eq("id", feedbackId);
-      return new Response(JSON.stringify({ error: "No formula brief found for this category" }), {
-        status: 422,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return;
     }
 
     // Build feedback text — extract from images if present
@@ -182,8 +157,8 @@ Format clearly with each distinct point on a new line.`,
       try {
         const extractedText = await callClaude([{ role: "user", content: imageContent }], 4000);
         fullFeedbackText = [fullFeedbackText, "\n\n[FROM IMAGES]\n" + extractedText].filter(Boolean).join("\n");
-      } catch (_e) {
-        // continue without image text
+      } catch (e) {
+        console.error("Image extraction failed:", e);
       }
     }
 
@@ -192,10 +167,7 @@ Format clearly with each distinct point on a new line.`,
         .from("manufacturer_feedback")
         .update({ status: "dismissed" })
         .eq("id", feedbackId);
-      return new Response(JSON.stringify({ error: "No feedback content found" }), {
-        status: 422,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return;
     }
 
     // Evaluate with Claude
@@ -270,8 +242,47 @@ Format clearly with each distinct point on a new line.`,
       })
       .eq("id", feedbackId);
 
+    console.log(`Feedback ${feedbackId} processed: ${verdict}`);
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "Unknown error";
+    console.error(`Error processing feedback ${feedbackId}:`, message);
+
+    const supabaseErr = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
+    await supabaseErr
+      .from("manufacturer_feedback")
+      .update({ status: "pending", claude_response: `Error: ${message}` })
+      .eq("id", feedbackId);
+  }
+}
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const { feedbackId } = await req.json();
+
+    if (!feedbackId) {
+      return new Response(JSON.stringify({ error: "feedbackId is required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!OPENROUTER_API_KEY) {
+      return new Response(JSON.stringify({ error: "OpenRouter API key not configured" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Use background task pattern to avoid timeout
+    // @ts-ignore - EdgeRuntime is available in Supabase edge functions
+    EdgeRuntime.waitUntil(processInBackground(feedbackId));
+
     return new Response(
-      JSON.stringify({ success: true, verdict, newVersionId }),
+      JSON.stringify({ success: true, status: "processing" }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e: unknown) {

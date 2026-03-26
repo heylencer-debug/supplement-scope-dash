@@ -93,24 +93,40 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
         .single();
       if (error || !version) throw new Error("Version not found");
 
-      const blob = await pdf(
-        <StrategyBriefPDF
-          content={version.formula_brief_content}
-          categoryName={keyword}
-          createdAt={version.created_at}
-        />
-      ).toBlob();
+      try {
+        const blob = await pdf(
+          <StrategyBriefPDF
+            content={version.formula_brief_content}
+            categoryName={keyword}
+            createdAt={version.created_at}
+          />
+        ).toBlob();
 
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${keyword.replace(/\s+/g, "_")}_Formula_v${version.version_number}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      toast({ title: "PDF downloaded", description: `Formula Brief v${version.version_number}` });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${keyword.replace(/\s+/g, "_")}_Formula_v${version.version_number}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        toast({ title: "PDF downloaded", description: `Formula Brief v${version.version_number}` });
+      } catch (pdfErr) {
+        // Fallback: download as plain text file
+        console.error("PDF generation failed, falling back to text:", pdfErr);
+        const textBlob = new Blob([version.formula_brief_content], { type: "text/markdown" });
+        const url = URL.createObjectURL(textBlob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${keyword.replace(/\s+/g, "_")}_Formula_v${version.version_number}.md`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        toast({ title: "Downloaded as Markdown", description: "PDF generation failed — saved as .md instead." });
+      }
     } catch (e: any) {
+      console.error("Download failed:", e);
       toast({ title: "Download failed", description: e.message, variant: "destructive" });
     } finally {
       setDownloadingVersion(null);

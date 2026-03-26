@@ -369,11 +369,11 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
                           {verdict && (
                             <span className={`text-xs font-medium ${verdict.color}`}>{verdict.label}</span>
                           )}
-                          {fb.status === "pending" && (
-                            <Badge variant="outline" className="text-xs text-orange-600 border-orange-300">Pending</Badge>
-                          )}
-                          {fb.status === "processing" && (
-                            <Badge variant="outline" className="text-xs text-blue-600 border-blue-300">Processing</Badge>
+                          {(fb.status === "pending" || fb.status === "processing") && (
+                            <Badge variant="outline" className="text-xs text-primary border-primary/30 gap-1.5 animate-fade-in">
+                              <div className="w-2.5 h-2.5 border-[1.5px] border-primary/30 border-t-primary rounded-full animate-spin" />
+                              {fb.status === "pending" ? "Queued" : "Analyzing..."}
+                            </Badge>
                           )}
                           {isOpen ? <ChevronUp className="w-3 h-3 text-muted-foreground" /> : <ChevronDown className="w-3 h-3 text-muted-foreground" />}
                         </div>

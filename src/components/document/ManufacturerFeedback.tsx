@@ -472,6 +472,18 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
                   <td className="py-2.5 px-4">
                     <Badge variant="outline" className="text-[10px]">{pb.label}</Badge>
                   </td>
+                  <td className="py-2.5 px-4">
+                    {(() => {
+                      const flavor = extractFlavorFromFormulaBrief(pb.content);
+                      return flavor ? (
+                        <Badge variant="outline" className="text-[10px] bg-orange-50 border-orange-200 text-orange-700">
+                          🍊 {flavor}
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      );
+                    })()}
+                  </td>
                   <td className="py-2.5 px-4 max-w-[300px]">
                     <p className="text-xs text-muted-foreground line-clamp-2">{pb.subtitle}</p>
                   </td>
@@ -508,7 +520,7 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
               ))}
               {allVersions.length === 0 && !pipelineBriefs?.length && (
                 <tr>
-                  <td colSpan={5} className="py-8 text-center text-sm text-muted-foreground">
+                  <td colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
                     No formula versions yet. Submit manufacturer feedback to generate versions.
                   </td>
                 </tr>

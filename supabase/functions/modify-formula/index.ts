@@ -80,7 +80,7 @@ async function processGenerationTask(
             'X-Title': 'Noodle Search Formula Modifier'
           },
           body: JSON.stringify({
-            model: 'google/gemini-3-pro-preview',
+            model: 'anthropic/claude-sonnet-4-6',
             messages,
             stream: false,
             max_tokens: 64000
@@ -349,7 +349,8 @@ CRITICAL RULES:
 2. new_formula_content MUST be the COMPLETE document, not just changes
 3. COPY unchanged sections EXACTLY - do not rewrite them
 4. Your output MUST be at least ${Math.floor(originalLength * 0.90)} characters
-5. If unsure whether to include something from original, INCLUDE IT`;
+5. If unsure whether to include something from original, INCLUDE IT
+6. **RECOMMENDED FLAVORS ARE MANDATORY**: If the P12 COMPLIANCE TEMPLATE or MARKET-ANALYZED RECOMMENDED FLAVORS section lists flavors (e.g. Strawberry, Citrus, Apple, Mixed Berry, Blackberry), ALL of them MUST appear in the Flavor section of the output. If the current formula is missing any of these flavors, RESTORE them from the P12 template. Never drop or omit recommended flavors.`;
     } else {
       // CONVERSATION MODE: Be helpful and discuss, no JSON output
       systemPrompt = `You are a Formula Development Specialist helping to discuss and plan modifications to a product formula. You have access to the complete formula brief document AND competitive intelligence about what ingredients competitors are using.
@@ -460,7 +461,7 @@ IMPORTANT RULES:
           'X-Title': 'Noodle Search Formula Modifier'
         },
         body: JSON.stringify({
-          model: 'google/gemini-3-pro-preview',
+          model: 'anthropic/claude-sonnet-4-6',
           messages,
           stream: true,
           max_tokens: 16000

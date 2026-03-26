@@ -33,10 +33,13 @@ export function extractFlavorsFromFormulaBrief(content: string | null | undefine
       'month supply', 'primary', 'value', 'bulk', 'pricing', 'margin',
       'targets', 'format', 'msrp', 'serving', 'gummy', 'gummies',
       'the', 'and', 'natural', 'flavor', 'flavors', 'profile',
+      'supply', 'count', 'pack', 'bottle', 'pouch',
     ];
     if (skipWords.some(w => f.toLowerCase() === w || f.toLowerCase().startsWith(w + ' '))) return;
-    // Skip if it looks like a section header, price, or pipe artifact
+    // Skip if it looks like a section header, price, pipe artifact, or pure number/size
     if (f.startsWith('#') || f.startsWith('---') || f.startsWith('|') || f.startsWith('$')) return;
+    // Skip pure numbers or size strings like "30", "60", "90", "120ct"
+    if (/^\d+\s*(?:ct|count|day|month|serving|pack|supply|capsule|gummies?|tablets?)?s?\s*$/i.test(f)) return;
 
     const key = f.toLowerCase();
     if (!seen.has(key)) {

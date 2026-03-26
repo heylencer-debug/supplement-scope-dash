@@ -114,6 +114,7 @@ serve(async (req) => {
 
     const complianceTemplate = getComplianceTemplateFromIngredients(briefRow?.ingredients);
     const complianceFlavorBlock = extractTemplateFlavorBlock(complianceTemplate);
+    const recommendedFlavors = extractRecommendedFlavors(briefRow?.ingredients);
 
     if (activeVersion) {
       currentFormula = activeVersion.formula_brief_content;

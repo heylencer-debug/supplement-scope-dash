@@ -858,5 +858,6 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
         </div>
       )}
     </div>
+    </div>
   );
 }

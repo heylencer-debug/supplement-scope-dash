@@ -146,9 +146,7 @@ export function P9BenchmarkOverview({ categoryId }: P9BenchmarkOverviewProps) {
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
-              <pre className="text-xs text-foreground whitespace-pre-wrap font-mono leading-relaxed bg-muted/30 p-3 rounded-lg border border-border max-h-[400px] overflow-y-auto">
-                {adjustedFormula}
-              </pre>
+              <ComparisonTable markdown={adjustedFormula} />
             </div>
             <div className="mt-3 grid grid-cols-3 gap-2 text-center">
               {brief.target_price && (

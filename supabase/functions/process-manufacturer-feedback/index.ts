@@ -192,6 +192,7 @@ async function processInBackground(feedbackId: string) {
       .maybeSingle();
 
     const complianceTemplate = getComplianceTemplateFromIngredients(briefRow?.ingredients);
+    const recommendedFlavors = extractRecommendedFlavors(briefRow?.ingredients);
 
     if (activeVersion) {
       currentFormula = activeVersion.formula_brief_content;

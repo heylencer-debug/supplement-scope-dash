@@ -375,43 +375,53 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
 
                           {/* Selectable changes — user overrides AI verdict */}
                           {fb.status === "reviewed" && parsedChanges.length > 0 && !fb.resulting_version_id && (
-                            <div className="border border-primary/20 rounded-lg p-3 bg-primary/5 space-y-2">
-                              <p className="text-xs font-semibold text-foreground">
-                                Select changes to apply to the formula brief:
-                              </p>
-                              <div className="space-y-1.5">
+                            <div className="border border-primary/20 rounded-lg p-4 bg-primary/5 space-y-3">
+                              <div className="flex items-center justify-between">
+                                <p className="text-sm font-semibold text-foreground">
+                                  Select changes to apply to the formula brief
+                                </p>
+                                <span className="text-xs text-muted-foreground">
+                                  {selected.size} of {parsedChanges.length} selected
+                                </span>
+                              </div>
+                              <div className="space-y-2">
                                 {parsedChanges.map((change, i) => {
                                   const isAccepted = change.verdict.toUpperCase().includes("ACCEPTED");
                                   const isRejected = change.verdict.toUpperCase().includes("REJECTED");
+                                  const isChecked = selected.has(i);
                                   return (
                                     <label
                                       key={i}
-                                      className="flex items-start gap-2 cursor-pointer hover:bg-white/50 rounded p-1.5 transition-colors"
+                                      className={`flex items-start gap-3 cursor-pointer rounded-lg border p-3 transition-colors ${
+                                        isChecked
+                                          ? "bg-white border-primary/30 shadow-sm"
+                                          : "bg-white/50 border-border/50 hover:border-border"
+                                      }`}
                                     >
                                       <Checkbox
-                                        checked={selected.has(i)}
+                                        checked={isChecked}
                                         onCheckedChange={() => toggleChange(fb.id, i)}
-                                        className="mt-0.5"
+                                        className="mt-0.5 flex-shrink-0"
                                       />
-                                      <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-1.5">
-                                          <span className="text-xs font-medium text-foreground">
+                                      <div className="flex-1 min-w-0 space-y-1.5">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <span className="text-sm font-medium text-foreground">
                                             {change.feedbackPoint}
                                           </span>
                                           <Badge
                                             variant="outline"
-                                            className={`text-[10px] px-1 py-0 h-4 ${
+                                            className={`text-[10px] px-1.5 py-0 h-4 flex-shrink-0 ${
                                               isAccepted
                                                 ? "text-green-700 border-green-300 bg-green-50"
                                                 : isRejected
                                                 ? "text-red-700 border-red-300 bg-red-50"
-                                                : "text-blue-700 border-blue-300 bg-blue-50"
+                                                : "text-amber-700 border-amber-300 bg-amber-50"
                                             }`}
                                           >
                                             {change.verdict}
                                           </Badge>
                                         </div>
-                                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                                        <p className="text-xs text-muted-foreground leading-relaxed">
                                           {change.reasoning}
                                         </p>
                                       </div>
@@ -421,7 +431,7 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
                               </div>
                               <Button
                                 size="sm"
-                                className="w-full mt-2 gap-1.5"
+                                className="w-full mt-1 gap-1.5"
                                 disabled={selected.size === 0 || isGenerating}
                                 onClick={() => handleGenerateVersion(fb.id, parsedChanges, selected)}
                               >

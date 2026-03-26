@@ -13,6 +13,7 @@ import remarkGfm from "remark-gfm";
 interface ManufacturerFeedbackProps {
   categoryId: string;
   keyword: string;
+  defaultExpanded?: boolean;
 }
 
 interface FeedbackRow {
@@ -34,10 +35,10 @@ const VERDICT_CONFIG = {
   rejected: { label: "Rejected", icon: XCircle, color: "text-red-600", bg: "bg-red-50 border-red-200" },
 };
 
-export function ManufacturerFeedback({ categoryId, keyword }: ManufacturerFeedbackProps) {
+export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = false }: ManufacturerFeedbackProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(defaultExpanded);
   const [feedbackText, setFeedbackText] = useState("");
   const [uploadedImages, setUploadedImages] = useState<{ file: File; url: string }[]>([]);
   const [uploading, setUploading] = useState(false);

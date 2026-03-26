@@ -10,7 +10,6 @@ import { useFormulaBriefVersions } from "@/hooks/useFormulaBriefVersions";
 import { DocumentContainer } from "@/components/document/DocumentContainer";
 import { VersionSelector } from "@/components/document/VersionSelector";
 import { FormulaChat } from "@/components/document/FormulaChat";
-import { ManufacturerFeedback } from "@/components/document/ManufacturerFeedback";
 import { FloatingChatButton } from "@/components/ui/floating-chat-button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -149,15 +148,6 @@ export default function StrategyBrief() {
               {activeVersion && ` • Version ${activeVersion.version_number}`}
             </p>
           </div>
-        </div>
-      )}
-
-      {effectiveCategoryId && categoryName && !isLoading && (
-        <div className="max-w-[800px] mx-auto px-4 pb-8">
-          <ManufacturerFeedback
-            categoryId={effectiveCategoryId}
-            keyword={categoryName}
-          />
         </div>
       )}
 

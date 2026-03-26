@@ -1,4 +1,4 @@
-import { Search, LayoutDashboard, Table, LucideIcon } from "lucide-react";
+import { Search, LayoutDashboard, Table, Factory, LucideIcon } from "lucide-react";
 import { NavLink as RouterNavLink, useLocation } from "react-router-dom";
 import { useCategoryContext } from "@/contexts/CategoryContext";
 import { cn } from "@/lib/utils";
@@ -25,6 +25,7 @@ const menuItems: MenuItem[] = [
   { title: "New Analysis", url: "/", icon: Search, preserveCategory: false },
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, preserveCategory: true },
   { title: "Product Explorer", url: "/products", icon: Table, preserveCategory: true },
+  { title: "Manufacturer Feedback", url: "/manufacturer-feedback", icon: Factory, preserveCategory: true },
 ];
 
 interface NavItemProps {

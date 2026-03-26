@@ -350,7 +350,7 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
             <div>
               <p className="text-sm font-semibold text-foreground">Formula Brief Versions</p>
               <p className="text-xs text-muted-foreground">
-                {allVersions.length + (originalBrief ? 1 : 0)} version{allVersions.length + (originalBrief ? 1 : 0) !== 1 ? 's' : ''} · Active version is used for all analyses
+                {allVersions.length + (pipelineBriefs?.length || 0)} version{allVersions.length + (pipelineBriefs?.length || 0) !== 1 ? 's' : ''} · Active version is used for all analyses
               </p>
             </div>
           </div>
@@ -428,22 +428,22 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
                   </td>
                 </tr>
               ))}
-              {/* Original formula brief from Compliance/AI analysis */}
-              {originalBrief && (
-                <tr className="hover:bg-muted/30 transition-colors">
+              {/* Pipeline briefs: Grok, Sonnet, QA */}
+              {pipelineBriefs?.map(pb => (
+                <tr key={pb.id} className="hover:bg-muted/30 transition-colors bg-muted/5">
                   <td className="py-2.5 px-4">
-                    <span className="font-medium text-foreground">Original</span>
+                    <span className="font-medium text-foreground">{pb.emoji}</span>
                   </td>
                   <td className="py-2.5 px-4">
-                    <Badge variant="outline" className="text-[10px]">⚖️ Compliance</Badge>
+                    <Badge variant="outline" className="text-[10px]">{pb.label}</Badge>
                   </td>
                   <td className="py-2.5 px-4 max-w-[300px]">
-                    <p className="text-xs text-muted-foreground">Initial formula brief from market analysis pipeline</p>
+                    <p className="text-xs text-muted-foreground line-clamp-2">{pb.subtitle}</p>
                   </td>
                   <td className="py-2.5 px-4 whitespace-nowrap">
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
                       <Clock className="w-3 h-3" />
-                      {originalBrief.created_at ? format(new Date(originalBrief.created_at), "MMM d, yyyy · h:mm a") : "—"}
+                      {pb.created_at ? format(new Date(pb.created_at), "MMM d, yyyy · h:mm a") : "—"}
                     </div>
                   </td>
                   <td className="py-2.5 px-4">
@@ -452,7 +452,7 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
                         size="sm"
                         variant="ghost"
                         className="h-7 text-xs gap-1"
-                        onClick={() => setViewingVersionId("original")}
+                        onClick={() => setViewingVersionId(pb.id)}
                       >
                         <Eye className="w-3 h-3" />
                         View
@@ -460,8 +460,8 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
                     </div>
                   </td>
                 </tr>
-              )}
-              {allVersions.length === 0 && !originalBrief && (
+              ))}
+              {allVersions.length === 0 && !pipelineBriefs?.length && (
                 <tr>
                   <td colSpan={5} className="py-8 text-center text-sm text-muted-foreground">
                     No formula versions yet. Submit manufacturer feedback to generate versions.

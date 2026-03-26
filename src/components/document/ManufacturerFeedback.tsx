@@ -49,12 +49,12 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
     queryKey: ["manufacturer_feedback", categoryId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("manufacturer_feedback")
+        .from("manufacturer_feedback" as any)
         .select("*")
         .eq("category_id", categoryId)
         .order("submitted_at", { ascending: false });
       if (error) throw error;
-      return data as FeedbackRow[];
+      return (data as unknown) as FeedbackRow[];
     },
     enabled: !!categoryId,
     refetchInterval: (query) => {

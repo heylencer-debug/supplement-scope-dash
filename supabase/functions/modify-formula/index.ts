@@ -241,6 +241,8 @@ serve(async (req) => {
 
     // Fetch P12 compliance template + recommended flavors as locked reference
     let p12Reference = '';
+    let p12TemplateContent = '';
+    let recommendedFlavorsBlock = '';
     {
       const { data: briefRow } = await supabase
         .from('formula_briefs')
@@ -253,6 +255,7 @@ serve(async (req) => {
         const ing = briefRow.ingredients as Record<string, unknown>;
         const p12Content = ing.final_formula_brief || ing.adjusted_formula;
         if (typeof p12Content === 'string' && p12Content.trim()) {
+          p12TemplateContent = p12Content.trim();
           p12Reference += `\n\n=== P12 COMPLIANCE TEMPLATE (LOCKED FORMAT + FLAVOR SOURCE OF TRUTH) ===\nYou MUST preserve the same section order, heading hierarchy, table structure, and flavor/variant coverage as this template.\n---BEGIN P12 TEMPLATE---\n${p12Content}\n---END P12 TEMPLATE---\n`;
         }
 
@@ -261,12 +264,17 @@ serve(async (req) => {
           const flavorLines = flavorRecs.map((f: Record<string, unknown>, i: number) => {
             const name = String(f.flavor_name || 'Unknown').replace(/^\w/, (c: string) => c.toUpperCase());
             const confidence = f.confidence ?? 'N/A';
-            return `${i + 1}. ${name} (Confidence: ${confidence}%)`;
+            const evidence = f.evidence as Record<string, unknown> | undefined;
+            const presence = evidence?.competitor_presence ?? '';
+            return `${i + 1}. **${name}** — Confidence: ${confidence}%${presence ? `, Competitor presence: ${presence}` : ''}`;
           });
-          p12Reference += `\n=== MARKET-ANALYZED RECOMMENDED FLAVORS (MUST be included in output) ===\n${flavorLines.join('\n')}\n=== END RECOMMENDED FLAVORS ===\n`;
+          recommendedFlavorsBlock = flavorLines.join('\n');
+          p12Reference += `\n=== MARKET-ANALYZED RECOMMENDED FLAVORS (MUST be included in output) ===\n${recommendedFlavorsBlock}\n=== END RECOMMENDED FLAVORS ===\n`;
         }
       }
       console.log('P12 reference length:', p12Reference.length);
+      console.log('P12 template content length:', p12TemplateContent.length);
+      console.log('Recommended flavors block:', recommendedFlavorsBlock ? 'present' : 'none');
     }
 
     // Different system prompts based on mode
@@ -283,47 +291,52 @@ serve(async (req) => {
 
     if (generateFormula) {
       // GENERATION MODE: Output JSON with complete new formula
-      systemPrompt = `You are a Formula Development Specialist performing a SURGICAL EDIT operation on a formula brief document.
+      systemPrompt = `You are a Formula Development Specialist generating an updated formula brief document.
 
-=== ABSOLUTE RULE: THIS IS A COPY-THEN-PATCH OPERATION ===
-You will COPY the ENTIRE original document, then ONLY change the specific sentences/paragraphs related to the conversation.
-This is NOT a rewrite. This is NOT a summarization. You are a TEXT EDITOR performing find-and-replace.
+=== TWO-DOCUMENT MERGE APPROACH ===
+You have TWO source documents. Your job is to merge them into one complete output:
 
-CURRENT FORMULA BRIEF (ORIGINAL DOCUMENT - ${originalLength} characters, ~${originalWordCount} words):
----BEGIN ORIGINAL DOCUMENT---
+1. **P12 COMPLIANCE TEMPLATE** — This is the STRUCTURAL AUTHORITY. Use its exact section order, heading hierarchy, table structures, and flavor/variant coverage as the skeleton.
+2. **CURRENT ACTIVE FORMULA** — This contains the latest business content (accepted changes from manufacturer feedback, ingredient tweaks, etc.). Carry forward all its substantive content.
+
+=== P12 COMPLIANCE TEMPLATE (STRUCTURAL BASE — ${p12TemplateContent.length} chars) ===
+---BEGIN P12 TEMPLATE---
+${p12TemplateContent || currentFormula}
+---END P12 TEMPLATE---
+
+=== CURRENT ACTIVE FORMULA (BUSINESS CONTENT SOURCE — ${originalLength} chars) ===
+---BEGIN ACTIVE FORMULA---
 ${currentFormula}
----END ORIGINAL DOCUMENT---
-${p12Reference}
+---END ACTIVE FORMULA---
+
+=== MARKET-ANALYZED RECOMMENDED FLAVORS (MANDATORY — from pipeline market analysis) ===
+${recommendedFlavorsBlock || 'No recommended flavors data available.'}
+These flavors MUST ALL appear in the Flavor / Variant section of the output. They came from competitive market analysis and are non-negotiable.
+=== END RECOMMENDED FLAVORS ===
+
 ${competitorContext}
 ${conversationSummary}
 
-=== MANDATORY APPROACH: COPY-PASTE FIRST ===
-Step 1: Start by mentally copying the ENTIRE original document above (all ${originalLength} characters)
-Step 2: Identify ONLY the specific sentences/paragraphs that relate to changes discussed in conversation
-Step 3: Replace ONLY those specific sentences/paragraphs with updated versions
-Step 4: Everything else remains EXACTLY as it was - character for character
+=== MERGE INSTRUCTIONS ===
+Step 1: Use the P12 TEMPLATE as your structural skeleton — same sections, same order, same heading levels, same table formats
+Step 2: For each section, use the ACTIVE FORMULA's content if it contains accepted changes or updates; otherwise use the P12 content
+Step 3: Apply any new changes discussed in the conversation
+Step 4: Ensure ALL recommended flavors appear in the Flavor/Variant section — restore any that are missing from the active formula
+Step 5: Verify the output has the complete P12 structure with no sections dropped
 
-=== FAILURE CONDITIONS (Your output will be REJECTED if): ===
-❌ Output is less than ${Math.floor(originalLength * 0.90)} characters (must be ≥90% of ${originalLength})
-❌ Any section is summarized or condensed
-❌ Any unchanged section is rewritten in different words
-❌ Any bullet points, examples, or details are removed
-❌ The document structure or section order is changed
+=== FAILURE CONDITIONS ===
+❌ Missing any section that exists in the P12 template
+❌ Missing any of the recommended flavors (${recommendedFlavorsBlock ? recommendedFlavorsBlock.split('\n').length + ' flavors required' : 'check P12 template'})
+❌ Output shorter than ${Math.floor(Math.max(originalLength, p12TemplateContent.length) * 0.90)} characters
+❌ Sections reordered from P12 structure
+❌ Tables reformatted differently from P12
 
-=== SUCCESS CONDITIONS: ===
-✓ Output is ${originalLength}+ characters (same length or longer than original)
-✓ Unchanged sections are IDENTICAL to original (copy-pasted verbatim)
-✓ Only the discussed changes are modified
-✓ All original formatting, bullet points, and structure preserved
-
-CRITICAL TASK: Review the ENTIRE conversation history and identify EVERY change discussed. Then:
-1. COPY the entire original document
-2. PATCH only the specific parts that need to change
-3. The result should be the same document with surgical edits
-
-Use the COMPETITOR INGREDIENT INTELLIGENCE to:
-- Validate suggested ingredient choices against what's working for competitors
-- Ensure dosages are competitive with successful products
+=== SUCCESS CONDITIONS ===
+✓ Every P12 section present in output
+✓ All ${recommendedFlavorsBlock ? recommendedFlavorsBlock.split('\n').length : 5}+ recommended flavors in the Flavor section
+✓ Latest accepted changes from active formula preserved
+✓ Conversation changes applied
+✓ Same markdown structure as P12
 
 CHANGES TO INCORPORATE (review conversation for):
 - All ingredient changes (additions, removals, dosage adjustments)
@@ -334,23 +347,15 @@ CHANGES TO INCORPORATE (review conversation for):
 You MUST respond with ONLY a JSON object (no markdown code blocks, no explanation):
 {
   "change_summary": "List each specific change made",
-  "new_formula_content": "The COMPLETE document (${originalLength}+ chars) with surgical edits applied"
+  "new_formula_content": "The COMPLETE merged document with P12 structure, all flavors, and conversation changes applied"
 }
-
-=== FINAL VERIFICATION BEFORE OUTPUT ===
-□ Count your output length - is it at least ${Math.floor(originalLength * 0.90)} characters?
-□ Did you copy unchanged sections word-for-word (not paraphrase)?
-□ Did you preserve ALL bullet points, examples, and details?
-□ Did you incorporate EVERY change from the conversation?
-□ Is the structure and section order identical to the original?
 
 CRITICAL RULES:
 1. Output ONLY raw JSON - no code blocks, no explanation
-2. new_formula_content MUST be the COMPLETE document, not just changes
-3. COPY unchanged sections EXACTLY - do not rewrite them
-4. Your output MUST be at least ${Math.floor(originalLength * 0.90)} characters
-5. If unsure whether to include something from original, INCLUDE IT
-6. **RECOMMENDED FLAVORS ARE MANDATORY**: If the P12 COMPLIANCE TEMPLATE or MARKET-ANALYZED RECOMMENDED FLAVORS section lists flavors (e.g. Strawberry, Citrus, Apple, Mixed Berry, Blackberry), ALL of them MUST appear in the Flavor section of the output. If the current formula is missing any of these flavors, RESTORE them from the P12 template. Never drop or omit recommended flavors.`;
+2. new_formula_content MUST be the COMPLETE document
+3. Use P12 structure as the skeleton, active formula content as the fill
+4. ALL recommended flavors MUST appear — this is non-negotiable
+5. If unsure whether to include something, INCLUDE IT`;
     } else {
       // CONVERSATION MODE: Be helpful and discuss, no JSON output
       systemPrompt = `You are a Formula Development Specialist helping to discuss and plan modifications to a product formula. You have access to the complete formula brief document AND competitive intelligence about what ingredients competitors are using.

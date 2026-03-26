@@ -29,6 +29,36 @@ async function callClaude(messages: Array<{ role: string; content: string }>, ma
   return j.choices?.[0]?.message?.content || "";
 }
 
+function getComplianceTemplateFromIngredients(ingredients: unknown): string | null {
+  if (!ingredients || typeof ingredients !== "object") return null;
+
+  const record = ingredients as Record<string, unknown>;
+  const candidates = [
+    record.final_formula_brief,
+    record.adjusted_formula,
+    record.compliance_formula,
+    record.final_pdf_version,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim()) {
+      return candidate.trim();
+    }
+  }
+
+  return null;
+}
+
+function extractTemplateFlavorBlock(content: string | null): string {
+  if (!content) return "";
+
+  const match =
+    content.match(/###\s*Flavor[\s\S]*?(?=\n---\n\n###\s*Pricing|\n###\s*Pricing|$)/i) ??
+    content.match(/###\s*Flavor[\s\S]*?(?=\n###\s*Pricing|$)/i);
+
+  return match?.[0]?.trim() || "";
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -57,20 +87,21 @@ serve(async (req) => {
     let currentFormula: string | null = null;
     let parentVersionId: string | null = null;
 
+    const { data: briefRow } = await supabase
+      .from("formula_briefs")
+      .select("ingredients")
+      .eq("category_id", categoryId)
+      .limit(1)
+      .maybeSingle();
+
+    const complianceTemplate = getComplianceTemplateFromIngredients(briefRow?.ingredients);
+    const complianceFlavorBlock = extractTemplateFlavorBlock(complianceTemplate);
+
     if (activeVersion) {
       currentFormula = activeVersion.formula_brief_content;
       parentVersionId = activeVersion.id;
     } else {
-      const { data: briefRow } = await supabase
-        .from("formula_briefs")
-        .select("ingredients")
-        .eq("category_id", categoryId)
-        .limit(1)
-        .single();
-      currentFormula =
-        (briefRow?.ingredients as any)?.final_formula_brief ||
-        (briefRow?.ingredients as any)?.adjusted_formula ||
-        null;
+      currentFormula = complianceTemplate;
     }
 
     if (!currentFormula) {
@@ -91,8 +122,18 @@ serve(async (req) => {
 
 The user has reviewed manufacturer feedback for **${keyword}** and manually selected which changes to apply to the formula brief — even if our AI previously rejected some of them.
 
-## CURRENT FORMULA BRIEF
+## CURRENT ACTIVE FORMULA CONTENT
 ${currentFormula}
+
+---
+
+## LOCKED P12 COMPLIANCE TEMPLATE (FORMAT + FLAVOR SOURCE OF TRUTH)
+${complianceTemplate || currentFormula}
+
+---
+
+## LOCKED P12 FLAVOR / VARIANT REFERENCE
+${complianceFlavorBlock || "No dedicated flavor block found in the compliance template."}
 
 ---
 
@@ -110,28 +151,28 @@ ${selectedPoints.map((p: string, i: number) => `${i + 1}. ${p}`).join("\n")}
 ## YOUR TASK
 Apply ALL of the selected changes to the formula brief. The user has overridden the AI's verdict — respect their decision.
 
-1. Apply each selected change to the formula brief
-2. Mark each change with [UPDATED] inline
-3. **CRITICAL — PRESERVE EXACT FORMAT AND STRUCTURE**: The output MUST use the EXACT same markdown structure, heading hierarchy, table formats, section ordering, and layout as the current formula brief above. Do NOT reorganize, rename sections, merge tables, or change the document structure in any way. Only modify the specific content affected by the selected changes.
-4. Write the complete updated formula brief
+1. Use the LOCKED P12 COMPLIANCE TEMPLATE as the exact source of truth for section order, heading hierarchy, markdown layout, table structure, and flavor / variant coverage
+2. Carry forward the already-accepted business content from the CURRENT ACTIVE FORMULA CONTENT
+3. Apply each selected change to the relevant content
+4. Mark each newly changed item with [UPDATED] inline
+5. If the current active formula drifted away from the P12 structure, restore the P12 structure in the output
 
-**CRITICAL — FLAVOR PRESERVATION:**
-- You MUST preserve and include ALL recommended flavors and the Flavor Strategy / Flavor Profile section from the current formula brief.
-- If the current brief lists specific flavors (e.g., in SKU tables, Flavor Strategy sections, or Natural Flavors rows), they MUST appear in the updated brief.
-- If manufacturer feedback mentions flavor changes, incorporate those while keeping the full flavor lineup visible.
-- The "Recommended Flavors" or "Flavor Profile" section should always be present in the output.
+**CRITICAL — RECOMMENDED FLAVORS ARE AUTHORITATIVE:**
+- The recommended flavors and variant lineup from the P12 compliance template came from earlier market-analysis phases and MUST stay visible
+- Preserve every flavor name and flavor option named anywhere in the P12 compliance template unless a selected change explicitly removes or replaces it
+- Do NOT collapse the recommendation into a single currently selected flavor
+- When selected changes are not flavor-related, keep the P12 flavor / variant coverage intact
 
 **FORMAT RULES:**
-- Keep the same heading levels (##, ###, ####)
-- Keep the same table column structure
-- Keep the same bullet point and numbering style
-- Keep the same section order
-- Do NOT add new sections or remove existing ones unless a selected change specifically requires it
+- Keep the same heading levels and section order as P12
+- Keep the same table column structure as P12
+- Keep the same bullet point and numbering style as P12
+- Do NOT add new sections or remove P12 sections unless a selected change explicitly requires it
 
 Respond in this structure:
 
 ## UPDATED FORMULA BRIEF
-[Complete updated formula brief preserving the exact structure of the original, with only the selected changes applied and marked with [UPDATED]]
+[Complete updated formula brief using the exact P12 structure, carrying forward the active-version content, preserving the full P12 flavor lineup, and marking only the newly changed items with [UPDATED]]
 
 ## CHANGE SUMMARY
 [One sentence describing what was changed]`;

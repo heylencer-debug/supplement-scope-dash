@@ -118,6 +118,30 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
     enabled: !!categoryId,
   });
 
+  // Mutation to set a version as active
+  const setActiveMutation = useMutation({
+    mutationFn: async (versionId: string) => {
+      const { error: deactivateError } = await supabase
+        .from("formula_brief_versions")
+        .update({ is_active: false })
+        .eq("category_id", categoryId);
+      if (deactivateError) throw deactivateError;
+      const { error: activateError } = await supabase
+        .from("formula_brief_versions")
+        .update({ is_active: true })
+        .eq("id", versionId);
+      if (activateError) throw activateError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["formula_brief_versions"] });
+      queryClient.invalidateQueries({ queryKey: ["formulaBrief"] });
+      toast({ title: "Active version updated", description: "All analyses will now use this version." });
+    },
+    onError: () => {
+      toast({ title: "Failed to update", description: "Could not set active version.", variant: "destructive" });
+    },
+  });
+
   const viewingVersion = viewingVersionId ? allVersions.find(v => v.id === viewingVersionId) : null;
   const handleDownloadVersion = useCallback(async (versionId: string) => {
     setDownloadingVersion(versionId);

@@ -1,19 +1,16 @@
 import { Document, Page, Text, View, StyleSheet, Font } from '@react-pdf/renderer';
 
-Font.register({
-  family: 'Inter',
-  fonts: [
-    { src: 'https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hiJ-Ek-_EeA.woff2', fontWeight: 400 },
-    { src: 'https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuI6fAZ9hiJ-Ek-_EeA.woff2', fontWeight: 600 },
-    { src: 'https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuFuYAZ9hiJ-Ek-_EeA.woff2', fontWeight: 700 },
-  ],
-});
+// Clear any previously registered fonts (fixes HMR caching issues)
+try { Font.clear(); } catch (_) { /* not available in all versions */ }
+
+// Register hyphenation callback to prevent crashes
+Font.registerHyphenationCallback((word) => [word]);
 
 const styles = StyleSheet.create({
   page: {
     padding: 48,
     paddingBottom: 60,
-    fontFamily: 'Inter',
+    fontFamily: 'Helvetica',
     fontSize: 10,
     lineHeight: 1.65,
     color: '#1e293b',

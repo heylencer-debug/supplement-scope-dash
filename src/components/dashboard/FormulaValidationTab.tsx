@@ -185,7 +185,7 @@ function ScoreStat({ label, score, max, color }: { label: string; score: number;
 
 // ─── Main component ────────────────────────────────────────────────────────────
 
-export function FormulaValidationTab({ categoryId, categoryName }: Props) {
+export function FormulaValidationTab({ categoryId, categoryName, activeVersionInfo }: Props) {
   const { data, isLoading, error } = useValidationData(categoryId);
   const ing = data?.ingredients ?? null;
 

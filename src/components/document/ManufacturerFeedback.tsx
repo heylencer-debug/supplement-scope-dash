@@ -421,7 +421,7 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
                         variant={v.is_active ? "default" : "outline"}
                         className={`h-7 text-xs gap-1 ${v.is_active ? '' : 'border-primary/30 text-primary hover:bg-primary/10'}`}
                         disabled={v.is_active || setActiveMutation.isPending}
-                        onClick={() => setActiveMutation.mutate(v.id)}
+                        onClick={() => setActiveMutation.mutate({ versionId: v.id })}
                       >
                         <Star className={`w-3 h-3 ${v.is_active ? 'fill-current' : ''}`} />
                         {v.is_active ? "Active" : "Set Active"}
@@ -469,6 +469,16 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
                   </td>
                   <td className="py-2.5 px-4">
                     <div className="flex items-center gap-1.5 justify-end">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs gap-1 border-primary/30 text-primary hover:bg-primary/10"
+                        disabled={setActiveMutation.isPending}
+                        onClick={() => setActiveMutation.mutate({ pipelineBrief: { id: pb.id, label: pb.label, content: pb.content } })}
+                      >
+                        <Star className="w-3 h-3" />
+                        Set Active
+                      </Button>
                       <Button
                         size="sm"
                         variant="ghost"

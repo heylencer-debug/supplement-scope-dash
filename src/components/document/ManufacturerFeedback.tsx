@@ -1,9 +1,9 @@
 import { useState, useCallback } from "react";
-import { Factory, Upload, Send, CheckCircle, XCircle, HelpCircle, AlertCircle, ChevronDown, ChevronUp, X, Image, Download } from "lucide-react";
+import { Factory, Upload, Send, CheckCircle, XCircle, HelpCircle, AlertCircle, ChevronDown, ChevronUp, X, Image, Download, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -27,7 +27,15 @@ interface FeedbackRow {
   reviewed_at: string | null;
   claude_verdict: "accepted" | "partially_accepted" | "questioned" | "rejected" | null;
   claude_response: string | null;
+  claude_changes: any[];
   resulting_version_id: string | null;
+}
+
+interface ParsedChange {
+  index: number;
+  feedbackPoint: string;
+  verdict: string;
+  reasoning: string;
 }
 
 const VERDICT_CONFIG = {
@@ -36,6 +44,24 @@ const VERDICT_CONFIG = {
   questioned: { label: "Questioned", icon: HelpCircle, color: "text-blue-600", bg: "bg-blue-50 border-blue-200" },
   rejected: { label: "Rejected", icon: XCircle, color: "text-red-600", bg: "bg-red-50 border-red-200" },
 };
+
+function parseChangesFromResponse(response: string | null): ParsedChange[] {
+  if (!response) return [];
+  // Match markdown table rows from the FEEDBACK EVALUATION section
+  const tableMatch = response.match(/##\s*FEEDBACK EVALUATION[\s\S]*?\n\|[\s\-|]+\n([\s\S]*?)(?=\n##|\n\n##|$)/i);
+  if (!tableMatch) return [];
+  
+  const rows = tableMatch[1].split("\n").filter(r => r.trim().startsWith("|"));
+  return rows.map((row, i) => {
+    const cells = row.split("|").map(c => c.trim()).filter(Boolean);
+    return {
+      index: i,
+      feedbackPoint: cells[1] || `Point ${i + 1}`,
+      verdict: cells[2] || "unknown",
+      reasoning: cells[3] || "",
+    };
+  }).filter(c => c.feedbackPoint && c.feedbackPoint !== "---");
+}
 
 export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = false }: ManufacturerFeedbackProps) {
   const { toast } = useToast();
@@ -46,6 +72,8 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
   const [uploading, setUploading] = useState(false);
   const [expandedFeedback, setExpandedFeedback] = useState<string | null>(null);
   const [downloadingVersion, setDownloadingVersion] = useState<string | null>(null);
+  const [selectedChanges, setSelectedChanges] = useState<Record<string, Set<number>>>({});
+  const [generatingVersion, setGeneratingVersion] = useState<string | null>(null);
 
   const handleDownloadVersion = useCallback(async (versionId: string) => {
     setDownloadingVersion(versionId);
@@ -80,6 +108,51 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
       setDownloadingVersion(null);
     }
   }, [keyword, toast]);
+
+  const handleGenerateVersion = useCallback(async (feedbackId: string, changes: ParsedChange[], selected: Set<number>) => {
+    setGeneratingVersion(feedbackId);
+    try {
+      const selectedPoints = changes
+        .filter((_, i) => selected.has(i))
+        .map(c => c.feedbackPoint);
+
+      if (selectedPoints.length === 0) {
+        toast({ title: "No changes selected", description: "Select at least one change to apply.", variant: "destructive" });
+        setGeneratingVersion(null);
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke("apply-selected-changes", {
+        body: {
+          feedbackId,
+          categoryId,
+          keyword,
+          selectedPoints,
+        },
+      });
+
+      if (error) throw error;
+
+      queryClient.invalidateQueries({ queryKey: ["manufacturer_feedback", categoryId] });
+      queryClient.invalidateQueries({ queryKey: ["formula_brief_versions"] });
+      toast({ title: "New version generated", description: `Applied ${selectedPoints.length} change(s) to formula brief.` });
+    } catch (e: any) {
+      toast({ title: "Failed to generate version", description: e.message, variant: "destructive" });
+    } finally {
+      setGeneratingVersion(null);
+    }
+  }, [categoryId, keyword, toast, queryClient]);
+
+  const toggleChange = useCallback((feedbackId: string, index: number) => {
+    setSelectedChanges(prev => {
+      const next = { ...prev };
+      const set = new Set(next[feedbackId] || []);
+      if (set.has(index)) set.delete(index);
+      else set.add(index);
+      next[feedbackId] = set;
+      return next;
+    });
+  }, []);
 
   // Load existing feedback — poll every 4s while any row is processing
   const { data: feedbackList = [] } = useQuery({
@@ -116,12 +189,11 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
       }).select().single();
       if (error) throw error;
 
-      // Trigger Edge Function to process immediately (fire and forget)
       const feedbackId = (data as any)?.id;
       if (feedbackId) {
         supabase.functions.invoke("process-manufacturer-feedback", {
           body: { feedbackId },
-        }).catch(() => {/* silent — status will show in history */});
+        }).catch(() => {});
       }
     },
     onSuccess: () => {
@@ -135,7 +207,6 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
     },
   });
 
-  // Image upload handler — converts to base64 and stores inline (no storage bucket needed)
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
@@ -232,106 +303,168 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
             </Button>
           </div>
 
-          {/* Feedback history */}
+          {/* Feedback history — NO scroll area, full display */}
           {feedbackList.length > 0 && (
             <div className="space-y-2">
               <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">History</p>
-              <ScrollArea className="max-h-96">
-                <div className="space-y-2">
-                  {feedbackList.map((fb) => {
-                    const verdict = fb.claude_verdict ? VERDICT_CONFIG[fb.claude_verdict] : null;
-                    const isOpen = expandedFeedback === fb.id;
-                    return (
-                      <div key={fb.id} className={`border rounded-lg overflow-hidden ${verdict?.bg || "bg-gray-50 border-gray-200"}`}>
-                        <button
-                          onClick={() => setExpandedFeedback(isOpen ? null : fb.id)}
-                          className="w-full flex items-center justify-between px-3 py-2 text-left"
-                        >
-                          <div className="flex items-center gap-2 min-w-0">
-                            {verdict ? (
-                              <verdict.icon className={`w-3.5 h-3.5 flex-shrink-0 ${verdict.color}`} />
-                            ) : (
-                              <div className="w-3.5 h-3.5 rounded-full bg-orange-400 flex-shrink-0" />
-                            )}
-                            <span className="text-xs text-gray-700 truncate">
-                              {fb.feedback_text?.substring(0, 80) || `${fb.image_urls?.length || 0} image(s)`}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
-                            {verdict && (
-                              <span className={`text-xs font-medium ${verdict.color}`}>{verdict.label}</span>
-                            )}
-                            {fb.status === "pending" && (
-                              <Badge variant="outline" className="text-xs text-orange-600 border-orange-300">Pending</Badge>
-                            )}
-                            {fb.status === "processing" && (
-                              <Badge variant="outline" className="text-xs text-blue-600 border-blue-300">Processing</Badge>
-                            )}
-                            {isOpen ? <ChevronUp className="w-3 h-3 text-gray-400" /> : <ChevronDown className="w-3 h-3 text-gray-400" />}
-                          </div>
-                        </button>
+              <div className="space-y-2">
+                {feedbackList.map((fb) => {
+                  const verdict = fb.claude_verdict ? VERDICT_CONFIG[fb.claude_verdict] : null;
+                  const isOpen = expandedFeedback === fb.id;
+                  const parsedChanges = parseChangesFromResponse(fb.claude_response);
+                  const selected = selectedChanges[fb.id] || new Set<number>();
+                  const isGenerating = generatingVersion === fb.id;
 
-                        {isOpen && (
-                          <div className="px-3 pb-3 space-y-2 border-t border-gray-200">
-                            {fb.feedback_text && (
-                              <div>
-                                <p className="text-xs font-medium text-gray-500 mb-1">Feedback</p>
-                                <p className="text-xs text-gray-700 whitespace-pre-wrap">{fb.feedback_text}</p>
+                  return (
+                    <div key={fb.id} className={`border rounded-lg overflow-hidden ${verdict?.bg || "bg-gray-50 border-gray-200"}`}>
+                      <button
+                        onClick={() => setExpandedFeedback(isOpen ? null : fb.id)}
+                        className="w-full flex items-center justify-between px-3 py-2 text-left"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          {verdict ? (
+                            <verdict.icon className={`w-3.5 h-3.5 flex-shrink-0 ${verdict.color}`} />
+                          ) : (
+                            <div className="w-3.5 h-3.5 rounded-full bg-orange-400 flex-shrink-0" />
+                          )}
+                          <span className="text-xs text-gray-700">
+                            {fb.feedback_text || `${fb.image_urls?.length || 0} image(s)`}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
+                          {verdict && (
+                            <span className={`text-xs font-medium ${verdict.color}`}>{verdict.label}</span>
+                          )}
+                          {fb.status === "pending" && (
+                            <Badge variant="outline" className="text-xs text-orange-600 border-orange-300">Pending</Badge>
+                          )}
+                          {fb.status === "processing" && (
+                            <Badge variant="outline" className="text-xs text-blue-600 border-blue-300">Processing</Badge>
+                          )}
+                          {isOpen ? <ChevronUp className="w-3 h-3 text-gray-400" /> : <ChevronDown className="w-3 h-3 text-gray-400" />}
+                        </div>
+                      </button>
+
+                      {isOpen && (
+                        <div className="px-3 pb-3 space-y-3 border-t border-gray-200">
+                          {fb.feedback_text && (
+                            <div>
+                              <p className="text-xs font-medium text-gray-500 mb-1 mt-2">Feedback</p>
+                              <p className="text-xs text-gray-700 whitespace-pre-wrap">{fb.feedback_text}</p>
+                            </div>
+                          )}
+                          {fb.image_urls?.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {fb.image_urls.map((url, i) => (
+                                <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                                  <img src={url} alt="" className="w-12 h-12 object-cover rounded border border-gray-200 hover:opacity-80 transition-opacity" />
+                                </a>
+                              ))}
+                            </div>
+                          )}
+                          {fb.claude_response && (
+                            <div>
+                              <p className="text-xs font-medium text-muted-foreground mb-1">Scout's Response</p>
+                              <div className="text-xs prose prose-sm max-w-none dark:prose-invert prose-headings:text-sm prose-headings:font-semibold prose-headings:mt-3 prose-headings:mb-1 prose-p:my-1 prose-table:text-xs prose-th:px-2 prose-th:py-1 prose-th:bg-muted prose-th:text-left prose-th:font-medium prose-td:px-2 prose-td:py-1 prose-td:border-t prose-td:border-border prose-tr:border-border overflow-x-auto">
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                  {fb.claude_response}
+                                </ReactMarkdown>
                               </div>
-                            )}
-                            {fb.image_urls?.length > 0 && (
-                              <div className="flex flex-wrap gap-1">
-                                {fb.image_urls.map((url, i) => (
-                                  <a key={i} href={url} target="_blank" rel="noopener noreferrer">
-                                    <img src={url} alt="" className="w-12 h-12 object-cover rounded border border-gray-200 hover:opacity-80 transition-opacity" />
-                                  </a>
-                                ))}
+                            </div>
+                          )}
+
+                          {/* Selectable changes — user overrides AI verdict */}
+                          {fb.status === "reviewed" && parsedChanges.length > 0 && !fb.resulting_version_id && (
+                            <div className="border border-primary/20 rounded-lg p-3 bg-primary/5 space-y-2">
+                              <p className="text-xs font-semibold text-foreground">
+                                Select changes to apply to the formula brief:
+                              </p>
+                              <div className="space-y-1.5">
+                                {parsedChanges.map((change, i) => {
+                                  const isAccepted = change.verdict.toUpperCase().includes("ACCEPTED");
+                                  const isRejected = change.verdict.toUpperCase().includes("REJECTED");
+                                  return (
+                                    <label
+                                      key={i}
+                                      className="flex items-start gap-2 cursor-pointer hover:bg-white/50 rounded p-1.5 transition-colors"
+                                    >
+                                      <Checkbox
+                                        checked={selected.has(i)}
+                                        onCheckedChange={() => toggleChange(fb.id, i)}
+                                        className="mt-0.5"
+                                      />
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-1.5">
+                                          <span className="text-xs font-medium text-foreground">
+                                            {change.feedbackPoint}
+                                          </span>
+                                          <Badge
+                                            variant="outline"
+                                            className={`text-[10px] px-1 py-0 h-4 ${
+                                              isAccepted
+                                                ? "text-green-700 border-green-300 bg-green-50"
+                                                : isRejected
+                                                ? "text-red-700 border-red-300 bg-red-50"
+                                                : "text-blue-700 border-blue-300 bg-blue-50"
+                                            }`}
+                                          >
+                                            {change.verdict}
+                                          </Badge>
+                                        </div>
+                                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                                          {change.reasoning}
+                                        </p>
+                                      </div>
+                                    </label>
+                                  );
+                                })}
                               </div>
-                            )}
-                            {fb.claude_response && (
-                              <div>
-                                <p className="text-xs font-medium text-muted-foreground mb-1">Scout's Response</p>
-                                <div className="text-xs prose prose-sm max-w-none dark:prose-invert prose-headings:text-sm prose-headings:font-semibold prose-headings:mt-3 prose-headings:mb-1 prose-p:my-1 prose-table:text-xs prose-th:px-2 prose-th:py-1 prose-th:bg-muted prose-th:text-left prose-th:font-medium prose-td:px-2 prose-td:py-1 prose-td:border-t prose-td:border-border prose-tr:border-border overflow-x-auto">
-                                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                    {fb.claude_response}
-                                  </ReactMarkdown>
-                                </div>
-                              </div>
-                            )}
-                            {fb.resulting_version_id && (
-                              <div className="flex items-center gap-2">
-                                <p className="text-xs text-green-700 flex-1">
-                                  ✓ New formula version created
-                                </p>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 text-xs gap-1.5"
-                                  disabled={downloadingVersion === fb.resulting_version_id}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDownloadVersion(fb.resulting_version_id!);
-                                  }}
-                                >
-                                  <Download className="w-3 h-3" />
-                                  {downloadingVersion === fb.resulting_version_id ? "Generating..." : "Download PDF"}
-                                </Button>
-                              </div>
-                            )}
-                            <p className="text-xs text-gray-400">
-                              Submitted {new Date(fb.submitted_at).toLocaleDateString()}
-                              {fb.reviewed_at && ` · Reviewed ${new Date(fb.reviewed_at).toLocaleDateString()}`}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </ScrollArea>
+                              <Button
+                                size="sm"
+                                className="w-full mt-2 gap-1.5"
+                                disabled={selected.size === 0 || isGenerating}
+                                onClick={() => handleGenerateVersion(fb.id, parsedChanges, selected)}
+                              >
+                                <Sparkles className="w-3.5 h-3.5" />
+                                {isGenerating
+                                  ? "Generating new version..."
+                                  : `Apply ${selected.size} change(s) & generate new version`}
+                              </Button>
+                            </div>
+                          )}
+
+                          {fb.resulting_version_id && (
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs text-green-700 flex-1">
+                                ✓ New formula version created
+                              </p>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs gap-1.5"
+                                disabled={downloadingVersion === fb.resulting_version_id}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDownloadVersion(fb.resulting_version_id!);
+                                }}
+                              >
+                                <Download className="w-3 h-3" />
+                                {downloadingVersion === fb.resulting_version_id ? "Generating..." : "Download PDF"}
+                              </Button>
+                            </div>
+                          )}
+                          <p className="text-xs text-gray-400">
+                            Submitted {new Date(fb.submitted_at).toLocaleDateString()}
+                            {fb.reviewed_at && ` · Reviewed ${new Date(fb.reviewed_at).toLocaleDateString()}`}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
-
         </div>
       )}
     </div>

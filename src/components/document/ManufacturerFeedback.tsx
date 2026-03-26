@@ -383,6 +383,7 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
               <tr className="border-b border-border bg-muted/20">
                 <th className="text-left py-2.5 px-4 text-xs font-medium text-muted-foreground uppercase tracking-wide">Version</th>
                 <th className="text-left py-2.5 px-4 text-xs font-medium text-muted-foreground uppercase tracking-wide">Source</th>
+                <th className="text-left py-2.5 px-4 text-xs font-medium text-muted-foreground uppercase tracking-wide">Flavor</th>
                 <th className="text-left py-2.5 px-4 text-xs font-medium text-muted-foreground uppercase tracking-wide">Change Summary</th>
                 <th className="text-left py-2.5 px-4 text-xs font-medium text-muted-foreground uppercase tracking-wide">Generated</th>
                 <th className="text-right py-2.5 px-4 text-xs font-medium text-muted-foreground uppercase tracking-wide">Actions</th>
@@ -404,6 +405,17 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
                       {(v.change_summary || '').startsWith('[USER OVERRIDE]') ? '🏭 Manufacturer' : v.version_number === 1 ? '🧪 AI Generated' : '💬 Chat'}
                     </Badge>
                   </td>
+                  <td className="py-2.5 px-4">
+                    {(() => {
+                      const flavor = extractFlavorFromFormulaBrief(v.formula_brief_content);
+                      return flavor ? (
+                        <Badge variant="outline" className="text-[10px] bg-orange-50 border-orange-200 text-orange-700">
+                          🍊 {flavor}
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      );
+                    })()}
                   <td className="py-2.5 px-4 max-w-[300px]">
                     <p className="text-xs text-muted-foreground line-clamp-2">
                       {v.change_summary?.replace('[USER OVERRIDE] ', '') || 'Initial formula brief'}

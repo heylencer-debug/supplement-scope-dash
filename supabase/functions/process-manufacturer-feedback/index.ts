@@ -59,7 +59,25 @@ function extractTemplateFlavorBlock(content: string | null): string {
   return match?.[0]?.trim() || "";
 }
 
-function buildEvaluationPrompt(keyword: string, currentFormula: string, complianceTemplate: string, feedbackText: string): string {
+function extractRecommendedFlavors(ingredients: unknown): string {
+  if (!ingredients || typeof ingredients !== "object") return "";
+
+  const record = ingredients as Record<string, unknown>;
+  const flavorRecs = record.flavor_recommendations;
+  if (!Array.isArray(flavorRecs) || flavorRecs.length === 0) return "";
+
+  const lines = flavorRecs.map((f: Record<string, unknown>, i: number) => {
+    const name = String(f.flavor_name || "Unknown").replace(/^\w/, (c: string) => c.toUpperCase());
+    const confidence = f.confidence ?? "N/A";
+    const evidence = f.evidence as Record<string, unknown> | undefined;
+    const presence = evidence?.competitor_presence ?? "";
+    return `${i + 1}. **${name}** — Confidence: ${confidence}%, Competitor presence: ${presence}`;
+  });
+
+  return `### Market-Analyzed Recommended Flavors (from pipeline phases)\n${lines.join("\n")}`;
+}
+
+function buildEvaluationPrompt(keyword: string, currentFormula: string, complianceTemplate: string, recommendedFlavors: string, feedbackText: string): string {
   return `You are a senior supplement formulator and scientific advisor for DOVIVE brand.
 
 A manufacturer has submitted feedback on our current formula brief for **${keyword}**.

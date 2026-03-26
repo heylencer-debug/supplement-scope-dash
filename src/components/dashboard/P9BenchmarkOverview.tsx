@@ -14,6 +14,12 @@ import remarkGfm from "remark-gfm";
 
 interface P9BenchmarkOverviewProps {
   categoryId: string;
+  activeVersionContent?: string | null;
+  activeVersionInfo?: {
+    versionNumber: number;
+    changeSummary: string | null;
+    createdAt: string;
+  } | null;
 }
 
 /** Parse a markdown table string into headers + rows */

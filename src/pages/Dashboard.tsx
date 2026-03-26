@@ -873,7 +873,7 @@ export default function Dashboard() {
               isActive: selectedVersion.is_active,
               changeSummary: selectedVersion.change_summary
             } : undefined}
-            formulaBriefContent={selectedVersion?.formula_brief_content || (analysis?.analysis_3_formula_brief as Record<string, unknown> | null)?.formula_brief_content as string | null}
+            formulaBriefContent={activeVersion?.formula_brief_content || selectedVersion?.formula_brief_content || (analysis?.analysis_3_formula_brief as Record<string, unknown> | null)?.formula_brief_content as string | null}
           />
           {/* Scout P7 Packaging Intelligence (claim frequency, badges, color signals) */}
           {category?.id && (

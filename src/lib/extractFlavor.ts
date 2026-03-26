@@ -1,108 +1,115 @@
 /**
- * Extracts flavor information from formula brief markdown content.
- * Looks for common flavor patterns and returns a standardized flavor string.
+ * Extracts ALL flavor information from formula brief markdown content.
+ * Returns an array of flavor strings found in the document.
  */
-export function extractFlavorFromFormulaBrief(formulaBriefContent: string | null | undefined): string | null {
-  if (!formulaBriefContent) return null;
-  
-  const content = formulaBriefContent.toLowerCase();
-  
-  // Common flavor keywords and patterns to search for
-  const flavorPatterns = [
-    // Direct flavor mentions
-    /flavor(?:ed)?[:\s]+([^.\n,]+)/gi,
-    /palatability[:\s]+([^.\n]+)/gi,
-    // Specific flavors in context
-    /natural\s+(\w+(?:\s+(?:&|and)\s+\w+)?)\s+flavor/gi,
-    /(\w+(?:\s+(?:&|and)\s+\w+)?)\s+flavored?/gi,
-    // Flavor profile sections
-    /flavor\s*profile[:\s]+([^.\n]+)/gi,
-    // Common protein-based flavors
-    /(chicken|beef|bacon|salmon|fish|turkey|lamb|peanut\s*butter|liver|duck|venison|bison|pork)(?:\s+(?:&|and)\s+(\w+))?\s*(?:flavor)?/gi,
+export function extractFlavorsFromFormulaBrief(content: string | null | undefined): string[] {
+  if (!content) return [];
+
+  const flavors: string[] = [];
+  const seen = new Set<string>();
+
+  const addFlavor = (f: string) => {
+    const cleaned = f.trim().replace(/[|*_`]/g, '').trim();
+    if (cleaned.length < 3 || cleaned.length > 60) return;
+    // Skip generic words
+    const skip = ['the', 'a', 'an', 'and', 'or', 'for', 'with', 'natural', 'flavor', 'flavors', 'flavored',
+      'serving', 'gummy', 'gummies', 'same', 'formula', 'system', 'profile', 'option', 'options',
+      'variant', 'variants', 'sku', 'count', 'primary', 'secondary', 'base', 'notes', 'note'];
+    if (skip.includes(cleaned.toLowerCase())) return;
+    const key = cleaned.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      flavors.push(cleaned);
+    }
+  };
+
+  // 1. SKU table rows: "SKU-XX | Brand Name — Flavor Name | ..."
+  const skuPattern = /SKU[- ]?\d+\s*\|[^|]*?[—–-]\s*([^|]+)\|/gi;
+  for (const m of content.matchAll(skuPattern)) {
+    // Extract flavor from SKU description like "Strawberry Calm" or "Sugar-Free Black Cherry"
+    const desc = m[1].trim();
+    // Remove common suffixes
+    const cleaned = desc
+      .replace(/,?\s*\d+-count.*$/i, '')
+      .replace(/,?\s*\d+\s*servings?.*$/i, '')
+      .trim();
+    if (cleaned) addFlavor(cleaned);
+  }
+
+  // 2. Flavor-related section headers followed by content
+  // e.g., "### Flavor Strategy", "Flavor Variants:", "Flavor Options:"
+  const flavorSectionPattern = /(?:flavor\s*(?:strategy|variants?|options?|profiles?|system|lineup|roadmap|plan))[:\s]*\n([\s\S]*?)(?=\n#{1,4}\s|\n---|\n\n\n)/gi;
+  for (const m of content.matchAll(flavorSectionPattern)) {
+    const section = m[1];
+    // Extract bullet points or numbered items
+    const items = section.matchAll(/[-•*]\s+\*?\*?([^*\n]+)\*?\*?/g);
+    for (const item of items) {
+      const text = item[1].trim().split(/[:\-–—]/)[0].trim();
+      if (text.length > 2 && text.length < 50) addFlavor(text);
+    }
+  }
+
+  // 3. Format table rows with flavor names: "| 45-Serving Blueberry Lavender |"
+  const formatFlavorPattern = /\|\s*\d+[- ](?:Serving|Count|ct)[- ]+([^|]+?)\s*\|/gi;
+  for (const m of content.matchAll(formatFlavorPattern)) {
+    const name = m[1].trim();
+    if (name && name.length > 2) addFlavor(name);
+  }
+
+  // 4. "Natural X Flavor" or "X & Y Flavors" patterns
+  const naturalFlavorPattern = /(?:Natural\s+)?(\w+(?:\s+(?:&|and)\s+\w+)*)\s+Flavou?rs?\b/gi;
+  for (const m of content.matchAll(naturalFlavorPattern)) {
+    const f = m[1].trim();
+    if (f.length > 2 && !['the', 'other', 'natural', 'artificial', 'with'].includes(f.toLowerCase())) {
+      addFlavor(f);
+    }
+  }
+
+  // 5. Common supplement flavors mentioned in context
+  const commonFlavors = [
+    'blueberry', 'strawberry', 'raspberry', 'blackberry', 'mixed berry',
+    'cherry', 'black cherry', 'tart cherry',
+    'lavender', 'lemon', 'lime', 'orange', 'mango', 'peach',
+    'grape', 'watermelon', 'tropical', 'pomegranate', 'acai',
+    'vanilla', 'chocolate', 'mint', 'peppermint',
+    'apple', 'green apple', 'pineapple', 'passion fruit', 'guava',
+    'citrus', 'ginger', 'honey', 'elderberry',
+    // Pet flavors
+    'chicken', 'beef', 'bacon', 'salmon', 'turkey', 'lamb',
+    'peanut butter', 'liver', 'duck', 'venison', 'bison', 'pork', 'fish'
   ];
-  
-  const foundFlavors: string[] = [];
-  
-  // Look for flavor-related sections in markdown
-  const lines = formulaBriefContent.split('\n');
-  let inFlavorSection = false;
-  
-  for (const line of lines) {
-    const lineLower = line.toLowerCase();
-    
-    // Check if we're entering a flavor-related section
-    if (lineLower.includes('flavor') || lineLower.includes('palatability') || lineLower.includes('taste')) {
-      inFlavorSection = true;
-      
-      // Check for direct flavor mentions in headers or bullets
-      const flavorMatch = line.match(/[:\-•]\s*(.+?)(?:\s*[-–]\s*|$)/);
-      if (flavorMatch && flavorMatch[1].length < 50) {
-        const flavor = flavorMatch[1].trim();
-        if (flavor && !flavor.toLowerCase().includes('flavor') && flavor.length > 2) {
-          foundFlavors.push(flavor);
-        }
-      }
-    }
-    
-    // Extract flavors mentioned in the content
-    if (inFlavorSection || lineLower.includes('flavor')) {
-      // Look for specific protein flavors
-      const proteinFlavors = line.match(/(chicken|beef|bacon|salmon|fish|turkey|lamb|peanut\s*butter|liver|duck|venison|bison|pork)/gi);
-      if (proteinFlavors) {
-        proteinFlavors.forEach(f => {
-          const capitalizedFlavor = f.charAt(0).toUpperCase() + f.slice(1).toLowerCase();
-          if (!foundFlavors.some(existing => existing.toLowerCase().includes(f.toLowerCase()))) {
-            foundFlavors.push(capitalizedFlavor);
-          }
-        });
-      }
-      
-      // Look for combined flavors (e.g., "Chicken & Bacon")
-      const combinedMatch = line.match(/(chicken|beef|bacon|salmon|turkey|lamb|liver|duck|pork)\s*(?:&|and)\s*(chicken|beef|bacon|salmon|turkey|lamb|liver|duck|pork)/gi);
-      if (combinedMatch) {
-        combinedMatch.forEach(combo => {
-          const cleaned = combo.replace(/\s+and\s+/gi, ' & ').replace(/\s+/g, ' ').trim();
-          const parts = cleaned.split(/\s*&\s*/);
-          const formattedCombo = parts.map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join(' & ');
-          // Remove individual flavors and add the combo
-          foundFlavors.length = 0;
-          foundFlavors.push(formattedCombo);
-        });
-      }
-    }
-    
-    // Reset section tracking after empty line
-    if (line.trim() === '') {
-      inFlavorSection = false;
-    }
-  }
-  
-  // Apply patterns to full content for additional matches
-  for (const pattern of flavorPatterns) {
-    const matches = formulaBriefContent.matchAll(pattern);
-    for (const match of matches) {
-      if (match[1]) {
-        const flavor = match[1].trim();
-        // Filter out generic words and very long matches
-        if (flavor.length > 2 && flavor.length < 40 && 
-            !['the', 'a', 'an', 'and', 'or', 'for', 'with', 'natural'].includes(flavor.toLowerCase())) {
-          if (!foundFlavors.some(f => f.toLowerCase() === flavor.toLowerCase())) {
-            foundFlavors.push(flavor.charAt(0).toUpperCase() + flavor.slice(1));
-          }
-        }
+
+  // Look for these in flavor-adjacent context (within 200 chars of "flavor")
+  const flavorContextPattern = /flavor/gi;
+  for (const match of content.matchAll(flavorContextPattern)) {
+    const start = Math.max(0, match.index! - 200);
+    const end = Math.min(content.length, match.index! + 200);
+    const context = content.substring(start, end).toLowerCase();
+    for (const cf of commonFlavors) {
+      if (context.includes(cf) && !seen.has(cf)) {
+        addFlavor(cf.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '));
       }
     }
   }
-  
-  if (foundFlavors.length === 0) return null;
-  
-  // Format the final flavor string
-  if (foundFlavors.length === 1) {
-    return `Natural ${foundFlavors[0]} Flavor`;
-  } else if (foundFlavors.length === 2) {
-    return `Natural ${foundFlavors[0]} & ${foundFlavors[1]} Flavor`;
-  } else {
-    // Take top 2 most relevant flavors
-    return `Natural ${foundFlavors[0]} & ${foundFlavors[1]} Flavor`;
+
+  // 6. Compound flavors: "Blueberry & Lavender", "Blueberry Lavender"
+  const compoundPattern = /\b([A-Z][a-z]+)\s+(?:&\s+)?([A-Z][a-z]+)\s+(?:flavor|gumm)/gi;
+  for (const m of content.matchAll(compoundPattern)) {
+    const combo = `${m[1]} & ${m[2]}`;
+    if (!seen.has(combo.toLowerCase())) {
+      addFlavor(combo);
+    }
   }
+
+  return flavors;
+}
+
+/**
+ * Legacy single-flavor extraction (returns first flavor or formatted string)
+ */
+export function extractFlavorFromFormulaBrief(content: string | null | undefined): string | null {
+  const flavors = extractFlavorsFromFormulaBrief(content);
+  if (flavors.length === 0) return null;
+  if (flavors.length === 1) return flavors[0];
+  return flavors.join(', ');
 }

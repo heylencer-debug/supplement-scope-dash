@@ -9,6 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { useFormulaBrief } from "@/hooks/useFormulaBrief";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface P9BenchmarkOverviewProps {
   categoryId: string;

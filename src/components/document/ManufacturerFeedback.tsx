@@ -311,10 +311,19 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
               onClick={() => submitMutation.mutate()}
               disabled={submitMutation.isPending || (!feedbackText.trim() && uploadedImages.length === 0)}
               size="sm"
-              className="w-full"
+              className="w-full gap-2"
             >
-              <Send className="w-3.5 h-3.5 mr-1.5" />
-              {submitMutation.isPending ? "Submitting..." : "Submit Feedback"}
+              {submitMutation.isPending ? (
+                <>
+                  <div className="w-3.5 h-3.5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                  Sending to Scout...
+                </>
+              ) : (
+                <>
+                  <Send className="w-3.5 h-3.5" />
+                  Submit Feedback
+                </>
+              )}
             </Button>
           </div>
 
@@ -339,6 +348,8 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
                         <div className="flex items-center gap-2 min-w-0 flex-1">
                           {verdict ? (
                             <verdict.icon className={`w-3.5 h-3.5 flex-shrink-0 ${verdict.color}`} />
+                          ) : fb.status === "processing" || fb.status === "pending" ? (
+                            <div className="w-3.5 h-3.5 border-2 border-primary/30 border-t-primary rounded-full animate-spin flex-shrink-0" />
                           ) : (
                             <div className="w-3.5 h-3.5 rounded-full bg-orange-400 flex-shrink-0" />
                           )}
@@ -358,11 +369,11 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
                           {verdict && (
                             <span className={`text-xs font-medium ${verdict.color}`}>{verdict.label}</span>
                           )}
-                          {fb.status === "pending" && (
-                            <Badge variant="outline" className="text-xs text-orange-600 border-orange-300">Pending</Badge>
-                          )}
-                          {fb.status === "processing" && (
-                            <Badge variant="outline" className="text-xs text-blue-600 border-blue-300">Processing</Badge>
+                          {(fb.status === "pending" || fb.status === "processing") && (
+                            <Badge variant="outline" className="text-xs text-primary border-primary/30 gap-1.5 animate-fade-in">
+                              <div className="w-2.5 h-2.5 border-[1.5px] border-primary/30 border-t-primary rounded-full animate-spin" />
+                              {fb.status === "pending" ? "Queued" : "Analyzing..."}
+                            </Badge>
                           )}
                           {isOpen ? <ChevronUp className="w-3 h-3 text-muted-foreground" /> : <ChevronDown className="w-3 h-3 text-muted-foreground" />}
                         </div>
@@ -538,14 +549,21 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
                               </div>
                               <Button
                                 size="sm"
-                                className="w-full mt-1 gap-1.5"
+                                className="w-full mt-1 gap-2"
                                 disabled={selected.size === 0 || isGenerating}
                                 onClick={() => handleGenerateVersion(fb.id, parsedChanges, selected)}
                               >
-                                <Sparkles className="w-3.5 h-3.5" />
-                                {isGenerating
-                                  ? "Generating new version..."
-                                  : `Apply ${selected.size} change(s) & generate new version`}
+                                {isGenerating ? (
+                                  <>
+                                    <div className="w-3.5 h-3.5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                                    Generating new version...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Sparkles className="w-3.5 h-3.5" />
+                                    {`Apply ${selected.size} change(s) & generate new version`}
+                                  </>
+                                )}
                               </Button>
                             </div>
                           )}

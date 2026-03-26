@@ -16,7 +16,11 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-interface Props { categoryId: string; categoryName?: string; }
+interface Props {
+  categoryId: string;
+  categoryName?: string;
+  activeVersionInfo?: { versionNumber: number; changeSummary: string | null } | null;
+}
 
 // ─── Verdict config ────────────────────────────────────────────────────────────
 

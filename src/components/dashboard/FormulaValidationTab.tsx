@@ -18,7 +18,11 @@ import {
 import { cn } from "@/lib/utils";
 import { generateManufacturerPDF } from "@/lib/manufacturerPDF";
 
-interface Props { categoryId: string; categoryName?: string; }
+interface Props {
+  categoryId: string;
+  categoryName?: string;
+  activeVersionInfo?: { versionNumber: number; changeSummary: string | null } | null;
+}
 
 // ─── Data fetcher ──────────────────────────────────────────────────────────────
 

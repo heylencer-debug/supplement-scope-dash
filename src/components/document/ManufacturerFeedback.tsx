@@ -478,11 +478,15 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
                   </td>
                   <td className="py-2.5 px-4">
                     {(() => {
-                      const flavor = extractFlavorFromFormulaBrief(pb.content);
-                      return flavor ? (
-                        <Badge variant="outline" className="text-[10px] bg-orange-50 border-orange-200 text-orange-700">
-                          🍊 {flavor}
-                        </Badge>
+                      const flavors = extractFlavorsFromFormulaBrief(pb.content);
+                      return flavors.length > 0 ? (
+                        <div className="flex flex-wrap gap-1 max-w-[200px]">
+                          {flavors.map((f, i) => (
+                            <Badge key={i} variant="outline" className="text-[10px] bg-orange-50 border-orange-200 text-orange-700">
+                              🍊 {f}
+                            </Badge>
+                          ))}
+                        </div>
                       ) : (
                         <span className="text-xs text-muted-foreground">—</span>
                       );

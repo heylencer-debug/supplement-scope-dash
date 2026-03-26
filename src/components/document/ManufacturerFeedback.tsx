@@ -299,9 +299,24 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
                               </div>
                             )}
                             {fb.resulting_version_id && (
-                              <p className="text-xs text-green-700">
-                                ✓ New formula version created from this feedback
-                              </p>
+                              <div className="flex items-center gap-2">
+                                <p className="text-xs text-green-700 flex-1">
+                                  ✓ New formula version created
+                                </p>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-xs gap-1.5"
+                                  disabled={downloadingVersion === fb.resulting_version_id}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDownloadVersion(fb.resulting_version_id!);
+                                  }}
+                                >
+                                  <Download className="w-3 h-3" />
+                                  {downloadingVersion === fb.resulting_version_id ? "Generating..." : "Download PDF"}
+                                </Button>
+                              </div>
                             )}
                             <p className="text-xs text-gray-400">
                               Submitted {new Date(fb.submitted_at).toLocaleDateString()}

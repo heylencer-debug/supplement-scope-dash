@@ -21,6 +21,8 @@ export function extractFlavorsFromFormulaBrief(content: string | null | undefine
       .replace(/[*_`]/g, '')                     // strip markdown bold/italic
       .replace(/\[UPDATED\]/gi, '')               // remove [UPDATED] tags
       .replace(/\s*\(.*?\)\s*$/g, '')             // remove trailing parenthetical like (180ct)
+      .replace(/^\(+/g, '')                       // remove leading parentheses like "(30"
+      .replace(/\)+$/g, '')                       // remove trailing parentheses
       .replace(/^\d+[-– ]*(?:count|ct|serving)s?\s*/i, '')  // remove "60-count" prefix
       .replace(/\s*[-–—]+\s*$/, '')               // trailing dashes
       .replace(/\s+/g, ' ')

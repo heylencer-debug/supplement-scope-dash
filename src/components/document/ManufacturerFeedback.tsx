@@ -549,14 +549,21 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
                               </div>
                               <Button
                                 size="sm"
-                                className="w-full mt-1 gap-1.5"
+                                className="w-full mt-1 gap-2"
                                 disabled={selected.size === 0 || isGenerating}
                                 onClick={() => handleGenerateVersion(fb.id, parsedChanges, selected)}
                               >
-                                <Sparkles className="w-3.5 h-3.5" />
-                                {isGenerating
-                                  ? "Generating new version..."
-                                  : `Apply ${selected.size} change(s) & generate new version`}
+                                {isGenerating ? (
+                                  <>
+                                    <div className="w-3.5 h-3.5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                                    Generating new version...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Sparkles className="w-3.5 h-3.5" />
+                                    {`Apply ${selected.size} change(s) & generate new version`}
+                                  </>
+                                )}
                               </Button>
                             </div>
                           )}

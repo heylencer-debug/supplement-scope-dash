@@ -1,7 +1,7 @@
 /**
- * ocr-phase4.js — Phase 4: GPT-4o Vision OCR on product images
+ * ocr-phase4.js — Phase 4: Claude Haiku Vision OCR on product images
  *
- * Pulls product images from dovive_research → sends to GPT-4o Vision
+ * Pulls product images from dovive_research → sends to Claude Haiku 4.5 Vision (via OpenRouter)
  * → extracts structured supplement facts → saves to dovive_ocr table
  *
  * Usage: node ocr-phase4.js "<keyword>" [--test]
@@ -11,23 +11,23 @@ require('dotenv').config();
 const fetch = require('node-fetch');
 const { createClient } = require('@supabase/supabase-js');
 
-const KEYWORD    = process.argv[2] || 'ashwagandha gummies';
-const TEST_MODE  = process.argv.includes('--test');
-const OPENAI_KEY = process.env.OPENAI_API_KEY;
-const supabase   = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const KEYWORD         = process.argv[2] || 'ashwagandha gummies';
+const TEST_MODE       = process.argv.includes('--test');
+const OPENROUTER_KEY  = process.env.OPENROUTER_API_KEY;
+const supabase        = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-// ── GPT-4o Vision call with retry ────────────────────────────
+// ── Claude Haiku Vision call with retry ──────────────────────
 async function analyzeImageWithGPT(imageUrl, asin, title, retries = 4) {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      return await _analyzeImageWithGPT(imageUrl, asin, title);
+      return await _analyzeImageWithClaude(imageUrl, asin, title);
     } catch (err) {
       const isRateLimit = err.message.includes('429') || err.message.includes('rate limit') || err.message.includes('Rate limit');
       const isServer    = err.message.includes('500') || err.message.includes('503');
       if ((isRateLimit || isServer) && attempt < retries) {
-        const wait = isRateLimit ? attempt * 20000 : attempt * 5000; // 20s, 40s, 60s for rate limits
+        const wait = isRateLimit ? attempt * 20000 : attempt * 5000;
         console.log(`\n  ⏳ Rate limited. Waiting ${wait/1000}s before retry ${attempt+1}/${retries}...`);
         await sleep(wait);
       } else {
@@ -37,7 +37,7 @@ async function analyzeImageWithGPT(imageUrl, asin, title, retries = 4) {
   }
 }
 
-async function _analyzeImageWithGPT(imageUrl, asin, title) {
+async function _analyzeImageWithClaude(imageUrl, asin, title) {
   const prompt = `You are analyzing an Amazon product image for a supplement product.
 ASIN: ${asin}
 Product: ${title}
@@ -59,14 +59,16 @@ Extract ALL text visible in this image and return a JSON object with these field
 If no supplement facts panel is visible, still extract any product claims, ingredients, or certifications visible.
 Return ONLY valid JSON, no markdown.`;
 
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${OPENAI_KEY}`,
-      'Content-Type': 'application/json'
+      'Authorization': `Bearer ${OPENROUTER_KEY}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': 'https://dovive.com',
+      'X-Title': 'DOVIVE Scout P4 OCR'
     },
     body: JSON.stringify({
-      model: 'gpt-4o',
+      model: 'anthropic/claude-haiku-4.5',
       max_tokens: 1000,
       messages: [{
         role: 'user',
@@ -80,20 +82,20 @@ Return ONLY valid JSON, no markdown.`;
 
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(`OpenAI error ${res.status}: ${err.slice(0, 200)}`);
+    throw new Error(`OpenRouter error ${res.status}: ${err.slice(0, 200)}`);
   }
 
   const data = await res.json();
+  if (data.error) throw new Error(`Claude Haiku OCR error: ${data.error.message || JSON.stringify(data.error)}`);
   const content = data.choices?.[0]?.message?.content || '';
   const usage = data.usage;
 
   try {
     return { result: JSON.parse(content), usage };
   } catch {
-    // Try to extract JSON from markdown
     const match = content.match(/\{[\s\S]*\}/);
     if (match) return { result: JSON.parse(match[0]), usage };
-    throw new Error('Could not parse GPT response: ' + content.slice(0, 100));
+    throw new Error('Could not parse Claude response: ' + content.slice(0, 100));
   }
 }
 
@@ -196,7 +198,7 @@ async function main() {
           health_claims:         result.health_claims?.length ? result.health_claims : null,
           certifications:        result.certifications?.length ? result.certifications : null,
           raw_text:              result.raw_text || null,
-          gpt_model:             'gpt-4o',
+          gpt_model:             'anthropic/claude-haiku-4.5',
           processed_at:          new Date().toISOString()
         });
 

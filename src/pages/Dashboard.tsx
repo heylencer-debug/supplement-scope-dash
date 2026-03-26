@@ -452,7 +452,7 @@ export default function Dashboard() {
       )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="products">📦 Products</TabsTrigger>
           <TabsTrigger value="market">📈 Market</TabsTrigger>
           <TabsTrigger value="packaging">🎨 Packaging</TabsTrigger>

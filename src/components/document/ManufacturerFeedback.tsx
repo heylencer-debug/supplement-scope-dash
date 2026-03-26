@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from "react";
-import { Factory, Upload, Send, CheckCircle, XCircle, HelpCircle, AlertCircle, ChevronDown, ChevronUp, X, Image, Download, Sparkles, Copy, Check, MessageSquare, Clock, ExternalLink } from "lucide-react";
+import { Factory, Upload, Send, CheckCircle, XCircle, HelpCircle, AlertCircle, ChevronDown, ChevronUp, X, Image, Download, Sparkles, Copy, Check, MessageSquare, Clock, ExternalLink, FileText, Eye } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,6 +12,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { pdf } from "@react-pdf/renderer";
 import { StrategyBriefPDF } from "@/components/document/StrategyBriefPDF";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface ManufacturerFeedbackProps {
   categoryId: string;

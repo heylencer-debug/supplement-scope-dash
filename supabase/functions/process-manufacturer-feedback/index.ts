@@ -56,6 +56,7 @@ ${feedbackText}
 3. **Manufacturing constraints are valid reasons to change** — if the manufacturer flags a real constraint (active load, heat stability, pH issue, sourcing problem), accept it and find the best clinical alternative
 4. **Cost reduction is valid IF it doesn't compromise efficacy** — switching to a less expensive but equally bioavailable form is acceptable; switching to an inferior form to cut cost is not
 5. **Be specific** — when questioning or rejecting, cite the clinical reason, the study, or the manufacturing principle. Do not give vague pushback.
+6. **Format preservation is mandatory** — if changes are accepted, the updated formula MUST use the EXACT same markdown structure, heading hierarchy, table formats, section ordering, and layout as the current formula brief. Do NOT reorganize, rename sections, merge tables, or change the document structure. Only modify content affected by accepted changes.
 
 ---
 

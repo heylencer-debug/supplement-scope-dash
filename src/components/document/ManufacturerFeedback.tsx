@@ -161,6 +161,13 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
     });
   }, []);
 
+  const handleCopyReply = useCallback(async (feedbackId: string, text: string) => {
+    await navigator.clipboard.writeText(text);
+    setCopiedReply(feedbackId);
+    setTimeout(() => setCopiedReply(null), 2000);
+    toast({ title: "Copied to clipboard", description: "Reply ready to paste into your email." });
+  }, [toast]);
+
   // Load existing feedback — poll every 4s while any row is processing
   const { data: feedbackList = [] } = useQuery({
     queryKey: ["manufacturer_feedback", categoryId],

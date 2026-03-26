@@ -548,31 +548,38 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
                             if (!defaultReply && !replyText) return null;
                             const isCopied = copiedReply === fb.id;
                             return (
-                              <div className="border border-border rounded-lg p-3 bg-muted/30 space-y-2">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-1.5">
-                                    <MessageSquare className="w-3.5 h-3.5 text-muted-foreground" />
-                                    <p className="text-xs font-semibold text-foreground">Reply to Manufacturer</p>
+                          <div className="rounded-[var(--radius)] border border-border bg-card shadow-sm overflow-hidden">
+                                <div className="flex items-center justify-between px-5 py-3.5 bg-muted/40 border-b border-border">
+                                  <div className="flex items-center gap-2.5">
+                                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                                      <MessageSquare className="w-4 h-4 text-primary" />
+                                    </div>
+                                    <div>
+                                      <p className="text-sm font-semibold text-foreground">Reply to Manufacturer</p>
+                                      <p className="text-xs text-muted-foreground">Edit before sending — pre-filled with Scout's recommendations</p>
+                                    </div>
                                   </div>
                                   <Button
                                     size="sm"
-                                    variant="outline"
-                                    className="h-7 text-xs gap-1.5"
+                                    variant={isCopied ? "default" : "outline"}
+                                    className="h-9 text-sm gap-2 px-4"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       handleCopyReply(fb.id, replyText);
                                     }}
                                   >
-                                    {isCopied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                                    {isCopied ? "Copied!" : "Copy"}
+                                    {isCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                                    {isCopied ? "Copied!" : "Copy Reply"}
                                   </Button>
                                 </div>
-                                <Textarea
-                                  value={replyText}
-                                  onChange={(e) => setReplyEdits(prev => ({ ...prev, [fb.id]: e.target.value }))}
-                                  rows={8}
-                                  className="text-xs leading-relaxed resize-y bg-background"
-                                />
+                                <div className="p-4">
+                                  <Textarea
+                                    value={replyText}
+                                    onChange={(e) => setReplyEdits(prev => ({ ...prev, [fb.id]: e.target.value }))}
+                                    rows={12}
+                                    className="text-sm leading-relaxed resize-y bg-background border-border focus-visible:ring-primary/30 min-h-[200px]"
+                                  />
+                                </div>
                               </div>
                             );
                           })()}

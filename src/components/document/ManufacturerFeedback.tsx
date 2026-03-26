@@ -491,9 +491,12 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
             prose-td:px-3 prose-td:py-2 prose-td:border-t prose-td:border-border/50 prose-td:text-muted-foreground
           ">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {viewingVersionId === "original"
-                ? (originalBrief?.content || "No content available")
-                : (viewingVersion?.formula_brief_content || "No content available")}
+              {(() => {
+                const pipelineBrief = pipelineBriefs?.find(pb => pb.id === viewingVersionId);
+                if (pipelineBrief) return pipelineBrief.content;
+                if (viewingVersion) return viewingVersion.formula_brief_content;
+                return "No content available";
+              })()}
             </ReactMarkdown>
           </div>
         </DialogContent>

@@ -1,0 +1,284 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.86.0";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+async function callClaude(messages: Array<{ role: string; content: unknown }>, maxTokens = 10000): Promise<string> {
+  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": "https://dovive.com",
+    },
+    body: JSON.stringify({
+      model: "anthropic/claude-sonnet-4-6",
+      max_tokens: maxTokens,
+      messages,
+    }),
+  });
+  const j = await res.json();
+  if (j.error) throw new Error(`Claude error: ${j.error.message}`);
+  return j.choices?.[0]?.message?.content || "";
+}
+
+function buildEvaluationPrompt(keyword: string, currentFormula: string, feedbackText: string): string {
+  return `You are a senior supplement formulator and scientific advisor for DOVIVE brand.
+
+A manufacturer has submitted feedback on our current formula brief for **${keyword}**.
+Your job is to evaluate each point of feedback objectively and decide:
+- **ACCEPTED**: The change improves the formula (better clinical outcome, manufacturability, cost, or safety)
+- **PARTIALLY ACCEPTED**: Some points are valid, others are not — apply the valid ones, push back on the rest
+- **QUESTIONED**: The change needs justification — ask a specific, evidence-based question back to the manufacturer
+- **REJECTED**: The change compromises clinical quality, safety, or lean formula principles — explain why with evidence
+
+## CURRENT ACTIVE FORMULA BRIEF
+${currentFormula}
+
+---
+
+## MANUFACTURER FEEDBACK
+${feedbackText}
+
+---
+
+## YOUR EVALUATION RULES
+
+1. **Clinical quality is non-negotiable** — do not accept changes that reduce doses below clinical minimums or swap bioavailable forms for inferior ones unless there is a hard manufacturing constraint
+2. **Lean formula principle** — do not accept adding ingredients without clinical justification
+3. **Manufacturing constraints are valid reasons to change** — if the manufacturer flags a real constraint (active load, heat stability, pH issue, sourcing problem), accept it and find the best clinical alternative
+4. **Cost reduction is valid IF it doesn't compromise efficacy** — switching to a less expensive but equally bioavailable form is acceptable; switching to an inferior form to cut cost is not
+5. **Be specific** — when questioning or rejecting, cite the clinical reason, the study, or the manufacturing principle. Do not give vague pushback.
+
+---
+
+## YOUR DELIVERABLE
+
+Respond in this exact structure:
+
+## OVERALL VERDICT
+[ACCEPTED / PARTIALLY ACCEPTED / QUESTIONED / REJECTED]
+
+## FEEDBACK EVALUATION
+For each distinct feedback point from the manufacturer:
+| # | Feedback Point | Verdict | Reasoning |
+|---|---------------|---------|-----------|
+[One row per feedback point with ACCEPTED/QUESTIONED/REJECTED verdict and specific reasoning]
+
+## UPDATED FORMULA
+[If any changes were ACCEPTED or PARTIALLY ACCEPTED: write the complete updated formula brief with all accepted changes applied. Mark each change with [UPDATED] inline. If nothing was accepted, write "No changes applied — see counter-arguments below."]
+
+## COUNTER-ARGUMENTS / QUESTIONS FOR MANUFACTURER
+[For each QUESTIONED or REJECTED point: write a specific, respectful, evidence-based response. If questioning, ask a precise question. If rejecting, cite the clinical or manufacturing reason.]
+
+## CHANGE SUMMARY
+[One sentence describing what changed in this version, suitable for the version history label. Example: "Applied CMO's zinc form change to bisglycinate; rejected biotin dose reduction (below clinical floor)."]`;
+}
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const { feedbackId } = await req.json();
+
+    if (!feedbackId) {
+      return new Response(JSON.stringify({ error: "feedbackId is required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!OPENROUTER_API_KEY) {
+      return new Response(JSON.stringify({ error: "OpenRouter API key not configured" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
+
+    // Load the feedback row
+    const { data: fb, error: fbErr } = await supabase
+      .from("manufacturer_feedback")
+      .select("*")
+      .eq("id", feedbackId)
+      .single();
+
+    if (fbErr || !fb) {
+      return new Response(JSON.stringify({ error: "Feedback not found" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Mark as processing
+    await supabase
+      .from("manufacturer_feedback")
+      .update({ status: "processing" })
+      .eq("id", feedbackId);
+
+    // Load current active formula brief
+    const { data: activeVersion } = await supabase
+      .from("formula_brief_versions")
+      .select("*")
+      .eq("category_id", fb.category_id)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    let currentFormula: string | null = null;
+    let parentVersionId: string | null = null;
+
+    if (activeVersion) {
+      currentFormula = activeVersion.formula_brief_content;
+      parentVersionId = activeVersion.id;
+    } else {
+      const { data: briefRow } = await supabase
+        .from("formula_briefs")
+        .select("ingredients")
+        .eq("category_id", fb.category_id)
+        .limit(1)
+        .single();
+      currentFormula =
+        briefRow?.ingredients?.final_formula_brief ||
+        briefRow?.ingredients?.adjusted_formula ||
+        null;
+    }
+
+    if (!currentFormula) {
+      await supabase
+        .from("manufacturer_feedback")
+        .update({ status: "pending", claude_response: "No formula brief found. Run P8 + P9 first." })
+        .eq("id", feedbackId);
+      return new Response(JSON.stringify({ error: "No formula brief found for this category" }), {
+        status: 422,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Build feedback text — extract from images if present
+    let fullFeedbackText = fb.feedback_text || "";
+    if (fb.image_urls?.length > 0) {
+      const imageContent = [
+        {
+          type: "text",
+          text: `Extract all text and content from these manufacturer feedback images for a supplement formula.
+Transcribe everything visible: ingredient names, doses, notes, comments, markups, diagrams, tables.
+Format clearly with each distinct point on a new line.`,
+        },
+        ...fb.image_urls.map((url: string) => ({
+          type: "image_url",
+          image_url: { url },
+        })),
+      ];
+      try {
+        const extractedText = await callClaude([{ role: "user", content: imageContent }], 4000);
+        fullFeedbackText = [fullFeedbackText, "\n\n[FROM IMAGES]\n" + extractedText].filter(Boolean).join("\n");
+      } catch (_e) {
+        // continue without image text
+      }
+    }
+
+    if (!fullFeedbackText.trim()) {
+      await supabase
+        .from("manufacturer_feedback")
+        .update({ status: "dismissed" })
+        .eq("id", feedbackId);
+      return new Response(JSON.stringify({ error: "No feedback content found" }), {
+        status: 422,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Evaluate with Claude
+    const prompt = buildEvaluationPrompt(fb.keyword, currentFormula, fullFeedbackText);
+    const evaluation = await callClaude([{ role: "user", content: prompt }], 10000);
+
+    // Parse verdict
+    const verdictMatch = evaluation.match(
+      /##\s*OVERALL VERDICT\s*\n+\[?(ACCEPTED|PARTIALLY ACCEPTED|QUESTIONED|REJECTED)\]?/i
+    );
+    const verdictRaw = verdictMatch?.[1] || "questioned";
+    const verdict = verdictRaw.toLowerCase().replace(" ", "_") as
+      | "accepted"
+      | "partially_accepted"
+      | "questioned"
+      | "rejected";
+
+    // Parse updated formula
+    const updatedFormulaMatch = evaluation.match(
+      /##\s*UPDATED FORMULA\s*\n+([\s\S]*?)(?=\n##\s*COUNTER-ARGUMENTS|$)/i
+    );
+    const updatedFormula = updatedFormulaMatch?.[1]?.trim() || null;
+    const hasChanges = updatedFormula && !updatedFormula.startsWith("No changes applied");
+
+    // Parse change summary
+    const changeSummaryMatch = evaluation.match(/##\s*CHANGE SUMMARY\s*\n+([\s\S]*?)(?=\n##|$)/i);
+    const changeSummary =
+      changeSummaryMatch?.[1]?.trim() || `Manufacturer feedback review — ${verdict}`;
+
+    // Create new formula version if changes accepted
+    let newVersionId: string | null = null;
+    if (hasChanges && (verdict === "accepted" || verdict === "partially_accepted")) {
+      await supabase
+        .from("formula_brief_versions")
+        .update({ is_active: false })
+        .eq("category_id", fb.category_id);
+
+      const { data: versions } = await supabase
+        .from("formula_brief_versions")
+        .select("version_number")
+        .eq("category_id", fb.category_id)
+        .order("version_number", { ascending: false })
+        .limit(1);
+
+      const nextVersion = versions?.[0]?.version_number ? versions[0].version_number + 1 : 1;
+
+      const { data: newVersion } = await supabase
+        .from("formula_brief_versions")
+        .insert({
+          category_id: fb.category_id,
+          version_number: nextVersion,
+          formula_brief_content: updatedFormula,
+          change_summary: `[MFR FEEDBACK] ${changeSummary}`,
+          parent_version_id: parentVersionId,
+          is_active: true,
+        })
+        .select()
+        .single();
+
+      newVersionId = newVersion?.id || null;
+    }
+
+    // Save verdict back to feedback row
+    await supabase
+      .from("manufacturer_feedback")
+      .update({
+        status: "reviewed",
+        reviewed_at: new Date().toISOString(),
+        claude_verdict: verdict,
+        claude_response: evaluation,
+        resulting_version_id: newVersionId,
+      })
+      .eq("id", feedbackId);
+
+    return new Response(
+      JSON.stringify({ success: true, verdict, newVersionId }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "Unknown error";
+    return new Response(JSON.stringify({ error: message }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});

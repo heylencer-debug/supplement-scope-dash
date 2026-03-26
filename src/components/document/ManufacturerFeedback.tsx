@@ -44,7 +44,7 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
   const [uploading, setUploading] = useState(false);
   const [expandedFeedback, setExpandedFeedback] = useState<string | null>(null);
 
-  // Load existing feedback
+  // Load existing feedback — poll every 4s while any row is processing
   const { data: feedbackList = [] } = useQuery({
     queryKey: ["manufacturer_feedback", categoryId],
     queryFn: async () => {
@@ -57,6 +57,10 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
       return data as FeedbackRow[];
     },
     enabled: !!categoryId,
+    refetchInterval: (query) => {
+      const rows = query.state.data as FeedbackRow[] | undefined;
+      return rows?.some((r) => r.status === "processing" || r.status === "pending") ? 4000 : false;
+    },
   });
 
   // Submit feedback mutation
@@ -66,20 +70,25 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
         throw new Error("Please add feedback text or upload an image");
       }
       const imageUrls = uploadedImages.map((i) => i.url);
-      const { error } = await supabase.from("manufacturer_feedback").insert({
+      const { data, error } = await supabase.from("manufacturer_feedback").insert({
         category_id: categoryId,
         keyword,
         feedback_text: feedbackText.trim() || null,
         image_urls: imageUrls,
         status: "pending",
-      });
+      }).select().single();
       if (error) throw error;
+
+      // Trigger Edge Function to process immediately (fire and forget)
+      supabase.functions.invoke("process-manufacturer-feedback", {
+        body: { feedbackId: data.id },
+      }).catch(() => {/* silent — status will show in history */});
     },
     onSuccess: () => {
       setFeedbackText("");
       setUploadedImages([]);
       queryClient.invalidateQueries({ queryKey: ["manufacturer_feedback", categoryId] });
-      toast({ title: "Feedback submitted", description: "Run phase-living-brief.js to process it." });
+      toast({ title: "Feedback submitted", description: "Scout is evaluating it now..." });
     },
     onError: (e: Error) => {
       toast({ title: "Error", description: e.message, variant: "destructive" });
@@ -268,14 +277,6 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
             </div>
           )}
 
-          {/* Instructions */}
-          <div className="bg-blue-50 border border-blue-200 rounded p-3">
-            <p className="text-xs text-blue-800 font-medium mb-1">To process pending feedback:</p>
-            <code className="text-xs text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded block">
-              node phase-living-brief.js --keyword "{keyword}"
-            </code>
-            <p className="text-xs text-blue-600 mt-1">Scout will evaluate each point and automatically create a new formula version if changes are accepted.</p>
-          </div>
         </div>
       )}
     </div>

@@ -59,6 +59,24 @@ function extractTemplateFlavorBlock(content: string | null): string {
   return match?.[0]?.trim() || "";
 }
 
+function extractRecommendedFlavors(ingredients: unknown): string {
+  if (!ingredients || typeof ingredients !== "object") return "";
+
+  const record = ingredients as Record<string, unknown>;
+  const flavorRecs = record.flavor_recommendations;
+  if (!Array.isArray(flavorRecs) || flavorRecs.length === 0) return "";
+
+  const lines = flavorRecs.map((f: Record<string, unknown>, i: number) => {
+    const name = String(f.flavor_name || "Unknown").replace(/^\w/, (c: string) => c.toUpperCase());
+    const confidence = f.confidence ?? "N/A";
+    const evidence = f.evidence as Record<string, unknown> | undefined;
+    const presence = evidence?.competitor_presence ?? "";
+    return `${i + 1}. **${name}** — Confidence: ${confidence}%, Competitor presence: ${presence}`;
+  });
+
+  return `### Market-Analyzed Recommended Flavors (from pipeline phases)\n${lines.join("\n")}`;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -96,6 +114,7 @@ serve(async (req) => {
 
     const complianceTemplate = getComplianceTemplateFromIngredients(briefRow?.ingredients);
     const complianceFlavorBlock = extractTemplateFlavorBlock(complianceTemplate);
+    const recommendedFlavors = extractRecommendedFlavors(briefRow?.ingredients);
 
     if (activeVersion) {
       currentFormula = activeVersion.formula_brief_content;
@@ -134,6 +153,11 @@ ${complianceTemplate || currentFormula}
 
 ## LOCKED P12 FLAVOR / VARIANT REFERENCE
 ${complianceFlavorBlock || "No dedicated flavor block found in the compliance template."}
+
+---
+
+## MARKET-ANALYZED RECOMMENDED FLAVORS (from earlier pipeline phases — MUST be included in output)
+${recommendedFlavors || "No flavor_recommendations data found."}
 
 ---
 

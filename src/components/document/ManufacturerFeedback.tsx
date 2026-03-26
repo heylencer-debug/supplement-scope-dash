@@ -49,12 +49,12 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
     queryKey: ["manufacturer_feedback", categoryId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("manufacturer_feedback")
+        .from("manufacturer_feedback" as any)
         .select("*")
         .eq("category_id", categoryId)
         .order("submitted_at", { ascending: false });
       if (error) throw error;
-      return data as FeedbackRow[];
+      return (data as unknown) as FeedbackRow[];
     },
     enabled: !!categoryId,
     refetchInterval: (query) => {
@@ -70,7 +70,7 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
         throw new Error("Please add feedback text or upload an image");
       }
       const imageUrls = uploadedImages.map((i) => i.url);
-      const { data, error } = await supabase.from("manufacturer_feedback").insert({
+      const { data, error } = await supabase.from("manufacturer_feedback" as any).insert({
         category_id: categoryId,
         keyword,
         feedback_text: feedbackText.trim() || null,
@@ -80,9 +80,12 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
       if (error) throw error;
 
       // Trigger Edge Function to process immediately (fire and forget)
-      supabase.functions.invoke("process-manufacturer-feedback", {
-        body: { feedbackId: data.id },
-      }).catch(() => {/* silent — status will show in history */});
+      const feedbackId = (data as any)?.id;
+      if (feedbackId) {
+        supabase.functions.invoke("process-manufacturer-feedback", {
+          body: { feedbackId },
+        }).catch(() => {/* silent — status will show in history */});
+      }
     },
     onSuccess: () => {
       setFeedbackText("");

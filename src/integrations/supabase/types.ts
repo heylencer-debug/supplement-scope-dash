@@ -901,6 +901,79 @@ export type Database = {
           },
         ]
       }
+      manufacturer_feedback: {
+        Row: {
+          category_id: string
+          claude_changes: Json | null
+          claude_response: string | null
+          claude_verdict: string | null
+          feedback_text: string | null
+          id: string
+          image_urls: Json | null
+          keyword: string
+          notes: string | null
+          resulting_version_id: string | null
+          reviewed_at: string | null
+          status: string
+          submitted_at: string | null
+          submitted_by: string | null
+        }
+        Insert: {
+          category_id: string
+          claude_changes?: Json | null
+          claude_response?: string | null
+          claude_verdict?: string | null
+          feedback_text?: string | null
+          id?: string
+          image_urls?: Json | null
+          keyword: string
+          notes?: string | null
+          resulting_version_id?: string | null
+          reviewed_at?: string | null
+          status?: string
+          submitted_at?: string | null
+          submitted_by?: string | null
+        }
+        Update: {
+          category_id?: string
+          claude_changes?: Json | null
+          claude_response?: string | null
+          claude_verdict?: string | null
+          feedback_text?: string | null
+          id?: string
+          image_urls?: Json | null
+          keyword?: string
+          notes?: string | null
+          resulting_version_id?: string | null
+          reviewed_at?: string | null
+          status?: string
+          submitted_at?: string | null
+          submitted_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "manufacturer_feedback_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manufacturer_feedback_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "v_category_dashboard"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manufacturer_feedback_resulting_version_id_fkey"
+            columns: ["resulting_version_id"]
+            isOneToOne: false
+            referencedRelation: "formula_brief_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       market_trend_analyses: {
         Row: {
           analysis: Json | null

@@ -80,8 +80,12 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
       if (error) throw error;
 
       // Trigger Edge Function to process immediately (fire and forget)
-      supabase.functions.invoke("process-manufacturer-feedback", {
-        body: { feedbackId: data.id },
+      const feedbackId = (data as any)?.id;
+      if (feedbackId) {
+        supabase.functions.invoke("process-manufacturer-feedback", {
+          body: { feedbackId },
+        }).catch(() => {/* silent — status will show in history */});
+      }
       }).catch(() => {/* silent — status will show in history */});
     },
     onSuccess: () => {

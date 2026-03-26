@@ -102,6 +102,11 @@ ${extractTemplateFlavorBlock(complianceTemplate) || "No dedicated flavor block f
 
 ---
 
+## MARKET-ANALYZED RECOMMENDED FLAVORS (from earlier pipeline phases — authoritative list)
+${recommendedFlavors || "No flavor_recommendations data found."}
+
+---
+
 ## MANUFACTURER FEEDBACK
 ${feedbackText}
 

@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from "react";
-import { Factory, Upload, Send, CheckCircle, XCircle, HelpCircle, AlertCircle, ChevronDown, ChevronUp, X, Image, Download, Sparkles, Copy, Check, MessageSquare, Clock, ExternalLink } from "lucide-react";
+import { Factory, Upload, Send, CheckCircle, XCircle, HelpCircle, AlertCircle, ChevronDown, ChevronUp, X, Image, Download, Sparkles, Copy, Check, MessageSquare, Clock, ExternalLink, FileText, Eye } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,6 +12,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { pdf } from "@react-pdf/renderer";
 import { StrategyBriefPDF } from "@/components/document/StrategyBriefPDF";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface ManufacturerFeedbackProps {
   categoryId: string;
@@ -83,6 +84,41 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
   const [generatingVersion, setGeneratingVersion] = useState<string | null>(null);
   const [replyEdits, setReplyEdits] = useState<Record<string, string>>({});
   const [copiedReply, setCopiedReply] = useState<string | null>(null);
+  const [viewingVersionId, setViewingVersionId] = useState<string | null>(null);
+
+  // Load all formula brief versions for this category
+  const { data: allVersions = [] } = useQuery({
+    queryKey: ["formula_brief_versions", categoryId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("formula_brief_versions")
+        .select("*")
+        .eq("category_id", categoryId)
+        .order("version_number", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!categoryId,
+  });
+
+  // Load original formula brief from formula_briefs table
+  const { data: originalBrief } = useQuery({
+    queryKey: ["original_formula_brief", categoryId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("formula_briefs")
+        .select("ingredients, created_at")
+        .eq("category_id", categoryId)
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      const content = (data?.ingredients as any)?.final_formula_brief || (data?.ingredients as any)?.adjusted_formula || null;
+      return content ? { content, created_at: data?.created_at } : null;
+    },
+    enabled: !!categoryId,
+  });
+
+  const viewingVersion = viewingVersionId ? allVersions.find(v => v.id === viewingVersionId) : null;
   const handleDownloadVersion = useCallback(async (versionId: string) => {
     setDownloadingVersion(versionId);
     try {
@@ -264,7 +300,157 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
   const pendingCount = feedbackList.filter((f) => f.status === "pending").length;
 
   return (
-    <div className="border border-gray-200 rounded-lg bg-white mt-4">
+    <div className="space-y-4">
+      {/* Formula Version History Table */}
+      <div className="rounded-[var(--radius)] border border-border bg-card shadow-sm overflow-hidden">
+        <div className="px-5 py-3.5 bg-muted/40 border-b border-border">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+              <FileText className="w-4 h-4 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-foreground">Formula Brief Versions</p>
+              <p className="text-xs text-muted-foreground">
+                {allVersions.length + (originalBrief ? 1 : 0)} version{allVersions.length + (originalBrief ? 1 : 0) !== 1 ? 's' : ''} · Active version is used for all analyses
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border bg-muted/20">
+                <th className="text-left py-2.5 px-4 text-xs font-medium text-muted-foreground uppercase tracking-wide">Version</th>
+                <th className="text-left py-2.5 px-4 text-xs font-medium text-muted-foreground uppercase tracking-wide">Source</th>
+                <th className="text-left py-2.5 px-4 text-xs font-medium text-muted-foreground uppercase tracking-wide">Change Summary</th>
+                <th className="text-left py-2.5 px-4 text-xs font-medium text-muted-foreground uppercase tracking-wide">Generated</th>
+                <th className="text-right py-2.5 px-4 text-xs font-medium text-muted-foreground uppercase tracking-wide">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/50">
+              {allVersions.map(v => (
+                <tr key={v.id} className={`hover:bg-muted/30 transition-colors ${v.is_active ? 'bg-primary/5' : ''}`}>
+                  <td className="py-2.5 px-4">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-foreground">v{v.version_number}</span>
+                      {v.is_active && (
+                        <Badge variant="default" className="text-[10px] h-5">Active</Badge>
+                      )}
+                    </div>
+                  </td>
+                  <td className="py-2.5 px-4">
+                    <Badge variant="outline" className="text-[10px]">
+                      {(v.change_summary || '').startsWith('[USER OVERRIDE]') ? '🏭 Manufacturer' : v.version_number === 1 ? '🧪 AI Generated' : '💬 Chat'}
+                    </Badge>
+                  </td>
+                  <td className="py-2.5 px-4 max-w-[300px]">
+                    <p className="text-xs text-muted-foreground line-clamp-2">
+                      {v.change_summary?.replace('[USER OVERRIDE] ', '') || 'Initial formula brief'}
+                    </p>
+                  </td>
+                  <td className="py-2.5 px-4 whitespace-nowrap">
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Clock className="w-3 h-3" />
+                      {format(new Date(v.created_at), "MMM d, yyyy · h:mm a")}
+                    </div>
+                  </td>
+                  <td className="py-2.5 px-4">
+                    <div className="flex items-center gap-1.5 justify-end">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-xs gap-1"
+                        onClick={() => setViewingVersionId(v.id)}
+                      >
+                        <Eye className="w-3 h-3" />
+                        View
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs gap-1"
+                        disabled={downloadingVersion === v.id}
+                        onClick={() => handleDownloadVersion(v.id)}
+                      >
+                        <Download className="w-3 h-3" />
+                        {downloadingVersion === v.id ? "..." : "PDF"}
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {/* Original formula brief from Compliance/AI analysis */}
+              {originalBrief && (
+                <tr className="hover:bg-muted/30 transition-colors">
+                  <td className="py-2.5 px-4">
+                    <span className="font-medium text-foreground">Original</span>
+                  </td>
+                  <td className="py-2.5 px-4">
+                    <Badge variant="outline" className="text-[10px]">⚖️ Compliance</Badge>
+                  </td>
+                  <td className="py-2.5 px-4 max-w-[300px]">
+                    <p className="text-xs text-muted-foreground">Initial formula brief from market analysis pipeline</p>
+                  </td>
+                  <td className="py-2.5 px-4 whitespace-nowrap">
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Clock className="w-3 h-3" />
+                      {originalBrief.created_at ? format(new Date(originalBrief.created_at), "MMM d, yyyy · h:mm a") : "—"}
+                    </div>
+                  </td>
+                  <td className="py-2.5 px-4">
+                    <div className="flex items-center gap-1.5 justify-end">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-xs gap-1"
+                        onClick={() => setViewingVersionId("original")}
+                      >
+                        <Eye className="w-3 h-3" />
+                        View
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              )}
+              {allVersions.length === 0 && !originalBrief && (
+                <tr>
+                  <td colSpan={5} className="py-8 text-center text-sm text-muted-foreground">
+                    No formula versions yet. Submit manufacturer feedback to generate versions.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Version Viewing Dialog */}
+      <Dialog open={viewingVersionId !== null} onOpenChange={(open) => !open && setViewingVersionId(null)}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-primary" />
+              {viewingVersionId === "original" ? "Original Formula Brief" : viewingVersion ? `Formula Brief v${viewingVersion.version_number}` : "Formula Brief"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="prose prose-sm max-w-none dark:prose-invert
+            prose-headings:font-semibold prose-headings:text-foreground
+            prose-p:text-muted-foreground prose-p:leading-relaxed
+            prose-strong:text-foreground
+            prose-table:text-xs
+            prose-th:px-3 prose-th:py-2 prose-th:bg-muted/30 prose-th:text-left prose-th:font-semibold prose-th:border-b prose-th:border-border
+            prose-td:px-3 prose-td:py-2 prose-td:border-t prose-td:border-border/50 prose-td:text-muted-foreground
+          ">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {viewingVersionId === "original"
+                ? (originalBrief?.content || "No content available")
+                : (viewingVersion?.formula_brief_content || "No content available")}
+            </ReactMarkdown>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+    <div className="border border-border rounded-[var(--radius)] bg-card mt-0">
       {/* Header */}
       <button
         onClick={() => setExpanded(!expanded)}
@@ -671,6 +857,7 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
           )}
         </div>
       )}
+    </div>
     </div>
   );
 }

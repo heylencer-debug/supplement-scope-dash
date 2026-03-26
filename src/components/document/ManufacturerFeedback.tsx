@@ -380,6 +380,18 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
                   </td>
                   <td className="py-2.5 px-4">
                     <div className="flex items-center gap-1.5 justify-end">
+                      {!v.is_active && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs gap-1 border-primary/30 text-primary hover:bg-primary/10"
+                          disabled={setActiveMutation.isPending}
+                          onClick={() => setActiveMutation.mutate(v.id)}
+                        >
+                          <Star className="w-3 h-3" />
+                          Set Active
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         variant="ghost"

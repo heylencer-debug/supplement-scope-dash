@@ -10,7 +10,7 @@ const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-async function callClaude(messages: Array<{ role: string; content: string }>, maxTokens = 12000): Promise<string> {
+async function callClaude(messages: Array<{ role: string; content: string }>, maxTokens = 16000): Promise<string> {
   const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: {

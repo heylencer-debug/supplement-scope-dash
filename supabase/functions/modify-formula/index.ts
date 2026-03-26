@@ -239,6 +239,36 @@ serve(async (req) => {
       console.log('No ingredient analysis data found for category');
     }
 
+    // Fetch P12 compliance template + recommended flavors as locked reference
+    let p12Reference = '';
+    {
+      const { data: briefRow } = await supabase
+        .from('formula_briefs')
+        .select('ingredients')
+        .eq('category_id', categoryId)
+        .limit(1)
+        .maybeSingle();
+
+      if (briefRow?.ingredients && typeof briefRow.ingredients === 'object') {
+        const ing = briefRow.ingredients as Record<string, unknown>;
+        const p12Content = ing.final_formula_brief || ing.adjusted_formula;
+        if (typeof p12Content === 'string' && p12Content.trim()) {
+          p12Reference += `\n\n=== P12 COMPLIANCE TEMPLATE (LOCKED FORMAT + FLAVOR SOURCE OF TRUTH) ===\nYou MUST preserve the same section order, heading hierarchy, table structure, and flavor/variant coverage as this template.\n---BEGIN P12 TEMPLATE---\n${p12Content}\n---END P12 TEMPLATE---\n`;
+        }
+
+        const flavorRecs = ing.flavor_recommendations;
+        if (Array.isArray(flavorRecs) && flavorRecs.length > 0) {
+          const flavorLines = flavorRecs.map((f: Record<string, unknown>, i: number) => {
+            const name = String(f.flavor_name || 'Unknown').replace(/^\w/, (c: string) => c.toUpperCase());
+            const confidence = f.confidence ?? 'N/A';
+            return `${i + 1}. ${name} (Confidence: ${confidence}%)`;
+          });
+          p12Reference += `\n=== MARKET-ANALYZED RECOMMENDED FLAVORS (MUST be included in output) ===\n${flavorLines.join('\n')}\n=== END RECOMMENDED FLAVORS ===\n`;
+        }
+      }
+      console.log('P12 reference length:', p12Reference.length);
+    }
+
     // Different system prompts based on mode
     let systemPrompt: string;
 
@@ -263,6 +293,7 @@ CURRENT FORMULA BRIEF (ORIGINAL DOCUMENT - ${originalLength} characters, ~${orig
 ---BEGIN ORIGINAL DOCUMENT---
 ${currentFormula}
 ---END ORIGINAL DOCUMENT---
+${p12Reference}
 ${competitorContext}
 ${conversationSummary}
 
@@ -325,6 +356,7 @@ CRITICAL RULES:
 
 CURRENT FORMULA BRIEF:
 ${currentFormula}
+${p12Reference}
 ${competitorContext}
 ${conversationSummary}
 

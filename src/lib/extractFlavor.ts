@@ -35,8 +35,8 @@ export function extractFlavorsFromFormulaBrief(content: string | null | undefine
       'the', 'and', 'natural', 'flavor', 'flavors', 'profile',
     ];
     if (skipWords.some(w => f.toLowerCase() === w || f.toLowerCase().startsWith(w + ' '))) return;
-    // Skip if it looks like a section header
-    if (f.startsWith('#') || f.startsWith('---')) return;
+    // Skip if it looks like a section header, price, or pipe artifact
+    if (f.startsWith('#') || f.startsWith('---') || f.startsWith('|') || f.startsWith('$')) return;
 
     const key = f.toLowerCase();
     if (!seen.has(key)) {

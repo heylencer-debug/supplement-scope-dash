@@ -7,6 +7,7 @@
 import { Trophy, CheckCircle2, FlaskConical, AlertCircle, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { useFormulaBrief } from "@/hooks/useFormulaBrief";
 
 interface P9BenchmarkOverviewProps {

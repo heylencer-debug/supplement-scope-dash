@@ -1,6 +1,8 @@
 import { Document, Page, Text, View, StyleSheet, Font } from '@react-pdf/renderer';
 
-// Use Helvetica (built-in) as primary to avoid font loading failures
+// Clear any previously registered fonts (fixes HMR caching issues)
+try { Font.clear(); } catch (_) { /* not available in all versions */ }
+
 // Register hyphenation callback to prevent crashes
 Font.registerHyphenationCallback((word) => [word]);
 

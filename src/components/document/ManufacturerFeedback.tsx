@@ -87,7 +87,6 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
         }).catch(() => {/* silent — status will show in history */});
       }
     },
-    },
     onSuccess: () => {
       setFeedbackText("");
       setUploadedImages([]);

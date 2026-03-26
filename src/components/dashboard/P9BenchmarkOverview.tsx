@@ -132,7 +132,7 @@ function ComparisonTable({ markdown }: { markdown: string }) {
   );
 }
 
-export function P9BenchmarkOverview({ categoryId }: P9BenchmarkOverviewProps) {
+export function P9BenchmarkOverview({ categoryId, activeVersionContent, activeVersionInfo }: P9BenchmarkOverviewProps) {
   const { data: brief, isLoading, error } = useFormulaBrief(categoryId);
 
   if (isLoading) {
@@ -144,6 +144,60 @@ export function P9BenchmarkOverview({ categoryId }: P9BenchmarkOverviewProps) {
     );
   }
 
+  // If an active version is set, show that instead of pipeline data
+  if (activeVersionContent) {
+    return (
+      <div className="space-y-4">
+        {/* Active Version Indicator */}
+        <Card className="border-primary/30 bg-primary/5">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm text-primary">
+              <CheckCircle2 className="h-4 w-4" />
+              Active Formula — Version {activeVersionInfo?.versionNumber || "?"}
+            </CardTitle>
+            <CardDescription className="text-xs">
+              {activeVersionInfo?.changeSummary || "Currently active formula version"}
+              {activeVersionInfo?.createdAt && (
+                <span className="ml-2 text-muted-foreground">
+                  • {new Date(activeVersionInfo.createdAt).toLocaleDateString()} {new Date(activeVersionInfo.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <ComparisonTable markdown={activeVersionContent} />
+            </div>
+            {/* Show pipeline meta if available */}
+            {brief && (
+              <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                {brief.target_price && (
+                  <div className="p-2 rounded-lg border border-border bg-muted/40">
+                    <p className="text-sm font-bold text-foreground">${brief.target_price.toFixed(2)}</p>
+                    <p className="text-[10px] text-muted-foreground">Target Price</p>
+                  </div>
+                )}
+                {brief.servings_per_container && (
+                  <div className="p-2 rounded-lg border border-border bg-muted/40">
+                    <p className="text-sm font-bold text-foreground">{brief.servings_per_container}</p>
+                    <p className="text-[10px] text-muted-foreground">Servings</p>
+                  </div>
+                )}
+                {brief.form_type && (
+                  <div className="p-2 rounded-lg border border-border bg-muted/40">
+                    <p className="text-sm font-bold text-foreground capitalize">{brief.form_type}</p>
+                    <p className="text-[10px] text-muted-foreground">Form</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Fallback: show pipeline data when no active version is set
   if (error || !brief?.ingredients) {
     return (
       <div className="flex items-center gap-2 text-sm text-chart-2 p-4 bg-chart-2/10 rounded-xl border border-chart-2/20">
@@ -251,9 +305,9 @@ export function P9BenchmarkOverview({ categoryId }: P9BenchmarkOverviewProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <pre className="text-xs text-foreground whitespace-pre-wrap font-mono leading-relaxed bg-muted/30 p-3 rounded-lg border border-border max-h-[500px] overflow-y-auto">
-              {finalBrief.slice(0, 5000)}{finalBrief.length > 5000 ? "\n\n... (truncated)" : ""}
-            </pre>
+            <div className="overflow-x-auto">
+              <ComparisonTable markdown={typeof finalBrief === 'string' ? finalBrief.slice(0, 5000) : ''} />
+            </div>
           </CardContent>
         </Card>
       )}

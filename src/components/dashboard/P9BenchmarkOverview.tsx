@@ -7,10 +7,60 @@
 import { Trophy, CheckCircle2, FlaskConical, AlertCircle, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { useFormulaBrief } from "@/hooks/useFormulaBrief";
 
 interface P9BenchmarkOverviewProps {
   categoryId: string;
+}
+
+/** Parse a markdown table string into headers + rows */
+function parseMarkdownTable(md: string): { headers: string[]; rows: string[][] } {
+  const lines = md.trim().split("\n").filter((l) => l.trim().length > 0);
+  const parse = (line: string) =>
+    line.split("|").map((c) => c.trim()).filter((_, i, a) => i > 0 && i < a.length);
+  if (lines.length < 2) return { headers: [], rows: [] };
+  const headers = parse(lines[0]);
+  // skip separator line (index 1)
+  const rows = lines.slice(2).map(parse);
+  return { headers, rows };
+}
+
+function ComparisonTable({ markdown }: { markdown: string }) {
+  const { headers, rows } = parseMarkdownTable(markdown);
+  if (headers.length === 0) {
+    return (
+      <pre className="text-xs text-foreground whitespace-pre-wrap font-mono leading-relaxed bg-muted/30 p-3 rounded-lg border border-border max-h-[400px] overflow-y-auto">
+        {markdown}
+      </pre>
+    );
+  }
+  return (
+    <div className="max-h-[500px] overflow-y-auto rounded-lg border border-border">
+      <Table className="table-auto">
+        <TableHeader>
+          <TableRow className="bg-muted/50">
+            {headers.map((h, i) => (
+              <TableHead key={i} className="text-[11px] font-semibold whitespace-nowrap px-3 py-2">
+                {h}
+              </TableHead>
+            ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((row, ri) => (
+            <TableRow key={ri} className={ri % 2 === 0 ? "" : "bg-muted/20"}>
+              {row.map((cell, ci) => (
+                <TableCell key={ci} className="text-[11px] px-3 py-2 whitespace-normal">
+                  {cell}
+                </TableCell>
+              ))}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
 }
 
 export function P9BenchmarkOverview({ categoryId }: P9BenchmarkOverviewProps) {
@@ -76,9 +126,7 @@ export function P9BenchmarkOverview({ categoryId }: P9BenchmarkOverviewProps) {
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
-              <pre className="text-xs text-foreground whitespace-pre-wrap font-mono leading-relaxed bg-muted/30 p-3 rounded-lg border border-border max-h-[400px] overflow-y-auto">
-                {comparison}
-              </pre>
+              <ComparisonTable markdown={comparison} />
             </div>
           </CardContent>
         </Card>

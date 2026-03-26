@@ -29,7 +29,37 @@ async function callClaude(messages: Array<{ role: string; content: unknown }>, m
   return j.choices?.[0]?.message?.content || "";
 }
 
-function buildEvaluationPrompt(keyword: string, currentFormula: string, feedbackText: string): string {
+function getComplianceTemplateFromIngredients(ingredients: unknown): string | null {
+  if (!ingredients || typeof ingredients !== "object") return null;
+
+  const record = ingredients as Record<string, unknown>;
+  const candidates = [
+    record.final_formula_brief,
+    record.adjusted_formula,
+    record.compliance_formula,
+    record.final_pdf_version,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim()) {
+      return candidate.trim();
+    }
+  }
+
+  return null;
+}
+
+function extractTemplateFlavorBlock(content: string | null): string {
+  if (!content) return "";
+
+  const match =
+    content.match(/###\s*Flavor[\s\S]*?(?=\n---\n\n###\s*Pricing|\n###\s*Pricing|$)/i) ??
+    content.match(/###\s*Flavor[\s\S]*?(?=\n###\s*Pricing|$)/i);
+
+  return match?.[0]?.trim() || "";
+}
+
+function buildEvaluationPrompt(keyword: string, currentFormula: string, complianceTemplate: string, feedbackText: string): string {
   return `You are a senior supplement formulator and scientific advisor for DOVIVE brand.
 
 A manufacturer has submitted feedback on our current formula brief for **${keyword}**.
@@ -41,6 +71,16 @@ Your job is to evaluate each point of feedback objectively and decide:
 
 ## CURRENT ACTIVE FORMULA BRIEF
 ${currentFormula}
+
+---
+
+## LOCKED P12 COMPLIANCE TEMPLATE (FORMAT + FLAVOR SOURCE OF TRUTH)
+${complianceTemplate}
+
+---
+
+## LOCKED P12 FLAVOR / VARIANT REFERENCE
+${extractTemplateFlavorBlock(complianceTemplate) || "No dedicated flavor block found in the compliance template."}
 
 ---
 
@@ -56,7 +96,8 @@ ${feedbackText}
 3. **Manufacturing constraints are valid reasons to change** — if the manufacturer flags a real constraint (active load, heat stability, pH issue, sourcing problem), accept it and find the best clinical alternative
 4. **Cost reduction is valid IF it doesn't compromise efficacy** — switching to a less expensive but equally bioavailable form is acceptable; switching to an inferior form to cut cost is not
 5. **Be specific** — when questioning or rejecting, cite the clinical reason, the study, or the manufacturing principle. Do not give vague pushback.
-6. **Format preservation is mandatory** — if changes are accepted, the updated formula MUST use the EXACT same markdown structure, heading hierarchy, table formats, section ordering, and layout as the current formula brief. Do NOT reorganize, rename sections, merge tables, or change the document structure. Only modify content affected by accepted changes.
+6. **P12 is the locked structure source of truth** — if changes are later accepted into a new version, that version must use the exact P12 section order, heading hierarchy, markdown layout, table structure, and flavor / variant coverage
+7. **Recommended flavors from P12 are authoritative** — do not implicitly drop or replace flavor options that came from earlier market-analysis phases; if flavor-related feedback is discussed, reference the full P12 flavor lineup explicitly
 
 ---
 
@@ -120,20 +161,20 @@ async function processInBackground(feedbackId: string) {
     let currentFormula: string | null = null;
     let parentVersionId: string | null = null;
 
+    const { data: briefRow } = await supabase
+      .from("formula_briefs")
+      .select("ingredients")
+      .eq("category_id", fb.category_id)
+      .limit(1)
+      .maybeSingle();
+
+    const complianceTemplate = getComplianceTemplateFromIngredients(briefRow?.ingredients);
+
     if (activeVersion) {
       currentFormula = activeVersion.formula_brief_content;
       parentVersionId = activeVersion.id;
     } else {
-      const { data: briefRow } = await supabase
-        .from("formula_briefs")
-        .select("ingredients")
-        .eq("category_id", fb.category_id)
-        .limit(1)
-        .single();
-      currentFormula =
-        briefRow?.ingredients?.final_formula_brief ||
-        briefRow?.ingredients?.adjusted_formula ||
-        null;
+      currentFormula = complianceTemplate;
     }
 
     if (!currentFormula) {
@@ -176,7 +217,12 @@ Format clearly with each distinct point on a new line.`,
     }
 
     // Evaluate with Claude
-    const prompt = buildEvaluationPrompt(fb.keyword, currentFormula, fullFeedbackText);
+    const prompt = buildEvaluationPrompt(
+      fb.keyword,
+      currentFormula,
+      complianceTemplate || currentFormula,
+      fullFeedbackText
+    );
     const evaluation = await callClaude([{ role: "user", content: prompt }], 10000);
 
     // Parse verdict

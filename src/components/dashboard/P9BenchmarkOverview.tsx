@@ -62,8 +62,6 @@ function ComparisonTable({ markdown }: { markdown: string }) {
     </div>
   );
 }
-  categoryId: string;
-}
 
 export function P9BenchmarkOverview({ categoryId }: P9BenchmarkOverviewProps) {
   const { data: brief, isLoading, error } = useFormulaBrief(categoryId);

@@ -245,6 +245,7 @@ Format clearly with each distinct point on a new line.`,
       fb.keyword,
       currentFormula,
       complianceTemplate || currentFormula,
+      recommendedFlavors,
       fullFeedbackText
     );
     const evaluation = await callClaude([{ role: "user", content: prompt }], 10000);

@@ -9,7 +9,6 @@ import NewAnalysis from "./pages/NewAnalysis";
 import Dashboard from "./pages/Dashboard";
 import ProductExplorer from "./pages/ProductExplorer";
 import AddProduct from "./pages/AddProduct";
-import ManufacturerFeedbackPage from "./pages/ManufacturerFeedbackPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,7 +26,6 @@ const App = () => (
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/products" element={<ProductExplorer />} />
               <Route path="/products/add" element={<AddProduct />} />
-              <Route path="/manufacturer-feedback" element={<ManufacturerFeedbackPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Layout>

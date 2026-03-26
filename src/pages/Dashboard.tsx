@@ -25,6 +25,7 @@ import { OcrCoveragePanel } from "@/components/dashboard/OcrCoveragePanel";
 import { PackagingIntelligence } from "@/components/dashboard/PackagingIntelligence";
 import { P9BenchmarkOverview } from "@/components/dashboard/P9BenchmarkOverview";
 import { MarketIntelligenceReport } from "@/components/dashboard/MarketIntelligenceReport";
+import { ManufacturerFeedback } from "@/components/document/ManufacturerFeedback";
 
 import {
   ResponsiveContainer,
@@ -452,13 +453,14 @@ export default function Dashboard() {
       )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="products">📦 Products</TabsTrigger>
           <TabsTrigger value="market">📈 Market</TabsTrigger>
           <TabsTrigger value="packaging">🎨 Packaging</TabsTrigger>
           <TabsTrigger value="formula">🧪 Formula Brief</TabsTrigger>
           <TabsTrigger value="qa">🔬 QA Review</TabsTrigger>
           <TabsTrigger value="validation">⚖️ Compliance</TabsTrigger>
+          <TabsTrigger value="manufacturer">🏭 Manufacturer</TabsTrigger>
         </TabsList>
 
         <TabsContent value="products" className="space-y-6 md:space-y-10 mt-4">
@@ -898,6 +900,19 @@ export default function Dashboard() {
             <FormulaValidationTab categoryId={category.id} categoryName={categoryName} />
           ) : (
             <div className="text-center py-12 text-muted-foreground">Select a category to view compliance data.</div>
+          )}
+        </TabsContent>
+
+        {/* TAB 7: Manufacturer Feedback — living formula brief */}
+        <TabsContent value="manufacturer" className="space-y-6 mt-4">
+          {category?.id && categoryName ? (
+            <ManufacturerFeedback
+              categoryId={category.id}
+              keyword={categoryName}
+              defaultExpanded
+            />
+          ) : (
+            <div className="text-center py-12 text-muted-foreground">Select a category to view manufacturer feedback.</div>
           )}
         </TabsContent>
       </Tabs>

@@ -70,7 +70,7 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
         throw new Error("Please add feedback text or upload an image");
       }
       const imageUrls = uploadedImages.map((i) => i.url);
-      const { data, error } = await supabase.from("manufacturer_feedback").insert({
+      const { data, error } = await supabase.from("manufacturer_feedback" as any).insert({
         category_id: categoryId,
         keyword,
         feedback_text: feedbackText.trim() || null,

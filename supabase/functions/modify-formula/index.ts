@@ -356,6 +356,7 @@ CRITICAL RULES:
 
 CURRENT FORMULA BRIEF:
 ${currentFormula}
+${p12Reference}
 ${competitorContext}
 ${conversationSummary}
 

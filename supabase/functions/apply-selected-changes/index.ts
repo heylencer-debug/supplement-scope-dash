@@ -156,6 +156,11 @@ ${complianceFlavorBlock || "No dedicated flavor block found in the compliance te
 
 ---
 
+## MARKET-ANALYZED RECOMMENDED FLAVORS (from earlier pipeline phases — MUST be included in output)
+${recommendedFlavors || "No flavor_recommendations data found."}
+
+---
+
 ## ORIGINAL AI EVALUATION
 ${fb?.claude_response || "Not available"}
 

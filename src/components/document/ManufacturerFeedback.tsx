@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Factory, Upload, Send, CheckCircle, XCircle, HelpCircle, AlertCircle, ChevronDown, ChevronUp, X, Image } from "lucide-react";
+import { useState, useCallback } from "react";
+import { Factory, Upload, Send, CheckCircle, XCircle, HelpCircle, AlertCircle, ChevronDown, ChevronUp, X, Image, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { pdf } from "@react-pdf/renderer";
+import { StrategyBriefPDF } from "@/components/document/StrategyBriefPDF";
 
 interface ManufacturerFeedbackProps {
   categoryId: string;
@@ -43,6 +45,41 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
   const [uploadedImages, setUploadedImages] = useState<{ file: File; url: string }[]>([]);
   const [uploading, setUploading] = useState(false);
   const [expandedFeedback, setExpandedFeedback] = useState<string | null>(null);
+  const [downloadingVersion, setDownloadingVersion] = useState<string | null>(null);
+
+  const handleDownloadVersion = useCallback(async (versionId: string) => {
+    setDownloadingVersion(versionId);
+    try {
+      const { data: version, error } = await supabase
+        .from("formula_brief_versions")
+        .select("formula_brief_content, version_number, created_at")
+        .eq("id", versionId)
+        .single();
+      if (error || !version) throw new Error("Version not found");
+
+      const blob = await pdf(
+        <StrategyBriefPDF
+          content={version.formula_brief_content}
+          categoryName={keyword}
+          createdAt={version.created_at}
+        />
+      ).toBlob();
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${keyword.replace(/\s+/g, "_")}_Formula_v${version.version_number}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast({ title: "PDF downloaded", description: `Formula Brief v${version.version_number}` });
+    } catch (e: any) {
+      toast({ title: "Download failed", description: e.message, variant: "destructive" });
+    } finally {
+      setDownloadingVersion(null);
+    }
+  }, [keyword, toast]);
 
   // Load existing feedback — poll every 4s while any row is processing
   const { data: feedbackList = [] } = useQuery({
@@ -262,9 +299,24 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
                               </div>
                             )}
                             {fb.resulting_version_id && (
-                              <p className="text-xs text-green-700">
-                                ✓ New formula version created from this feedback
-                              </p>
+                              <div className="flex items-center gap-2">
+                                <p className="text-xs text-green-700 flex-1">
+                                  ✓ New formula version created
+                                </p>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-xs gap-1.5"
+                                  disabled={downloadingVersion === fb.resulting_version_id}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDownloadVersion(fb.resulting_version_id!);
+                                  }}
+                                >
+                                  <Download className="w-3 h-3" />
+                                  {downloadingVersion === fb.resulting_version_id ? "Generating..." : "Download PDF"}
+                                </Button>
+                              </div>
                             )}
                             <p className="text-xs text-gray-400">
                               Submitted {new Date(fb.submitted_at).toLocaleDateString()}

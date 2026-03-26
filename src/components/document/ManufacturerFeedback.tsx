@@ -376,33 +376,100 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
                               ))}
                             </div>
                           )}
-                          {fb.claude_response && (
-                            <div className="space-y-2">
-                              <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                                <Sparkles className="w-3.5 h-3.5 text-primary" />
-                                Scout's Evaluation
-                              </p>
-                              <div className="rounded-lg border border-border bg-background p-4 overflow-x-auto">
-                                <div className="prose prose-sm max-w-none dark:prose-invert
-                                  prose-headings:font-semibold prose-headings:text-foreground
-                                  prose-h1:text-base prose-h1:mt-0 prose-h1:mb-3 prose-h1:pb-2 prose-h1:border-b prose-h1:border-border
-                                  prose-h2:text-sm prose-h2:mt-5 prose-h2:mb-2 prose-h2:pb-1.5 prose-h2:border-b prose-h2:border-border/50
-                                  prose-h3:text-sm prose-h3:mt-4 prose-h3:mb-1.5
-                                  prose-p:text-xs prose-p:leading-relaxed prose-p:my-2 prose-p:text-muted-foreground
-                                  prose-li:text-xs prose-li:leading-relaxed prose-li:text-muted-foreground
-                                  prose-strong:text-foreground prose-strong:font-semibold
-                                  prose-table:text-xs prose-table:my-3
-                                  prose-th:px-3 prose-th:py-2 prose-th:bg-muted/50 prose-th:text-left prose-th:font-semibold prose-th:text-foreground prose-th:border-b prose-th:border-border
-                                  prose-td:px-3 prose-td:py-2.5 prose-td:border-t prose-td:border-border/50 prose-td:text-muted-foreground prose-td:align-top
-                                  prose-tr:border-border
-                                ">
-                                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                    {fb.claude_response}
-                                  </ReactMarkdown>
-                                </div>
+                          {fb.claude_response && (() => {
+                            // Parse structured sections from the response
+                            const overallMatch = fb.claude_response.match(/##\s*OVERALL VERDICT\s*\n+\[?(ACCEPTED|PARTIALLY ACCEPTED|QUESTIONED|REJECTED)\]?\s*\n*([\s\S]*?)(?=\n##\s*FEEDBACK|$)/i);
+                            const overallVerdict = overallMatch?.[1] || "";
+                            const overallSummary = overallMatch?.[2]?.trim() || "";
+
+                            return (
+                              <div className="space-y-3">
+                                <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                                  <Sparkles className="w-3.5 h-3.5 text-primary" />
+                                  Scout's Evaluation
+                                </p>
+
+                                {/* Overall verdict card */}
+                                {overallVerdict && (
+                                  <div className="rounded-[var(--radius)] border border-border bg-card p-4 space-y-2">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Overall Verdict</span>
+                                      <Badge
+                                        variant="outline"
+                                        className={`text-xs px-2 py-0.5 ${
+                                          overallVerdict.includes("ACCEPTED") && !overallVerdict.includes("PARTIALLY")
+                                            ? "text-green-700 border-green-300 bg-green-50"
+                                            : overallVerdict.includes("PARTIALLY")
+                                            ? "text-amber-700 border-amber-300 bg-amber-50"
+                                            : overallVerdict.includes("QUESTIONED")
+                                            ? "text-blue-700 border-blue-300 bg-blue-50"
+                                            : "text-red-700 border-red-300 bg-red-50"
+                                        }`}
+                                      >
+                                        {overallVerdict}
+                                      </Badge>
+                                    </div>
+                                    {overallSummary && (
+                                      <p className="text-xs leading-relaxed text-muted-foreground">{overallSummary}</p>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Feedback evaluation table — rendered in a card */}
+                                {parsedChanges.length > 0 && (
+                                  <div className="rounded-[var(--radius)] border border-border bg-card overflow-hidden">
+                                    <div className="px-4 py-2.5 bg-muted/30 border-b border-border">
+                                      <span className="text-xs font-semibold text-foreground">Point-by-Point Evaluation</span>
+                                    </div>
+                                    <div className="divide-y divide-border">
+                                      {parsedChanges.map((change, i) => {
+                                        const isAccepted = change.verdict.toUpperCase().includes("ACCEPTED");
+                                        const isRejected = change.verdict.toUpperCase().includes("REJECTED");
+                                        return (
+                                          <div key={i} className="px-4 py-3 space-y-1">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                              <span className="text-xs font-semibold text-foreground">{change.feedbackPoint}</span>
+                                              <Badge
+                                                variant="outline"
+                                                className={`text-[10px] px-1.5 py-0 h-4 ${
+                                                  isAccepted
+                                                    ? "text-green-700 border-green-300 bg-green-50"
+                                                    : isRejected
+                                                    ? "text-red-700 border-red-300 bg-red-50"
+                                                    : "text-amber-700 border-amber-300 bg-amber-50"
+                                                }`}
+                                              >
+                                                {change.verdict}
+                                              </Badge>
+                                            </div>
+                                            <p className="text-xs leading-relaxed text-muted-foreground">{change.reasoning}</p>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Fallback: if we couldn't parse structured content, show raw markdown */}
+                                {parsedChanges.length === 0 && !overallVerdict && (
+                                  <div className="rounded-[var(--radius)] border border-border bg-card p-4 overflow-x-auto">
+                                    <div className="prose prose-sm max-w-none dark:prose-invert
+                                      prose-headings:font-semibold prose-headings:text-foreground prose-headings:text-sm prose-headings:mt-4 prose-headings:mb-2
+                                      prose-p:text-xs prose-p:leading-relaxed prose-p:my-2 prose-p:text-muted-foreground
+                                      prose-strong:text-foreground
+                                      prose-table:text-xs
+                                      prose-th:px-3 prose-th:py-2 prose-th:bg-muted/30 prose-th:text-left prose-th:font-semibold prose-th:border-b prose-th:border-border
+                                      prose-td:px-3 prose-td:py-2 prose-td:border-t prose-td:border-border/50 prose-td:text-muted-foreground prose-td:align-top
+                                    ">
+                                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                        {fb.claude_response}
+                                      </ReactMarkdown>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
-                            </div>
-                          )}
+                            );
+                          })()}
 
                           {/* Selectable changes — user overrides AI verdict */}
                           {fb.status === "reviewed" && parsedChanges.length > 0 && !fb.resulting_version_id && (

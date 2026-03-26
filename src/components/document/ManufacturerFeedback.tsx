@@ -416,6 +416,7 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
                         <span className="text-xs text-muted-foreground">—</span>
                       );
                     })()}
+                  </td>
                   <td className="py-2.5 px-4 max-w-[300px]">
                     <p className="text-xs text-muted-foreground line-clamp-2">
                       {v.change_summary?.replace('[USER OVERRIDE] ', '') || 'Initial formula brief'}

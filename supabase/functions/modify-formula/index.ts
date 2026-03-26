@@ -241,6 +241,8 @@ serve(async (req) => {
 
     // Fetch P12 compliance template + recommended flavors as locked reference
     let p12Reference = '';
+    let p12TemplateContent = '';
+    let recommendedFlavorsBlock = '';
     {
       const { data: briefRow } = await supabase
         .from('formula_briefs')
@@ -253,6 +255,7 @@ serve(async (req) => {
         const ing = briefRow.ingredients as Record<string, unknown>;
         const p12Content = ing.final_formula_brief || ing.adjusted_formula;
         if (typeof p12Content === 'string' && p12Content.trim()) {
+          p12TemplateContent = p12Content.trim();
           p12Reference += `\n\n=== P12 COMPLIANCE TEMPLATE (LOCKED FORMAT + FLAVOR SOURCE OF TRUTH) ===\nYou MUST preserve the same section order, heading hierarchy, table structure, and flavor/variant coverage as this template.\n---BEGIN P12 TEMPLATE---\n${p12Content}\n---END P12 TEMPLATE---\n`;
         }
 
@@ -261,12 +264,17 @@ serve(async (req) => {
           const flavorLines = flavorRecs.map((f: Record<string, unknown>, i: number) => {
             const name = String(f.flavor_name || 'Unknown').replace(/^\w/, (c: string) => c.toUpperCase());
             const confidence = f.confidence ?? 'N/A';
-            return `${i + 1}. ${name} (Confidence: ${confidence}%)`;
+            const evidence = f.evidence as Record<string, unknown> | undefined;
+            const presence = evidence?.competitor_presence ?? '';
+            return `${i + 1}. **${name}** — Confidence: ${confidence}%${presence ? `, Competitor presence: ${presence}` : ''}`;
           });
-          p12Reference += `\n=== MARKET-ANALYZED RECOMMENDED FLAVORS (MUST be included in output) ===\n${flavorLines.join('\n')}\n=== END RECOMMENDED FLAVORS ===\n`;
+          recommendedFlavorsBlock = flavorLines.join('\n');
+          p12Reference += `\n=== MARKET-ANALYZED RECOMMENDED FLAVORS (MUST be included in output) ===\n${recommendedFlavorsBlock}\n=== END RECOMMENDED FLAVORS ===\n`;
         }
       }
       console.log('P12 reference length:', p12Reference.length);
+      console.log('P12 template content length:', p12TemplateContent.length);
+      console.log('Recommended flavors block:', recommendedFlavorsBlock ? 'present' : 'none');
     }
 
     // Different system prompts based on mode

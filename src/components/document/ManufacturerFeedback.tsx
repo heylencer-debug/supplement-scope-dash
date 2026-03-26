@@ -594,29 +594,39 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
                           })()}
 
                           {fb.resulting_version_id && (
-                            <div className="flex items-center gap-2">
-                              <p className="text-xs text-green-700 flex-1">
-                                ✓ New formula version created
+                            <div className="rounded-[var(--radius)] border border-green-200 bg-green-50/50 p-3 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <CheckCircle className="w-4 h-4 text-green-600" />
+                                  <p className="text-sm font-medium text-green-800">
+                                    New formula version created
+                                  </p>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-xs gap-1.5"
+                                  disabled={downloadingVersion === fb.resulting_version_id}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDownloadVersion(fb.resulting_version_id!);
+                                  }}
+                                >
+                                  <Download className="w-3 h-3" />
+                                  {downloadingVersion === fb.resulting_version_id ? "Generating..." : "Download PDF"}
+                                </Button>
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                View the latest version in the <strong>Strategy Brief</strong> tab — it's automatically set as the active version.
                               </p>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-7 text-xs gap-1.5"
-                                disabled={downloadingVersion === fb.resulting_version_id}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDownloadVersion(fb.resulting_version_id!);
-                                }}
-                              >
-                                <Download className="w-3 h-3" />
-                                {downloadingVersion === fb.resulting_version_id ? "Generating..." : "Download PDF"}
-                              </Button>
                             </div>
                           )}
-                          <p className="text-xs text-gray-400">
-                            Submitted {new Date(fb.submitted_at).toLocaleDateString()}
-                            {fb.reviewed_at && ` · Reviewed ${new Date(fb.reviewed_at).toLocaleDateString()}`}
-                          </p>
+                          {fb.reviewed_at && (
+                            <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                              <Clock className="w-2.5 h-2.5" />
+                              Reviewed {format(new Date(fb.reviewed_at), "MMM d, yyyy · h:mm a")}
+                            </p>
+                          )}
                         </div>
                       )}
                     </div>

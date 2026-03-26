@@ -888,7 +888,7 @@ export default function Dashboard() {
         {/* TAB 5: QA Review (P9 Scout) */}
         <TabsContent value="qa" className="space-y-6 mt-4">
           {category?.id ? (
-            <FormulaQATab categoryId={category.id} categoryName={categoryName} />
+            <FormulaQATab categoryId={category.id} categoryName={categoryName} activeVersionInfo={activeVersion ? { versionNumber: activeVersion.version_number, changeSummary: activeVersion.change_summary } : null} />
           ) : (
             <div className="text-center py-12 text-muted-foreground">Select a category to run QA review.</div>
           )}
@@ -897,7 +897,7 @@ export default function Dashboard() {
         {/* TAB 6: Compliance — P11 Competitive Benchmarking + P12 FDA */}
         <TabsContent value="validation" className="space-y-6 mt-4">
           {category?.id ? (
-            <FormulaValidationTab categoryId={category.id} categoryName={categoryName} />
+            <FormulaValidationTab categoryId={category.id} categoryName={categoryName} activeVersionInfo={activeVersion ? { versionNumber: activeVersion.version_number, changeSummary: activeVersion.change_summary } : null} />
           ) : (
             <div className="text-center py-12 text-muted-foreground">Select a category to view compliance data.</div>
           )}

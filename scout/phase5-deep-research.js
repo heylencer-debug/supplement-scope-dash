@@ -52,7 +52,7 @@ async function callGrok(prompt) {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'grok-4-1-fast-non-reasoning',
+      model: 'grok-4.20-beta-0309-reasoning',
       max_tokens: 4000,
       messages: [{ role: 'user', content: prompt }],
     }),

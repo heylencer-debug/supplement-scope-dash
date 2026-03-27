@@ -45,7 +45,7 @@ async function callClaudeSonnet(prompt, maxTokens = 12000) {
   if (!key) throw new Error('OPENROUTER_API_KEY not set');
   const start = Date.now();
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 300000);
+  const timeout = setTimeout(() => controller.abort(), 600000);
   try {
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST', signal: controller.signal,
@@ -58,17 +58,34 @@ async function callClaudeSonnet(prompt, maxTokens = 12000) {
       body: JSON.stringify({
         model: 'anthropic/claude-sonnet-4.6',
         max_tokens: maxTokens,
+        stream: true,
         messages: [{ role: 'user', content: prompt }],
       }),
     });
-    const raw = await res.text();
-    let j;
-    try { j = JSON.parse(raw); } catch { throw new Error(`Bad JSON from OpenRouter: ${raw.slice(0, 200)}`); }
-    if (j.error) throw new Error(`Claude Sonnet error: ${j.error.message || JSON.stringify(j.error)}`);
-    if (j.usage) console.log(`  Tokens: ${j.usage.prompt_tokens}→${j.usage.completion_tokens}`);
-    const output = j.choices?.[0]?.message?.content || null;
-    console.log(`  ✅ Claude Sonnet done (${Math.round((Date.now()-start)/1000)}s, ${Math.round((output?.length||0)/1000)}k chars)`);
-    return output;
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Claude Sonnet error ${res.status}: ${errText.slice(0, 200)}`);
+    }
+    let output = '';
+    let promptTokens = 0, completionTokens = 0;
+    const text = await res.text();
+    for (const line of text.split('\n')) {
+      if (!line.startsWith('data: ')) continue;
+      const data = line.slice(6).trim();
+      if (data === '[DONE]') break;
+      try {
+        const j = JSON.parse(data);
+        if (j.error) throw new Error(`Claude Sonnet error: ${j.error.message || JSON.stringify(j.error)}`);
+        const delta = j.choices?.[0]?.delta?.content;
+        if (delta) output += delta;
+        if (j.usage) { promptTokens = j.usage.prompt_tokens || 0; completionTokens = j.usage.completion_tokens || 0; }
+      } catch (e) {
+        if (e.message.startsWith('Claude Sonnet error')) throw e;
+      }
+    }
+    if (promptTokens || completionTokens) console.log(`  Tokens: ${promptTokens}→${completionTokens}`);
+    console.log(`  ✅ Claude Sonnet done (${Math.round((Date.now()-start)/1000)}s, ${Math.round(output.length/1000)}k chars)`);
+    return output || null;
   } finally {
     clearTimeout(timeout);
   }
@@ -79,7 +96,7 @@ async function callClaudeOpus(prompt, maxTokens = 12000) {
   if (!key) throw new Error('OPENROUTER_API_KEY not set');
   const start = Date.now();
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 300000);
+  const timeout = setTimeout(() => controller.abort(), 600000);
   try {
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST', signal: controller.signal,
@@ -92,17 +109,34 @@ async function callClaudeOpus(prompt, maxTokens = 12000) {
       body: JSON.stringify({
         model: 'anthropic/claude-opus-4.6',
         max_tokens: maxTokens,
+        stream: true,
         messages: [{ role: 'user', content: prompt }],
       }),
     });
-    const raw = await res.text();
-    let j;
-    try { j = JSON.parse(raw); } catch { throw new Error(`Bad JSON from OpenRouter: ${raw.slice(0, 200)}`); }
-    if (j.error) throw new Error(`Claude Opus error: ${j.error.message || JSON.stringify(j.error)}`);
-    if (j.usage) console.log(`  Tokens: ${j.usage.prompt_tokens}→${j.usage.completion_tokens}`);
-    const output = j.choices?.[0]?.message?.content || null;
-    console.log(`  ✅ Claude Opus done (${Math.round((Date.now()-start)/1000)}s, ${Math.round((output?.length||0)/1000)}k chars)`);
-    return output;
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Claude Opus error ${res.status}: ${errText.slice(0, 200)}`);
+    }
+    let output = '';
+    let promptTokens = 0, completionTokens = 0;
+    const text = await res.text();
+    for (const line of text.split('\n')) {
+      if (!line.startsWith('data: ')) continue;
+      const data = line.slice(6).trim();
+      if (data === '[DONE]') break;
+      try {
+        const j = JSON.parse(data);
+        if (j.error) throw new Error(`Claude Opus error: ${j.error.message || JSON.stringify(j.error)}`);
+        const delta = j.choices?.[0]?.delta?.content;
+        if (delta) output += delta;
+        if (j.usage) { promptTokens = j.usage.prompt_tokens || 0; completionTokens = j.usage.completion_tokens || 0; }
+      } catch (e) {
+        if (e.message.startsWith('Claude Opus error')) throw e;
+      }
+    }
+    if (promptTokens || completionTokens) console.log(`  Tokens: ${promptTokens}→${completionTokens}`);
+    console.log(`  ✅ Claude Opus done (${Math.round((Date.now()-start)/1000)}s, ${Math.round(output.length/1000)}k chars)`);
+    return output || null;
   } finally {
     clearTimeout(timeout);
   }
@@ -297,7 +331,11 @@ Produce a validation report in this exact format:
 // ─── Parse overall score ───────────────────────────────────────────────────────
 
 function parseScore(draft) {
-  const m = draft?.match(/Overall formula competitiveness.*?(\d+(?:\.\d+)?)\s*\/\s*10/);
+  if (!draft) return null;
+  // Table row format: | Overall formula competitiveness | 7.5/10 | ...
+  const m = draft.match(/Overall formula competitiveness\s*\|?\s*(\d+(?:\.\d+)?)\s*\/\s*10/i)
+         || draft.match(/Overall.*?competitiveness.*?(\d+(?:\.\d+)?)\s*\/\s*10/i)
+         || draft.match(/competitiveness.*?score.*?(\d+(?:\.\d+)?)\s*\/\s*10/i);
   return m ? parseFloat(m[1]) : null;
 }
 
@@ -442,7 +480,7 @@ async function run() {
     const outDir = path.join(__dirname, 'output');
     if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
     const outPath = path.join(outDir, `${date}-${slug}-competitive-benchmarking.md`);
-    fs.writeFileSync(outPath, [grokDraft, '\n\n---\n\n', opusValidation].join(''));
+    fs.writeFileSync(outPath, [sonnetDraft, '\n\n---\n\n', opusValidation].join(''));
     console.log(`  ✅ Saved to ${outPath}`);
   }
 

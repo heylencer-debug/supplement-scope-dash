@@ -1268,7 +1268,7 @@ async function run() {
   const claudeBrief = claudeResult.status === "fulfilled" ? claudeResult.value : null;
 
   if (grokResult.status === "rejected")   console.error("  WARNING: Grok 4.2 failed:", grokResult.reason?.message);
-  if (claudeResult.status === "rejected") console.error("  WARNING: Claude Opus failed:", claudeResult.reason?.message);
+  if (claudeResult.status === "rejected") console.error("  WARNING: Claude Sonnet failed:", claudeResult.reason?.message);
   if (!grokBrief && !claudeBrief) throw new Error("Both AI models failed - no formula output");
 
   console.log("\nDual formulation complete:");
@@ -1291,7 +1291,7 @@ async function run() {
     console.log(grokBrief.substring(0, 400));
   }
   if (claudeBrief) {
-    console.log("\n=== CLAUDE OPUS 4.6 PREVIEW (first 400 chars) ===");
+    console.log("\n=== CLAUDE SONNET 4.6 PREVIEW (first 400 chars) ===");
     console.log(claudeBrief.substring(0, 400));
   }
   const total = (grokBrief?.length||0) + (claudeBrief?.length||0);

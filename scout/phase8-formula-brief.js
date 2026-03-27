@@ -689,14 +689,6 @@ ${p.other_ingredients || 'Not specified'}
 
   return `You are a senior supplement formulation specialist and CMO consultant creating a FORMULA SPECIFICATION to BEAT the #1 market leader for DOVIVE brand.
 
-⛔ HARD MANUFACTURING CONSTRAINT — GUMMY ACTIVE LOAD:
-Total actives per gummy MUST NOT exceed 350 mg. This is a physical limit — gummies above 350 mg/unit will not set properly at the CMO.
-- Count every active ingredient (mg/mcg converted to mg).
-- Divide total actives by number of gummies per serving.
-- If the sum exceeds 350 mg/gummy, REMOVE the lowest-priority actives until you are at or below 350 mg.
-- Do NOT include this constraint as a note — ENFORCE it before writing the final formula table.
-- Magnesium in any form is BANNED from gummy formulas above 50 mg/gummy due to hygroscopicity. If magnesium is needed, cap it at 50 mg or move it to a different dosage form.
-
 # DATA SOURCES FEEDING THIS BRIEF (ALL must be used):
 - P1: Amazon scrape — ${cs.total_products} products (titles, BSR, prices, bullets, claims)
 - P2: Keepa enrichment — revenue, monthly sales, BSR trends per product

@@ -235,13 +235,14 @@ For each competitor with OCR data:
 |---|---|---|---|---|
 
 ## FORMULA STRENGTH SCORE
+IMPORTANT: Every score below MUST be a number from 0.0 to 10.0. Do NOT write words like STRONG, WEAK, or MODERATE — write the number only (e.g. 7.5).
 | Dimension | Score (0-10) | Rationale |
 |---|---|---|
-| Dose superiority (vs market) | [X/10] | [one line, evidence-based] |
-| Ingredient uniqueness | [X/10] | [one line] |
-| Certifications & quality signals | [X/10] | [one line] |
-| Value proposition at target price | [X/10] | [one line] |
-| Overall formula competitiveness | [X/10] | [one line] |
+| Dose superiority (vs market) | [number/10] | [one line, evidence-based] |
+| Ingredient uniqueness | [number/10] | [one line] |
+| Certifications & quality signals | [number/10] | [one line] |
+| Value proposition at target price | [number/10] | [one line] |
+| Overall formula competitiveness | [number/10] | [one line] |
 
 ## DATA QUALITY FLAGS
 List every instance where you wrote NEEDS_VERIFICATION and why:
@@ -332,11 +333,21 @@ Produce a validation report in this exact format:
 
 function parseScore(draft) {
   if (!draft) return null;
-  // Table row format: | Overall formula competitiveness | 7.5/10 | ...
+  // 1. Numeric X/10 anywhere near "competitiveness"
   const m = draft.match(/Overall formula competitiveness\s*\|?\s*(\d+(?:\.\d+)?)\s*\/\s*10/i)
          || draft.match(/Overall.*?competitiveness.*?(\d+(?:\.\d+)?)\s*\/\s*10/i)
-         || draft.match(/competitiveness.*?score.*?(\d+(?:\.\d+)?)\s*\/\s*10/i);
-  return m ? parseFloat(m[1]) : null;
+         || draft.match(/competitiveness.*?(\d+(?:\.\d+)?)\s*\/\s*10/i)
+         || draft.match(/FORMULA STRENGTH SCORE[\s\S]{0,500}(\d+(?:\.\d+)?)\s*\/\s*10/i);
+  if (m) return parseFloat(m[1]);
+  // 2. Any X/10 in the doc as last resort
+  const any = draft.match(/(\d+(?:\.\d+)?)\s*\/\s*10/);
+  if (any) return parseFloat(any[1]);
+  // 3. Qualitative text → numeric fallback
+  if (/\bSTRONG\b/i.test(draft)) return 7.5;
+  if (/\bVERY STRONG\b/i.test(draft)) return 9.0;
+  if (/\bMODERATE\b/i.test(draft)) return 5.5;
+  if (/\bWEAK\b/i.test(draft)) return 3.0;
+  return null;
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────

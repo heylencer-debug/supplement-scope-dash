@@ -21,7 +21,8 @@ const DASH = createClient(
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp3a2l0a2Z1ZmlnbGRwbGRxdGJxIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MTA0NTY0NSwiZXhwIjoyMDc2NjIxNjQ1fQ.FjLFaMPE4VO5vVwFEAAvLiub3Xc1hhjsv9fd2jWFIAc'
 );
 
-const KEYWORD = process.argv[2] || 'ashwagandha gummies';
+const kwIdx = process.argv.indexOf('--keyword');
+const KEYWORD = kwIdx !== -1 ? process.argv[kwIdx + 1] : (process.argv[2] || 'ashwagandha gummies');
 
 // Dynamic category lookup — resolves keyword → DASH category_id
 async function lookupCategoryId(keyword) {

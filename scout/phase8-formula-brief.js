@@ -67,25 +67,50 @@ async function callClaudeSonnet(prompt) {
   const key = getOpenRouterKey();
   if (!key) throw new Error('OPENROUTER_API_KEY not found in sterling/.env');
   const start = Date.now();
-  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${key}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://dovive.com',
-      'X-Title': 'DOVIVE Scout',
-    },
-    body: JSON.stringify({
-      model: 'anthropic/claude-sonnet-4.6',
-      max_tokens: 16000,
-      messages: [{ role: 'user', content: prompt }],
-    }),
-  });
-  const j = await res.json();
-  if (j.error) throw new Error(`Claude Sonnet 4.6 error: ${j.error.message}`);
-  const output = j.choices?.[0]?.message?.content || null;
-  console.log(`  ✅ Claude Sonnet 4.6 done (${Math.round((Date.now()-start)/1000)}s, ${Math.round((output?.length||0)/1000)}k chars)`);
-  return output;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 600000); // 10 min hard timeout
+  try {
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        'Authorization': `Bearer ${key}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://dovive.com',
+        'X-Title': 'DOVIVE Scout P8 Formula',
+      },
+      body: JSON.stringify({
+        model: 'anthropic/claude-sonnet-4.6',
+        max_tokens: 16000,
+        stream: true,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Claude Sonnet 4.6 error ${res.status}: ${errText.slice(0, 200)}`);
+    }
+    let output = '';
+    const text = await res.text();
+    for (const line of text.split('\n')) {
+      if (!line.startsWith('data: ')) continue;
+      const data = line.slice(6).trim();
+      if (data === '[DONE]') break;
+      try {
+        const j = JSON.parse(data);
+        if (j.error) throw new Error(`Claude Sonnet 4.6 error: ${j.error.message || JSON.stringify(j.error)}`);
+        const delta = j.choices?.[0]?.delta?.content;
+        if (delta) output += delta;
+      } catch (e) {
+        if (e.message.startsWith('Claude Sonnet 4.6 error')) throw e;
+      }
+    }
+    if (!output) throw new Error('Claude Sonnet 4.6 returned empty response');
+    console.log(`  ✅ Claude Sonnet 4.6 done (${Math.round((Date.now()-start)/1000)}s, ${Math.round(output.length/1000)}k chars)`);
+    return output;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 // ─── P5 Deep Research Fetch ───────────────────────────────────────────────────
 async function fetchP5DeepResearch(keyword) {
@@ -663,6 +688,14 @@ ${p.other_ingredients || 'Not specified'}
   ).join('\n') || 'Claims data not available';
 
   return `You are a senior supplement formulation specialist and CMO consultant creating a FORMULA SPECIFICATION to BEAT the #1 market leader for DOVIVE brand.
+
+⛔ HARD MANUFACTURING CONSTRAINT — GUMMY ACTIVE LOAD:
+Total actives per gummy MUST NOT exceed 350 mg. This is a physical limit — gummies above 350 mg/unit will not set properly at the CMO.
+- Count every active ingredient (mg/mcg converted to mg).
+- Divide total actives by number of gummies per serving.
+- If the sum exceeds 350 mg/gummy, REMOVE the lowest-priority actives until you are at or below 350 mg.
+- Do NOT include this constraint as a note — ENFORCE it before writing the final formula table.
+- Magnesium in any form is BANNED from gummy formulas above 50 mg/gummy due to hygroscopicity. If magnesium is needed, cap it at 50 mg or move it to a different dosage form.
 
 # DATA SOURCES FEEDING THIS BRIEF (ALL must be used):
 - P1: Amazon scrape — ${cs.total_products} products (titles, BSR, prices, bullets, claims)

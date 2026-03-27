@@ -464,9 +464,17 @@ function parseCompetitorNotes(qaReport) {
 // â"€â"€â"€ Parse QA verdict â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 function parseQAVerdict(qaReport) {
-  const verdictMatch = qaReport.match(/\*\*Overall:\*\*\s*(.+)/);
-  const scoreMatch = qaReport.match(/\*\*QA Score:\*\*\s*(\d+(?:\.\d+)?)/);
-  const summaryMatch = qaReport.match(/\*\*Summary:\*\*\s*(.+)/);
+  if (!qaReport) return { verdict: 'UNKNOWN', score: null, summary: '' };
+  // Verdict — try bold format first, then plain
+  const verdictMatch = qaReport.match(/\*\*Overall:\*\*\s*(.+)/)
+                    || qaReport.match(/Overall:\s*(APPROVED[^.\n]*|NEEDS MAJOR REVISION[^.\n]*)/i)
+                    || qaReport.match(/(APPROVED WITH ADJUSTMENTS|APPROVED|NEEDS MAJOR REVISION)/i);
+  // Score — try bold QA Score, then any X/10 near score/verdict section
+  const scoreMatch = qaReport.match(/\*\*QA Score:\*\*\s*(\d+(?:\.\d+)?)/)
+                  || qaReport.match(/QA Score:\s*(\d+(?:\.\d+)?)/)
+                  || qaReport.match(/Score:\s*(\d+(?:\.\d+)?)\/10/i);
+  const summaryMatch = qaReport.match(/\*\*Summary:\*\*\s*(.+)/)
+                    || qaReport.match(/Summary:\s*(.+)/);
   return {
     verdict: verdictMatch?.[1]?.trim() || 'UNKNOWN',
     score: scoreMatch?.[1] ? parseFloat(scoreMatch[1]) : null,

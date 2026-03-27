@@ -283,21 +283,31 @@ function extractIngredientNames(formulaText) {
   if (!formulaText) return [];
   const names = new Set();
 
-  // Match markdown table rows: | Ingredient | Amount | ...
-  const tableRows = formulaText.matchAll(/^\|\s*([^|]+?)\s*\|\s*[\d,\.]+\s*(?:mcg|mg|g|IU|%|billion)/gm);
+  // 1. Markdown table rows (with or without leading spaces/pipes)
+  // Handles: | KSM-66® Ashwagandha | 600 mg | ... |
+  const tableRows = formulaText.matchAll(/\|\s*([^|]{3,60}?)\s*\|\s*[\d,\.]+\s*(?:mcg|mg|g|IU|%|billion)/gi);
   for (const row of tableRows) {
-    const name = row[1].trim().replace(/[*_`]/g, '');
-    if (name && name.length > 2 && !name.match(/^[-=]+$/)) names.add(name);
+    const name = row[1].trim().replace(/[*_`]/g, '').replace(/\s+/g, ' ');
+    if (name && name.length > 2 && !name.match(/^[-=:]+$/) && !/ingredient|amount|standardization|function|evidence/i.test(name)) {
+      names.add(name);
+    }
   }
 
-  // Also match "Ingredient: Xmg" patterns
-  const inlineMatches = formulaText.matchAll(/([A-Za-z][A-Za-z\s\-']+?):\s*[\d,\.]+\s*(?:mcg|mg|g|IU)/g);
+  // 2. Bold or plain "Name: Xmg" inline patterns
+  const inlineMatches = formulaText.matchAll(/\*{0,2}([A-Za-z][A-Za-z0-9®\s\-'(),]{2,60}?)\*{0,2}:\s*[\d,\.]+\s*(?:mcg|mg|g|IU)/g);
   for (const m of inlineMatches) {
     const name = m[1].trim();
     if (name.length > 2) names.add(name);
   }
 
-  return [...names].slice(0, 20); // Cap at 20 to avoid excessive NIH fetches
+  // 3. Fallback: any capitalized phrase before a dosage
+  const doseMatches = formulaText.matchAll(/([A-Z][A-Za-z0-9®\s\-'()]{3,50}?)\s+[\d,\.]+\s*(?:mg|mcg|IU)/g);
+  for (const m of doseMatches) {
+    const name = m[1].trim();
+    if (name.length > 3 && !/serving|total|per|dose|gummy|tablet|capsule/i.test(name)) names.add(name);
+  }
+
+  return [...names].slice(0, 20);
 }
 
 // ─── Build Claude Opus Primary Prompt ─────────────────────────────────────────

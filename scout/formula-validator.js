@@ -30,22 +30,56 @@ const GUMMY_CONSTRAINTS = {
   ],
 };
 
+// Known excipient/inactive ingredient names — never count these as actives
+const EXCIPIENT_NAMES = new Set([
+  'tapioca syrup', 'tapioca starch', 'corn syrup', 'glucose syrup',
+  'pectin', 'gelatin', 'agar', 'carrageenan',
+  'citric acid', 'malic acid', 'tartaric acid', 'fumaric acid',
+  'sodium citrate', 'potassium citrate',
+  'sugar', 'sucrose', 'fructose', 'glucose', 'dextrose', 'maltodextrin',
+  'sorbitol', 'xylitol', 'erythritol', 'stevia', 'monk fruit',
+  'water', 'purified water',
+  'natural flavor', 'natural flavors', 'artificial flavor',
+  'carnauba wax', 'beeswax',
+  'titanium dioxide', 'silicon dioxide', 'silica',
+  'magnesium stearate', 'stearic acid',
+  'vegetable oil', 'sunflower oil', 'coconut oil',
+  'color', 'colorant', 'fd&c',
+  'sodium benzoate', 'potassium sorbate', 'ascorbic acid', // as preservative
+]);
+
 /**
- * Parse ingredient rows from a formula text block
+ * Parse ingredient rows from a formula text block — ACTIVES ONLY.
+ * Stops at FUNCTIONAL EXCIPIENTS / OTHER INGREDIENTS section.
  * Handles markdown table format: | Ingredient | Amount | ...
  */
 function parseFormulaTable(formulaText) {
   if (!formulaText) return [];
   const ingredients = [];
   const lines = formulaText.split('\n');
+  let inExcipientSection = false;
+
   for (const line of lines) {
+    // Stop counting once we hit the excipients/other ingredients section
+    if (/FUNCTIONAL EXCIPIENT|OTHER INGREDIENT|EXCIPIENT SYSTEM|INACTIVE INGREDIENT/i.test(line)) {
+      inExcipientSection = true;
+    }
+    // Resume for a new actives section (e.g. TERTIARY ACTIVES after SECONDARY)
+    if (/PRIMARY ACTIVE|SECONDARY ACTIVE|TERTIARY ACTIVE/i.test(line)) {
+      inExcipientSection = false;
+    }
+    if (inExcipientSection) continue;
+
     if (!line.trim().startsWith('|')) continue;
     const cells = line.split('|').map(c => c.trim()).filter(Boolean);
     if (cells.length < 2) continue;
     const name = cells[0].replace(/\*+/g, '').toLowerCase().trim();
     const amountStr = cells[1].replace(/\*+/g, '').trim();
-    // Skip header rows
-    if (name === 'ingredient' || name === '---' || name.includes('---')) continue;
+    // Skip header rows and separators
+    if (name === 'ingredient' || name === '---' || name.includes('---') || name === 'form/standardization') continue;
+    // Skip known excipients
+    if (EXCIPIENT_NAMES.has(name)) continue;
+    if (/flavor|sweetener|color|preservative|coating|base|matrix/i.test(name)) continue;
     // Parse mg amount
     const mgMatch = amountStr.match(/(\d+(?:\.\d+)?)\s*mg/i);
     const mcgMatch = amountStr.match(/(\d+(?:\.\d+)?)\s*mcg/i);

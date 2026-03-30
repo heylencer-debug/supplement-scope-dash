@@ -30,8 +30,8 @@ interface UnifiedVersion {
   is_active: boolean;
   formula_brief_content: string;
   change_summary: string | null;
-  source: "p12" | "living";
-  // P12 metadata
+  source: "version" | "pipeline";
+  // Extra display metadata
   form_type?: string | null;
   target_price?: number | null;
   cogs_target?: number | null;
@@ -41,6 +41,9 @@ interface UnifiedVersion {
   fda_score?: string | null;
   fda_status?: string | null;
   competitive_score?: string | null;
+  // Pipeline-specific
+  emoji?: string;
+  subtitle?: string;
 }
 
 interface MfrComment {
@@ -70,40 +73,6 @@ function verdictColor(verdict: string): string {
   if (/ADJUSTMENTS/i.test(verdict)) return "bg-yellow-100 text-yellow-800 border-yellow-200";
   if (/NON-COMPLIANT|REVISION|MAJOR/i.test(verdict)) return "bg-red-100 text-red-800 border-red-200";
   return "bg-gray-100 text-gray-600 border-gray-200";
-}
-
-/** Extract P12 metadata from formula_briefs.ingredients JSON */
-function extractP12Metadata(ingredients: Record<string, unknown>) {
-  const qaReport = (ingredients?.qa_report as string) ?? "";
-  let qaVerdict = "";
-  if (qaReport) {
-    const m = qaReport.match(/\*\*Overall:\*\*\s*(.+)/)
-      || qaReport.match(/Overall:\s*(APPROVED[^.\n]*|NEEDS MAJOR REVISION[^.\n]*)/i)
-      || qaReport.match(/(APPROVED WITH ADJUSTMENTS|APPROVED|NEEDS MAJOR REVISION)/i);
-    qaVerdict = m?.[1]?.trim() ?? "";
-  }
-
-  let qaScore: string | null = null;
-  if (qaReport) {
-    const m = qaReport.match(/\*\*QA Score:\*\*\s*([\d.]+)/) || qaReport.match(/QA Score:\s*([\d.]+)/);
-    qaScore = m?.[1] ?? null;
-  }
-
-  const fda = (ingredients?.fda_compliance as Record<string, unknown>) ?? {};
-  const fdaScore = fda.compliance_score != null ? String(fda.compliance_score) : null;
-  const fdaStatus = (fda.compliance_status as string) ?? "";
-
-  let competitiveScore: string | null = null;
-  const rawBench = ingredients?.competitive_benchmarking;
-  if (rawBench) {
-    const report = typeof rawBench === "string" ? rawBench : JSON.stringify(rawBench);
-    const m = report.match(/Overall.*?competitiveness.*?([\d.]+)\s*\/\s*10/i)
-      || report.match(/competitiveness.*?([\d.]+)\s*\/\s*10/i)
-      || report.match(/([\d.]+)\s*\/\s*10/);
-    competitiveScore = m?.[1] ?? null;
-  }
-
-  return { qa_verdict: qaVerdict || null, qa_score: qaScore, fda_score: fdaScore, fda_status: fdaStatus, competitive_score: competitiveScore };
 }
 
 function ScoreChip({ label, value, max }: { label: string; value: string | null; max: number }) {
@@ -166,77 +135,129 @@ export default function ManufacturerPortalInternal() {
       });
   }, []);
 
-  // Load versions: P12 base from formula_briefs + living versions from formula_brief_versions
+  // Load versions — same data sources as Dashboard Manufacturer tab
   useEffect(() => {
     if (!selectedCat) return;
     setActiveItem(null);
     setActiveTab("overview");
 
-    const briefsQ = supabase
-      .from("formula_briefs")
-      .select("id, category_id, created_at, updated_at, ingredients, form_type, target_price, cogs_target, positioning")
-      .eq("category_id", selectedCat.id)
-      .order("created_at", { ascending: true })
-      .limit(1);
-
-    const liveQ = supabase
+    const versionsQ = supabase
       .from("formula_brief_versions")
-      .select("id, category_id, created_at, version_number, is_active, formula_brief_content, change_summary")
+      .select("*")
       .eq("category_id", selectedCat.id)
       .order("version_number", { ascending: true });
 
-    Promise.all([briefsQ, liveQ]).then(([{ data: briefs }, { data: live }]) => {
+    const briefsQ = supabase
+      .from("formula_briefs")
+      .select("ingredients, created_at")
+      .eq("category_id", selectedCat.id)
+      .limit(1)
+      .maybeSingle();
+
+    Promise.all([versionsQ, briefsQ]).then(([{ data: liveVersions }, { data: briefData }]) => {
       const all: UnifiedVersion[] = [];
 
-      // P12 base version from formula_briefs
-      if (briefs?.length) {
-        const b = briefs[0] as any;
-        const ingredients = (b.ingredients ?? {}) as Record<string, unknown>;
-        const p12Meta = extractP12Metadata(ingredients);
-        // Use the full P12 document (final_formula_brief), fallback to adjusted_formula
-        const formulaContent = (ingredients.final_formula_brief ?? ingredients.adjusted_formula ?? "") as string;
-        const changeSummary = `Dual AI formula brief — ${[
-          ingredients.formula_brief_model_grok && `Grok`,
-          ingredients.formula_brief_model_claude && `Claude Sonnet`,
-        ].filter(Boolean).join(" + ") || "AI Generated"}`;
-
-        all.push({
-          id: b.id,
-          label: "v1",
-          category_id: b.category_id,
-          created_at: b.created_at,
-          version_number: 0,
-          is_active: !live?.some((v: any) => v.is_active),
-          formula_brief_content: formulaContent,
-          change_summary: changeSummary,
-          source: "p12",
-          form_type: b.form_type,
-          target_price: b.target_price,
-          cogs_target: b.cogs_target,
-          positioning: b.positioning,
-          ...p12Meta,
-        });
-      }
-
-      // Living versions from formula_brief_versions
-      if (live?.length) {
-        for (const v of live as any[]) {
+      // Living versions from formula_brief_versions (same as Dashboard tab)
+      if (liveVersions?.length) {
+        for (const v of liveVersions as any[]) {
           all.push({
             id: v.id,
-            label: `v${(briefs?.length ? 1 : 0) + v.version_number}`,
+            label: `v${v.version_number}`,
             category_id: v.category_id,
             created_at: v.created_at,
             version_number: v.version_number,
             is_active: v.is_active,
             formula_brief_content: v.formula_brief_content,
             change_summary: v.change_summary,
-            source: "living",
+            source: "version",
+          });
+        }
+      }
+
+      // Pipeline briefs from formula_briefs.ingredients (same as Dashboard tab)
+      if (briefData) {
+        const ing = briefData.ingredients as any;
+        if (ing?.ai_generated_brief_grok) {
+          all.push({
+            id: "grok",
+            label: "Formula A — Grok",
+            category_id: selectedCat.id,
+            created_at: briefData.created_at ?? "",
+            version_number: -1,
+            is_active: false,
+            formula_brief_content: ing.ai_generated_brief_grok,
+            change_summary: "Deep scientific reasoning",
+            source: "pipeline",
+            emoji: "🤖",
+            subtitle: "Deep scientific reasoning",
+          });
+        }
+        if (ing?.ai_generated_brief_claude) {
+          all.push({
+            id: "claude",
+            label: "Formula B — Sonnet",
+            category_id: selectedCat.id,
+            created_at: briefData.created_at ?? "",
+            version_number: -1,
+            is_active: false,
+            formula_brief_content: ing.ai_generated_brief_claude,
+            change_summary: "1M context synthesis",
+            source: "pipeline",
+            emoji: "🧠",
+            subtitle: "1M context synthesis",
+          });
+        } else if (ing?.ai_generated_brief) {
+          all.push({
+            id: "legacy",
+            label: "AI Generated Brief",
+            category_id: selectedCat.id,
+            created_at: briefData.created_at ?? "",
+            version_number: -1,
+            is_active: false,
+            formula_brief_content: ing.ai_generated_brief,
+            change_summary: "Initial AI brief",
+            source: "pipeline",
+            emoji: "🧠",
+            subtitle: "Initial AI brief",
+          });
+        }
+        const complianceContent = ing?.final_formula_brief || ing?.adjusted_formula;
+        if (complianceContent) {
+          all.push({
+            id: "compliance",
+            label: "⚖️ Compliance",
+            category_id: selectedCat.id,
+            created_at: briefData.created_at ?? "",
+            version_number: -1,
+            is_active: false,
+            formula_brief_content: complianceContent,
+            change_summary: "Initial formula brief from market analysis pipeline",
+            source: "pipeline",
+            emoji: "⚖️",
+            subtitle: "Initial formula brief from market analysis pipeline",
+          });
+        }
+        if (ing?.final_formula_brief) {
+          all.push({
+            id: "qa-final",
+            label: "✅ QA Approved Final",
+            category_id: selectedCat.id,
+            created_at: briefData.created_at ?? "",
+            version_number: -1,
+            is_active: false,
+            formula_brief_content: ing.final_formula_brief,
+            change_summary: `${ing?.qa_verdict?.verdict || 'Reviewed'} · Score: ${ing?.qa_verdict?.score || '—'}/10`,
+            source: "pipeline",
+            emoji: "✅",
+            subtitle: `${ing?.qa_verdict?.verdict || 'Reviewed'} · Score: ${ing?.qa_verdict?.score || '—'}/10`,
           });
         }
       }
 
       setVersions(all);
-      if (all.length) setActiveItem(all[all.length - 1]); // default to latest
+      // Default to first version (or first pipeline brief)
+      const firstVersion = all.find(v => v.source === "version") ?? all[0];
+      if (firstVersion) setActiveItem(firstVersion);
     });
   }, [selectedCat]);
 
@@ -400,7 +421,8 @@ export default function ManufacturerPortalInternal() {
                   <CardContent className="p-3 space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
-                        {item.source === "living" && <GitBranch className="w-3 h-3 text-purple-500" />}
+                        {item.source === "version" && <GitBranch className="w-3 h-3 text-purple-500" />}
+                        {item.source === "pipeline" && item.emoji && <span className="text-xs">{item.emoji}</span>}
                         <span className="text-sm font-bold text-gray-800">{item.label}</span>
                         {item.is_active && (
                           <span className="text-[9px] px-1.5 py-0 bg-purple-100 text-purple-700 rounded-full font-semibold">active</span>
@@ -488,7 +510,7 @@ export default function ManufacturerPortalInternal() {
                 <span className="text-xs text-gray-400">{activeItem.label}</span>
                 {activeItem.is_active && (
                   <span className="text-[10px] px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full">
-                    {activeItem.source === "p12" ? "P12 Base" : "Active"}
+                    {activeItem.source === "pipeline" ? "Pipeline Source" : "Active"}
                   </span>
                 )}
               </div>
@@ -501,7 +523,7 @@ export default function ManufacturerPortalInternal() {
                 {activeTab === "overview" && (
                   <div className="max-w-xl space-y-3">
                     <MetaRow label="Version" value={activeItem.label} />
-                    <MetaRow label="Source" value={activeItem.source === "p12" ? "P12 Formula (FDA Compliance)" : "Living Version"} />
+                    <MetaRow label="Source" value={activeItem.source === "pipeline" ? `Pipeline: ${activeItem.label}` : `Version ${activeItem.label}`} />
                     <MetaRow label="Created" value={formatDate(activeItem.created_at)} />
                     {activeItem.change_summary && (
                       <MetaRow label="Summary" value={activeItem.change_summary} />
@@ -524,7 +546,7 @@ export default function ManufacturerPortalInternal() {
                   <div className="space-y-6 max-w-3xl">
                     <div>
                       <h3 className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">
-                        {activeItem.source === "p12" ? "P12 Formula Brief" : `Version ${activeItem.label}`}
+                        {activeItem.source === "pipeline" ? activeItem.label : `Version ${activeItem.label}`}
                         {activeItem.change_summary ? ` — ${activeItem.change_summary}` : ""}
                       </h3>
                       <SectionText text={activeItem.formula_brief_content} fallback="No formula content available." />

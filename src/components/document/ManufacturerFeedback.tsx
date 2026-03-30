@@ -197,7 +197,25 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
     },
   });
 
-  const viewingVersion = viewingVersionId ? allVersions.find(v => v.id === viewingVersionId) : null;
+  const deleteVersionMutation = useMutation({
+    mutationFn: async (versionId: string) => {
+      const { error } = await supabase
+        .from("formula_brief_versions")
+        .delete()
+        .eq("id", versionId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["formula_brief_versions"] });
+      queryClient.invalidateQueries({ queryKey: ["formula_brief_active_version"] });
+      queryClient.invalidateQueries({ queryKey: ["formulaBrief"] });
+      toast({ title: "Version deleted", description: "The formula version has been removed." });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete", description: "Could not delete version.", variant: "destructive" });
+    },
+  });
+
   const handleDownloadVersion = useCallback(async (versionId: string) => {
     setDownloadingVersion(versionId);
     try {

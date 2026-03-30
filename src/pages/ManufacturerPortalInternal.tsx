@@ -178,17 +178,18 @@ export default function ManufacturerPortalInternal() {
       return;
     }
     setGeneratingLink(true);
-    const { data, error } = await supabase
+    const token = crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
+    const { error } = await supabase
       .from("manufacturer_sessions")
-      .insert({ manufacturer_name: mfrName.trim() })
-      .select("token")
-      .single();
+      .insert({ token, manufacturer_name: mfrName.trim(), expires_at: expiresAt });
     setGeneratingLink(false);
-    if (error || !data) {
-      toast({ title: "Failed to generate link", variant: "destructive" });
+    if (error) {
+      console.error("Generate link error:", error);
+      toast({ title: "Failed to generate link", description: error.message, variant: "destructive" });
       return;
     }
-    const url = `${window.location.origin}/mfr/${data.token}`;
+    const url = `${window.location.origin}/mfr/${token}`;
     navigator.clipboard.writeText(url).then(() => {
       toast({ title: "Link copied to clipboard!", description: url });
       setMfrName("");

@@ -72,6 +72,26 @@ function parseManufacturerReply(response: string | null): string {
   return match?.[1]?.trim() || "";
 }
 
+function getPromotedPipelineId(changeSummary: string | null | undefined): string | null {
+  if (!changeSummary) return null;
+
+  const taggedMatch = changeSummary.match(/\[pipeline:([^\]]+)\]/i);
+  if (taggedMatch?.[1]) {
+    return taggedMatch[1].trim().toLowerCase();
+  }
+
+  const normalized = changeSummary.toLowerCase();
+  if (!normalized.includes("set as active from")) return null;
+
+  if (normalized.includes("grok") || normalized.includes("formula a")) return "grok";
+  if (normalized.includes("sonnet") || normalized.includes("claude") || normalized.includes("formula b")) return "claude";
+  if (normalized.includes("qa approved final") || normalized.includes("qa final")) return "qa-final";
+  if (normalized.includes("ai generated brief") || normalized.includes("legacy")) return "legacy";
+  if (normalized.includes("compliance")) return "compliance";
+
+  return null;
+}
+
 export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = false }: ManufacturerFeedbackProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -237,6 +257,38 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
   });
 
   const viewingVersion = viewingVersionId ? allVersions.find(v => v.id === viewingVersionId) : null;
+
+  const promotedPipelineVersions = useMemo(() => {
+    const latestByPipeline = new Map<string, (typeof allVersions)[number]>();
+
+    allVersions.forEach((version) => {
+      const pipelineId = getPromotedPipelineId(version.change_summary);
+      if (!pipelineId) return;
+
+      const existing = latestByPipeline.get(pipelineId);
+      if (!existing || version.is_active || version.version_number > existing.version_number) {
+        latestByPipeline.set(pipelineId, version);
+      }
+    });
+
+    return latestByPipeline;
+  }, [allVersions]);
+
+  const visibleVersions = useMemo(
+    () => allVersions.filter((version) => !getPromotedPipelineId(version.change_summary)),
+    [allVersions]
+  );
+
+  const visiblePipelineBriefs = useMemo(
+    () => (pipelineBriefs ?? []).map((brief) => {
+      const promotedVersion = promotedPipelineVersions.get(brief.id) ?? null;
+      return {
+        ...brief,
+        is_active: promotedVersion?.is_active ?? false,
+      };
+    }),
+    [pipelineBriefs, promotedPipelineVersions]
+  );
 
   const handleDownloadVersion = useCallback(async (versionId: string) => {
     setDownloadingVersion(versionId);
@@ -430,7 +482,7 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
             <div>
               <p className="text-sm font-semibold text-foreground">Formula Brief Versions</p>
               <p className="text-xs text-muted-foreground">
-                {allVersions.length + (pipelineBriefs?.length || 0)} version{allVersions.length + (pipelineBriefs?.length || 0) !== 1 ? 's' : ''} · Active version is used for all analyses
+                {visibleVersions.length + visiblePipelineBriefs.length} version{visibleVersions.length + visiblePipelineBriefs.length !== 1 ? 's' : ''} · Active version is used for all analyses
               </p>
             </div>
           </div>
@@ -448,7 +500,7 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
               </tr>
             </thead>
             <tbody className="divide-y divide-border/50">
-              {allVersions.map(v => (
+              {visibleVersions.map(v => (
                 <tr key={v.id} className={`hover:bg-muted/30 transition-colors ${v.is_active ? 'bg-primary/5' : ''}`}>
                   <td className="py-2.5 px-4">
                     <div className="flex items-center gap-2">
@@ -540,11 +592,15 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
                   </td>
                 </tr>
               ))}
-              {/* Pipeline briefs: Grok, Sonnet, QA */}
-              {pipelineBriefs?.map(pb => (
-                <tr key={pb.id} className="hover:bg-muted/30 transition-colors bg-muted/5">
+              {visiblePipelineBriefs.map(pb => (
+                <tr key={pb.id} className={`hover:bg-muted/30 transition-colors ${pb.is_active ? 'bg-primary/5' : 'bg-muted/5'}`}>
                   <td className="py-2.5 px-4">
-                    <span className="font-medium text-foreground">{pb.emoji}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-foreground">{pb.emoji}</span>
+                      {pb.is_active && (
+                        <Badge variant="default" className="text-[10px] h-5">Active</Badge>
+                      )}
+                    </div>
                   </td>
                   <td className="py-2.5 px-4">
                     <Badge variant="outline" className="text-[10px]">{pb.label}</Badge>
@@ -578,13 +634,13 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
                     <div className="flex items-center gap-1.5 justify-end">
                       <Button
                         size="sm"
-                        variant="outline"
-                        className="h-7 text-xs gap-1 border-primary/30 text-primary hover:bg-primary/10"
-                        disabled={setActiveMutation.isPending}
+                        variant={pb.is_active ? "default" : "outline"}
+                        className={`h-7 text-xs gap-1 ${pb.is_active ? '' : 'border-primary/30 text-primary hover:bg-primary/10'}`}
+                        disabled={pb.is_active || setActiveMutation.isPending}
                         onClick={() => setActiveMutation.mutate({ pipelineBrief: { id: pb.id, label: pb.label, content: pb.content } })}
                       >
-                        <Star className="w-3 h-3" />
-                        Set Active
+                        <Star className={`w-3 h-3 ${pb.is_active ? 'fill-current' : ''}`} />
+                        {pb.is_active ? "Active" : "Set Active"}
                       </Button>
                       <Button
                         size="sm"
@@ -599,7 +655,7 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
                   </td>
                 </tr>
               ))}
-              {allVersions.length === 0 && !pipelineBriefs?.length && (
+              {visibleVersions.length === 0 && !visiblePipelineBriefs.length && (
                 <tr>
                   <td colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
                     No formula versions yet. Submit manufacturer feedback to generate versions.

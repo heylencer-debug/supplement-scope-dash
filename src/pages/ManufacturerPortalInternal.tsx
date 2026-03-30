@@ -200,7 +200,7 @@ export default function ManufacturerPortalInternal() {
     supabase
       .from("categories")
       .select("id, name, total_products")
-      .order("created_at", { ascending: false })
+      .order("updated_at", { ascending: false })
       .limit(20)
       .then(({ data }) => {
         if (data?.length) {

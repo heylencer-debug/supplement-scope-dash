@@ -208,8 +208,7 @@ export default function ManufacturerPortal() {
       return;
     }
     (async () => {
-      const { data } = await supabase
-        .from("manufacturer_sessions")
+      const { data } = await (supabase.from as any)("manufacturer_sessions")
         .select("id,token,manufacturer_name,expires_at")
         .eq("token", token)
         .single();

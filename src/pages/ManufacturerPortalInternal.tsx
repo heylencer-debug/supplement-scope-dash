@@ -75,40 +75,6 @@ function verdictColor(verdict: string): string {
   return "bg-gray-100 text-gray-600 border-gray-200";
 }
 
-/** Extract P12 metadata from formula_briefs.ingredients JSON */
-function extractP12Metadata(ingredients: Record<string, unknown>) {
-  const qaReport = (ingredients?.qa_report as string) ?? "";
-  let qaVerdict = "";
-  if (qaReport) {
-    const m = qaReport.match(/\*\*Overall:\*\*\s*(.+)/)
-      || qaReport.match(/Overall:\s*(APPROVED[^.\n]*|NEEDS MAJOR REVISION[^.\n]*)/i)
-      || qaReport.match(/(APPROVED WITH ADJUSTMENTS|APPROVED|NEEDS MAJOR REVISION)/i);
-    qaVerdict = m?.[1]?.trim() ?? "";
-  }
-
-  let qaScore: string | null = null;
-  if (qaReport) {
-    const m = qaReport.match(/\*\*QA Score:\*\*\s*([\d.]+)/) || qaReport.match(/QA Score:\s*([\d.]+)/);
-    qaScore = m?.[1] ?? null;
-  }
-
-  const fda = (ingredients?.fda_compliance as Record<string, unknown>) ?? {};
-  const fdaScore = fda.compliance_score != null ? String(fda.compliance_score) : null;
-  const fdaStatus = (fda.compliance_status as string) ?? "";
-
-  let competitiveScore: string | null = null;
-  const rawBench = ingredients?.competitive_benchmarking;
-  if (rawBench) {
-    const report = typeof rawBench === "string" ? rawBench : JSON.stringify(rawBench);
-    const m = report.match(/Overall.*?competitiveness.*?([\d.]+)\s*\/\s*10/i)
-      || report.match(/competitiveness.*?([\d.]+)\s*\/\s*10/i)
-      || report.match(/([\d.]+)\s*\/\s*10/);
-    competitiveScore = m?.[1] ?? null;
-  }
-
-  return { qa_verdict: qaVerdict || null, qa_score: qaScore, fda_score: fdaScore, fda_status: fdaStatus, competitive_score: competitiveScore };
-}
-
 function ScoreChip({ label, value, max }: { label: string; value: string | null; max: number }) {
   if (!value) return null;
   const pct = Math.min(100, (parseFloat(value) / max) * 100);

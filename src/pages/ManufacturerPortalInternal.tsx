@@ -122,7 +122,10 @@ function getFDAAnalysis(brief: FormulaBrief): string {
 }
 
 function getCompetitiveReport(brief: FormulaBrief): string {
-  return (ing(brief)?.competitive_benchmarking as string) ?? "";
+  const raw = ing(brief)?.competitive_benchmarking;
+  if (!raw) return "";
+  if (typeof raw === "string") return raw;
+  try { return JSON.stringify(raw); } catch { return ""; }
 }
 
 function getCompetitiveScore(brief: FormulaBrief): string | null {

@@ -236,7 +236,7 @@ export default function ManufacturerPortalInternal() {
       .order("version_number", { ascending: true });
 
     Promise.all([briefsQ, liveQ]).then(([{ data: briefs }, { data: live }]) => {
-      const pipelineItems: VersionItem[] = ((briefs ?? []) as FormulaBrief[]).map((b, i) => ({
+      const pipelineItems: VersionItem[] = ((briefs ?? []) as unknown as FormulaBrief[]).map((b, i) => ({
         kind: "pipeline",
         brief: b,
         label: `v${i + 1}`,

@@ -21,36 +21,7 @@ interface Category {
   total_products: number | null;
 }
 
-interface FormulaBrief {
-  id: string;
-  category_id: string;
-  created_at: string;
-  updated_at: string;
-  ingredients: Record<string, unknown>;
-  positioning: string | null;
-  target_customer: string | null;
-  form_type: string | null;
-  flavor_profile: string | null;
-  servings_per_container: number | null;
-  target_price: number | null;
-  cogs_target: number | null;
-  margin_estimate: number | null;
-  moq_estimate: number | null;
-  lead_time_weeks: number | null;
-  manufacturing_notes: string | null;
-  regulatory_notes: string | null;
-  market_summary: string | null;
-  opportunity_insights: string | null;
-  key_differentiators: string[] | null;
-  consumer_pain_points: string[] | null;
-  risk_factors: string[] | null;
-  testing_requirements: string[] | null;
-  certifications: string[] | null;
-  packaging_type: string | null;
-  packaging_recommendations: string | null;
-}
-
-interface FormulaVersion {
+interface UnifiedVersion {
   id: string;
   category_id: string;
   created_at: string;
@@ -58,12 +29,18 @@ interface FormulaVersion {
   is_active: boolean;
   formula_brief_content: string;
   change_summary: string | null;
+  source: "p12" | "living"; // p12 = base from formula_briefs, living = formula_brief_versions
+  // P12 metadata extracted from ingredients JSON
+  form_type?: string | null;
+  target_price?: number | null;
+  cogs_target?: number | null;
+  positioning?: string | null;
+  qa_verdict?: string | null;
+  qa_score?: string | null;
+  fda_score?: string | null;
+  fda_status?: string | null;
+  competitive_score?: string | null;
 }
-
-// Unified version item shown in the list
-type VersionItem =
-  | { kind: "pipeline"; brief: FormulaBrief; label: string }
-  | { kind: "living";   ver: FormulaVersion; label: string };
 
 interface MfrComment {
   id: string;

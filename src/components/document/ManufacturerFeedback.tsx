@@ -155,18 +155,36 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
           .eq("id", payload.versionId);
         if (error) throw error;
       } else if (payload.pipelineBrief) {
-        // Insert pipeline brief as a new version and set active
-        const maxVersion = allVersions.length > 0 ? Math.max(...allVersions.map(v => v.version_number)) : 0;
-        const { error } = await supabase
+        // Check if this pipeline brief was already promoted to a version
+        const { data: existing } = await supabase
           .from("formula_brief_versions")
-          .insert({
-            category_id: categoryId,
-            formula_brief_content: payload.pipelineBrief.content,
-            version_number: maxVersion + 1,
-            is_active: true,
-            change_summary: `Set as active from pipeline: ${payload.pipelineBrief.label}`,
-          });
-        if (error) throw error;
+          .select("id")
+          .eq("category_id", categoryId)
+          .eq("change_summary", `Set as active from pipeline: ${payload.pipelineBrief.label}`)
+          .limit(1)
+          .maybeSingle();
+
+        if (existing) {
+          // Already promoted — just activate the existing version
+          const { error } = await supabase
+            .from("formula_brief_versions")
+            .update({ is_active: true })
+            .eq("id", existing.id);
+          if (error) throw error;
+        } else {
+          // Insert pipeline brief as a new version and set active
+          const maxVersion = allVersions.length > 0 ? Math.max(...allVersions.map(v => v.version_number)) : 0;
+          const { error } = await supabase
+            .from("formula_brief_versions")
+            .insert({
+              category_id: categoryId,
+              formula_brief_content: payload.pipelineBrief.content,
+              version_number: maxVersion + 1,
+              is_active: true,
+              change_summary: `Set as active from pipeline: ${payload.pipelineBrief.label}`,
+            });
+          if (error) throw error;
+        }
       }
     },
     onSuccess: () => {

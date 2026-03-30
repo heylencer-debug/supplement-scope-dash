@@ -155,12 +155,15 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
           .eq("id", payload.versionId);
         if (error) throw error;
       } else if (payload.pipelineBrief) {
+        // Use stable pipeline ID for dedup (not the label which has emojis)
+        const pipelineTag = `pipeline:${payload.pipelineBrief.id}`;
+        
         // Check if this pipeline brief was already promoted to a version
         const { data: existing } = await supabase
           .from("formula_brief_versions")
           .select("id")
           .eq("category_id", categoryId)
-          .eq("change_summary", `Set as active from pipeline: ${payload.pipelineBrief.label}`)
+          .like("change_summary", `%${pipelineTag}%`)
           .limit(1)
           .maybeSingle();
 
@@ -172,18 +175,35 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
             .eq("id", existing.id);
           if (error) throw error;
         } else {
-          // Insert pipeline brief as a new version and set active
-          const maxVersion = allVersions.length > 0 ? Math.max(...allVersions.map(v => v.version_number)) : 0;
-          const { error } = await supabase
+          // Also check by content match to catch previously promoted versions with old tags
+          const { data: contentMatch } = await supabase
             .from("formula_brief_versions")
-            .insert({
-              category_id: categoryId,
-              formula_brief_content: payload.pipelineBrief.content,
-              version_number: maxVersion + 1,
-              is_active: true,
-              change_summary: `Set as active from pipeline: ${payload.pipelineBrief.label}`,
-            });
-          if (error) throw error;
+            .select("id")
+            .eq("category_id", categoryId)
+            .eq("formula_brief_content", payload.pipelineBrief.content)
+            .limit(1)
+            .maybeSingle();
+
+          if (contentMatch) {
+            const { error } = await supabase
+              .from("formula_brief_versions")
+              .update({ is_active: true })
+              .eq("id", contentMatch.id);
+            if (error) throw error;
+          } else {
+            // Insert pipeline brief as a new version and set active
+            const maxVersion = allVersions.length > 0 ? Math.max(...allVersions.map(v => v.version_number)) : 0;
+            const { error } = await supabase
+              .from("formula_brief_versions")
+              .insert({
+                category_id: categoryId,
+                formula_brief_content: payload.pipelineBrief.content,
+                version_number: maxVersion + 1,
+                is_active: true,
+                change_summary: `[${pipelineTag}] Set as active from: ${payload.pipelineBrief.label}`,
+              });
+            if (error) throw error;
+          }
         }
       }
     },

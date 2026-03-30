@@ -395,7 +395,9 @@ export default function ManufacturerPortalInternal() {
       return;
     }
     setGeneratingLink(true);
-    const token = crypto.randomUUID();
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+    const token = Array.from(crypto.getRandomValues(new Uint8Array(10)))
+      .map((b) => chars[b % chars.length]).join("");
     const expiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
     const { error } = await supabase
       .from("manufacturer_sessions")

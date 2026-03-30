@@ -433,12 +433,14 @@ export default function Dashboard() {
     if (!name || !name.trim()) return;
     setGeneratingLink(true);
     try {
-      const { data, error } = await (supabase.from as any)("manufacturer_sessions")
-        .insert({ manufacturer_name: name.trim() })
-        .select("token")
-        .single();
-      if (error || !data) throw new Error(error?.message ?? "Insert failed");
-      const url = `${window.location.origin}/mfr/${data.token}`;
+      const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+      const token = Array.from(crypto.getRandomValues(new Uint8Array(10)))
+        .map((b) => chars[b % chars.length]).join("");
+      const expiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
+      const { error } = await (supabase.from as any)("manufacturer_sessions")
+        .insert({ token, manufacturer_name: name.trim(), expires_at: expiresAt });
+      if (error) throw new Error(error.message);
+      const url = `${window.location.origin}/mfr/${token}`;
       await navigator.clipboard.writeText(url);
       toast({ title: "Link copied to clipboard", description: url });
     } catch (err: unknown) {

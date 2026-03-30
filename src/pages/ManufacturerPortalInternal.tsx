@@ -557,7 +557,7 @@ export default function ManufacturerPortalInternal() {
                 {activeTab === "overview" && (
                   <div className="max-w-xl space-y-3">
                     <MetaRow label="Version" value={activeItem.label} />
-                    <MetaRow label="Source" value={activeItem.source === "p12" ? "P12 Formula (FDA Compliance)" : "Living Version"} />
+                    <MetaRow label="Source" value={activeItem.source === "pipeline" ? `Pipeline: ${activeItem.label}` : `Version ${activeItem.label}`} />
                     <MetaRow label="Created" value={formatDate(activeItem.created_at)} />
                     {activeItem.change_summary && (
                       <MetaRow label="Summary" value={activeItem.change_summary} />

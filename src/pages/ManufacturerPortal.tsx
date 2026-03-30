@@ -339,7 +339,8 @@ export default function ManufacturerPortal() {
 
     if (attachmentFile) {
       const safeName = attachmentFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-      const path = `${selectedCategoryId}/${activeCommentVersion}/${Date.now()}-${safeName}`;
+      const safeVersion = activeCommentVersion.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const path = `${selectedCategoryId}/${safeVersion}/${Date.now()}-${safeName}`;
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from("manufacturer-uploads")
         .upload(path, attachmentFile, { upsert: false });

@@ -64,51 +64,54 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-function ing(brief: FormulaBrief): Record<string, unknown> {
-  return brief.ingredients ?? {};
+function verdictColor(verdict: string): string {
+  if (/APPROVED$/i.test(verdict)) return "bg-green-100 text-green-800 border-green-200";
+  if (/ADJUSTMENTS/i.test(verdict)) return "bg-yellow-100 text-yellow-800 border-yellow-200";
+  if (/NON-COMPLIANT|REVISION|MAJOR/i.test(verdict)) return "bg-red-100 text-red-800 border-red-200";
+  return "bg-gray-100 text-gray-600 border-gray-200";
 }
 
-function getQAVerdict(brief: FormulaBrief): string {
-  const qa = (ing(brief)?.qa_report as string) ?? "";
-  if (!qa) return "";
-  const m = qa.match(/\*\*Overall:\*\*\s*(.+)/)
-          || qa.match(/Overall:\s*(APPROVED[^.\n]*|NEEDS MAJOR REVISION[^.\n]*)/i)
-          || qa.match(/(APPROVED WITH ADJUSTMENTS|APPROVED|NEEDS MAJOR REVISION)/i);
-  return m?.[1]?.trim() ?? "";
-}
+/** Extract P12 metadata from formula_briefs.ingredients JSON for the base version card */
+function extractP12Metadata(ingredients: Record<string, unknown>): Pick<UnifiedVersion, "form_type" | "target_price" | "cogs_target" | "positioning" | "qa_verdict" | "qa_score" | "fda_score" | "fda_status" | "competitive_score"> {
+  const qaReport = (ingredients?.qa_report as string) ?? "";
+  let qaVerdict = "";
+  if (qaReport) {
+    const m = qaReport.match(/\*\*Overall:\*\*\s*(.+)/)
+      || qaReport.match(/Overall:\s*(APPROVED[^.\n]*|NEEDS MAJOR REVISION[^.\n]*)/i)
+      || qaReport.match(/(APPROVED WITH ADJUSTMENTS|APPROVED|NEEDS MAJOR REVISION)/i);
+    qaVerdict = m?.[1]?.trim() ?? "";
+  }
 
-function getQAScore(brief: FormulaBrief): string | null {
-  const qa = (ing(brief)?.qa_report as string) ?? "";
-  const m = qa.match(/\*\*QA Score:\*\*\s*([\d.]+)/) || qa.match(/QA Score:\s*([\d.]+)/);
-  return m?.[1] ?? null;
-}
+  let qaScore: string | null = null;
+  if (qaReport) {
+    const m = qaReport.match(/\*\*QA Score:\*\*\s*([\d.]+)/) || qaReport.match(/QA Score:\s*([\d.]+)/);
+    qaScore = m?.[1] ?? null;
+  }
 
-function getFDAScore(brief: FormulaBrief): string | null {
-  const fda = (ing(brief)?.fda_compliance as Record<string, unknown>) ?? {};
-  return fda.compliance_score != null ? String(fda.compliance_score) : null;
-}
+  const fda = (ingredients?.fda_compliance as Record<string, unknown>) ?? {};
+  const fdaScore = fda.compliance_score != null ? String(fda.compliance_score) : null;
+  const fdaStatus = (fda.compliance_status as string) ?? "";
 
-function getFDAStatus(brief: FormulaBrief): string {
-  const fda = (ing(brief)?.fda_compliance as Record<string, unknown>) ?? {};
-  return (fda.compliance_status as string) ?? "";
-}
+  let competitiveScore: string | null = null;
+  const rawBench = ingredients?.competitive_benchmarking;
+  if (rawBench) {
+    const report = typeof rawBench === "string" ? rawBench : JSON.stringify(rawBench);
+    const m = report.match(/Overall.*?competitiveness.*?([\d.]+)\s*\/\s*10/i)
+      || report.match(/competitiveness.*?([\d.]+)\s*\/\s*10/i)
+      || report.match(/([\d.]+)\s*\/\s*10/);
+    competitiveScore = m?.[1] ?? null;
+  }
 
-function getCompetitiveScore(brief: FormulaBrief): string | null {
-  const raw = ing(brief)?.competitive_benchmarking;
-  if (!raw) return null;
-  const report = typeof raw === "string" ? raw : JSON.stringify(raw);
-  const m = report.match(/Overall.*?competitiveness.*?([\d.]+)\s*\/\s*10/i)
-           || report.match(/competitiveness.*?([\d.]+)\s*\/\s*10/i)
-           || report.match(/([\d.]+)\s*\/\s*10/);
-  return m?.[1] ?? null;
-}
-
-function getFormulaText(brief: FormulaBrief): { adjusted: string; grok: string; claude: string } {
-  const i = ing(brief);
   return {
-    adjusted: (i?.adjusted_formula ?? i?.final_formula_brief ?? "") as string,
-    grok: (i?.grok_brief ?? i?.grok_formula_brief ?? "") as string,
-    claude: (i?.claude_brief ?? i?.claude_formula_brief ?? i?.ai_generated_brief ?? "") as string,
+    form_type: null, // will be set from brief-level field
+    target_price: null,
+    cogs_target: null,
+    positioning: null,
+    qa_verdict: qaVerdict || null,
+    qa_score: qaScore,
+    fda_score: fdaScore,
+    fda_status: fdaStatus,
+    competitive_score: competitiveScore,
   };
 }
 

@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { PDFDownloadLink } from "@react-pdf/renderer";
+import { FormulaPDF } from "@/components/FormulaPDF";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -465,6 +467,32 @@ export default function ManufacturerPortal() {
                               >
                                 {isExpanded ? "Hide Formula" : "View Formula"}
                               </Button>
+                              <PDFDownloadLink
+                                document={
+                                  <FormulaPDF
+                                    categoryName={selectedCategory?.name ?? ""}
+                                    versionLabel={label}
+                                    formulaText={getFormulaText(ing)}
+                                    date={formatDate(brief.created_at)}
+                                    qaScore={getQAScore(ing)}
+                                    fdaScore={getFDAScore(ing)}
+                                    qaVerdict={getQAVerdict(ing)}
+                                    manufacturerName={session?.manufacturer_name}
+                                  />
+                                }
+                                fileName={`DOVIVE-${(selectedCategory?.name ?? "Formula").replace(/\s+/g, "-")}-${label}.pdf`}
+                              >
+                                {({ loading }) => (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-xs h-7 border-gray-200 text-gray-600 hover:bg-gray-50 gap-1"
+                                    disabled={loading}
+                                  >
+                                    {loading ? "Preparing…" : "⬇ Download PDF"}
+                                  </Button>
+                                )}
+                              </PDFDownloadLink>
                               <Button
                                 variant={isCommentActive ? "default" : "ghost"}
                                 size="sm"

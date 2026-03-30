@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
+import { PDFDownloadLink } from "@react-pdf/renderer";
+import { FormulaPDF } from "@/components/FormulaPDF";
 import {
   Link2, ChevronRight, MessageSquare, FlaskConical, LayoutDashboard, GitBranch,
   Pencil, Trash2, Check, X, Eye, EyeOff,
@@ -587,13 +589,35 @@ export default function ManufacturerPortalInternal() {
                 {/* ── FORMULA ── */}
                 {activeTab === "formula" && (
                   <div className="space-y-6 max-w-3xl">
-                    <div>
-                      <h3 className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
                         {activeItem.source === "pipeline" ? activeItem.label : `Version ${activeItem.label}`}
                         {activeItem.change_summary ? ` — ${activeItem.change_summary}` : ""}
                       </h3>
-                      <SectionText text={activeItem.formula_brief_content} fallback="No formula content available." />
+                      {activeItem.formula_brief_content && (
+                        <PDFDownloadLink
+                          document={
+                            <FormulaPDF
+                              categoryName={selectedCat?.name ?? ""}
+                              versionLabel={activeItem.label}
+                              formulaText={activeItem.formula_brief_content}
+                              date={new Date(activeItem.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                              qaScore={activeItem.qa_score ?? null}
+                              fdaScore={activeItem.fda_score ?? null}
+                              qaVerdict={activeItem.qa_verdict ?? null}
+                            />
+                          }
+                          fileName={`DOVIVE-${(selectedCat?.name ?? "Formula").replace(/\s+/g, "-")}-${activeItem.label}.pdf`}
+                        >
+                          {({ loading }) => (
+                            <Button variant="outline" size="sm" className="h-7 text-xs gap-1" disabled={loading}>
+                              {loading ? "Preparing…" : "⬇ Download PDF"}
+                            </Button>
+                          )}
+                        </PDFDownloadLink>
+                      )}
                     </div>
+                    <SectionText text={activeItem.formula_brief_content} fallback="No formula content available." />
                   </div>
                 )}
 

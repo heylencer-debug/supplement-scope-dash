@@ -195,12 +195,13 @@ export default function ManufacturerPortalInternal() {
   const [mfrName, setMfrName] = useState("");
   const [generatingLink, setGeneratingLink] = useState(false);
 
-  // Load all categories (no product count filter)
+  // Load categories — same query as New Analysis page
   useEffect(() => {
     supabase
       .from("categories")
       .select("id, name, total_products")
-      .order("total_products", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(20)
       .then(({ data }) => {
         if (data?.length) {
           setCategories(data as Category[]);

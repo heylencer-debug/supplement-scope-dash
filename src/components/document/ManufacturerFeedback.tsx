@@ -259,7 +259,7 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
   const viewingVersion = viewingVersionId ? allVersions.find(v => v.id === viewingVersionId) : null;
 
   const promotedPipelineVersions = useMemo(() => {
-    const latestByPipeline = new Map<string, FormulaBriefVersion>();
+    const latestByPipeline = new Map<string, (typeof allVersions)[number]>();
 
     allVersions.forEach((version) => {
       const pipelineId = getPromotedPipelineId(version.change_summary);

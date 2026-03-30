@@ -72,6 +72,26 @@ function parseManufacturerReply(response: string | null): string {
   return match?.[1]?.trim() || "";
 }
 
+function getPromotedPipelineId(changeSummary: string | null | undefined): string | null {
+  if (!changeSummary) return null;
+
+  const taggedMatch = changeSummary.match(/\[pipeline:([^\]]+)\]/i);
+  if (taggedMatch?.[1]) {
+    return taggedMatch[1].trim().toLowerCase();
+  }
+
+  const normalized = changeSummary.toLowerCase();
+  if (!normalized.includes("set as active from")) return null;
+
+  if (normalized.includes("grok") || normalized.includes("formula a")) return "grok";
+  if (normalized.includes("sonnet") || normalized.includes("claude") || normalized.includes("formula b")) return "claude";
+  if (normalized.includes("qa approved final") || normalized.includes("qa final")) return "qa-final";
+  if (normalized.includes("ai generated brief") || normalized.includes("legacy")) return "legacy";
+  if (normalized.includes("compliance")) return "compliance";
+
+  return null;
+}
+
 export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = false }: ManufacturerFeedbackProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();

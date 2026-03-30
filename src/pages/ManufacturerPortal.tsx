@@ -164,6 +164,7 @@ export default function ManufacturerPortal() {
     created_at: string;
     formula_text: string;
     change_summary: string | null;
+    comment_labels?: string[];
     qa_verdict: string | null;
     qa_score: string | null;
     fda_score: string | null;
@@ -274,16 +275,31 @@ export default function ManufacturerPortal() {
       ]);
       setAllCatComments((allComments ?? []) as MfrComment[]);
 
+      const liveVersionRows = (liveVersions ?? []) as any[];
       const all: UnifiedVersion[] = [];
+      const promotedPipelineVersions = new Map<string, any>();
+
+      for (const version of liveVersionRows) {
+        const pipelineId = getPromotedPipelineId(version.change_summary);
+        if (!pipelineId) continue;
+
+        const existing = promotedPipelineVersions.get(pipelineId);
+        if (!existing || version.is_active || version.version_number > existing.version_number) {
+          promotedPipelineVersions.set(pipelineId, version);
+        }
+      }
 
       // Living versions from formula_brief_versions
-      for (const v of (liveVersions ?? []) as any[]) {
+      for (const v of liveVersionRows) {
+        if (getPromotedPipelineId(v.change_summary)) continue;
+
         all.push({
           id: v.id,
           label: `v${v.version_number}`,
           created_at: v.created_at,
           formula_text: v.formula_brief_content ?? "",
           change_summary: v.change_summary,
+          comment_labels: [`v${v.version_number}`],
           qa_verdict: null, qa_score: null, fda_score: null, fda_status: null,
         });
       }
@@ -303,30 +319,37 @@ export default function ManufacturerPortal() {
         const fdaStatus = (fda.compliance_status as string) ?? null;
 
         if (ing?.ai_generated_brief_grok) {
-          all.push({ id: "grok", label: "Formula A — Grok", created_at: briefData.created_at ?? "", formula_text: ing.ai_generated_brief_grok, change_summary: "Deep scientific reasoning", qa_verdict: qaVerdict, qa_score: qaScore, fda_score: fdaScore, fda_status: fdaStatus });
+          const promotedVersion = promotedPipelineVersions.get("grok");
+          all.push({ id: "grok", label: "Formula A — Grok", created_at: briefData.created_at ?? "", formula_text: ing.ai_generated_brief_grok, change_summary: "Deep scientific reasoning", comment_labels: promotedVersion ? ["Formula A — Grok", `v${promotedVersion.version_number}`] : ["Formula A — Grok"], qa_verdict: qaVerdict, qa_score: qaScore, fda_score: fdaScore, fda_status: fdaStatus });
         }
         if (ing?.ai_generated_brief_claude) {
-          all.push({ id: "claude", label: "Formula B — Sonnet", created_at: briefData.created_at ?? "", formula_text: ing.ai_generated_brief_claude, change_summary: "1M context synthesis", qa_verdict: qaVerdict, qa_score: qaScore, fda_score: fdaScore, fda_status: fdaStatus });
+          const promotedVersion = promotedPipelineVersions.get("claude");
+          all.push({ id: "claude", label: "Formula B — Sonnet", created_at: briefData.created_at ?? "", formula_text: ing.ai_generated_brief_claude, change_summary: "1M context synthesis", comment_labels: promotedVersion ? ["Formula B — Sonnet", `v${promotedVersion.version_number}`] : ["Formula B — Sonnet"], qa_verdict: qaVerdict, qa_score: qaScore, fda_score: fdaScore, fda_status: fdaStatus });
         } else if (ing?.ai_generated_brief) {
-          all.push({ id: "legacy", label: "AI Generated Brief", created_at: briefData.created_at ?? "", formula_text: ing.ai_generated_brief, change_summary: "Initial AI brief", qa_verdict: qaVerdict, qa_score: qaScore, fda_score: fdaScore, fda_status: fdaStatus });
+          const promotedVersion = promotedPipelineVersions.get("legacy");
+          all.push({ id: "legacy", label: "AI Generated Brief", created_at: briefData.created_at ?? "", formula_text: ing.ai_generated_brief, change_summary: "Initial AI brief", comment_labels: promotedVersion ? ["AI Generated Brief", `v${promotedVersion.version_number}`] : ["AI Generated Brief"], qa_verdict: qaVerdict, qa_score: qaScore, fda_score: fdaScore, fda_status: fdaStatus });
         }
         const complianceContent = ing?.final_formula_brief || ing?.adjusted_formula;
         if (complianceContent) {
-          all.push({ id: "compliance", label: "⚖️ Compliance", created_at: briefData.created_at ?? "", formula_text: complianceContent, change_summary: "Initial formula brief from market analysis pipeline", qa_verdict: qaVerdict, qa_score: qaScore, fda_score: fdaScore, fda_status: fdaStatus });
+          const promotedVersion = promotedPipelineVersions.get("compliance");
+          all.push({ id: "compliance", label: "⚖️ Compliance", created_at: briefData.created_at ?? "", formula_text: complianceContent, change_summary: "Initial formula brief from market analysis pipeline", comment_labels: promotedVersion ? ["⚖️ Compliance", `v${promotedVersion.version_number}`] : ["⚖️ Compliance"], qa_verdict: qaVerdict, qa_score: qaScore, fda_score: fdaScore, fda_status: fdaStatus });
         }
         if (ing?.final_formula_brief) {
-          all.push({ id: "qa-final", label: "✅ QA Approved Final", created_at: briefData.created_at ?? "", formula_text: ing.final_formula_brief, change_summary: `${ing?.qa_verdict?.verdict || "Reviewed"} · Score: ${ing?.qa_verdict?.score || "—"}/10`, qa_verdict: qaVerdict, qa_score: qaScore, fda_score: fdaScore, fda_status: fdaStatus });
+          const promotedVersion = promotedPipelineVersions.get("qa-final");
+          all.push({ id: "qa-final", label: "✅ QA Approved Final", created_at: briefData.created_at ?? "", formula_text: ing.final_formula_brief, change_summary: `${ing?.qa_verdict?.verdict || "Reviewed"} · Score: ${ing?.qa_verdict?.score || "—"}/10`, comment_labels: promotedVersion ? ["✅ QA Approved Final", `v${promotedVersion.version_number}`] : ["✅ QA Approved Final"], qa_verdict: qaVerdict, qa_score: qaScore, fda_score: fdaScore, fda_status: fdaStatus });
         }
       }
 
       setVersions(all);
-      const pub = pubData?.version_label ?? null;
-      setPublishedLabel(pub);
-      const found = pub ? all.find(v => v.label === pub) ?? null : null;
+      const rawPublishedLabel = pubData?.version_label ?? null;
+      const found = rawPublishedLabel
+        ? all.find(v => v.comment_labels?.includes(rawPublishedLabel) || v.label === rawPublishedLabel) ?? null
+        : null;
+      setPublishedLabel(found?.label ?? rawPublishedLabel);
       setPublishedVersion(found);
       if (found) {
         setActiveCommentVersion(found.label);
-        loadComments(selectedCategoryId, found.label);
+        loadComments(selectedCategoryId, found.comment_labels ?? [found.label]);
       }
       setBriefsLoading(false);
     })();
@@ -334,11 +357,11 @@ export default function ManufacturerPortal() {
 
   // ── Load comments ──────────────────────────────────────────────────────────
   const loadComments = useCallback(
-    async (categoryId: string, vLabel: string) => {
+    async (categoryId: string, versionLabels: string[]) => {
       const { data } = await (supabase.from as any)("manufacturer_comments")
         .select("*")
         .eq("category_id", categoryId)
-        .eq("version_label", vLabel)
+        .in("version_label", versionLabels)
         .order("created_at", { ascending: true });
       setComments((data ?? []) as MfrComment[]);
     },
@@ -348,11 +371,13 @@ export default function ManufacturerPortal() {
   // Polling every 10 seconds
   useEffect(() => {
     if (!selectedCategoryId || !activeCommentVersion) return;
+    const activeVersion = versions.find((version) => version.label === activeCommentVersion);
+    if (!activeVersion) return;
     const id = setInterval(() => {
-      loadComments(selectedCategoryId, activeCommentVersion);
+      loadComments(selectedCategoryId, activeVersion.comment_labels ?? [activeCommentVersion]);
     }, 10000);
     return () => clearInterval(id);
-  }, [selectedCategoryId, activeCommentVersion, loadComments]);
+  }, [selectedCategoryId, activeCommentVersion, loadComments, versions]);
 
   // ── Submit comment ─────────────────────────────────────────────────────────
   async function handleSubmitComment() {
@@ -573,7 +598,7 @@ export default function ManufacturerPortal() {
                               ].join(" ")}
                               onClick={() => {
                                 setActiveCommentVersion(v.label);
-                                loadComments(selectedCategoryId!, v.label);
+                                loadComments(selectedCategoryId!, v.comment_labels ?? [v.label]);
                               }}
                             >
                               Comments
@@ -735,7 +760,7 @@ export default function ManufacturerPortal() {
                       label: v.label,
                       created_at: v.created_at,
                       change_summary: v.change_summary ?? undefined,
-                      source: "version" as const,
+                      source: getPromotedPipelineId(v.change_summary) ? "pipeline" as const : "version" as const,
                     }))}
                     showVersionChip={true}
                   />

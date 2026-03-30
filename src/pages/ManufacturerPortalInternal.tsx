@@ -455,7 +455,8 @@ export default function ManufacturerPortalInternal() {
                   <CardContent className="p-3 space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
-                        {item.source === "living" && <GitBranch className="w-3 h-3 text-purple-500" />}
+                        {item.source === "version" && <GitBranch className="w-3 h-3 text-purple-500" />}
+                        {item.source === "pipeline" && item.emoji && <span className="text-xs">{item.emoji}</span>}
                         <span className="text-sm font-bold text-gray-800">{item.label}</span>
                         {item.is_active && (
                           <span className="text-[9px] px-1.5 py-0 bg-purple-100 text-purple-700 rounded-full font-semibold">active</span>

@@ -186,15 +186,23 @@ export default function ManufacturerPortal() {
     })();
   }, [token]);
 
-  // ── Load categories ────────────────────────────────────────────────────────
+  // ── Load categories (only those with a shared version) ────────────────────
   useEffect(() => {
     if (!session) return;
     (async () => {
+      const { data: pubRows } = await supabase
+        .from("manufacturer_published_versions")
+        .select("category_id");
+
+      const ids = (pubRows ?? []).map((r: any) => r.category_id);
+      if (ids.length === 0) return;
+
       const { data } = await supabase
         .from("categories")
         .select("id,name,total_products,updated_at")
-        .order("updated_at", { ascending: false })
-        .limit(20);
+        .in("id", ids)
+        .order("updated_at", { ascending: false });
+
       if (data && data.length > 0) {
         setCategories(data as Category[]);
         setSelectedCategoryId(data[0].id);

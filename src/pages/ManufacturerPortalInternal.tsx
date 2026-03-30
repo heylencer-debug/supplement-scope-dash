@@ -116,8 +116,9 @@ function getFDAStatus(brief: FormulaBrief): string {
 }
 
 function getCompetitiveScore(brief: FormulaBrief): string | null {
-  const report = (ing(brief)?.competitive_benchmarking as string) ?? "";
-  if (!report) return null;
+  const raw = ing(brief)?.competitive_benchmarking;
+  if (!raw) return null;
+  const report = typeof raw === "string" ? raw : JSON.stringify(raw);
   const m = report.match(/Overall.*?competitiveness.*?([\d.]+)\s*\/\s*10/i)
            || report.match(/competitiveness.*?([\d.]+)\s*\/\s*10/i)
            || report.match(/([\d.]+)\s*\/\s*10/);

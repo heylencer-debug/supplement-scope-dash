@@ -426,7 +426,8 @@ export default function ManufacturerPortal() {
       setCommentText("");
       setAttachmentFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
-      await loadComments(selectedCategoryId, activeCommentVersion);
+      const activeVersion = versions.find((version) => version.label === activeCommentVersion);
+      await loadComments(selectedCategoryId, activeVersion?.comment_labels ?? [activeCommentVersion]);
       // Refresh history feed
       const { data: refreshed } = await (supabase.from as any)("manufacturer_comments")
         .select("*").eq("category_id", selectedCategoryId).order("created_at", { ascending: false });

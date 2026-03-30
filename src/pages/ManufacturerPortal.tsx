@@ -271,8 +271,7 @@ export default function ManufacturerPortal() {
   // ── Load comments ──────────────────────────────────────────────────────────
   const loadComments = useCallback(
     async (categoryId: string, vLabel: string) => {
-      const { data } = await supabase
-        .from("manufacturer_comments")
+      const { data } = await (supabase.from as any)("manufacturer_comments")
         .select("*")
         .eq("category_id", categoryId)
         .eq("version_label", vLabel)

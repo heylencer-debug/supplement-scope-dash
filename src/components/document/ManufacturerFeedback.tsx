@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from "react";
-import { Factory, Upload, Send, CheckCircle, XCircle, HelpCircle, AlertCircle, ChevronDown, ChevronUp, X, Image, Download, Sparkles, Copy, Check, MessageSquare, Clock, ExternalLink, FileText, Eye, Star } from "lucide-react";
+import { Factory, Upload, Send, CheckCircle, XCircle, HelpCircle, AlertCircle, ChevronDown, ChevronUp, X, Image, Download, Sparkles, Copy, Check, MessageSquare, Clock, ExternalLink, FileText, Eye, Star, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -197,7 +197,27 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
     },
   });
 
+  const deleteVersionMutation = useMutation({
+    mutationFn: async (versionId: string) => {
+      const { error } = await supabase
+        .from("formula_brief_versions")
+        .delete()
+        .eq("id", versionId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["formula_brief_versions"] });
+      queryClient.invalidateQueries({ queryKey: ["formula_brief_active_version"] });
+      queryClient.invalidateQueries({ queryKey: ["formulaBrief"] });
+      toast({ title: "Version deleted", description: "The formula version has been removed." });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete", description: "Could not delete version.", variant: "destructive" });
+    },
+  });
+
   const viewingVersion = viewingVersionId ? allVersions.find(v => v.id === viewingVersionId) : null;
+
   const handleDownloadVersion = useCallback(async (versionId: string) => {
     setDownloadingVersion(versionId);
     try {
@@ -480,6 +500,21 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
                       >
                         <Download className="w-3 h-3" />
                         {downloadingVersion === v.id ? "..." : "PDF"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-xs gap-1 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        disabled={v.is_active || deleteVersionMutation.isPending}
+                        title={v.is_active ? "Cannot delete the active version" : "Delete this version"}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (window.confirm(`Delete v${v.version_number}? This cannot be undone.`)) {
+                            deleteVersionMutation.mutate(v.id);
+                          }
+                        }}
+                      >
+                        <Trash2 className="w-3 h-3" />
                       </Button>
                     </div>
                   </td>

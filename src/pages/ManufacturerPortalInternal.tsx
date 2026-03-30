@@ -580,7 +580,7 @@ export default function ManufacturerPortalInternal() {
                   <div className="space-y-6 max-w-3xl">
                     <div>
                       <h3 className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">
-                        {activeItem.source === "p12" ? "P12 Formula Brief" : `Version ${activeItem.label}`}
+                        {activeItem.source === "pipeline" ? activeItem.label : `Version ${activeItem.label}`}
                         {activeItem.change_summary ? ` — ${activeItem.change_summary}` : ""}
                       </h3>
                       <SectionText text={activeItem.formula_brief_content} fallback="No formula content available." />

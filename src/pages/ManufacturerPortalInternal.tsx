@@ -23,14 +23,15 @@ interface Category {
 
 interface UnifiedVersion {
   id: string;
+  label: string;
   category_id: string;
   created_at: string;
   version_number: number;
   is_active: boolean;
   formula_brief_content: string;
   change_summary: string | null;
-  source: "p12" | "living"; // p12 = base from formula_briefs, living = formula_brief_versions
-  // P12 metadata extracted from ingredients JSON
+  source: "p12" | "living";
+  // P12 metadata
   form_type?: string | null;
   target_price?: number | null;
   cogs_target?: number | null;
@@ -71,8 +72,8 @@ function verdictColor(verdict: string): string {
   return "bg-gray-100 text-gray-600 border-gray-200";
 }
 
-/** Extract P12 metadata from formula_briefs.ingredients JSON for the base version card */
-function extractP12Metadata(ingredients: Record<string, unknown>): Pick<UnifiedVersion, "form_type" | "target_price" | "cogs_target" | "positioning" | "qa_verdict" | "qa_score" | "fda_score" | "fda_status" | "competitive_score"> {
+/** Extract P12 metadata from formula_briefs.ingredients JSON */
+function extractP12Metadata(ingredients: Record<string, unknown>) {
   const qaReport = (ingredients?.qa_report as string) ?? "";
   let qaVerdict = "";
   if (qaReport) {
@@ -102,24 +103,7 @@ function extractP12Metadata(ingredients: Record<string, unknown>): Pick<UnifiedV
     competitiveScore = m?.[1] ?? null;
   }
 
-  return {
-    form_type: null, // will be set from brief-level field
-    target_price: null,
-    cogs_target: null,
-    positioning: null,
-    qa_verdict: qaVerdict || null,
-    qa_score: qaScore,
-    fda_score: fdaScore,
-    fda_status: fdaStatus,
-    competitive_score: competitiveScore,
-  };
-}
-
-function verdictColor(verdict: string): string {
-  if (/APPROVED$/i.test(verdict)) return "bg-green-100 text-green-800 border-green-200";
-  if (/ADJUSTMENTS/i.test(verdict)) return "bg-yellow-100 text-yellow-800 border-yellow-200";
-  if (/NON-COMPLIANT|REVISION|MAJOR/i.test(verdict)) return "bg-red-100 text-red-800 border-red-200";
-  return "bg-gray-100 text-gray-600 border-gray-200";
+  return { qa_verdict: qaVerdict || null, qa_score: qaScore, fda_score: fdaScore, fda_status: fdaStatus, competitive_score: competitiveScore };
 }
 
 function ScoreChip({ label, value, max }: { label: string; value: string | null; max: number }) {
@@ -143,17 +127,6 @@ function MetaRow({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-function TagList({ items, color }: { items: string[] | null; color: string }) {
-  if (!items?.length) return <span className="text-xs text-gray-400">—</span>;
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      {items.map((t, i) => (
-        <span key={i} className={`text-[11px] px-2 py-0.5 rounded-full ${color}`}>{t}</span>
-      ))}
-    </div>
-  );
-}
-
 function SectionText({ text, fallback = "No data available." }: { text: string; fallback?: string }) {
   if (!text) return <p className="text-sm text-gray-400 py-4">{fallback}</p>;
   return <pre className="text-xs text-gray-700 whitespace-pre-wrap leading-relaxed font-sans">{text}</pre>;
@@ -166,8 +139,8 @@ export default function ManufacturerPortalInternal() {
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCat, setSelectedCat] = useState<Category | null>(null);
-  const [versions, setVersions] = useState<VersionItem[]>([]);
-  const [activeItem, setActiveItem] = useState<VersionItem | null>(null);
+  const [versions, setVersions] = useState<UnifiedVersion[]>([]);
+  const [activeItem, setActiveItem] = useState<UnifiedVersion | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
   const [comments, setComments] = useState<MfrComment[]>([]);
   const [commentText, setCommentText] = useState("");
@@ -178,7 +151,7 @@ export default function ManufacturerPortalInternal() {
   const [mfrName, setMfrName] = useState("");
   const [generatingLink, setGeneratingLink] = useState(false);
 
-  // Load categories — same query as New Analysis page
+  // Load categories
   useEffect(() => {
     supabase
       .from("categories")
@@ -193,7 +166,7 @@ export default function ManufacturerPortalInternal() {
       });
   }, []);
 
-  // Load versions for selected category — merge formula_briefs + formula_brief_versions
+  // Load versions: P12 base from formula_briefs + living versions from formula_brief_versions
   useEffect(() => {
     if (!selectedCat) return;
     setActiveItem(null);
@@ -201,17 +174,10 @@ export default function ManufacturerPortalInternal() {
 
     const briefsQ = supabase
       .from("formula_briefs")
-      .select([
-        "id", "category_id", "created_at", "updated_at", "ingredients",
-        "positioning", "target_customer", "form_type", "flavor_profile",
-        "servings_per_container", "target_price", "cogs_target", "margin_estimate",
-        "moq_estimate", "lead_time_weeks", "manufacturing_notes", "regulatory_notes",
-        "market_summary", "opportunity_insights", "key_differentiators",
-        "consumer_pain_points", "risk_factors", "testing_requirements",
-        "certifications", "packaging_type", "packaging_recommendations",
-      ].join(", "))
+      .select("id, category_id, created_at, updated_at, ingredients, form_type, target_price, cogs_target, positioning")
       .eq("category_id", selectedCat.id)
-      .order("created_at", { ascending: true });
+      .order("created_at", { ascending: true })
+      .limit(1);
 
     const liveQ = supabase
       .from("formula_brief_versions")
@@ -220,19 +186,55 @@ export default function ManufacturerPortalInternal() {
       .order("version_number", { ascending: true });
 
     Promise.all([briefsQ, liveQ]).then(([{ data: briefs }, { data: live }]) => {
-      const pipelineItems: VersionItem[] = ((briefs ?? []) as unknown as FormulaBrief[]).map((b, i) => ({
-        kind: "pipeline",
-        brief: b,
-        label: `v${i + 1}`,
-      }));
+      const all: UnifiedVersion[] = [];
 
-      const livingItems: VersionItem[] = ((live ?? []) as FormulaVersion[]).map((v) => ({
-        kind: "living",
-        ver: v,
-        label: `mfr-v${v.version_number}`,
-      }));
+      // P12 base version from formula_briefs
+      if (briefs?.length) {
+        const b = briefs[0] as any;
+        const ingredients = (b.ingredients ?? {}) as Record<string, unknown>;
+        const p12Meta = extractP12Metadata(ingredients);
+        // Get the full formula text — prefer adjusted_formula > final_formula_brief
+        const formulaContent = (ingredients.adjusted_formula ?? ingredients.final_formula_brief ?? "") as string;
+        const changeSummary = `Dual AI formula brief — ${[
+          ingredients.formula_brief_model_grok && `Grok`,
+          ingredients.formula_brief_model_claude && `Claude Sonnet`,
+        ].filter(Boolean).join(" + ") || "AI Generated"}`;
 
-      const all: VersionItem[] = [...pipelineItems, ...livingItems];
+        all.push({
+          id: b.id,
+          label: "v1",
+          category_id: b.category_id,
+          created_at: b.created_at,
+          version_number: 0,
+          is_active: !live?.some((v: any) => v.is_active),
+          formula_brief_content: formulaContent,
+          change_summary: changeSummary,
+          source: "p12",
+          form_type: b.form_type,
+          target_price: b.target_price,
+          cogs_target: b.cogs_target,
+          positioning: b.positioning,
+          ...p12Meta,
+        });
+      }
+
+      // Living versions from formula_brief_versions
+      if (live?.length) {
+        for (const v of live as any[]) {
+          all.push({
+            id: v.id,
+            label: `v${(briefs?.length ? 1 : 0) + v.version_number}`,
+            category_id: v.category_id,
+            created_at: v.created_at,
+            version_number: v.version_number,
+            is_active: v.is_active,
+            formula_brief_content: v.formula_brief_content,
+            change_summary: v.change_summary,
+            source: "living",
+          });
+        }
+      }
+
       setVersions(all);
       if (all.length) setActiveItem(all[all.length - 1]); // default to latest
     });
@@ -308,9 +310,6 @@ export default function ManufacturerPortalInternal() {
   };
 
   // ─── Derived ────────────────────────────────────────────────────────────────
-
-  const activeBrief = activeItem?.kind === "pipeline" ? activeItem.brief : null;
-  const activeLiving = activeItem?.kind === "living" ? activeItem.ver : null;
 
   const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
     { key: "overview", label: "Overview", icon: LayoutDashboard },
@@ -389,77 +388,64 @@ export default function ManufacturerPortalInternal() {
             )}
 
             {versions.map((item) => {
-              const isActive = activeItem?.label === item.label;
+              const isSelected = activeItem?.id === item.id;
               const baseCard = `cursor-pointer transition-all border rounded-lg ${
-                isActive
+                isSelected
                   ? "border-indigo-200 shadow-sm bg-indigo-50/40"
                   : "border-gray-100 hover:border-gray-200 hover:shadow-sm bg-white"
               }`;
 
-              if (item.kind === "pipeline") {
-                const b = item.brief;
-                const verdict = getQAVerdict(b);
-                const qaScore = getQAScore(b);
-                const fdaScore = getFDAScore(b);
-                const compScore = getCompetitiveScore(b);
-                const fdaStatus = getFDAStatus(b);
-
-                return (
-                  <Card key={item.label} onClick={() => { setActiveItem(item); setActiveTab("overview"); }} className={baseCard}>
-                    <CardContent className="p-3 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-bold text-gray-800">{item.label}</span>
-                        <span className="text-[10px] text-gray-400">{formatDate(b.created_at)}</span>
-                      </div>
-                      {b.form_type && (
-                        <span className="inline-block text-[10px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 font-medium">
-                          {b.form_type}
-                        </span>
-                      )}
-                      {b.positioning && (
-                        <p className="text-[11px] text-gray-500 leading-tight line-clamp-2">{b.positioning}</p>
-                      )}
-                      {verdict && (
-                        <Badge className={`text-[10px] px-2 py-0 border ${verdictColor(verdict)}`}>
-                          {verdict.length > 26 ? verdict.slice(0, 26) + "…" : verdict}
-                        </Badge>
-                      )}
-                      {fdaStatus && !verdict && (
-                        <p className="text-[11px] text-gray-400 truncate">{fdaStatus}</p>
-                      )}
-                      <div className="flex gap-3 pt-1">
-                        <ScoreChip label="QA" value={qaScore} max={10} />
-                        <ScoreChip label="FDA" value={fdaScore} max={100} />
-                        <ScoreChip label="Comp" value={compScore} max={10} />
-                      </div>
-                      {b.target_price != null && (
-                        <p className="text-[11px] text-gray-400">
-                          Target <span className="font-semibold text-gray-600">${b.target_price}</span>
-                          {b.cogs_target != null ? ` · COGS $${b.cogs_target}` : ""}
-                        </p>
-                      )}
-                    </CardContent>
-                  </Card>
-                );
-              }
-
-              // Living brief version
-              const v = item.ver;
               return (
-                <Card key={item.label} onClick={() => { setActiveItem(item); setActiveTab("formula"); }} className={baseCard}>
+                <Card key={item.id} onClick={() => { setActiveItem(item); setActiveTab("overview"); }} className={baseCard}>
                   <CardContent className="p-3 space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
-                        <GitBranch className="w-3 h-3 text-purple-500" />
+                        {item.source === "living" && <GitBranch className="w-3 h-3 text-purple-500" />}
                         <span className="text-sm font-bold text-gray-800">{item.label}</span>
-                        {v.is_active && (
+                        {item.is_active && (
                           <span className="text-[9px] px-1.5 py-0 bg-purple-100 text-purple-700 rounded-full font-semibold">active</span>
                         )}
                       </div>
-                      <span className="text-[10px] text-gray-400">{formatDate(v.created_at)}</span>
+                      <span className="text-[10px] text-gray-400">{formatDate(item.created_at)}</span>
                     </div>
-                    {v.change_summary && (
-                      <p className="text-[11px] text-gray-500 leading-tight line-clamp-2">{v.change_summary}</p>
+
+                    {item.form_type && (
+                      <span className="inline-block text-[10px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 font-medium">
+                        {item.form_type}
+                      </span>
+                    )}
+
+                    {item.positioning && (
+                      <p className="text-[11px] text-gray-500 leading-tight line-clamp-2">{item.positioning}</p>
+                    )}
+
+                    {item.change_summary && !item.positioning && (
+                      <p className="text-[11px] text-gray-500 leading-tight line-clamp-2">{item.change_summary}</p>
+                    )}
+
+                    {item.qa_verdict && (
+                      <Badge className={`text-[10px] px-2 py-0 border ${verdictColor(item.qa_verdict)}`}>
+                        {item.qa_verdict.length > 26 ? item.qa_verdict.slice(0, 26) + "…" : item.qa_verdict}
+                      </Badge>
+                    )}
+
+                    {item.fda_status && !item.qa_verdict && (
+                      <p className="text-[11px] text-gray-400 truncate">{item.fda_status}</p>
+                    )}
+
+                    {(item.qa_score || item.fda_score || item.competitive_score) && (
+                      <div className="flex gap-3 pt-1">
+                        <ScoreChip label="QA" value={item.qa_score ?? null} max={10} />
+                        <ScoreChip label="FDA" value={item.fda_score ?? null} max={100} />
+                        <ScoreChip label="Comp" value={item.competitive_score ?? null} max={10} />
+                      </div>
+                    )}
+
+                    {item.target_price != null && (
+                      <p className="text-[11px] text-gray-400">
+                        Target <span className="font-semibold text-gray-600">${item.target_price}</span>
+                        {item.cogs_target != null ? ` · COGS $${item.cogs_target}` : ""}
+                      </p>
                     )}
                   </CardContent>
                 </Card>
@@ -500,8 +486,10 @@ export default function ManufacturerPortalInternal() {
               ))}
               <div className="ml-auto pr-2 flex items-center gap-2">
                 <span className="text-xs text-gray-400">{activeItem.label}</span>
-                {activeItem.kind === "living" && activeItem.ver.is_active && (
-                  <span className="text-[10px] px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full">MFR active</span>
+                {activeItem.is_active && (
+                  <span className="text-[10px] px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full">
+                    {activeItem.source === "p12" ? "P12 Base" : "Active"}
+                  </span>
                 )}
               </div>
             </div>
@@ -511,186 +499,36 @@ export default function ManufacturerPortalInternal() {
 
                 {/* ── OVERVIEW ── */}
                 {activeTab === "overview" && (
-                  <>
-                    {activeLiving ? (
-                      <div className="max-w-xl space-y-3">
-                        <MetaRow label="Version" value={activeLiving.version_number} />
-                        <MetaRow label="Created" value={formatDate(activeLiving.created_at)} />
-                        <MetaRow label="Change summary" value={activeLiving.change_summary} />
-                        <MetaRow label="Status" value={activeLiving.is_active ? "Active" : "Archived"} />
-                        <p className="text-xs text-gray-400 pt-2">
-                          This is a manufacturer feedback version. View the Formula tab for content.
-                        </p>
-                      </div>
-                    ) : activeBrief ? (
-                      <div className="space-y-6 max-w-2xl">
-                        <div className="space-y-2">
-                          <MetaRow label="Version" value={activeItem.label} />
-                          <MetaRow label="Created" value={formatDate(activeBrief.created_at)} />
-                          <MetaRow label="Updated" value={formatDate(activeBrief.updated_at)} />
-                        </div>
-                        <Separator />
-                        <div>
-                          <h3 className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">Product</h3>
-                          <div className="space-y-2">
-                            <MetaRow label="Form type" value={activeBrief.form_type} />
-                            <MetaRow label="Positioning" value={activeBrief.positioning} />
-                            <MetaRow label="Target customer" value={activeBrief.target_customer} />
-                            <MetaRow label="Flavor profile" value={activeBrief.flavor_profile} />
-                            <MetaRow label="Servings / container" value={activeBrief.servings_per_container} />
-                            <MetaRow label="Packaging" value={activeBrief.packaging_type} />
-                          </div>
-                        </div>
-                        <Separator />
-                        <div>
-                          <h3 className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">Commercials</h3>
-                          <div className="space-y-2">
-                            <MetaRow label="Target price" value={activeBrief.target_price != null ? `$${activeBrief.target_price}` : null} />
-                            <MetaRow label="COGS target" value={activeBrief.cogs_target != null ? `$${activeBrief.cogs_target}` : null} />
-                            <MetaRow label="Margin estimate" value={activeBrief.margin_estimate != null ? `${activeBrief.margin_estimate}%` : null} />
-                            <MetaRow label="MOQ estimate" value={activeBrief.moq_estimate != null ? `${activeBrief.moq_estimate.toLocaleString()} units` : null} />
-                            <MetaRow label="Lead time" value={activeBrief.lead_time_weeks != null ? `${activeBrief.lead_time_weeks} weeks` : null} />
-                          </div>
-                        </div>
-                        {(activeBrief.key_differentiators?.length || activeBrief.consumer_pain_points?.length || activeBrief.risk_factors?.length) && (
-                          <>
-                            <Separator />
-                            <div>
-                              <h3 className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">Strategy</h3>
-                              <div className="space-y-3">
-                                {activeBrief.key_differentiators?.length ? (
-                                  <div>
-                                    <p className="text-[11px] text-gray-400 mb-1.5">Key differentiators</p>
-                                    <TagList items={activeBrief.key_differentiators} color="bg-indigo-50 text-indigo-700" />
-                                  </div>
-                                ) : null}
-                                {activeBrief.consumer_pain_points?.length ? (
-                                  <div>
-                                    <p className="text-[11px] text-gray-400 mb-1.5">Consumer pain points</p>
-                                    <TagList items={activeBrief.consumer_pain_points} color="bg-amber-50 text-amber-700" />
-                                  </div>
-                                ) : null}
-                                {activeBrief.risk_factors?.length ? (
-                                  <div>
-                                    <p className="text-[11px] text-gray-400 mb-1.5">Risk factors</p>
-                                    <TagList items={activeBrief.risk_factors} color="bg-red-50 text-red-700" />
-                                  </div>
-                                ) : null}
-                                {activeBrief.certifications?.length ? (
-                                  <div>
-                                    <p className="text-[11px] text-gray-400 mb-1.5">Certifications</p>
-                                    <TagList items={activeBrief.certifications} color="bg-green-50 text-green-700" />
-                                  </div>
-                                ) : null}
-                                {activeBrief.testing_requirements?.length ? (
-                                  <div>
-                                    <p className="text-[11px] text-gray-400 mb-1.5">Testing requirements</p>
-                                    <TagList items={activeBrief.testing_requirements} color="bg-gray-100 text-gray-600" />
-                                  </div>
-                                ) : null}
-                              </div>
-                            </div>
-                          </>
-                        )}
-                        {(activeBrief.market_summary || activeBrief.opportunity_insights) && (
-                          <>
-                            <Separator />
-                            <div>
-                              <h3 className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">Market</h3>
-                              <div className="space-y-4">
-                                {activeBrief.market_summary && (
-                                  <div>
-                                    <p className="text-[11px] text-gray-400 mb-1">Market summary</p>
-                                    <p className="text-xs text-gray-700 leading-relaxed">{activeBrief.market_summary}</p>
-                                  </div>
-                                )}
-                                {activeBrief.opportunity_insights && (
-                                  <div>
-                                    <p className="text-[11px] text-gray-400 mb-1">Opportunity insights</p>
-                                    <p className="text-xs text-gray-700 leading-relaxed">{activeBrief.opportunity_insights}</p>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </>
-                        )}
-                        {(activeBrief.manufacturing_notes || activeBrief.regulatory_notes || activeBrief.packaging_recommendations) && (
-                          <>
-                            <Separator />
-                            <div>
-                              <h3 className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">Manufacturing</h3>
-                              <div className="space-y-4">
-                                {activeBrief.manufacturing_notes && (
-                                  <div>
-                                    <p className="text-[11px] text-gray-400 mb-1">Manufacturing notes</p>
-                                    <p className="text-xs text-gray-700 leading-relaxed">{activeBrief.manufacturing_notes}</p>
-                                  </div>
-                                )}
-                                {activeBrief.regulatory_notes && (
-                                  <div>
-                                    <p className="text-[11px] text-gray-400 mb-1">Regulatory notes</p>
-                                    <p className="text-xs text-gray-700 leading-relaxed">{activeBrief.regulatory_notes}</p>
-                                  </div>
-                                )}
-                                {activeBrief.packaging_recommendations && (
-                                  <div>
-                                    <p className="text-[11px] text-gray-400 mb-1">Packaging recommendations</p>
-                                    <p className="text-xs text-gray-700 leading-relaxed">{activeBrief.packaging_recommendations}</p>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    ) : null}
-                  </>
+                  <div className="max-w-xl space-y-3">
+                    <MetaRow label="Version" value={activeItem.label} />
+                    <MetaRow label="Source" value={activeItem.source === "p12" ? "P12 Formula (FDA Compliance)" : "Living Version"} />
+                    <MetaRow label="Created" value={formatDate(activeItem.created_at)} />
+                    {activeItem.change_summary && (
+                      <MetaRow label="Summary" value={activeItem.change_summary} />
+                    )}
+                    <MetaRow label="Status" value={activeItem.is_active ? "Active" : "Archived"} />
+                    {activeItem.form_type && <MetaRow label="Form type" value={activeItem.form_type} />}
+                    {activeItem.target_price != null && <MetaRow label="Target price" value={`$${activeItem.target_price}`} />}
+                    {activeItem.cogs_target != null && <MetaRow label="COGS target" value={`$${activeItem.cogs_target}`} />}
+                    {activeItem.qa_verdict && <MetaRow label="QA Verdict" value={activeItem.qa_verdict} />}
+                    {activeItem.fda_score && <MetaRow label="FDA Score" value={`${activeItem.fda_score}/100`} />}
+                    {activeItem.competitive_score && <MetaRow label="Competitive Score" value={`${activeItem.competitive_score}/10`} />}
+                    <p className="text-xs text-gray-400 pt-2">
+                      View the <button onClick={() => setActiveTab("formula")} className="text-indigo-600 underline">Formula tab</button> for the full document.
+                    </p>
+                  </div>
                 )}
 
                 {/* ── FORMULA ── */}
                 {activeTab === "formula" && (
                   <div className="space-y-6 max-w-3xl">
-                    {activeLiving ? (
-                      <div>
-                        <h3 className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">
-                          Formula — {activeLiving.change_summary ?? `MFR v${activeLiving.version_number}`}
-                        </h3>
-                        <SectionText text={activeLiving.formula_brief_content} fallback="No formula content." />
-                      </div>
-                    ) : activeBrief ? (() => {
-                      const { adjusted, grok, claude } = getFormulaText(activeBrief);
-                      return (
-                        <>
-                          {adjusted ? (
-                            <div>
-                              <h3 className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">Final Formula (Post-QA)</h3>
-                              <SectionText text={adjusted} />
-                            </div>
-                          ) : null}
-                          {grok ? (
-                            <>
-                              {adjusted && <Separator />}
-                              <div>
-                                <h3 className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">Grok 4.2 Draft</h3>
-                                <SectionText text={grok} />
-                              </div>
-                            </>
-                          ) : null}
-                          {claude ? (
-                            <>
-                              {(adjusted || grok) && <Separator />}
-                              <div>
-                                <h3 className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">Claude Sonnet 4.6 Draft</h3>
-                                <SectionText text={claude} />
-                              </div>
-                            </>
-                          ) : null}
-                          {!adjusted && !grok && !claude && (
-                            <p className="text-sm text-gray-400 py-4">No formula data available.</p>
-                          )}
-                        </>
-                      );
-                    })() : null}
+                    <div>
+                      <h3 className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">
+                        {activeItem.source === "p12" ? "P12 Formula Brief" : `Version ${activeItem.label}`}
+                        {activeItem.change_summary ? ` — ${activeItem.change_summary}` : ""}
+                      </h3>
+                      <SectionText text={activeItem.formula_brief_content} fallback="No formula content available." />
+                    </div>
                   </div>
                 )}
 
@@ -698,15 +536,17 @@ export default function ManufacturerPortalInternal() {
                 {activeTab === "comments" && (
                   <div className="max-w-2xl">
                     {comments.length === 0 ? (
-                      <p className="text-sm text-gray-400 text-center py-8">No comments yet.</p>
+                      <p className="text-sm text-gray-400 py-8 text-center">No comments yet for {activeItem.label}.</p>
                     ) : (
-                      <div className="space-y-5 mb-6">
+                      <div className="space-y-4">
                         {comments.map((c) => {
                           const isInternal = c.session_token === "00000000-0000-0000-0000-000000000000";
                           const isEditing = editingId === c.id;
                           return (
                             <div key={c.id} className="flex gap-3 group">
-                              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${isInternal ? "bg-indigo-100 text-indigo-700" : "bg-purple-100 text-purple-700"}`}>
+                              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                                isInternal ? "bg-indigo-100 text-indigo-700" : "bg-purple-100 text-purple-700"
+                              }`}>
                                 {getInitials(c.author_name)}
                               </div>
                               <div className="flex-1 min-w-0">
@@ -716,7 +556,6 @@ export default function ManufacturerPortalInternal() {
                                     <span className="text-[9px] px-1.5 py-0 bg-purple-100 text-purple-600 rounded-full">manufacturer</span>
                                   )}
                                   <span className="text-[10px] text-gray-400">{formatDate(c.created_at)}</span>
-                                  {/* Action buttons — show on hover */}
                                   <div className="ml-auto flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                     {isInternal && !isEditing && (
                                       <button

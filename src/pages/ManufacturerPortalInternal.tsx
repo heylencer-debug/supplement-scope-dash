@@ -34,6 +34,7 @@ interface UnifiedVersion {
   is_active: boolean;
   formula_brief_content: string;
   change_summary: string | null;
+  comment_labels?: string[];
   source: "version" | "pipeline";
   // Extra display metadata
   form_type?: string | null;
@@ -189,11 +190,25 @@ export default function ManufacturerPortalInternal() {
       .maybeSingle();
 
     Promise.all([versionsQ, briefsQ, publishedQ]).then(([{ data: liveVersions }, { data: briefData }, { data: pubData }]) => {
+      const liveVersionRows = (liveVersions ?? []) as any[];
       const all: UnifiedVersion[] = [];
+      const promotedPipelineVersions = new Map<string, any>();
+
+      for (const version of liveVersionRows) {
+        const pipelineId = getPromotedPipelineId(version.change_summary);
+        if (!pipelineId) continue;
+
+        const existing = promotedPipelineVersions.get(pipelineId);
+        if (!existing || version.is_active || version.version_number > existing.version_number) {
+          promotedPipelineVersions.set(pipelineId, version);
+        }
+      }
 
       // Living versions from formula_brief_versions (same as Dashboard tab)
-      if (liveVersions?.length) {
-        for (const v of liveVersions as any[]) {
+      if (liveVersionRows.length) {
+        for (const v of liveVersionRows) {
+          if (getPromotedPipelineId(v.change_summary)) continue;
+
           all.push({
             id: v.id,
             label: `v${v.version_number}`,
@@ -203,6 +218,7 @@ export default function ManufacturerPortalInternal() {
             is_active: v.is_active,
             formula_brief_content: v.formula_brief_content,
             change_summary: v.change_summary,
+            comment_labels: [`v${v.version_number}`],
             source: "version",
           });
         }
@@ -212,44 +228,50 @@ export default function ManufacturerPortalInternal() {
       if (briefData) {
         const ing = briefData.ingredients as any;
         if (ing?.ai_generated_brief_grok) {
+          const promotedVersion = promotedPipelineVersions.get("grok");
           all.push({
             id: "grok",
             label: "Formula A — Grok",
             category_id: selectedCat.id,
             created_at: briefData.created_at ?? "",
             version_number: -1,
-            is_active: false,
+            is_active: promotedVersion?.is_active ?? false,
             formula_brief_content: ing.ai_generated_brief_grok,
             change_summary: "Deep scientific reasoning",
+            comment_labels: promotedVersion ? ["Formula A — Grok", `v${promotedVersion.version_number}`] : ["Formula A — Grok"],
             source: "pipeline",
             emoji: "🤖",
             subtitle: "Deep scientific reasoning",
           });
         }
         if (ing?.ai_generated_brief_claude) {
+          const promotedVersion = promotedPipelineVersions.get("claude");
           all.push({
             id: "claude",
             label: "Formula B — Sonnet",
             category_id: selectedCat.id,
             created_at: briefData.created_at ?? "",
             version_number: -1,
-            is_active: false,
+            is_active: promotedVersion?.is_active ?? false,
             formula_brief_content: ing.ai_generated_brief_claude,
             change_summary: "1M context synthesis",
+            comment_labels: promotedVersion ? ["Formula B — Sonnet", `v${promotedVersion.version_number}`] : ["Formula B — Sonnet"],
             source: "pipeline",
             emoji: "🧠",
             subtitle: "1M context synthesis",
           });
         } else if (ing?.ai_generated_brief) {
+          const promotedVersion = promotedPipelineVersions.get("legacy");
           all.push({
             id: "legacy",
             label: "AI Generated Brief",
             category_id: selectedCat.id,
             created_at: briefData.created_at ?? "",
             version_number: -1,
-            is_active: false,
+            is_active: promotedVersion?.is_active ?? false,
             formula_brief_content: ing.ai_generated_brief,
             change_summary: "Initial AI brief",
+            comment_labels: promotedVersion ? ["AI Generated Brief", `v${promotedVersion.version_number}`] : ["AI Generated Brief"],
             source: "pipeline",
             emoji: "🧠",
             subtitle: "Initial AI brief",
@@ -257,30 +279,34 @@ export default function ManufacturerPortalInternal() {
         }
         const complianceContent = ing?.final_formula_brief || ing?.adjusted_formula;
         if (complianceContent) {
+          const promotedVersion = promotedPipelineVersions.get("compliance");
           all.push({
             id: "compliance",
             label: "⚖️ Compliance",
             category_id: selectedCat.id,
             created_at: briefData.created_at ?? "",
             version_number: -1,
-            is_active: false,
+            is_active: promotedVersion?.is_active ?? false,
             formula_brief_content: complianceContent,
             change_summary: "Initial formula brief from market analysis pipeline",
+            comment_labels: promotedVersion ? ["⚖️ Compliance", `v${promotedVersion.version_number}`] : ["⚖️ Compliance"],
             source: "pipeline",
             emoji: "⚖️",
             subtitle: "Initial formula brief from market analysis pipeline",
           });
         }
         if (ing?.final_formula_brief) {
+          const promotedVersion = promotedPipelineVersions.get("qa-final");
           all.push({
             id: "qa-final",
             label: "✅ QA Approved Final",
             category_id: selectedCat.id,
             created_at: briefData.created_at ?? "",
             version_number: -1,
-            is_active: false,
+            is_active: promotedVersion?.is_active ?? false,
             formula_brief_content: ing.final_formula_brief,
             change_summary: `${ing?.qa_verdict?.verdict || 'Reviewed'} · Score: ${ing?.qa_verdict?.score || '—'}/10`,
+            comment_labels: promotedVersion ? ["✅ QA Approved Final", `v${promotedVersion.version_number}`] : ["✅ QA Approved Final"],
             source: "pipeline",
             emoji: "✅",
             subtitle: `${ing?.qa_verdict?.verdict || 'Reviewed'} · Score: ${ing?.qa_verdict?.score || '—'}/10`,
@@ -289,9 +315,13 @@ export default function ManufacturerPortalInternal() {
       }
 
       setVersions(all);
-      setPublishedLabel(pubData?.version_label ?? null);
+      const rawPublishedLabel = pubData?.version_label ?? null;
+      const resolvedPublishedItem = rawPublishedLabel
+        ? all.find((item) => item.comment_labels?.includes(rawPublishedLabel) || item.label === rawPublishedLabel) ?? null
+        : null;
+      setPublishedLabel(resolvedPublishedItem?.label ?? rawPublishedLabel);
       // Default to first version (or first pipeline brief)
-      const firstVersion = all.find(v => v.source === "version") ?? all[0];
+      const firstVersion = all.find(v => v.is_active) ?? all.find(v => v.source === "version") ?? all[0];
       if (firstVersion) setActiveItem(firstVersion);
     });
 
@@ -310,7 +340,7 @@ export default function ManufacturerPortalInternal() {
       .from("manufacturer_comments")
       .select("*")
       .eq("category_id", selectedCat.id)
-      .eq("version_label", activeItem.label)
+      .in("version_label", activeItem.comment_labels ?? [activeItem.label])
       .order("created_at", { ascending: true })
       .then(({ data }) => setComments((data ?? []) as MfrComment[]));
   }, [activeItem, selectedCat]);

@@ -169,77 +169,129 @@ export default function ManufacturerPortalInternal() {
       });
   }, []);
 
-  // Load versions: P12 base from formula_briefs + living versions from formula_brief_versions
+  // Load versions — same data sources as Dashboard Manufacturer tab
   useEffect(() => {
     if (!selectedCat) return;
     setActiveItem(null);
     setActiveTab("overview");
 
-    const briefsQ = supabase
-      .from("formula_briefs")
-      .select("id, category_id, created_at, updated_at, ingredients, form_type, target_price, cogs_target, positioning")
-      .eq("category_id", selectedCat.id)
-      .order("created_at", { ascending: true })
-      .limit(1);
-
-    const liveQ = supabase
+    const versionsQ = supabase
       .from("formula_brief_versions")
-      .select("id, category_id, created_at, version_number, is_active, formula_brief_content, change_summary")
+      .select("*")
       .eq("category_id", selectedCat.id)
       .order("version_number", { ascending: true });
 
-    Promise.all([briefsQ, liveQ]).then(([{ data: briefs }, { data: live }]) => {
+    const briefsQ = supabase
+      .from("formula_briefs")
+      .select("ingredients, created_at")
+      .eq("category_id", selectedCat.id)
+      .limit(1)
+      .maybeSingle();
+
+    Promise.all([versionsQ, briefsQ]).then(([{ data: liveVersions }, { data: briefData }]) => {
       const all: UnifiedVersion[] = [];
 
-      // P12 base version from formula_briefs
-      if (briefs?.length) {
-        const b = briefs[0] as any;
-        const ingredients = (b.ingredients ?? {}) as Record<string, unknown>;
-        const p12Meta = extractP12Metadata(ingredients);
-        // Use the full P12 document (final_formula_brief), fallback to adjusted_formula
-        const formulaContent = (ingredients.final_formula_brief ?? ingredients.adjusted_formula ?? "") as string;
-        const changeSummary = `Dual AI formula brief — ${[
-          ingredients.formula_brief_model_grok && `Grok`,
-          ingredients.formula_brief_model_claude && `Claude Sonnet`,
-        ].filter(Boolean).join(" + ") || "AI Generated"}`;
-
-        all.push({
-          id: b.id,
-          label: "v1",
-          category_id: b.category_id,
-          created_at: b.created_at,
-          version_number: 0,
-          is_active: !live?.some((v: any) => v.is_active),
-          formula_brief_content: formulaContent,
-          change_summary: changeSummary,
-          source: "p12",
-          form_type: b.form_type,
-          target_price: b.target_price,
-          cogs_target: b.cogs_target,
-          positioning: b.positioning,
-          ...p12Meta,
-        });
-      }
-
-      // Living versions from formula_brief_versions
-      if (live?.length) {
-        for (const v of live as any[]) {
+      // Living versions from formula_brief_versions (same as Dashboard tab)
+      if (liveVersions?.length) {
+        for (const v of liveVersions as any[]) {
           all.push({
             id: v.id,
-            label: `v${(briefs?.length ? 1 : 0) + v.version_number}`,
+            label: `v${v.version_number}`,
             category_id: v.category_id,
             created_at: v.created_at,
             version_number: v.version_number,
             is_active: v.is_active,
             formula_brief_content: v.formula_brief_content,
             change_summary: v.change_summary,
-            source: "living",
+            source: "version",
+          });
+        }
+      }
+
+      // Pipeline briefs from formula_briefs.ingredients (same as Dashboard tab)
+      if (briefData) {
+        const ing = briefData.ingredients as any;
+        if (ing?.ai_generated_brief_grok) {
+          all.push({
+            id: "grok",
+            label: "Formula A — Grok",
+            category_id: selectedCat.id,
+            created_at: briefData.created_at ?? "",
+            version_number: -1,
+            is_active: false,
+            formula_brief_content: ing.ai_generated_brief_grok,
+            change_summary: "Deep scientific reasoning",
+            source: "pipeline",
+            emoji: "🤖",
+            subtitle: "Deep scientific reasoning",
+          });
+        }
+        if (ing?.ai_generated_brief_claude) {
+          all.push({
+            id: "claude",
+            label: "Formula B — Sonnet",
+            category_id: selectedCat.id,
+            created_at: briefData.created_at ?? "",
+            version_number: -1,
+            is_active: false,
+            formula_brief_content: ing.ai_generated_brief_claude,
+            change_summary: "1M context synthesis",
+            source: "pipeline",
+            emoji: "🧠",
+            subtitle: "1M context synthesis",
+          });
+        } else if (ing?.ai_generated_brief) {
+          all.push({
+            id: "legacy",
+            label: "AI Generated Brief",
+            category_id: selectedCat.id,
+            created_at: briefData.created_at ?? "",
+            version_number: -1,
+            is_active: false,
+            formula_brief_content: ing.ai_generated_brief,
+            change_summary: "Initial AI brief",
+            source: "pipeline",
+            emoji: "🧠",
+            subtitle: "Initial AI brief",
+          });
+        }
+        const complianceContent = ing?.final_formula_brief || ing?.adjusted_formula;
+        if (complianceContent) {
+          all.push({
+            id: "compliance",
+            label: "⚖️ Compliance",
+            category_id: selectedCat.id,
+            created_at: briefData.created_at ?? "",
+            version_number: -1,
+            is_active: false,
+            formula_brief_content: complianceContent,
+            change_summary: "Initial formula brief from market analysis pipeline",
+            source: "pipeline",
+            emoji: "⚖️",
+            subtitle: "Initial formula brief from market analysis pipeline",
+          });
+        }
+        if (ing?.final_formula_brief) {
+          all.push({
+            id: "qa-final",
+            label: "✅ QA Approved Final",
+            category_id: selectedCat.id,
+            created_at: briefData.created_at ?? "",
+            version_number: -1,
+            is_active: false,
+            formula_brief_content: ing.final_formula_brief,
+            change_summary: `${ing?.qa_verdict?.verdict || 'Reviewed'} · Score: ${ing?.qa_verdict?.score || '—'}/10`,
+            source: "pipeline",
+            emoji: "✅",
+            subtitle: `${ing?.qa_verdict?.verdict || 'Reviewed'} · Score: ${ing?.qa_verdict?.score || '—'}/10`,
           });
         }
       }
 
       setVersions(all);
-      if (all.length) setActiveItem(all[all.length - 1]); // default to latest
+      // Default to first version (or first pipeline brief)
+      const firstVersion = all.find(v => v.source === "version") ?? all[0];
+      if (firstVersion) setActiveItem(firstVersion);
     });
   }, [selectedCat]);
 

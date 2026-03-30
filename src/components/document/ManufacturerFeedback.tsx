@@ -258,6 +258,38 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
 
   const viewingVersion = viewingVersionId ? allVersions.find(v => v.id === viewingVersionId) : null;
 
+  const promotedPipelineVersions = useMemo(() => {
+    const latestByPipeline = new Map<string, FormulaBriefVersion>();
+
+    allVersions.forEach((version) => {
+      const pipelineId = getPromotedPipelineId(version.change_summary);
+      if (!pipelineId) return;
+
+      const existing = latestByPipeline.get(pipelineId);
+      if (!existing || version.is_active || version.version_number > existing.version_number) {
+        latestByPipeline.set(pipelineId, version);
+      }
+    });
+
+    return latestByPipeline;
+  }, [allVersions]);
+
+  const visibleVersions = useMemo(
+    () => allVersions.filter((version) => !getPromotedPipelineId(version.change_summary)),
+    [allVersions]
+  );
+
+  const visiblePipelineBriefs = useMemo(
+    () => (pipelineBriefs ?? []).map((brief) => {
+      const promotedVersion = promotedPipelineVersions.get(brief.id) ?? null;
+      return {
+        ...brief,
+        is_active: promotedVersion?.is_active ?? false,
+      };
+    }),
+    [pipelineBriefs, promotedPipelineVersions]
+  );
+
   const handleDownloadVersion = useCallback(async (versionId: string) => {
     setDownloadingVersion(versionId);
     try {

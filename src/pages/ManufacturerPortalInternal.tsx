@@ -275,8 +275,7 @@ export default function ManufacturerPortalInternal() {
   const loadComments = useCallback(() => {
     if (!activeVersion || !selectedCat) return;
     const vLabel = getVersionLabel(briefs, activeVersion);
-    supabase
-      .from("manufacturer_comments")
+    (supabase.from as any)("manufacturer_comments")
       .select("*")
       .eq("category_id", selectedCat.id)
       .eq("version_label", vLabel)

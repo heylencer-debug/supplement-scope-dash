@@ -344,7 +344,7 @@ export default function ManufacturerPortal() {
         .from("manufacturer-uploads")
         .upload(path, attachmentFile, { upsert: false });
       if (uploadError) {
-        setSubmitError("File upload failed. Please try again.");
+        setSubmitError(`Upload failed: ${uploadError.message}`);
         setSubmitting(false);
         return;
       }

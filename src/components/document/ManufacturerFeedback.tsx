@@ -21,6 +21,18 @@ interface ManufacturerFeedbackProps {
   defaultExpanded?: boolean;
 }
 
+interface PortalComment {
+  id: string;
+  author_name: string;
+  comment: string;
+  version_label: string;
+  created_at: string;
+  session_token: string;
+  attachment_url: string | null;
+  attachment_name: string | null;
+  attachment_type: string | null;
+}
+
 interface FeedbackRow {
   id: string;
   feedback_text: string | null;
@@ -106,6 +118,8 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
   const [replyEdits, setReplyEdits] = useState<Record<string, string>>({});
   const [copiedReply, setCopiedReply] = useState<string | null>(null);
   const [viewingVersionId, setViewingVersionId] = useState<string | null>(null);
+  const [portalCommentsOpen, setPortalCommentsOpen] = useState(false);
+  const [selectedCommentIds, setSelectedCommentIds] = useState<Set<string>>(new Set());
 
   // Load all formula brief versions for this category
   const { data: allVersions = [] } = useQuery({
@@ -392,6 +406,20 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
     toast({ title: "Copied to clipboard", description: "Reply ready to paste into your email." });
   }, [toast]);
 
+  // Load manufacturer portal comments for this category
+  const { data: portalComments = [] } = useQuery({
+    queryKey: ["manufacturer_comments_portal", categoryId],
+    queryFn: async () => {
+      const { data } = await (supabase.from as any)("manufacturer_comments")
+        .select("*")
+        .eq("category_id", categoryId)
+        .neq("session_token", "00000000-0000-0000-0000-000000000000") // exclude DOVIVE Team
+        .order("created_at", { ascending: false });
+      return (data ?? []) as PortalComment[];
+    },
+    enabled: !!categoryId,
+  });
+
   // Load existing feedback — poll every 4s while any row is processing
   const { data: feedbackList = [] } = useQuery({
     queryKey: ["manufacturer_feedback", categoryId],
@@ -444,6 +472,23 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },
   });
+
+  const importSelectedComments = () => {
+    const selected = portalComments.filter((c) => selectedCommentIds.has(c.id));
+    if (!selected.length) return;
+    const text = selected
+      .map((c) => `[${c.author_name} · ${c.version_label} · ${format(new Date(c.created_at), "MMM d")}]\n${c.comment || "(file attachment)"}`)
+      .join("\n\n---\n\n");
+    setFeedbackText((prev) => prev ? `${prev}\n\n${text}` : text);
+    // Attach any images from selected comments
+    const imageAttachments = selected
+      .filter((c) => c.attachment_url && c.attachment_type?.startsWith("image/"))
+      .map((c) => ({ file: new File([], c.attachment_name ?? "image"), url: c.attachment_url! }));
+    if (imageAttachments.length) setUploadedImages((prev) => [...prev, ...imageAttachments]);
+    setSelectedCommentIds(new Set());
+    setPortalCommentsOpen(false);
+    toast({ title: `${selected.length} comment${selected.length > 1 ? "s" : ""} imported`, description: "Review and submit to analyze." });
+  };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -716,6 +761,82 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
 
       {expanded && (
         <div className="px-4 pb-4 space-y-4 border-t border-gray-100 pt-4">
+          {/* Portal Comments — import from manufacturer portal */}
+          {portalComments.length > 0 && (
+            <div className="border border-purple-100 rounded-lg overflow-hidden">
+              <button
+                onClick={() => setPortalCommentsOpen(!portalCommentsOpen)}
+                className="w-full flex items-center justify-between px-3 py-2.5 text-left hover:bg-purple-50 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="w-3.5 h-3.5 text-purple-500" />
+                  <span className="text-xs font-medium text-gray-700">Portal Comments</span>
+                  <span className="text-[10px] px-1.5 py-0 bg-purple-100 text-purple-700 rounded-full">
+                    {portalComments.length}
+                  </span>
+                </div>
+                {portalCommentsOpen
+                  ? <ChevronUp className="w-3.5 h-3.5 text-gray-400" />
+                  : <ChevronDown className="w-3.5 h-3.5 text-gray-400" />}
+              </button>
+
+              {portalCommentsOpen && (
+                <div className="border-t border-purple-100">
+                  <div className="divide-y divide-gray-50 max-h-64 overflow-y-auto">
+                    {portalComments.map((c) => (
+                      <label key={c.id} className="flex items-start gap-2.5 px-3 py-2.5 hover:bg-gray-50 cursor-pointer">
+                        <Checkbox
+                          checked={selectedCommentIds.has(c.id)}
+                          onCheckedChange={(checked) =>
+                            setSelectedCommentIds((prev) => {
+                              const next = new Set(prev);
+                              checked ? next.add(c.id) : next.delete(c.id);
+                              return next;
+                            })
+                          }
+                          className="mt-0.5 shrink-0"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+                            <span className="text-xs font-medium text-gray-700">{c.author_name}</span>
+                            <span className="text-[10px] px-1.5 py-0 bg-gray-100 text-gray-500 rounded-full">{c.version_label}</span>
+                            <span className="text-[10px] text-gray-400 ml-auto">{format(new Date(c.created_at), "MMM d, h:mm a")}</span>
+                          </div>
+                          {c.comment && (
+                            <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed">{c.comment}</p>
+                          )}
+                          {c.attachment_url && (
+                            <span className="inline-flex items-center gap-1 text-[10px] text-blue-500 mt-0.5">
+                              <FileText className="w-2.5 h-2.5" />
+                              {c.attachment_name ?? "Attachment"}
+                            </span>
+                          )}
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="border-t border-purple-100 px-3 py-2 bg-purple-50 flex items-center justify-between">
+                    <span className="text-[10px] text-purple-500">
+                      {selectedCommentIds.size > 0
+                        ? `${selectedCommentIds.size} selected`
+                        : "Select comments to import"}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs gap-1.5 border-purple-200 text-purple-700 hover:bg-purple-100"
+                      disabled={selectedCommentIds.size === 0}
+                      onClick={importSelectedComments}
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      Import as feedback
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Submit form */}
           <div className="space-y-3">
             <p className="text-xs text-gray-500">

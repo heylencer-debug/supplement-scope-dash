@@ -308,16 +308,20 @@ export default function ManufacturerPortalInternal() {
   const submitComment = async () => {
     if (!commentText.trim() || !activeItem || !selectedCat) return;
     setSubmitting(true);
-    await supabase.from("manufacturer_comments").insert({
+    const { error } = await (supabase.from as any)("manufacturer_comments").insert({
       session_token: "00000000-0000-0000-0000-000000000000",
       category_id: selectedCat.id,
       version_label: activeItem.label,
       author_name: authorName || "DOVIVE Team",
       comment: commentText.trim(),
     });
-    setCommentText("");
+    if (error) {
+      toast({ title: "Failed to post comment", description: error.message, variant: "destructive" });
+    } else {
+      setCommentText("");
+      loadComments();
+    }
     setSubmitting(false);
-    loadComments();
   };
 
   const generateLink = async () => {

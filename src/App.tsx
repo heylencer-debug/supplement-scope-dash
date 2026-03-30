@@ -10,6 +10,7 @@ import Dashboard from "./pages/Dashboard";
 import ProductExplorer from "./pages/ProductExplorer";
 import AddProduct from "./pages/AddProduct";
 import NotFound from "./pages/NotFound";
+import ManufacturerPortal from "./pages/ManufacturerPortal";
 
 const queryClient = new QueryClient();
 
@@ -20,15 +21,26 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <Layout>
-            <Routes>
-              <Route path="/" element={<NewAnalysis />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/products" element={<ProductExplorer />} />
-              <Route path="/products/add" element={<AddProduct />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Layout>
+          <Routes>
+            {/* Standalone manufacturer portal — no main app layout */}
+            <Route path="/mfr/:token" element={<ManufacturerPortal />} />
+
+            {/* Main app routes wrapped in Layout */}
+            <Route
+              path="*"
+              element={
+                <Layout>
+                  <Routes>
+                    <Route path="/" element={<NewAnalysis />} />
+                    <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/products" element={<ProductExplorer />} />
+                    <Route path="/products/add" element={<AddProduct />} />
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
+                </Layout>
+              }
+            />
+          </Routes>
         </BrowserRouter>
       </CategoryProvider>
     </TooltipProvider>

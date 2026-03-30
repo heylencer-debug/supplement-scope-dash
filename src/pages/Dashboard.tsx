@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { ScrollAnimate } from "@/components/ui/scroll-animate";
-import { Building2, ChevronsUpDown } from "lucide-react";
+import { Building2, ChevronsUpDown, Link2 } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 
@@ -50,6 +50,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { Target } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 function PipelineCollapsible({ categoryId, categoryName }: { categoryId: string; categoryName: string }) {
   const { data: phases } = usePipelineStatus(categoryId, categoryName);
@@ -138,8 +139,10 @@ export default function Dashboard() {
   const urlCategoryName = rawUrlCategoryName ? rawUrlCategoryName.replace(/^=+/, "").trim() : null;
   const { setCategoryContext, categoryName: contextCategoryName } = useCategoryContext();
   const queryClient = useQueryClient();
-  
+  const { toast } = useToast();
+
   const [activeTab, setActiveTab] = useState("products");
+  const [generatingLink, setGeneratingLink] = useState(false);
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
 
   const categoryName = urlCategoryName || contextCategoryName;
@@ -424,6 +427,28 @@ export default function Dashboard() {
   }
 
   const isDataLoading = analysisLoading || productsLoading;
+
+  async function handleGenerateLink() {
+    const name = window.prompt("Manufacturer name for this link:");
+    if (!name || !name.trim()) return;
+    setGeneratingLink(true);
+    try {
+      const { data, error } = await supabase
+        .from("manufacturer_sessions")
+        .insert({ manufacturer_name: name.trim() })
+        .select("token")
+        .single();
+      if (error || !data) throw new Error(error?.message ?? "Insert failed");
+      const url = `${window.location.origin}/mfr/${data.token}`;
+      await navigator.clipboard.writeText(url);
+      toast({ title: "Link copied to clipboard", description: url });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast({ title: "Failed to generate link", description: msg, variant: "destructive" });
+    } finally {
+      setGeneratingLink(false);
+    }
+  }
 
   return (
     <div className="space-y-6 md:space-y-10 pb-12 md:pb-16 overflow-x-hidden">
@@ -905,6 +930,18 @@ export default function Dashboard() {
 
         {/* TAB 7: Manufacturer Feedback — living formula brief */}
         <TabsContent value="manufacturer" className="space-y-6 mt-4">
+          <div className="flex justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 text-xs"
+              onClick={handleGenerateLink}
+              disabled={generatingLink}
+            >
+              <Link2 className="w-3.5 h-3.5" />
+              {generatingLink ? "Generating…" : "Generate Manufacturer Link"}
+            </Button>
+          </div>
           {category?.id && categoryName ? (
             <ManufacturerFeedback
               categoryId={category.id}

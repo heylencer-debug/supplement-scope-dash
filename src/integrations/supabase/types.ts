@@ -903,6 +903,9 @@ export type Database = {
       }
       manufacturer_comments: {
         Row: {
+          attachment_name: string | null
+          attachment_type: string | null
+          attachment_url: string | null
           author_name: string
           category_id: string
           comment: string
@@ -912,6 +915,9 @@ export type Database = {
           version_label: string
         }
         Insert: {
+          attachment_name?: string | null
+          attachment_type?: string | null
+          attachment_url?: string | null
           author_name: string
           category_id: string
           comment: string
@@ -921,6 +927,9 @@ export type Database = {
           version_label: string
         }
         Update: {
+          attachment_name?: string | null
+          attachment_type?: string | null
+          attachment_url?: string | null
           author_name?: string
           category_id?: string
           comment?: string
@@ -1008,6 +1017,39 @@ export type Database = {
             columns: ["resulting_version_id"]
             isOneToOne: false
             referencedRelation: "formula_brief_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      manufacturer_published_versions: {
+        Row: {
+          category_id: string
+          updated_at: string | null
+          version_label: string
+        }
+        Insert: {
+          category_id: string
+          updated_at?: string | null
+          version_label: string
+        }
+        Update: {
+          category_id?: string
+          updated_at?: string | null
+          version_label?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "manufacturer_published_versions_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: true
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manufacturer_published_versions_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: true
+            referencedRelation: "v_category_dashboard"
             referencedColumns: ["id"]
           },
         ]

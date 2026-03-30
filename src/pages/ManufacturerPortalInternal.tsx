@@ -544,7 +544,7 @@ export default function ManufacturerPortalInternal() {
                 <span className="text-xs text-gray-400">{activeItem.label}</span>
                 {activeItem.is_active && (
                   <span className="text-[10px] px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full">
-                    {activeItem.source === "p12" ? "P12 Base" : "Active"}
+                    {activeItem.source === "pipeline" ? "Pipeline Source" : "Active"}
                   </span>
                 )}
               </div>

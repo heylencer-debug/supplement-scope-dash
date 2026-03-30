@@ -30,8 +30,8 @@ interface UnifiedVersion {
   is_active: boolean;
   formula_brief_content: string;
   change_summary: string | null;
-  source: "p12" | "living";
-  // P12 metadata
+  source: "version" | "pipeline";
+  // Extra display metadata
   form_type?: string | null;
   target_price?: number | null;
   cogs_target?: number | null;
@@ -41,6 +41,9 @@ interface UnifiedVersion {
   fda_score?: string | null;
   fda_status?: string | null;
   competitive_score?: string | null;
+  // Pipeline-specific
+  emoji?: string;
+  subtitle?: string;
 }
 
 interface MfrComment {

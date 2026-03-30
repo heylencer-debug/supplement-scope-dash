@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { PDFDownloadLink } from "@react-pdf/renderer";
 import { FormulaPDF } from "@/components/FormulaPDF";
+import { Paperclip, X, FileText, Image } from "lucide-react";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -33,6 +34,9 @@ interface MfrComment {
   author_name: string;
   comment: string;
   created_at: string;
+  attachment_url: string | null;
+  attachment_name: string | null;
+  attachment_type: string | null;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -157,6 +161,8 @@ export default function ManufacturerPortal() {
   const [commentText, setCommentText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ── Validate token ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -322,20 +328,50 @@ export default function ManufacturerPortal() {
 
   // ── Submit comment ─────────────────────────────────────────────────────────
   async function handleSubmitComment() {
-    if (!commentText.trim() || !session || !selectedCategoryId || !activeCommentVersion) return;
+    if (!commentText.trim() && !attachmentFile) return;
+    if (!session || !selectedCategoryId || !activeCommentVersion) return;
     setSubmitting(true);
     setSubmitError(null);
+
+    let attachmentUrl: string | null = null;
+    let attachmentName: string | null = null;
+    let attachmentType: string | null = null;
+
+    if (attachmentFile) {
+      const safeName = attachmentFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const path = `${selectedCategoryId}/${activeCommentVersion}/${Date.now()}-${safeName}`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from("manufacturer-uploads")
+        .upload(path, attachmentFile, { upsert: false });
+      if (uploadError) {
+        setSubmitError("File upload failed. Please try again.");
+        setSubmitting(false);
+        return;
+      }
+      const { data: { publicUrl } } = supabase.storage
+        .from("manufacturer-uploads")
+        .getPublicUrl(uploadData.path);
+      attachmentUrl = publicUrl;
+      attachmentName = attachmentFile.name;
+      attachmentType = attachmentFile.type || "application/octet-stream";
+    }
+
     const { error } = await (supabase.from as any)("manufacturer_comments").insert({
       session_token: session.token,
       category_id: selectedCategoryId,
       version_label: activeCommentVersion,
       author_name: session.manufacturer_name,
       comment: commentText.trim(),
+      attachment_url: attachmentUrl,
+      attachment_name: attachmentName,
+      attachment_type: attachmentType,
     });
     if (error) {
-      setSubmitError("Failed to send comment. Please try again.");
+      setSubmitError("Failed to send. Please try again.");
     } else {
       setCommentText("");
+      setAttachmentFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
       await loadComments(selectedCategoryId, activeCommentVersion);
     }
     setSubmitting(false);
@@ -556,7 +592,32 @@ export default function ManufacturerPortal() {
                               <span className="text-sm font-medium text-gray-800">{c.author_name}</span>
                               <span className="text-xs text-gray-400">{formatTime(c.created_at)}</span>
                             </div>
-                            <p className="text-sm text-gray-600 leading-relaxed">{c.comment}</p>
+                            {c.comment && (
+                              <p className="text-sm text-gray-600 leading-relaxed">{c.comment}</p>
+                            )}
+                            {c.attachment_url && (
+                              <div className="mt-2">
+                                {c.attachment_type?.startsWith("image/") ? (
+                                  <a href={c.attachment_url} target="_blank" rel="noopener noreferrer">
+                                    <img
+                                      src={c.attachment_url}
+                                      alt={c.attachment_name ?? "attachment"}
+                                      className="max-w-xs max-h-48 rounded-lg border border-gray-200 object-cover hover:opacity-90 transition-opacity"
+                                    />
+                                  </a>
+                                ) : (
+                                  <a
+                                    href={c.attachment_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-2 text-xs text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-100 rounded-lg px-3 py-2 transition-colors"
+                                  >
+                                    <FileText className="w-3.5 h-3.5 shrink-0" />
+                                    <span className="truncate max-w-[200px]">{c.attachment_name ?? "Attachment"}</span>
+                                  </a>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </div>
                       ))
@@ -565,10 +626,16 @@ export default function ManufacturerPortal() {
 
                   {/* Comment input */}
                   <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      className="hidden"
+                      onChange={(e) => setAttachmentFile(e.target.files?.[0] ?? null)}
+                    />
                     <Textarea
                       value={commentText}
                       onChange={(e) => setCommentText(e.target.value)}
-                      placeholder="Add a comment…"
+                      placeholder="Add a comment or attach a file…"
                       className="border-0 resize-none text-sm focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none min-h-[80px]"
                       onKeyDown={(e) => {
                         if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
@@ -576,16 +643,47 @@ export default function ManufacturerPortal() {
                         }
                       }}
                     />
+                    {attachmentFile && (
+                      <div className="px-3 py-2 bg-blue-50 border-t border-blue-100 flex items-center gap-2">
+                        {attachmentFile.type.startsWith("image/") ? (
+                          <Image className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                        ) : (
+                          <FileText className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                        )}
+                        <span className="text-xs text-blue-700 flex-1 truncate">{attachmentFile.name}</span>
+                        <span className="text-xs text-blue-400">
+                          {(attachmentFile.size / 1024 / 1024).toFixed(1)} MB
+                        </span>
+                        <button
+                          onClick={() => {
+                            setAttachmentFile(null);
+                            if (fileInputRef.current) fileInputRef.current.value = "";
+                          }}
+                          className="text-blue-400 hover:text-blue-600 p-0.5 rounded"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
                     <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-t border-gray-200">
                       {submitError ? (
                         <span className="text-xs text-red-500">{submitError}</span>
                       ) : (
-                        <span className="text-xs text-gray-400">Cmd+Enter to send</span>
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => fileInputRef.current?.click()}
+                            className="text-gray-400 hover:text-gray-600 transition-colors"
+                            title="Attach a file"
+                          >
+                            <Paperclip className="w-4 h-4" />
+                          </button>
+                          <span className="text-xs text-gray-400">Cmd+Enter to send</span>
+                        </div>
                       )}
                       <Button
                         size="sm"
                         className="h-7 text-xs bg-blue-600 hover:bg-blue-700 text-white"
-                        disabled={!commentText.trim() || submitting}
+                        disabled={(!commentText.trim() && !attachmentFile) || submitting}
                         onClick={handleSubmitComment}
                       >
                         {submitting ? "Sending…" : "Send"}

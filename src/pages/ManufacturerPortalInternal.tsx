@@ -12,7 +12,7 @@ import { PDFDownloadLink } from "@react-pdf/renderer";
 import { FormulaPDF } from "@/components/FormulaPDF";
 import {
   Link2, ChevronRight, MessageSquare, FlaskConical, LayoutDashboard, GitBranch,
-  Pencil, Trash2, Check, X, Eye, EyeOff,
+  Pencil, Trash2, Check, X, Eye, EyeOff, FileText,
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -56,6 +56,9 @@ interface MfrComment {
   author_name: string;
   comment: string;
   created_at: string;
+  attachment_url: string | null;
+  attachment_name: string | null;
+  attachment_type: string | null;
 }
 
 type TabKey = "overview" | "formula" | "comments";
@@ -694,7 +697,34 @@ export default function ManufacturerPortalInternal() {
                                     autoFocus
                                   />
                                 ) : (
-                                  <p className="text-sm text-gray-700 leading-relaxed">{c.comment}</p>
+                                  <>
+                                    {c.comment && (
+                                      <p className="text-sm text-gray-700 leading-relaxed">{c.comment}</p>
+                                    )}
+                                    {c.attachment_url && (
+                                      <div className="mt-2">
+                                        {c.attachment_type?.startsWith("image/") ? (
+                                          <a href={c.attachment_url} target="_blank" rel="noopener noreferrer">
+                                            <img
+                                              src={c.attachment_url}
+                                              alt={c.attachment_name ?? "attachment"}
+                                              className="max-w-xs max-h-48 rounded-lg border border-gray-200 object-cover hover:opacity-90 transition-opacity"
+                                            />
+                                          </a>
+                                        ) : (
+                                          <a
+                                            href={c.attachment_url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-2 text-xs text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-100 rounded-lg px-3 py-2 transition-colors"
+                                          >
+                                            <FileText className="w-3.5 h-3.5 shrink-0" />
+                                            <span className="truncate max-w-[200px]">{c.attachment_name ?? "Attachment"}</span>
+                                          </a>
+                                        )}
+                                      </div>
+                                    )}
+                                  </>
                                 )}
                               </div>
                             </div>

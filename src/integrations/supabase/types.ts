@@ -901,6 +901,44 @@ export type Database = {
           },
         ]
       }
+      manufacturer_comments: {
+        Row: {
+          author_name: string
+          category_id: string
+          comment: string
+          created_at: string | null
+          id: string
+          session_token: string
+          version_label: string
+        }
+        Insert: {
+          author_name: string
+          category_id: string
+          comment: string
+          created_at?: string | null
+          id?: string
+          session_token: string
+          version_label: string
+        }
+        Update: {
+          author_name?: string
+          category_id?: string
+          comment?: string
+          created_at?: string | null
+          id?: string
+          session_token?: string
+          version_label?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "manufacturer_comments_session_token_fkey"
+            columns: ["session_token"]
+            isOneToOne: false
+            referencedRelation: "manufacturer_sessions"
+            referencedColumns: ["token"]
+          },
+        ]
+      }
       manufacturer_feedback: {
         Row: {
           category_id: string
@@ -973,6 +1011,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      manufacturer_sessions: {
+        Row: {
+          created_at: string | null
+          expires_at: string | null
+          id: string
+          manufacturer_name: string
+          token: string
+        }
+        Insert: {
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          manufacturer_name: string
+          token?: string
+        }
+        Update: {
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          manufacturer_name?: string
+          token?: string
+        }
+        Relationships: []
       }
       market_trend_analyses: {
         Row: {

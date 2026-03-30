@@ -501,6 +501,21 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
                         <Download className="w-3 h-3" />
                         {downloadingVersion === v.id ? "..." : "PDF"}
                       </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-xs gap-1 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        disabled={v.is_active || deleteVersionMutation.isPending}
+                        title={v.is_active ? "Cannot delete the active version" : "Delete this version"}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (window.confirm(`Delete v${v.version_number}? This cannot be undone.`)) {
+                            deleteVersionMutation.mutate(v.id);
+                          }
+                        }}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
                     </div>
                   </td>
                 </tr>

@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import {
   Link2, ChevronRight, MessageSquare, FlaskConical, LayoutDashboard, GitBranch,
+  Pencil, Trash2, Check, X,
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -192,6 +193,8 @@ export default function ManufacturerPortalInternal() {
   const [commentText, setCommentText] = useState("");
   const [authorName, setAuthorName] = useState("DOVIVE Team");
   const [submitting, setSubmitting] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
   const [mfrName, setMfrName] = useState("");
   const [generatingLink, setGeneratingLink] = useState(false);
 
@@ -272,6 +275,19 @@ export default function ManufacturerPortalInternal() {
     const interval = setInterval(loadComments, 10000);
     return () => clearInterval(interval);
   }, [loadComments]);
+
+  const deleteComment = async (id: string) => {
+    await supabase.from("manufacturer_comments").delete().eq("id", id);
+    loadComments();
+  };
+
+  const saveEdit = async (id: string) => {
+    if (!editText.trim()) return;
+    await supabase.from("manufacturer_comments").update({ comment: editText.trim() }).eq("id", id);
+    setEditingId(null);
+    setEditText("");
+    loadComments();
+  };
 
   const submitComment = async () => {
     if (!commentText.trim() || !activeItem || !selectedCat) return;
@@ -705,20 +721,77 @@ export default function ManufacturerPortalInternal() {
                       <p className="text-sm text-gray-400 text-center py-8">No comments yet.</p>
                     ) : (
                       <div className="space-y-5 mb-6">
-                        {comments.map((c) => (
-                          <div key={c.id} className="flex gap-3">
-                            <div className="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-bold flex-shrink-0">
-                              {getInitials(c.author_name)}
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className="text-xs font-semibold text-gray-800">{c.author_name}</span>
-                                <span className="text-[10px] text-gray-400">{formatDate(c.created_at)}</span>
+                        {comments.map((c) => {
+                          const isInternal = c.session_token === "00000000-0000-0000-0000-000000000000";
+                          const isEditing = editingId === c.id;
+                          return (
+                            <div key={c.id} className="flex gap-3 group">
+                              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${isInternal ? "bg-indigo-100 text-indigo-700" : "bg-purple-100 text-purple-700"}`}>
+                                {getInitials(c.author_name)}
                               </div>
-                              <p className="text-sm text-gray-700 leading-relaxed">{c.comment}</p>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-xs font-semibold text-gray-800">{c.author_name}</span>
+                                  {!isInternal && (
+                                    <span className="text-[9px] px-1.5 py-0 bg-purple-100 text-purple-600 rounded-full">manufacturer</span>
+                                  )}
+                                  <span className="text-[10px] text-gray-400">{formatDate(c.created_at)}</span>
+                                  {/* Action buttons — show on hover */}
+                                  <div className="ml-auto flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    {isInternal && !isEditing && (
+                                      <button
+                                        onClick={() => { setEditingId(c.id); setEditText(c.comment); }}
+                                        className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600"
+                                        title="Edit"
+                                      >
+                                        <Pencil className="w-3 h-3" />
+                                      </button>
+                                    )}
+                                    {!isEditing && (
+                                      <button
+                                        onClick={() => deleteComment(c.id)}
+                                        className="p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-500"
+                                        title="Delete"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                      </button>
+                                    )}
+                                    {isEditing && (
+                                      <>
+                                        <button
+                                          onClick={() => saveEdit(c.id)}
+                                          className="p-1 rounded hover:bg-green-50 text-gray-400 hover:text-green-600"
+                                          title="Save"
+                                        >
+                                          <Check className="w-3 h-3" />
+                                        </button>
+                                        <button
+                                          onClick={() => { setEditingId(null); setEditText(""); }}
+                                          className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600"
+                                          title="Cancel"
+                                        >
+                                          <X className="w-3 h-3" />
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                                {isEditing ? (
+                                  <Textarea
+                                    value={editText}
+                                    onChange={(e) => setEditText(e.target.value)}
+                                    onKeyDown={(e) => { if (e.key === "Enter" && e.metaKey) saveEdit(c.id); if (e.key === "Escape") { setEditingId(null); setEditText(""); } }}
+                                    rows={2}
+                                    className="text-sm resize-none w-full"
+                                    autoFocus
+                                  />
+                                ) : (
+                                  <p className="text-sm text-gray-700 leading-relaxed">{c.comment}</p>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                     <Separator className="my-4" />

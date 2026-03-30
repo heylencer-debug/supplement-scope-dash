@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { PDFDownloadLink } from "@react-pdf/renderer";
 import { FormulaPDF } from "@/components/FormulaPDF";
+import { FormulaViewer } from "@/components/FormulaViewer";
 import { Paperclip, X, FileText, Image } from "lucide-react";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -554,13 +555,8 @@ export default function ManufacturerPortal() {
                           </div>
 
                           {isExpanded && (
-                            <div className="mt-4 p-4 rounded-lg bg-gray-50 border border-gray-200">
-                              <p className="text-[10px] uppercase tracking-widest text-gray-400 font-semibold mb-3">
-                                Formula Detail
-                              </p>
-                              <pre className="text-xs text-gray-700 whitespace-pre-wrap font-mono leading-relaxed overflow-x-auto max-h-96 overflow-y-auto">
-                                {v.formula_text}
-                              </pre>
+                            <div className="mt-4 p-5 rounded-lg bg-gray-50 border border-gray-200 max-h-[600px] overflow-y-auto">
+                              <FormulaViewer text={v.formula_text} />
                             </div>
                           )}
                         </CardContent>

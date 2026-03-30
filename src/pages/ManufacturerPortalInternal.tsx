@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { PDFDownloadLink } from "@react-pdf/renderer";
 import { FormulaPDF } from "@/components/FormulaPDF";
+import { FormulaViewer } from "@/components/FormulaViewer";
 import {
   Link2, ChevronRight, MessageSquare, FlaskConical, LayoutDashboard, GitBranch,
   Pencil, Trash2, Check, X, Eye, EyeOff, FileText,
@@ -102,8 +103,7 @@ function MetaRow({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 function SectionText({ text, fallback = "No data available." }: { text: string; fallback?: string }) {
-  if (!text) return <p className="text-sm text-gray-400 py-4">{fallback}</p>;
-  return <pre className="text-xs text-gray-700 whitespace-pre-wrap leading-relaxed font-sans">{text}</pre>;
+  return <FormulaViewer text={text} fallback={fallback} />;
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────

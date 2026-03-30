@@ -208,8 +208,7 @@ export default function ManufacturerPortal() {
       return;
     }
     (async () => {
-      const { data } = await supabase
-        .from("manufacturer_sessions")
+      const { data } = await (supabase.from as any)("manufacturer_sessions")
         .select("id,token,manufacturer_name,expires_at")
         .eq("token", token)
         .single();
@@ -253,8 +252,7 @@ export default function ManufacturerPortal() {
     setActiveCommentVersion(null);
     setComments([]);
     (async () => {
-      const { data } = await supabase
-        .from("formula_briefs")
+      const { data } = await (supabase.from as any)("formula_briefs")
         .select("id,category_id,created_at,ingredients")
         .eq("category_id", selectedCategoryId)
         .order("created_at", { ascending: false });
@@ -272,8 +270,7 @@ export default function ManufacturerPortal() {
   // ── Load comments ──────────────────────────────────────────────────────────
   const loadComments = useCallback(
     async (categoryId: string, vLabel: string) => {
-      const { data } = await supabase
-        .from("manufacturer_comments")
+      const { data } = await (supabase.from as any)("manufacturer_comments")
         .select("*")
         .eq("category_id", categoryId)
         .eq("version_label", vLabel)
@@ -297,7 +294,7 @@ export default function ManufacturerPortal() {
     if (!commentText.trim() || !session || !selectedCategoryId || !activeCommentVersion) return;
     setSubmitting(true);
     setSubmitError(null);
-    const { error } = await supabase.from("manufacturer_comments").insert({
+    const { error } = await (supabase.from as any)("manufacturer_comments").insert({
       session_token: session.token,
       category_id: selectedCategoryId,
       version_label: activeCommentVersion,

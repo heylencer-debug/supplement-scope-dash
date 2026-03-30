@@ -433,8 +433,7 @@ export default function Dashboard() {
     if (!name || !name.trim()) return;
     setGeneratingLink(true);
     try {
-      const { data, error } = await supabase
-        .from("manufacturer_sessions")
+      const { data, error } = await (supabase.from as any)("manufacturer_sessions")
         .insert({ manufacturer_name: name.trim() })
         .select("token")
         .single();

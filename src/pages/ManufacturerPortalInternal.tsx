@@ -122,7 +122,10 @@ function getFDAAnalysis(brief: FormulaBrief): string {
 }
 
 function getCompetitiveReport(brief: FormulaBrief): string {
-  return (ing(brief)?.competitive_benchmarking as string) ?? "";
+  const raw = ing(brief)?.competitive_benchmarking;
+  if (!raw) return "";
+  if (typeof raw === "string") return raw;
+  try { return JSON.stringify(raw); } catch { return ""; }
 }
 
 function getCompetitiveScore(brief: FormulaBrief): string | null {
@@ -249,8 +252,7 @@ export default function ManufacturerPortalInternal() {
     if (!selectedCat) return;
     setActiveVersion(null);
     setActiveTab("overview");
-    supabase
-      .from("formula_briefs")
+    (supabase.from as any)("formula_briefs")
       .select([
         "id", "category_id", "created_at", "updated_at", "ingredients",
         "positioning", "target_customer", "form_type", "flavor_profile",
@@ -273,8 +275,7 @@ export default function ManufacturerPortalInternal() {
   const loadComments = useCallback(() => {
     if (!activeVersion || !selectedCat) return;
     const vLabel = getVersionLabel(briefs, activeVersion);
-    supabase
-      .from("manufacturer_comments")
+    (supabase.from as any)("manufacturer_comments")
       .select("*")
       .eq("category_id", selectedCat.id)
       .eq("version_label", vLabel)
@@ -292,7 +293,7 @@ export default function ManufacturerPortalInternal() {
     if (!commentText.trim() || !activeVersion || !selectedCat) return;
     setSubmitting(true);
     const vLabel = getVersionLabel(briefs, activeVersion);
-    await supabase.from("manufacturer_comments").insert({
+    await (supabase.from as any)("manufacturer_comments").insert({
       session_token: "00000000-0000-0000-0000-000000000000",
       category_id: selectedCat.id,
       version_label: vLabel,
@@ -312,8 +313,7 @@ export default function ManufacturerPortalInternal() {
     setGeneratingLink(true);
     const token = crypto.randomUUID();
     const expiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
-    const { error } = await supabase
-      .from("manufacturer_sessions")
+    const { error } = await (supabase.from as any)("manufacturer_sessions")
       .insert({ token, manufacturer_name: mfrName.trim(), expires_at: expiresAt });
     setGeneratingLink(false);
     if (error) {

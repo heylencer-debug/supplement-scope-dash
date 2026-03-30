@@ -190,6 +190,7 @@ export default function ManufacturerPortal() {
 
   const [briefs, setBriefs] = useState<FormulaBrief[]>([]);
   const [brifsLoading, setBriefsLoading] = useState(false);
+  const [publishedLabel, setPublishedLabel] = useState<string | null | undefined>(undefined);
 
   const [expandedVersionId, setExpandedVersionId] = useState<string | null>(null);
 
@@ -251,17 +252,33 @@ export default function ManufacturerPortal() {
     setExpandedVersionId(null);
     setActiveCommentVersion(null);
     setComments([]);
+    setPublishedLabel(undefined);
     (async () => {
-      const { data } = await (supabase.from as any)("formula_briefs")
-        .select("id,category_id,created_at,ingredients")
-        .eq("category_id", selectedCategoryId)
-        .order("created_at", { ascending: false });
+      const [{ data }, { data: pubData }] = await Promise.all([
+        (supabase.from as any)("formula_briefs")
+          .select("id,category_id,created_at,ingredients")
+          .eq("category_id", selectedCategoryId)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("manufacturer_published_versions")
+          .select("version_label")
+          .eq("category_id", selectedCategoryId)
+          .maybeSingle(),
+      ]);
       const rows = (data ?? []) as FormulaBrief[];
       setBriefs(rows);
+      const pub = pubData?.version_label ?? null;
+      setPublishedLabel(pub);
       if (rows.length > 0) {
-        const firstLabel = versionLabel(rows[0], 0, rows.length);
-        setActiveCommentVersion(firstLabel);
-        loadComments(selectedCategoryId, firstLabel);
+        // If a published version exists, auto-select it; otherwise use first
+        const total = rows.length;
+        let defaultLabel = versionLabel(rows[0], 0, total);
+        if (pub) {
+          const pubIdx = rows.findIndex((_, i) => versionLabel(rows[i], i, total) === pub);
+          if (pubIdx !== -1) defaultLabel = pub;
+        }
+        setActiveCommentVersion(defaultLabel);
+        loadComments(selectedCategoryId, defaultLabel);
       }
       setBriefsLoading(false);
     })();
@@ -384,12 +401,18 @@ export default function ManufacturerPortal() {
                   Formula Versions
                 </h2>
 
-                {brifsLoading ? (
+                {brifsLoading || publishedLabel === undefined ? (
                   <div className="space-y-3">
                     {[1, 2].map((i) => (
                       <div key={i} className="h-20 rounded-lg bg-gray-100 animate-pulse" />
                     ))}
                   </div>
+                ) : publishedLabel === null ? (
+                  <Card className="border border-gray-200">
+                    <CardContent className="py-8 text-center text-gray-400 text-sm">
+                      No formula version has been shared yet. Check back soon.
+                    </CardContent>
+                  </Card>
                 ) : briefs.length === 0 ? (
                   <Card className="border border-gray-200">
                     <CardContent className="py-8 text-center text-gray-400 text-sm">
@@ -398,8 +421,9 @@ export default function ManufacturerPortal() {
                   </Card>
                 ) : (
                   <div className="space-y-3">
-                    {briefs.map((brief, idx) => {
-                      const label = versionLabel(brief, idx, briefs.length);
+                    {briefs.filter((_, idx) => versionLabel(briefs[idx], idx, briefs.length) === publishedLabel).map((brief) => {
+                      const realIdx = briefs.indexOf(brief);
+                      const label = versionLabel(brief, realIdx, briefs.length);
                       const ing = (brief.ingredients ?? {}) as Record<string, unknown>;
                       const verdict = getQAVerdict(ing);
                       const qaScore = getQAScore(ing);

@@ -313,8 +313,7 @@ export default function ManufacturerPortalInternal() {
     setGeneratingLink(true);
     const token = crypto.randomUUID();
     const expiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
-    const { error } = await supabase
-      .from("manufacturer_sessions")
+    const { error } = await (supabase.from as any)("manufacturer_sessions")
       .insert({ token, manufacturer_name: mfrName.trim(), expires_at: expiresAt });
     setGeneratingLink(false);
     if (error) {

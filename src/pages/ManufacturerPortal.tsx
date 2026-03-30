@@ -295,7 +295,7 @@ export default function ManufacturerPortal() {
     if (!commentText.trim() || !session || !selectedCategoryId || !activeCommentVersion) return;
     setSubmitting(true);
     setSubmitError(null);
-    const { error } = await supabase.from("manufacturer_comments").insert({
+    const { error } = await (supabase.from as any)("manufacturer_comments").insert({
       session_token: session.token,
       category_id: selectedCategoryId,
       version_label: activeCommentVersion,

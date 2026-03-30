@@ -9,8 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import {
-  Link2, ChevronRight, MessageSquare, FileText,
-  LayoutDashboard, ShieldCheck, BarChart2, FlaskConical,
+  Link2, ChevronRight, MessageSquare, FlaskConical, LayoutDashboard, GitBranch,
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -18,8 +17,7 @@ import {
 interface Category {
   id: string;
   name: string;
-  total_products: number;
-  form_type?: string | null;
+  total_products: number | null;
 }
 
 interface FormulaBrief {
@@ -28,7 +26,6 @@ interface FormulaBrief {
   created_at: string;
   updated_at: string;
   ingredients: Record<string, unknown>;
-  // structured columns
   positioning: string | null;
   target_customer: string | null;
   form_type: string | null;
@@ -52,6 +49,21 @@ interface FormulaBrief {
   packaging_recommendations: string | null;
 }
 
+interface FormulaVersion {
+  id: string;
+  category_id: string;
+  created_at: string;
+  version_number: number;
+  is_active: boolean;
+  formula_brief_content: string;
+  change_summary: string | null;
+}
+
+// Unified version item shown in the list
+type VersionItem =
+  | { kind: "pipeline"; brief: FormulaBrief; label: string }
+  | { kind: "living";   ver: FormulaVersion; label: string };
+
 interface MfrComment {
   id: string;
   session_token: string;
@@ -62,7 +74,7 @@ interface MfrComment {
   created_at: string;
 }
 
-type TabKey = "overview" | "formula" | "qa" | "competitive" | "fda" | "comments";
+type TabKey = "overview" | "formula" | "comments";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -74,22 +86,12 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-function getVersionLabel(briefs: FormulaBrief[], brief: FormulaBrief): string {
-  const sorted = [...briefs].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-  const idx = sorted.findIndex((b) => b.id === brief.id);
-  return `v${idx + 1}`;
-}
-
 function ing(brief: FormulaBrief): Record<string, unknown> {
   return brief.ingredients ?? {};
 }
 
-function getQAReport(brief: FormulaBrief): string {
-  return (ing(brief)?.qa_report as string) ?? "";
-}
-
 function getQAVerdict(brief: FormulaBrief): string {
-  const qa = getQAReport(brief);
+  const qa = (ing(brief)?.qa_report as string) ?? "";
   if (!qa) return "";
   const m = qa.match(/\*\*Overall:\*\*\s*(.+)/)
           || qa.match(/Overall:\s*(APPROVED[^.\n]*|NEEDS MAJOR REVISION[^.\n]*)/i)
@@ -98,38 +100,23 @@ function getQAVerdict(brief: FormulaBrief): string {
 }
 
 function getQAScore(brief: FormulaBrief): string | null {
-  const qa = getQAReport(brief);
-  if (!qa) return null;
+  const qa = (ing(brief)?.qa_report as string) ?? "";
   const m = qa.match(/\*\*QA Score:\*\*\s*([\d.]+)/) || qa.match(/QA Score:\s*([\d.]+)/);
   return m?.[1] ?? null;
 }
 
-function getFDA(brief: FormulaBrief): Record<string, unknown> {
-  return (ing(brief)?.fda_compliance as Record<string, unknown>) ?? {};
-}
-
 function getFDAScore(brief: FormulaBrief): string | null {
-  const score = getFDA(brief)?.compliance_score;
-  return score != null ? String(score) : null;
+  const fda = (ing(brief)?.fda_compliance as Record<string, unknown>) ?? {};
+  return fda.compliance_score != null ? String(fda.compliance_score) : null;
 }
 
 function getFDAStatus(brief: FormulaBrief): string {
-  return (getFDA(brief)?.compliance_status as string) ?? "";
-}
-
-function getFDAAnalysis(brief: FormulaBrief): string {
-  return (getFDA(brief)?.analysis as string) ?? "";
-}
-
-function getCompetitiveReport(brief: FormulaBrief): string {
-  const raw = ing(brief)?.competitive_benchmarking;
-  if (!raw) return "";
-  if (typeof raw === "string") return raw;
-  try { return JSON.stringify(raw); } catch { return ""; }
+  const fda = (ing(brief)?.fda_compliance as Record<string, unknown>) ?? {};
+  return (fda.compliance_status as string) ?? "";
 }
 
 function getCompetitiveScore(brief: FormulaBrief): string | null {
-  const report = getCompetitiveReport(brief);
+  const report = (ing(brief)?.competitive_benchmarking as string) ?? "";
   if (!report) return null;
   const m = report.match(/Overall.*?competitiveness.*?([\d.]+)\s*\/\s*10/i)
            || report.match(/competitiveness.*?([\d.]+)\s*\/\s*10/i)
@@ -137,19 +124,13 @@ function getCompetitiveScore(brief: FormulaBrief): string | null {
   return m?.[1] ?? null;
 }
 
-function getFormulaText(brief: FormulaBrief): string {
+function getFormulaText(brief: FormulaBrief): { adjusted: string; grok: string; claude: string } {
   const i = ing(brief);
-  return (i?.adjusted_formula ?? i?.final_formula_brief ?? i?.ai_generated_brief ?? "") as string;
-}
-
-function getGrokBrief(brief: FormulaBrief): string {
-  const i = ing(brief);
-  return (i?.grok_brief ?? i?.grok_formula_brief ?? "") as string;
-}
-
-function getClaudeBrief(brief: FormulaBrief): string {
-  const i = ing(brief);
-  return (i?.claude_brief ?? i?.claude_formula_brief ?? "") as string;
+  return {
+    adjusted: (i?.adjusted_formula ?? i?.final_formula_brief ?? "") as string,
+    grok: (i?.grok_brief ?? i?.grok_formula_brief ?? "") as string,
+    claude: (i?.claude_brief ?? i?.claude_formula_brief ?? i?.ai_generated_brief ?? "") as string,
+  };
 }
 
 function verdictColor(verdict: string): string {
@@ -159,38 +140,14 @@ function verdictColor(verdict: string): string {
   return "bg-gray-100 text-gray-600 border-gray-200";
 }
 
-function fdaColor(status: string): string {
-  if (/compliant/i.test(status) && !/non/i.test(status)) return "bg-green-100 text-green-800 border-green-200";
-  if (/minor/i.test(status)) return "bg-yellow-100 text-yellow-800 border-yellow-200";
-  if (/non-compliant|major/i.test(status)) return "bg-red-100 text-red-800 border-red-200";
-  return "bg-gray-100 text-gray-600 border-gray-200";
-}
-
 function ScoreChip({ label, value, max }: { label: string; value: string | null; max: number }) {
   if (!value) return null;
-  const num = parseFloat(value);
-  const pct = Math.min(100, (num / max) * 100);
+  const pct = Math.min(100, (parseFloat(value) / max) * 100);
   const color = pct >= 75 ? "text-green-700" : pct >= 50 ? "text-yellow-700" : "text-red-600";
   return (
     <div className="flex flex-col items-center gap-0.5">
-      <span className={`text-base font-bold ${color}`}>{value}<span className="text-[10px] text-gray-400">/{max}</span></span>
+      <span className={`text-sm font-bold ${color}`}>{value}<span className="text-[10px] text-gray-400">/{max}</span></span>
       <span className="text-[10px] text-gray-400 uppercase tracking-wide">{label}</span>
-    </div>
-  );
-}
-
-function SectionText({ text, fallback = "No data available." }: { text: string; fallback?: string }) {
-  if (!text) return <p className="text-sm text-gray-400 py-4">{fallback}</p>;
-  return <pre className="text-xs text-gray-700 whitespace-pre-wrap leading-relaxed font-sans">{text}</pre>;
-}
-
-function TagList({ items, color = "bg-gray-100 text-gray-700" }: { items: string[] | null; color?: string }) {
-  if (!items?.length) return <span className="text-xs text-gray-400">—</span>;
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      {items.map((t, i) => (
-        <span key={i} className={`text-[11px] px-2 py-0.5 rounded-full ${color}`}>{t}</span>
-      ))}
     </div>
   );
 }
@@ -204,16 +161,21 @@ function MetaRow({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-// ─── Tab definitions ──────────────────────────────────────────────────────────
+function TagList({ items, color }: { items: string[] | null; color: string }) {
+  if (!items?.length) return <span className="text-xs text-gray-400">—</span>;
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {items.map((t, i) => (
+        <span key={i} className={`text-[11px] px-2 py-0.5 rounded-full ${color}`}>{t}</span>
+      ))}
+    </div>
+  );
+}
 
-const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
-  { key: "overview",     label: "Overview",     icon: LayoutDashboard },
-  { key: "formula",      label: "Formula",      icon: FlaskConical },
-  { key: "qa",           label: "QA Report",    icon: ShieldCheck },
-  { key: "competitive",  label: "Competitive",  icon: BarChart2 },
-  { key: "fda",          label: "FDA",          icon: ShieldCheck },
-  { key: "comments",     label: "Comments",     icon: MessageSquare },
-];
+function SectionText({ text, fallback = "No data available." }: { text: string; fallback?: string }) {
+  if (!text) return <p className="text-sm text-gray-400 py-4">{fallback}</p>;
+  return <pre className="text-xs text-gray-700 whitespace-pre-wrap leading-relaxed font-sans">{text}</pre>;
+}
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
@@ -222,8 +184,8 @@ export default function ManufacturerPortalInternal() {
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCat, setSelectedCat] = useState<Category | null>(null);
-  const [briefs, setBriefs] = useState<FormulaBrief[]>([]);
-  const [activeVersion, setActiveVersion] = useState<FormulaBrief | null>(null);
+  const [versions, setVersions] = useState<VersionItem[]>([]);
+  const [activeItem, setActiveItem] = useState<VersionItem | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
   const [comments, setComments] = useState<MfrComment[]>([]);
   const [commentText, setCommentText] = useState("");
@@ -232,12 +194,11 @@ export default function ManufacturerPortalInternal() {
   const [mfrName, setMfrName] = useState("");
   const [generatingLink, setGeneratingLink] = useState(false);
 
-  // Load categories
+  // Load all categories (no product count filter)
   useEffect(() => {
     supabase
       .from("categories")
       .select("id, name, total_products")
-      .gt("total_products", 0)
       .order("total_products", { ascending: false })
       .then(({ data }) => {
         if (data?.length) {
@@ -247,12 +208,14 @@ export default function ManufacturerPortalInternal() {
       });
   }, []);
 
-  // Load briefs for selected category
+  // Load versions for selected category — merge formula_briefs + formula_brief_versions
   useEffect(() => {
     if (!selectedCat) return;
-    setActiveVersion(null);
+    setActiveItem(null);
     setActiveTab("overview");
-    (supabase.from as any)("formula_briefs")
+
+    const briefsQ = supabase
+      .from("formula_briefs")
       .select([
         "id", "category_id", "created_at", "updated_at", "ingredients",
         "positioning", "target_customer", "form_type", "flavor_profile",
@@ -263,25 +226,44 @@ export default function ManufacturerPortalInternal() {
         "certifications", "packaging_type", "packaging_recommendations",
       ].join(", "))
       .eq("category_id", selectedCat.id)
-      .order("created_at", { ascending: false })
-      .then(({ data }) => {
-        const rows = (data ?? []) as FormulaBrief[];
-        setBriefs(rows);
-        if (rows.length) setActiveVersion(rows[0]);
-      });
+      .order("created_at", { ascending: true });
+
+    const liveQ = supabase
+      .from("formula_brief_versions")
+      .select("id, category_id, created_at, version_number, is_active, formula_brief_content, change_summary")
+      .eq("category_id", selectedCat.id)
+      .order("version_number", { ascending: true });
+
+    Promise.all([briefsQ, liveQ]).then(([{ data: briefs }, { data: live }]) => {
+      const pipelineItems: VersionItem[] = ((briefs ?? []) as FormulaBrief[]).map((b, i) => ({
+        kind: "pipeline",
+        brief: b,
+        label: `v${i + 1}`,
+      }));
+
+      const livingItems: VersionItem[] = ((live ?? []) as FormulaVersion[]).map((v) => ({
+        kind: "living",
+        ver: v,
+        label: `mfr-v${v.version_number}`,
+      }));
+
+      const all: VersionItem[] = [...pipelineItems, ...livingItems];
+      setVersions(all);
+      if (all.length) setActiveItem(all[all.length - 1]); // default to latest
+    });
   }, [selectedCat]);
 
   // Load comments
   const loadComments = useCallback(() => {
-    if (!activeVersion || !selectedCat) return;
-    const vLabel = getVersionLabel(briefs, activeVersion);
-    (supabase.from as any)("manufacturer_comments")
+    if (!activeItem || !selectedCat) return;
+    supabase
+      .from("manufacturer_comments")
       .select("*")
       .eq("category_id", selectedCat.id)
-      .eq("version_label", vLabel)
+      .eq("version_label", activeItem.label)
       .order("created_at", { ascending: true })
       .then(({ data }) => setComments((data ?? []) as MfrComment[]));
-  }, [activeVersion, selectedCat, briefs]);
+  }, [activeItem, selectedCat]);
 
   useEffect(() => {
     loadComments();
@@ -290,13 +272,12 @@ export default function ManufacturerPortalInternal() {
   }, [loadComments]);
 
   const submitComment = async () => {
-    if (!commentText.trim() || !activeVersion || !selectedCat) return;
+    if (!commentText.trim() || !activeItem || !selectedCat) return;
     setSubmitting(true);
-    const vLabel = getVersionLabel(briefs, activeVersion);
-    await (supabase.from as any)("manufacturer_comments").insert({
+    await supabase.from("manufacturer_comments").insert({
       session_token: "00000000-0000-0000-0000-000000000000",
       category_id: selectedCat.id,
-      version_label: vLabel,
+      version_label: activeItem.label,
       author_name: authorName || "DOVIVE Team",
       comment: commentText.trim(),
     });
@@ -313,7 +294,8 @@ export default function ManufacturerPortalInternal() {
     setGeneratingLink(true);
     const token = crypto.randomUUID();
     const expiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
-    const { error } = await (supabase.from as any)("manufacturer_sessions")
+    const { error } = await supabase
+      .from("manufacturer_sessions")
       .insert({ token, manufacturer_name: mfrName.trim(), expires_at: expiresAt });
     setGeneratingLink(false);
     if (error) {
@@ -327,14 +309,23 @@ export default function ManufacturerPortalInternal() {
     });
   };
 
-  // ─── Render ─────────────────────────────────────────────────────────────────
+  // ─── Derived ────────────────────────────────────────────────────────────────
 
-  const vLabel = activeVersion ? getVersionLabel(briefs, activeVersion) : "";
+  const activeBrief = activeItem?.kind === "pipeline" ? activeItem.brief : null;
+  const activeLiving = activeItem?.kind === "living" ? activeItem.ver : null;
+
+  const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
+    { key: "overview", label: "Overview", icon: LayoutDashboard },
+    { key: "formula",  label: "Formula",  icon: FlaskConical },
+    { key: "comments", label: "Comments", icon: MessageSquare },
+  ];
+
+  // ─── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div className="flex h-[calc(100vh-4rem)] overflow-hidden bg-gray-50">
 
-      {/* ── Left Sidebar ─────────────────────────────────────────────────────── */}
+      {/* ── Left Sidebar: Categories ─────────────────────────────────────────── */}
       <div className="w-52 flex-shrink-0 bg-white border-r border-gray-100 flex flex-col">
         <div className="px-4 py-4 border-b border-gray-100">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Projects</p>
@@ -345,7 +336,7 @@ export default function ManufacturerPortalInternal() {
               <button
                 key={cat.id}
                 onClick={() => setSelectedCat(cat)}
-                className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all flex items-center gap-2 group ${
+                className={`w-full text-left px-3 py-2 rounded-lg transition-all flex items-center gap-2 group ${
                   selectedCat?.id === cat.id
                     ? "bg-indigo-50 text-indigo-700 font-semibold"
                     : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
@@ -355,7 +346,9 @@ export default function ManufacturerPortalInternal() {
                   selectedCat?.id === cat.id ? "bg-indigo-500" : "bg-gray-300 group-hover:bg-gray-400"
                 }`} />
                 <span className="truncate text-xs">{cat.name}</span>
-                <span className="ml-auto text-[10px] text-gray-400 flex-shrink-0">{cat.total_products}</span>
+                {cat.total_products ? (
+                  <span className="ml-auto text-[10px] text-gray-400 flex-shrink-0">{cat.total_products}</span>
+                ) : null}
               </button>
             ))}
           </div>
@@ -385,82 +378,90 @@ export default function ManufacturerPortalInternal() {
 
       {/* ── Version List ─────────────────────────────────────────────────────── */}
       <div className="w-64 flex-shrink-0 bg-white border-r border-gray-100 flex flex-col">
-        {/* Category header */}
         <div className="px-4 py-4 border-b border-gray-100">
           <h2 className="text-sm font-bold text-gray-900 truncate">{selectedCat?.name ?? "—"}</h2>
           <p className="text-[11px] text-gray-400 mt-0.5">
-            {selectedCat?.total_products ?? 0} products · {briefs.length} version{briefs.length !== 1 ? "s" : ""}
+            {selectedCat?.total_products ?? 0} products · {versions.length} version{versions.length !== 1 ? "s" : ""}
           </p>
-          {/* Latest form type from first brief */}
-          {briefs[0]?.form_type && (
-            <Badge className="mt-2 text-[10px] bg-indigo-50 text-indigo-700 border-indigo-100 border">
-              {briefs[0].form_type}
-            </Badge>
-          )}
-        </div>
-        <div className="px-4 py-2 border-b border-gray-100">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Formula Versions</p>
         </div>
         <ScrollArea className="flex-1">
           <div className="p-3 space-y-2">
-            {briefs.length === 0 && (
+            {versions.length === 0 && (
               <p className="text-xs text-gray-400 text-center py-6">No formula versions yet</p>
             )}
-            {briefs.map((brief) => {
-              const label = getVersionLabel(briefs, brief);
-              const verdict = getQAVerdict(brief);
-              const qaScore = getQAScore(brief);
-              const fdaScore = getFDAScore(brief);
-              const compScore = getCompetitiveScore(brief);
-              const isActive = activeVersion?.id === brief.id;
 
+            {versions.map((item) => {
+              const isActive = activeItem?.label === item.label;
+              const baseCard = `cursor-pointer transition-all border rounded-lg ${
+                isActive
+                  ? "border-indigo-200 shadow-sm bg-indigo-50/40"
+                  : "border-gray-100 hover:border-gray-200 hover:shadow-sm bg-white"
+              }`;
+
+              if (item.kind === "pipeline") {
+                const b = item.brief;
+                const verdict = getQAVerdict(b);
+                const qaScore = getQAScore(b);
+                const fdaScore = getFDAScore(b);
+                const compScore = getCompetitiveScore(b);
+                const fdaStatus = getFDAStatus(b);
+
+                return (
+                  <Card key={item.label} onClick={() => { setActiveItem(item); setActiveTab("overview"); }} className={baseCard}>
+                    <CardContent className="p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-bold text-gray-800">{item.label}</span>
+                        <span className="text-[10px] text-gray-400">{formatDate(b.created_at)}</span>
+                      </div>
+                      {b.form_type && (
+                        <span className="inline-block text-[10px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 font-medium">
+                          {b.form_type}
+                        </span>
+                      )}
+                      {b.positioning && (
+                        <p className="text-[11px] text-gray-500 leading-tight line-clamp-2">{b.positioning}</p>
+                      )}
+                      {verdict && (
+                        <Badge className={`text-[10px] px-2 py-0 border ${verdictColor(verdict)}`}>
+                          {verdict.length > 26 ? verdict.slice(0, 26) + "…" : verdict}
+                        </Badge>
+                      )}
+                      {fdaStatus && !verdict && (
+                        <p className="text-[11px] text-gray-400 truncate">{fdaStatus}</p>
+                      )}
+                      <div className="flex gap-3 pt-1">
+                        <ScoreChip label="QA" value={qaScore} max={10} />
+                        <ScoreChip label="FDA" value={fdaScore} max={100} />
+                        <ScoreChip label="Comp" value={compScore} max={10} />
+                      </div>
+                      {b.target_price != null && (
+                        <p className="text-[11px] text-gray-400">
+                          Target <span className="font-semibold text-gray-600">${b.target_price}</span>
+                          {b.cogs_target != null ? ` · COGS $${b.cogs_target}` : ""}
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              }
+
+              // Living brief version
+              const v = item.ver;
               return (
-                <Card
-                  key={brief.id}
-                  onClick={() => { setActiveVersion(brief); setActiveTab("overview"); }}
-                  className={`cursor-pointer transition-all border ${
-                    isActive
-                      ? "border-indigo-200 shadow-sm bg-indigo-50/40"
-                      : "border-gray-100 hover:border-gray-200 hover:shadow-sm bg-white"
-                  }`}
-                >
+                <Card key={item.label} onClick={() => { setActiveItem(item); setActiveTab("formula"); }} className={baseCard}>
                   <CardContent className="p-3 space-y-2">
-                    {/* Header row */}
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-bold text-gray-800">{label}</span>
-                      <span className="text-[10px] text-gray-400">{formatDate(brief.created_at)}</span>
+                      <div className="flex items-center gap-1.5">
+                        <GitBranch className="w-3 h-3 text-purple-500" />
+                        <span className="text-sm font-bold text-gray-800">{item.label}</span>
+                        {v.is_active && (
+                          <span className="text-[9px] px-1.5 py-0 bg-purple-100 text-purple-700 rounded-full font-semibold">active</span>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-gray-400">{formatDate(v.created_at)}</span>
                     </div>
-
-                    {/* Form type + positioning */}
-                    {brief.form_type && (
-                      <span className="inline-block text-[10px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 font-medium">
-                        {brief.form_type}
-                      </span>
-                    )}
-                    {brief.positioning && (
-                      <p className="text-[11px] text-gray-500 leading-tight line-clamp-2">{brief.positioning}</p>
-                    )}
-
-                    {/* QA verdict */}
-                    {verdict && (
-                      <Badge className={`text-[10px] px-2 py-0 border ${verdictColor(verdict)}`}>
-                        {verdict.length > 26 ? verdict.slice(0, 26) + "…" : verdict}
-                      </Badge>
-                    )}
-
-                    {/* Score row */}
-                    <div className="flex gap-3 pt-1">
-                      <ScoreChip label="QA" value={qaScore} max={10} />
-                      <ScoreChip label="FDA" value={fdaScore} max={100} />
-                      <ScoreChip label="Comp" value={compScore} max={10} />
-                    </div>
-
-                    {/* Price */}
-                    {brief.target_price && (
-                      <p className="text-[11px] text-gray-400">
-                        Target <span className="font-semibold text-gray-600">${brief.target_price}</span>
-                        {brief.cogs_target ? ` · COGS $${brief.cogs_target}` : ""}
-                      </p>
+                    {v.change_summary && (
+                      <p className="text-[11px] text-gray-500 leading-tight line-clamp-2">{v.change_summary}</p>
                     )}
                   </CardContent>
                 </Card>
@@ -472,303 +473,232 @@ export default function ManufacturerPortalInternal() {
 
       {/* ── Detail Panel ─────────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0 bg-white">
-        {!activeVersion ? (
+        {!activeItem ? (
           <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
             Select a formula version
           </div>
         ) : (
           <>
             {/* Tab bar */}
-            <div className="border-b border-gray-100 px-4 flex items-center gap-0 overflow-x-auto">
-              {TABS.map((tab) => {
-                const Icon = tab.icon;
-                const isActive = activeTab === tab.key;
-                return (
-                  <button
-                    key={tab.key}
-                    onClick={() => setActiveTab(tab.key)}
-                    className={`flex items-center gap-1.5 px-3 py-3 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
-                      isActive
-                        ? "border-indigo-500 text-indigo-700"
-                        : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-200"
-                    }`}
-                  >
-                    <Icon className="w-3.5 h-3.5" />
-                    {tab.label}
-                    {tab.key === "comments" && comments.length > 0 && (
-                      <span className="ml-1 bg-indigo-100 text-indigo-700 text-[10px] px-1.5 py-0 rounded-full">
-                        {comments.length}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
+            <div className="border-b border-gray-100 px-4 flex items-center gap-0">
+              {TABS.map(({ key, label, icon: Icon }) => (
+                <button
+                  key={key}
+                  onClick={() => setActiveTab(key)}
+                  className={`flex items-center gap-1.5 px-4 py-3 text-xs font-medium border-b-2 transition-colors ${
+                    activeTab === key
+                      ? "border-indigo-500 text-indigo-700"
+                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-200"
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  {label}
+                  {key === "comments" && comments.length > 0 && (
+                    <span className="ml-1 bg-indigo-100 text-indigo-700 text-[10px] px-1.5 rounded-full">
+                      {comments.length}
+                    </span>
+                  )}
+                </button>
+              ))}
+              <div className="ml-auto pr-2 flex items-center gap-2">
+                <span className="text-xs text-gray-400">{activeItem.label}</span>
+                {activeItem.kind === "living" && activeItem.ver.is_active && (
+                  <span className="text-[10px] px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full">MFR active</span>
+                )}
+              </div>
             </div>
 
-            {/* Tab content */}
             <ScrollArea className="flex-1">
               <div className="px-6 py-5">
 
                 {/* ── OVERVIEW ── */}
                 {activeTab === "overview" && (
-                  <div className="space-y-6 max-w-2xl">
-                    <div>
-                      <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Version</h3>
-                      <div className="space-y-2">
-                        <MetaRow label="Version" value={vLabel} />
-                        <MetaRow label="Created" value={formatDate(activeVersion.created_at)} />
-                        <MetaRow label="Updated" value={formatDate(activeVersion.updated_at)} />
+                  <>
+                    {activeLiving ? (
+                      <div className="max-w-xl space-y-3">
+                        <MetaRow label="Version" value={activeLiving.version_number} />
+                        <MetaRow label="Created" value={formatDate(activeLiving.created_at)} />
+                        <MetaRow label="Change summary" value={activeLiving.change_summary} />
+                        <MetaRow label="Status" value={activeLiving.is_active ? "Active" : "Archived"} />
+                        <p className="text-xs text-gray-400 pt-2">
+                          This is a manufacturer feedback version. View the Formula tab for content.
+                        </p>
                       </div>
-                    </div>
-
-                    <Separator />
-
-                    <div>
-                      <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Product</h3>
-                      <div className="space-y-2">
-                        <MetaRow label="Form type" value={activeVersion.form_type} />
-                        <MetaRow label="Positioning" value={activeVersion.positioning} />
-                        <MetaRow label="Target customer" value={activeVersion.target_customer} />
-                        <MetaRow label="Flavor profile" value={activeVersion.flavor_profile} />
-                        <MetaRow label="Servings / container" value={activeVersion.servings_per_container} />
-                        <MetaRow label="Packaging" value={activeVersion.packaging_type} />
-                      </div>
-                    </div>
-
-                    <Separator />
-
-                    <div>
-                      <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Commercials</h3>
-                      <div className="space-y-2">
-                        <MetaRow label="Target price" value={activeVersion.target_price != null ? `$${activeVersion.target_price}` : null} />
-                        <MetaRow label="COGS target" value={activeVersion.cogs_target != null ? `$${activeVersion.cogs_target}` : null} />
-                        <MetaRow label="Margin estimate" value={activeVersion.margin_estimate != null ? `${activeVersion.margin_estimate}%` : null} />
-                        <MetaRow label="MOQ estimate" value={activeVersion.moq_estimate != null ? `${activeVersion.moq_estimate.toLocaleString()} units` : null} />
-                        <MetaRow label="Lead time" value={activeVersion.lead_time_weeks != null ? `${activeVersion.lead_time_weeks} weeks` : null} />
-                      </div>
-                    </div>
-
-                    {(activeVersion.key_differentiators?.length || activeVersion.consumer_pain_points?.length) && (
-                      <>
+                    ) : activeBrief ? (
+                      <div className="space-y-6 max-w-2xl">
+                        <div className="space-y-2">
+                          <MetaRow label="Version" value={activeItem.label} />
+                          <MetaRow label="Created" value={formatDate(activeBrief.created_at)} />
+                          <MetaRow label="Updated" value={formatDate(activeBrief.updated_at)} />
+                        </div>
                         <Separator />
                         <div>
-                          <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Strategy</h3>
-                          <div className="space-y-3">
-                            {activeVersion.key_differentiators?.length ? (
-                              <div>
-                                <p className="text-[11px] text-gray-400 mb-1.5">Key differentiators</p>
-                                <TagList items={activeVersion.key_differentiators} color="bg-indigo-50 text-indigo-700" />
-                              </div>
-                            ) : null}
-                            {activeVersion.consumer_pain_points?.length ? (
-                              <div>
-                                <p className="text-[11px] text-gray-400 mb-1.5">Consumer pain points</p>
-                                <TagList items={activeVersion.consumer_pain_points} color="bg-amber-50 text-amber-700" />
-                              </div>
-                            ) : null}
-                            {activeVersion.risk_factors?.length ? (
-                              <div>
-                                <p className="text-[11px] text-gray-400 mb-1.5">Risk factors</p>
-                                <TagList items={activeVersion.risk_factors} color="bg-red-50 text-red-700" />
-                              </div>
-                            ) : null}
-                            {activeVersion.certifications?.length ? (
-                              <div>
-                                <p className="text-[11px] text-gray-400 mb-1.5">Certifications</p>
-                                <TagList items={activeVersion.certifications} color="bg-green-50 text-green-700" />
-                              </div>
-                            ) : null}
-                            {activeVersion.testing_requirements?.length ? (
-                              <div>
-                                <p className="text-[11px] text-gray-400 mb-1.5">Testing requirements</p>
-                                <TagList items={activeVersion.testing_requirements} color="bg-gray-100 text-gray-600" />
-                              </div>
-                            ) : null}
+                          <h3 className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">Product</h3>
+                          <div className="space-y-2">
+                            <MetaRow label="Form type" value={activeBrief.form_type} />
+                            <MetaRow label="Positioning" value={activeBrief.positioning} />
+                            <MetaRow label="Target customer" value={activeBrief.target_customer} />
+                            <MetaRow label="Flavor profile" value={activeBrief.flavor_profile} />
+                            <MetaRow label="Servings / container" value={activeBrief.servings_per_container} />
+                            <MetaRow label="Packaging" value={activeBrief.packaging_type} />
                           </div>
                         </div>
-                      </>
-                    )}
-
-                    {(activeVersion.market_summary || activeVersion.opportunity_insights) && (
-                      <>
                         <Separator />
                         <div>
-                          <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Market</h3>
-                          <div className="space-y-4">
-                            {activeVersion.market_summary && (
-                              <div>
-                                <p className="text-[11px] text-gray-400 mb-1">Market summary</p>
-                                <p className="text-xs text-gray-700 leading-relaxed">{activeVersion.market_summary}</p>
-                              </div>
-                            )}
-                            {activeVersion.opportunity_insights && (
-                              <div>
-                                <p className="text-[11px] text-gray-400 mb-1">Opportunity insights</p>
-                                <p className="text-xs text-gray-700 leading-relaxed">{activeVersion.opportunity_insights}</p>
-                              </div>
-                            )}
+                          <h3 className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">Commercials</h3>
+                          <div className="space-y-2">
+                            <MetaRow label="Target price" value={activeBrief.target_price != null ? `$${activeBrief.target_price}` : null} />
+                            <MetaRow label="COGS target" value={activeBrief.cogs_target != null ? `$${activeBrief.cogs_target}` : null} />
+                            <MetaRow label="Margin estimate" value={activeBrief.margin_estimate != null ? `${activeBrief.margin_estimate}%` : null} />
+                            <MetaRow label="MOQ estimate" value={activeBrief.moq_estimate != null ? `${activeBrief.moq_estimate.toLocaleString()} units` : null} />
+                            <MetaRow label="Lead time" value={activeBrief.lead_time_weeks != null ? `${activeBrief.lead_time_weeks} weeks` : null} />
                           </div>
                         </div>
-                      </>
-                    )}
-
-                    {(activeVersion.manufacturing_notes || activeVersion.regulatory_notes || activeVersion.packaging_recommendations) && (
-                      <>
-                        <Separator />
-                        <div>
-                          <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Manufacturing</h3>
-                          <div className="space-y-4">
-                            {activeVersion.manufacturing_notes && (
-                              <div>
-                                <p className="text-[11px] text-gray-400 mb-1">Manufacturing notes</p>
-                                <p className="text-xs text-gray-700 leading-relaxed">{activeVersion.manufacturing_notes}</p>
+                        {(activeBrief.key_differentiators?.length || activeBrief.consumer_pain_points?.length || activeBrief.risk_factors?.length) && (
+                          <>
+                            <Separator />
+                            <div>
+                              <h3 className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">Strategy</h3>
+                              <div className="space-y-3">
+                                {activeBrief.key_differentiators?.length ? (
+                                  <div>
+                                    <p className="text-[11px] text-gray-400 mb-1.5">Key differentiators</p>
+                                    <TagList items={activeBrief.key_differentiators} color="bg-indigo-50 text-indigo-700" />
+                                  </div>
+                                ) : null}
+                                {activeBrief.consumer_pain_points?.length ? (
+                                  <div>
+                                    <p className="text-[11px] text-gray-400 mb-1.5">Consumer pain points</p>
+                                    <TagList items={activeBrief.consumer_pain_points} color="bg-amber-50 text-amber-700" />
+                                  </div>
+                                ) : null}
+                                {activeBrief.risk_factors?.length ? (
+                                  <div>
+                                    <p className="text-[11px] text-gray-400 mb-1.5">Risk factors</p>
+                                    <TagList items={activeBrief.risk_factors} color="bg-red-50 text-red-700" />
+                                  </div>
+                                ) : null}
+                                {activeBrief.certifications?.length ? (
+                                  <div>
+                                    <p className="text-[11px] text-gray-400 mb-1.5">Certifications</p>
+                                    <TagList items={activeBrief.certifications} color="bg-green-50 text-green-700" />
+                                  </div>
+                                ) : null}
+                                {activeBrief.testing_requirements?.length ? (
+                                  <div>
+                                    <p className="text-[11px] text-gray-400 mb-1.5">Testing requirements</p>
+                                    <TagList items={activeBrief.testing_requirements} color="bg-gray-100 text-gray-600" />
+                                  </div>
+                                ) : null}
                               </div>
-                            )}
-                            {activeVersion.regulatory_notes && (
-                              <div>
-                                <p className="text-[11px] text-gray-400 mb-1">Regulatory notes</p>
-                                <p className="text-xs text-gray-700 leading-relaxed">{activeVersion.regulatory_notes}</p>
+                            </div>
+                          </>
+                        )}
+                        {(activeBrief.market_summary || activeBrief.opportunity_insights) && (
+                          <>
+                            <Separator />
+                            <div>
+                              <h3 className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">Market</h3>
+                              <div className="space-y-4">
+                                {activeBrief.market_summary && (
+                                  <div>
+                                    <p className="text-[11px] text-gray-400 mb-1">Market summary</p>
+                                    <p className="text-xs text-gray-700 leading-relaxed">{activeBrief.market_summary}</p>
+                                  </div>
+                                )}
+                                {activeBrief.opportunity_insights && (
+                                  <div>
+                                    <p className="text-[11px] text-gray-400 mb-1">Opportunity insights</p>
+                                    <p className="text-xs text-gray-700 leading-relaxed">{activeBrief.opportunity_insights}</p>
+                                  </div>
+                                )}
                               </div>
-                            )}
-                            {activeVersion.packaging_recommendations && (
-                              <div>
-                                <p className="text-[11px] text-gray-400 mb-1">Packaging recommendations</p>
-                                <p className="text-xs text-gray-700 leading-relaxed">{activeVersion.packaging_recommendations}</p>
+                            </div>
+                          </>
+                        )}
+                        {(activeBrief.manufacturing_notes || activeBrief.regulatory_notes || activeBrief.packaging_recommendations) && (
+                          <>
+                            <Separator />
+                            <div>
+                              <h3 className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">Manufacturing</h3>
+                              <div className="space-y-4">
+                                {activeBrief.manufacturing_notes && (
+                                  <div>
+                                    <p className="text-[11px] text-gray-400 mb-1">Manufacturing notes</p>
+                                    <p className="text-xs text-gray-700 leading-relaxed">{activeBrief.manufacturing_notes}</p>
+                                  </div>
+                                )}
+                                {activeBrief.regulatory_notes && (
+                                  <div>
+                                    <p className="text-[11px] text-gray-400 mb-1">Regulatory notes</p>
+                                    <p className="text-xs text-gray-700 leading-relaxed">{activeBrief.regulatory_notes}</p>
+                                  </div>
+                                )}
+                                {activeBrief.packaging_recommendations && (
+                                  <div>
+                                    <p className="text-[11px] text-gray-400 mb-1">Packaging recommendations</p>
+                                    <p className="text-xs text-gray-700 leading-relaxed">{activeBrief.packaging_recommendations}</p>
+                                  </div>
+                                )}
                               </div>
-                            )}
-                          </div>
-                        </div>
-                      </>
-                    )}
-                  </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    ) : null}
+                  </>
                 )}
 
                 {/* ── FORMULA ── */}
-                {activeTab === "formula" && (() => {
-                  const adjusted = getFormulaText(activeVersion);
-                  const grok = getGrokBrief(activeVersion);
-                  const claude = getClaudeBrief(activeVersion);
-                  return (
-                    <div className="space-y-6 max-w-3xl">
-                      {adjusted ? (
-                        <div>
-                          <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Final Formula (Post-QA)</h3>
-                          <SectionText text={adjusted} />
-                        </div>
-                      ) : null}
-                      {grok ? (
+                {activeTab === "formula" && (
+                  <div className="space-y-6 max-w-3xl">
+                    {activeLiving ? (
+                      <div>
+                        <h3 className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">
+                          Formula — {activeLiving.change_summary ?? `MFR v${activeLiving.version_number}`}
+                        </h3>
+                        <SectionText text={activeLiving.formula_brief_content} fallback="No formula content." />
+                      </div>
+                    ) : activeBrief ? (() => {
+                      const { adjusted, grok, claude } = getFormulaText(activeBrief);
+                      return (
                         <>
-                          {adjusted && <Separator />}
-                          <div>
-                            <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Grok 4.2 Draft</h3>
-                            <SectionText text={grok} />
-                          </div>
+                          {adjusted ? (
+                            <div>
+                              <h3 className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">Final Formula (Post-QA)</h3>
+                              <SectionText text={adjusted} />
+                            </div>
+                          ) : null}
+                          {grok ? (
+                            <>
+                              {adjusted && <Separator />}
+                              <div>
+                                <h3 className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">Grok 4.2 Draft</h3>
+                                <SectionText text={grok} />
+                              </div>
+                            </>
+                          ) : null}
+                          {claude ? (
+                            <>
+                              {(adjusted || grok) && <Separator />}
+                              <div>
+                                <h3 className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">Claude Sonnet 4.6 Draft</h3>
+                                <SectionText text={claude} />
+                              </div>
+                            </>
+                          ) : null}
+                          {!adjusted && !grok && !claude && (
+                            <p className="text-sm text-gray-400 py-4">No formula data available.</p>
+                          )}
                         </>
-                      ) : null}
-                      {claude ? (
-                        <>
-                          {(adjusted || grok) && <Separator />}
-                          <div>
-                            <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Claude Sonnet 4.6 Draft</h3>
-                            <SectionText text={claude} />
-                          </div>
-                        </>
-                      ) : null}
-                      {!adjusted && !grok && !claude && (
-                        <p className="text-sm text-gray-400 py-4">No formula data available for this version.</p>
-                      )}
-                    </div>
-                  );
-                })()}
-
-                {/* ── QA REPORT ── */}
-                {activeTab === "qa" && (() => {
-                  const qa = getQAReport(activeVersion);
-                  const verdict = getQAVerdict(activeVersion);
-                  const score = getQAScore(activeVersion);
-                  return (
-                    <div className="space-y-4 max-w-3xl">
-                      {(verdict || score) && (
-                        <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
-                          {verdict && (
-                            <Badge className={`text-xs px-3 py-1 border ${verdictColor(verdict)}`}>{verdict}</Badge>
-                          )}
-                          {score && (
-                            <span className="text-sm text-gray-500">
-                              QA Score: <span className="font-bold text-gray-800">{score}/10</span>
-                            </span>
-                          )}
-                        </div>
-                      )}
-                      <SectionText text={qa} fallback="No QA report available for this version." />
-                    </div>
-                  );
-                })()}
-
-                {/* ── COMPETITIVE ── */}
-                {activeTab === "competitive" && (() => {
-                  const report = getCompetitiveReport(activeVersion);
-                  const score = getCompetitiveScore(activeVersion);
-                  return (
-                    <div className="space-y-4 max-w-3xl">
-                      {score && (
-                        <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
-                          <span className="text-sm text-gray-500">
-                            Competitive Score: <span className="font-bold text-gray-800">{score}/10</span>
-                          </span>
-                        </div>
-                      )}
-                      <SectionText text={report} fallback="No competitive benchmarking report available." />
-                    </div>
-                  );
-                })()}
-
-                {/* ── FDA ── */}
-                {activeTab === "fda" && (() => {
-                  const score = getFDAScore(activeVersion);
-                  const status = getFDAStatus(activeVersion);
-                  const analysis = getFDAAnalysis(activeVersion);
-                  const fda = getFDA(activeVersion);
-                  const ingredientAnalysis = fda?.ingredient_analysis as string | undefined;
-                  return (
-                    <div className="space-y-4 max-w-3xl">
-                      {(score || status) && (
-                        <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
-                          {status && (
-                            <Badge className={`text-xs px-3 py-1 border ${fdaColor(status)}`}>{status}</Badge>
-                          )}
-                          {score && (
-                            <span className="text-sm text-gray-500">
-                              Compliance Score: <span className="font-bold text-gray-800">{score}/100</span>
-                            </span>
-                          )}
-                        </div>
-                      )}
-                      {analysis && (
-                        <div>
-                          <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Analysis</h3>
-                          <SectionText text={analysis} />
-                        </div>
-                      )}
-                      {ingredientAnalysis && (
-                        <>
-                          <Separator />
-                          <div>
-                            <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Ingredient Analysis</h3>
-                            <SectionText text={ingredientAnalysis} />
-                          </div>
-                        </>
-                      )}
-                      {!analysis && !ingredientAnalysis && !score && (
-                        <p className="text-sm text-gray-400 py-4">No FDA compliance report available.</p>
-                      )}
-                    </div>
-                  );
-                })()}
+                      );
+                    })() : null}
+                  </div>
+                )}
 
                 {/* ── COMMENTS ── */}
                 {activeTab === "comments" && (
-                  <div className="max-w-2xl space-y-0">
+                  <div className="max-w-2xl">
                     {comments.length === 0 ? (
                       <p className="text-sm text-gray-400 text-center py-8">No comments yet.</p>
                     ) : (

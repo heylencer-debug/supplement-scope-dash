@@ -18,7 +18,7 @@ export function useRecentCategories(limit: number = 20) {
       const { data: categories, error } = await supabase
         .from("categories")
         .select("id, name, search_term, total_products, created_at, last_scanned, analysis_type, product_forms")
-        .order("created_at", { ascending: false })
+        .order("updated_at", { ascending: false })
         .limit(limit);
 
       if (error) throw error;

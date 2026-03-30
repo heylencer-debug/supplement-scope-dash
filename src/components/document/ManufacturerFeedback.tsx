@@ -216,7 +216,7 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
     },
   });
 
-  const handleDownloadVersion = useCallback(async (versionId: string) => {
+  const viewingVersion = viewingVersionId ? allVersions.find(v => v.id === viewingVersionId) : null;
     setDownloadingVersion(versionId);
     try {
       const { data: version, error } = await supabase

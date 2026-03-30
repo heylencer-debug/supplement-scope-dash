@@ -252,8 +252,7 @@ export default function ManufacturerPortalInternal() {
     if (!selectedCat) return;
     setActiveVersion(null);
     setActiveTab("overview");
-    supabase
-      .from("formula_briefs")
+    (supabase.from as any)("formula_briefs")
       .select([
         "id", "category_id", "created_at", "updated_at", "ingredients",
         "positioning", "target_customer", "form_type", "flavor_profile",

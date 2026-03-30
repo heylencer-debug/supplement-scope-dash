@@ -635,7 +635,11 @@ async function run() {
     .update({ ingredients: updatedIngredients })
     .eq('id', briefRow.id);
   if (saveErr) console.error(`  ❌ Save error: ${saveErr.message}`);
-  else console.log(`  ✅ Saved to formula_briefs.ingredients.fda_compliance`);
+  else {
+    console.log(`  ✅ Saved to formula_briefs.ingredients.fda_compliance`);
+    await DASH.from('categories').update({ updated_at: new Date().toISOString() }).eq('id', CAT_ID);
+    console.log('  ✅ Category updated_at bumped');
+  }
 
   // ── Save to vault ─────────────────────────────────────────────────────────
   console.log(`\nSaving to vault...`);

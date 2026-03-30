@@ -980,7 +980,11 @@ async function run() {
     .update({ ingredients: updatedIngredients })
     .eq('id', briefRow.id);
   if (saveErr) console.error(`  âŒ Save error: ${saveErr.message}`);
-  else console.log(`  âœ… Saved to formula_briefs.ingredients.qa_report`);
+  else {
+    console.log(`  âœ… Saved to formula_briefs.ingredients.qa_report`);
+    await DASH.from('categories').update({ updated_at: new Date().toISOString() }).eq('id', CAT_ID);
+    console.log('  ✅ Category updated_at bumped');
+  }
 
   // ── Call 2 invocation ──────────────────────────────────────────────────────
   const marketIntelText = marketIntel || '';
@@ -1191,7 +1195,10 @@ async function run() {
       })
       .eq('id', briefRow.id);
     if (c2Err) console.error('  Call 2 save error:', c2Err.message);
-    else console.log('  Call 2 results saved (comparison + flavor QA + pipeline metadata + run audit) OK');
+    else {
+      console.log('  Call 2 results saved (comparison + flavor QA + pipeline metadata + run audit) OK');
+      await DASH.from('categories').update({ updated_at: new Date().toISOString() }).eq('id', CAT_ID);
+    }
   }
 
   if (finalNoteCount > 0) {

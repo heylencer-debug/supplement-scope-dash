@@ -1189,6 +1189,10 @@ async function saveToDB(categoryId, grokBrief, claudeBrief, marketData) {
   });
 
   if (error) throw error;
+
+  // Bump category so "sort by updated_at" floats it to top
+  await DASH.from('categories').update({ updated_at: new Date().toISOString() }).eq('id', categoryId);
+  console.log('  ✅ Category updated_at bumped');
 }
 
 async function saveToVault(grokBrief, claudeBrief) {

@@ -293,7 +293,7 @@ export default function ManufacturerPortalInternal() {
     if (!commentText.trim() || !activeVersion || !selectedCat) return;
     setSubmitting(true);
     const vLabel = getVersionLabel(briefs, activeVersion);
-    await supabase.from("manufacturer_comments").insert({
+    await (supabase.from as any)("manufacturer_comments").insert({
       session_token: "00000000-0000-0000-0000-000000000000",
       category_id: selectedCat.id,
       version_label: vLabel,

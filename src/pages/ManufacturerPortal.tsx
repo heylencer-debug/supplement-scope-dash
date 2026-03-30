@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { PDFDownloadLink } from "@react-pdf/renderer";
 import { FormulaPDF } from "@/components/FormulaPDF";
 import { FormulaViewer } from "@/components/FormulaViewer";
+import { ActivityTimeline, type TimelineComment, type TimelineVersion } from "@/components/ActivityTimeline";
 import { Paperclip, X, FileText, Image } from "lucide-react";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -164,6 +165,7 @@ export default function ManufacturerPortal() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [allCatComments, setAllCatComments] = useState<MfrComment[]>([]);
 
   // ── Validate token ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -228,7 +230,7 @@ export default function ManufacturerPortal() {
     setPublishedVersion(null);
 
     (async () => {
-      const [{ data: liveVersions }, { data: briefData }, { data: pubData }] = await Promise.all([
+      const [{ data: liveVersions }, { data: briefData }, { data: pubData }, { data: allComments }] = await Promise.all([
         supabase
           .from("formula_brief_versions")
           .select("*")
@@ -245,7 +247,12 @@ export default function ManufacturerPortal() {
           .select("version_label")
           .eq("category_id", selectedCategoryId)
           .maybeSingle(),
+        (supabase.from as any)("manufacturer_comments")
+          .select("*")
+          .eq("category_id", selectedCategoryId)
+          .order("created_at", { ascending: false }),
       ]);
+      setAllCatComments((allComments ?? []) as MfrComment[]);
 
       const all: UnifiedVersion[] = [];
 
@@ -375,6 +382,10 @@ export default function ManufacturerPortal() {
       setAttachmentFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
       await loadComments(selectedCategoryId, activeCommentVersion);
+      // Refresh history feed
+      const { data: refreshed } = await (supabase.from as any)("manufacturer_comments")
+        .select("*").eq("category_id", selectedCategoryId).order("created_at", { ascending: false });
+      setAllCatComments((refreshed ?? []) as MfrComment[]);
     }
     setSubmitting(false);
   }
@@ -687,6 +698,27 @@ export default function ManufacturerPortal() {
                       </Button>
                     </div>
                   </div>
+                </section>
+              )}
+
+              {/* Project History */}
+              {(allCatComments.length > 0 || versions.length > 0) && (
+                <section>
+                  <Separator className="mb-6" />
+                  <h2 className="text-xs uppercase tracking-widest text-gray-400 font-semibold mb-5">
+                    Project History
+                  </h2>
+                  <ActivityTimeline
+                    comments={allCatComments as TimelineComment[]}
+                    versions={versions.map((v) => ({
+                      id: v.id,
+                      label: v.label,
+                      created_at: v.created_at,
+                      change_summary: v.change_summary ?? undefined,
+                      source: "version" as const,
+                    }))}
+                    showVersionChip={true}
+                  />
                 </section>
               )}
             </div>

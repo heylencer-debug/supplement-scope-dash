@@ -13,8 +13,9 @@ import { FormulaPDF } from "@/components/FormulaPDF";
 import { FormulaViewer } from "@/components/FormulaViewer";
 import {
   Link2, ChevronRight, MessageSquare, FlaskConical, LayoutDashboard, GitBranch,
-  Pencil, Trash2, Check, X, Eye, EyeOff, FileText,
+  Pencil, Trash2, Check, X, Eye, EyeOff, FileText, Clock,
 } from "lucide-react";
+import { ActivityTimeline, type TimelineComment, type TimelineVersion } from "@/components/ActivityTimeline";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -62,7 +63,7 @@ interface MfrComment {
   attachment_type: string | null;
 }
 
-type TabKey = "overview" | "formula" | "comments";
+type TabKey = "overview" | "formula" | "comments" | "history";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -125,6 +126,7 @@ export default function ManufacturerPortalInternal() {
   const [mfrName, setMfrName] = useState("");
   const [generatingLink, setGeneratingLink] = useState(false);
   const [publishedLabel, setPublishedLabel] = useState<string | null>(null);
+  const [allCatComments, setAllCatComments] = useState<MfrComment[]>([]);
 
   // Load categories
   useEffect(() => {
@@ -272,6 +274,13 @@ export default function ManufacturerPortalInternal() {
       const firstVersion = all.find(v => v.source === "version") ?? all[0];
       if (firstVersion) setActiveItem(firstVersion);
     });
+
+    // Load all comments for this category (used in History tab)
+    (supabase.from as any)("manufacturer_comments")
+      .select("*")
+      .eq("category_id", selectedCat.id)
+      .order("created_at", { ascending: false })
+      .then(({ data }: any) => setAllCatComments((data ?? []) as MfrComment[]));
   }, [selectedCat]);
 
   // Load comments
@@ -320,6 +329,12 @@ export default function ManufacturerPortalInternal() {
     } else {
       setCommentText("");
       loadComments();
+      // Refresh history feed
+      (supabase.from as any)("manufacturer_comments")
+        .select("*")
+        .eq("category_id", selectedCat.id)
+        .order("created_at", { ascending: false })
+        .then(({ data }: any) => setAllCatComments((data ?? []) as MfrComment[]));
     }
     setSubmitting(false);
   };
@@ -370,6 +385,7 @@ export default function ManufacturerPortalInternal() {
     { key: "overview", label: "Overview", icon: LayoutDashboard },
     { key: "formula",  label: "Formula",  icon: FlaskConical },
     { key: "comments", label: "Comments", icon: MessageSquare },
+    { key: "history",  label: "History",  icon: Clock },
   ];
 
   // ─── Render ─────────────────────────────────────────────────────────────────
@@ -763,6 +779,26 @@ export default function ManufacturerPortalInternal() {
                         </Button>
                       </div>
                     </div>
+                  </div>
+                )}
+
+                {/* ── HISTORY ── */}
+                {activeTab === "history" && (
+                  <div className="max-w-2xl">
+                    <p className="text-[10px] uppercase tracking-widest text-gray-400 font-semibold mb-5">
+                      Project Activity — {selectedCat?.name}
+                    </p>
+                    <ActivityTimeline
+                      comments={allCatComments as TimelineComment[]}
+                      versions={versions.map((v) => ({
+                        id: v.id,
+                        label: v.label,
+                        created_at: v.created_at,
+                        change_summary: v.change_summary ?? undefined,
+                        source: v.source,
+                      } as TimelineVersion))}
+                      showVersionChip={true}
+                    />
                   </div>
                 )}
 

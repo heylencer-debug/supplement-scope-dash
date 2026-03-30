@@ -252,8 +252,7 @@ export default function ManufacturerPortal() {
     setActiveCommentVersion(null);
     setComments([]);
     (async () => {
-      const { data } = await supabase
-        .from("formula_briefs")
+      const { data } = await (supabase.from as any)("formula_briefs")
         .select("id,category_id,created_at,ingredients")
         .eq("category_id", selectedCategoryId)
         .order("created_at", { ascending: false });

@@ -193,8 +193,8 @@ export default function ManufacturerPortalInternal() {
         const b = briefs[0] as any;
         const ingredients = (b.ingredients ?? {}) as Record<string, unknown>;
         const p12Meta = extractP12Metadata(ingredients);
-        // Get the full formula text — prefer adjusted_formula > final_formula_brief
-        const formulaContent = (ingredients.adjusted_formula ?? ingredients.final_formula_brief ?? "") as string;
+        // Use the full P12 document (final_formula_brief), fallback to adjusted_formula
+        const formulaContent = (ingredients.final_formula_brief ?? ingredients.adjusted_formula ?? "") as string;
         const changeSummary = `Dual AI formula brief — ${[
           ingredients.formula_brief_model_grok && `Grok`,
           ingredients.formula_brief_model_claude && `Claude Sonnet`,

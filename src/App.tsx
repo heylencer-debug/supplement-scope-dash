@@ -11,6 +11,7 @@ import ProductExplorer from "./pages/ProductExplorer";
 import AddProduct from "./pages/AddProduct";
 import NotFound from "./pages/NotFound";
 import ManufacturerPortal from "./pages/ManufacturerPortal";
+import ManufacturerPortalInternal from "./pages/ManufacturerPortalInternal";
 
 const queryClient = new QueryClient();
 
@@ -35,6 +36,7 @@ const App = () => (
                     <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/products" element={<ProductExplorer />} />
                     <Route path="/products/add" element={<AddProduct />} />
+                    <Route path="/manufacturer-portal" element={<ManufacturerPortalInternal />} />
                     <Route path="*" element={<NotFound />} />
                   </Routes>
                 </Layout>

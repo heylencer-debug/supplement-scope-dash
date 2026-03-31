@@ -202,7 +202,7 @@ export function Layout({ children }: LayoutProps) {
       <div className="min-h-screen flex w-full">
         <AppSidebar />
         <main className="flex-1 flex flex-col">
-          <header className="h-14 border-b border-border bg-card shadow-soft flex items-center px-2 sm:px-4 gap-2 sm:gap-3 overflow-hidden">
+          <header className="h-14 border-b border-border bg-card shadow-soft flex items-center px-2 sm:px-4 gap-2 sm:gap-3 overflow-visible">
             <SidebarTrigger className="flex-shrink-0" />
             
             {/* New Analysis Button */}

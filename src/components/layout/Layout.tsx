@@ -225,7 +225,7 @@ export function Layout({ children }: LayoutProps) {
                 <div className="h-5 w-px bg-border flex-shrink-0" />
                 
                 {/* Analysis Tabs - scrollable area with scroll indicators */}
-                <div className="flex-1 relative min-w-0">
+                <div className="flex-1 relative min-w-0 overflow-hidden">
                   {/* Left scroll indicator */}
                   <div 
                     className={cn(

@@ -1,5 +1,60 @@
 # Scout pipeline — Cloud Run Job deploy notes
 
+## 2026-08-28 follow-up 2: P5 also migrated to Claude Sonnet 5 via OpenRouter (Grok fully out)
+
+**Trigger**: user decision to remove Grok from P5 too — the 2026-08-28 P5
+rebuild (grounded + parallel + off-Amazon scraping) still used xAI Grok
+(`api.x.ai`, `grok-4-fast` routine / `grok-4.20-beta-0309-reasoning`
+memory-fallback) as the summarizer that writes the grounded brief. Converted
+it to the same OpenRouter + `ANALYSIS_MODEL` pattern as P6/P8-P11.
+
+**Change** (`scout/phase5-deep-research.js`):
+- Replaced `getXaiKey()` (`XAI_API_KEY`) with `getOpenRouterKey()`
+  (`OPENROUTER_API_KEY`). `XAI_API_KEY` is no longer required by this phase.
+- `callGrok()` (name kept — internal only, not referenced elsewhere) now
+  POSTs to `https://openrouter.ai/api/v1/chat/completions` with the same
+  headers (`HTTP-Referer`, `X-Title`) as the other OpenRouter call sites.
+  Response parsing (`j.choices?.[0]?.message?.content`) unchanged — already
+  OpenAI-shape.
+- New `DEFAULT_ANALYSIS_MODEL = process.env.P5_MODEL || process.env.ANALYSIS_MODEL
+  || 'anthropic/claude-sonnet-5'`. `P5_FAST_MODEL` (routine tier) and
+  `P5_REASONING_MODEL` (memory-fallback tier) both now default to this same
+  model — no reason to keep a separate Grok "reasoning" fallback once Grok is
+  out — but both env vars are still individually honored if explicitly set
+  (e.g. to point one tier back at a different model). Memory-fallback output
+  is still clearly flagged `(low confidence — from memory, not verified)` in
+  the prompt, unchanged.
+- `maxTokens` bumped: routine grounded brief 1600 → 2800, memory-fallback
+  3000 → 4000 (the ~500-700 word grounded brief plus markdown headers runs
+  ~2500-4000 output tokens on Sonnet 5; old Grok ceiling risked truncation).
+  Kept lean relative to P8/P9's 12k-16k ceilings since P5 runs ~8 products
+  concurrently (`P5_CONCURRENCY`, default 5 lanes) — no change to concurrency
+  or pool sizes.
+- `getAlreadyResearched()` skip-filter updated to match `researched_by`
+  containing `'claude'` OR `'grok'` (was `'grok'`-only) so already-completed
+  Claude runs are correctly skipped on rerun, while legacy Grok-labeled rows
+  remain skippable too (not force-reprocessed just because the model changed).
+- Everything else in the 2026-08-28 P5 rebuild is untouched:
+  `fetchGroundingData()`, `formatGroundingForPrompt()`, the Playwright
+  brand-page scrape (`findAndScrapeSource()`, `pickConfidentResult()`,
+  `extractSignalsFromText()`, `saveSource()` → `dovive_p5_sources`),
+  `runPool()` concurrency helper, `buildGroundedPrompt()`,
+  `parseResearchOutput()`, `saveToSupabase()` / `saveToDashProduct()`. Pool
+  sizes (`P5_TOP_COUNT`=5, `P5_NEW_COUNT`=3) and concurrency (`P5_CONCURRENCY`=5)
+  unchanged.
+- `researched_by` / `data_grounding.*` / console `Model:` line all
+  automatically reflect the new model since they read `P5_FAST_MODEL` /
+  `P5_REASONING_MODEL` / `meta.model` dynamically — no separate field needed.
+
+**Image rebuilt + Cloud Run Job updated again**: build ID
+`0a11b7e3-f433-4351-9dcc-ae1202c0c49c`, digest
+`sha256:785304da42aedca0b980a2f96bb3951cf58a48447c07be7e2dbc25550ddfcfdf`.
+`gcloud run jobs update dovive-scout --image ...:latest` applied;
+`timeoutSeconds` confirmed unchanged at `10800` (describe call was blocked
+once by the Claude Code auto-mode classifier, retry succeeded — no infra
+issue). Job was **NOT executed** — the "turmeric gummies" test run in
+progress on an older image tag was not touched.
+
 ## 2026-08-28 follow-up: P6 also migrated to Claude Sonnet 5 via OpenRouter
 
 **Trigger**: coordinator follow-up after the initial P8-P11 migration below — P6

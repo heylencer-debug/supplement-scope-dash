@@ -46,8 +46,15 @@
  *   P5_TOP_COUNT       products in Pool A (default 5)
  *   P5_NEW_COUNT       products in Pool B (default 3)
  *   P5_CONCURRENCY     parallel product analyses (default 5)
- *   P5_FAST_MODEL      routine summarization model (default grok-4-fast)
- *   P5_REASONING_MODEL heavy fallback model, memory-only case (default grok-4.20-beta-0309-reasoning)
+ *   P5_MODEL           routine + memory-fallback summarization model
+ *                      (default ANALYSIS_MODEL, falls back to anthropic/claude-sonnet-5)
+ *   P5_FAST_MODEL      legacy alias, still honored if set (routine summarization model)
+ *   P5_REASONING_MODEL legacy alias, still honored if set (memory-only fallback model)
+ *
+ * 2026-08-28: switched from xAI Grok (api.x.ai) to Claude Sonnet 5 via
+ * OpenRouter — Grok's memory of brand/product details was unreliable, and
+ * this keeps P5 on the same OpenRouter + ANALYSIS_MODEL pattern as P6/P8-P11.
+ * XAI_API_KEY is no longer required by this phase.
  */
 
 require('dotenv').config();
@@ -67,24 +74,34 @@ const POOL_ARG = process.argv.includes('--pool')     ? process.argv[process.argv
 const P5_TOP_COUNT   = parseInt(process.env.P5_TOP_COUNT   || '5', 10);
 const P5_NEW_COUNT   = parseInt(process.env.P5_NEW_COUNT   || '3', 10);
 const P5_CONCURRENCY = parseInt(process.env.P5_CONCURRENCY || '5', 10);
-const P5_FAST_MODEL      = process.env.P5_FAST_MODEL      || 'grok-4-fast';
-const P5_REASONING_MODEL = process.env.P5_REASONING_MODEL || 'grok-4.20-beta-0309-reasoning';
 
-// ─── xAI Key ──────────────────────────────────────────────────────────────────
+// Analysis model — configurable without a rebuild. Default: Claude Sonnet 5 via OpenRouter.
+// P5_FAST_MODEL / P5_REASONING_MODEL are honored as legacy per-tier overrides if explicitly
+// set (e.g. to point back at a Grok model), otherwise both tiers use the same model.
+const DEFAULT_ANALYSIS_MODEL = process.env.P5_MODEL || process.env.ANALYSIS_MODEL || 'anthropic/claude-sonnet-5';
+const P5_FAST_MODEL      = process.env.P5_FAST_MODEL      || DEFAULT_ANALYSIS_MODEL;
+const P5_REASONING_MODEL = process.env.P5_REASONING_MODEL || DEFAULT_ANALYSIS_MODEL;
 
-function getXaiKey() {
-  return process.env.XAI_API_KEY || null;
+// ─── OpenRouter Key ──────────────────────────────────────────────────────────
+
+function getOpenRouterKey() {
+  return process.env.OPENROUTER_API_KEY || null;
 }
 
-// ─── Grok Call (model + max_tokens configurable per call) ─────────────────────
+// ─── Claude Call via OpenRouter (model + max_tokens configurable per call) ────
 
 async function callGrok(prompt, { model = P5_FAST_MODEL, maxTokens = 1600 } = {}) {
-  const key = getXaiKey();
-  if (!key) throw new Error('XAI_API_KEY not found in scout/.env');
+  const key = getOpenRouterKey();
+  if (!key) throw new Error('OPENROUTER_API_KEY not found in scout/.env');
 
-  const res = await fetch('https://api.x.ai/v1/chat/completions', {
+  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+    headers: {
+      'Authorization': `Bearer ${key}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': 'https://dovive.com',
+      'X-Title': 'DOVIVE Scout P5 Deep Research',
+    },
     body: JSON.stringify({
       model,
       max_tokens: maxTokens,
@@ -92,7 +109,7 @@ async function callGrok(prompt, { model = P5_FAST_MODEL, maxTokens = 1600 } = {}
     }),
   });
   const j = await res.json();
-  if (j.error) throw new Error(`Grok error (${model}): ${j.error.message}`);
+  if (j.error) throw new Error(`OpenRouter error (${model}): ${j.error.message || JSON.stringify(j.error)}`);
   return j.choices?.[0]?.message?.content || null;
 }
 
@@ -449,7 +466,7 @@ async function getAlreadyResearched() {
     .select('asin, pool, researched_by')
     .ilike('keyword', `%${KEYWORD.split(' ')[0]}%`);
   return new Set((data || [])
-    .filter(r => r.researched_by?.includes('grok'))
+    .filter(r => r.researched_by?.includes('claude') || r.researched_by?.includes('grok'))
     .map(r => `${r.asin}_${r.pool}`));
 }
 
@@ -522,11 +539,13 @@ Page excerpt: ${scraped.raw_html_excerpt.substring(0, 1200)}`;
 
   const memoryFallback = !grounding.hasRealData && !sourceUrl;
   const model = memoryFallback ? P5_REASONING_MODEL : P5_FAST_MODEL;
-  const maxTokens = memoryFallback ? 3000 : 1600;
+  // Grounded brief target is ~500-700 words (~2500-4000 output tokens incl. markdown structure);
+  // memory-fallback case gets a bit more headroom since it has no real data to lean on.
+  const maxTokens = memoryFallback ? 4000 : 2800;
 
   const prompt = buildGroundedPrompt(product, rank, pool, KEYWORD, groundingText, sourceBlock, memoryFallback);
   const rawOutput = await callGrok(prompt, { model, maxTokens });
-  if (!rawOutput) throw new Error(`Empty response from Grok (${model})`);
+  if (!rawOutput) throw new Error(`Empty response from AI model (${model})`);
 
   const record = parseResearchOutput(rawOutput, product, pool, {
     model, hasRealData: grounding.hasRealData, sourceUrl, sourceExtracted, memoryFallback,

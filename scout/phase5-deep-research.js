@@ -380,23 +380,56 @@ How DOVIVE can beat this specific product. One-line positioning statement: "DOVI
 }
 
 // ─── Parse AI output into structured fields ────────────────────────────────────
+//
+// Tolerant section matcher — the model doesn't always reproduce the exact
+// "### N. HEADING" markdown requested in the prompt (heading level can drift
+// between ## and ###, the numbering/period can be dropped, models sometimes
+// bold the heading instead). Matches by heading NAME only, any heading level
+// 2-4, optional leading number, optional trailing colon, case-insensitive.
+function matchNamedSection(text, name, nextNames) {
+  const next = nextNames.length
+    ? `(?:\\n#{2,4}\\s*(?:\\d+\\.?\\s*)?(?:${nextNames.join('|')})|---\\s*\\n|$)`
+    : '(?:---\\s*\\n|$)';
+  const re = new RegExp(`#{2,4}\\s*(?:\\d+\\.?\\s*)?${name}\\s*:?\\s*\\n?([\\s\\S]*?)${next}`, 'i');
+  return text.match(re)?.[1]?.trim() || '';
+}
 
 function parseResearchOutput(rawText, product, pool, meta) {
-  const threatMatch = rawText.match(/\*\*Threat Level:\*\*\s*([^\n\-–]+)/i);
+  const threatMatch = rawText.match(/\*\*Threat Level:?\*\*\s*([^\n\-–]+)/i)
+    || rawText.match(/Threat Level:?\s*([^\n\-–]+)/i);
   const threatLevel = threatMatch?.[1]?.trim().split(/[\s,]/)[0] || 'Unknown';
 
-  const angleSection = rawText.match(/### 5\. DOVIVE COMPETITIVE ANGLE([\s\S]*?)(?:### 6|$)/)?.[1]?.trim() || '';
+  const sectionNames = [
+    'FORMULA SNAPSHOT',
+    'MARKET POSITION',
+    'CONSUMER SENTIMENT',
+    'THIRD-PARTY TESTING (?:&|AND) TRANSPARENCY',
+    'DOVIVE COMPETITIVE ANGLE',
+    'THREAT ASSESSMENT',
+    'KEY INTELLIGENCE SUMMARY',
+  ];
 
-  const summarySection = rawText.match(/### 7\. KEY INTELLIGENCE SUMMARY([\s\S]*?)(?:---|$)/)?.[1]?.trim() || '';
+  const formulaSection  = matchNamedSection(rawText, sectionNames[0], sectionNames.slice(1));
+  const angleSection    = matchNamedSection(rawText, sectionNames[4], sectionNames.slice(5));
+  const threatsSection  = matchNamedSection(rawText, sectionNames[5], sectionNames.slice(6));
+  const summarySection  = matchNamedSection(rawText, sectionNames[6], []);
+
   const keyBullets = summarySection
     .split('\n')
-    .filter(l => l.trim().startsWith('-') || l.trim().startsWith('•'))
-    .map(l => l.replace(/^[-•]\s*/, '').trim())
+    .filter(l => l.trim().startsWith('-') || l.trim().startsWith('•') || l.trim().startsWith('*'))
+    .map(l => l.replace(/^[-•*]\s*/, '').trim())
     .filter(Boolean)
     .slice(0, 5);
 
-  const formulaSection = rawText.match(/### 1\. FORMULA SNAPSHOT([\s\S]*?)(?:### 2|$)/)?.[1]?.trim() || '';
-  const threatsSection = rawText.match(/### 6\. THREAT ASSESSMENT([\s\S]*?)(?:### 7|$)/)?.[1]?.trim() || '';
+  // If none of the named sections matched anything at all, the model likely
+  // deviated from the requested structure entirely (free-form prose, a
+  // different heading scheme, etc). We NEVER lose the raw text in this case
+  // (full_research below always carries it) — just flag it loudly so it's
+  // visible in the pipeline logs and in data_grounding.parse_fallback.
+  const anyStructuredContent = !!(formulaSection || angleSection || threatsSection || keyBullets.length);
+  if (!anyStructuredContent) {
+    console.warn(`  ⚠ P5 parse fallback: no structured sections matched for ${product.asin} (${product.brand || 'unknown brand'}) — saving full_research raw text only, structured fields will be empty`);
+  }
 
   return {
     asin: product.asin,
@@ -417,8 +450,8 @@ function parseResearchOutput(rawText, product, pool, meta) {
     external_reviews: [],
     healthline_covered: false,
     labdoor_score: null,
-    key_weaknesses: (threatsSection.match(/Where they're vulnerable[:\s]+([\s\S]*?)(?:\n-|\n###|$)/i)?.[1] || '').substring(0, 400),
-    key_strengths: (threatsSection.match(/Why they win[:\s]+([\s\S]*?)(?:\n-|\n###|$)/i)?.[1] || '').substring(0, 400),
+    key_weaknesses: (threatsSection.match(/Where they'?re vulnerable:?\*{0,2}\s*([\s\S]*?)(?:\n\*\*|\n#{2,4}|$)/i)?.[1] || '').trim().substring(0, 400),
+    key_strengths: (threatsSection.match(/Why they win:?\*{0,2}\s*([\s\S]*?)(?:\n\*\*|\n#{2,4}|$)/i)?.[1] || '').trim().substring(0, 400),
     competitor_angle: angleSection.substring(0, 600),
     full_research: rawText,
     researched_at: new Date().toISOString(),
@@ -428,6 +461,7 @@ function parseResearchOutput(rawText, product, pool, meta) {
       had_source_scrape: !!meta.sourceUrl,
       source_url: meta.sourceUrl || null,
       memory_fallback: meta.memoryFallback,
+      parse_fallback: !anyStructuredContent,
     },
     phase: 5,
   };
@@ -472,21 +506,51 @@ async function getAlreadyResearched() {
 
 // ─── Save to DOVIVE Supabase ───────────────────────────────────────────────────
 
+// CRITICAL: full_research (the raw model brief) must never be silently
+// dropped, even if some other field in the record doesn't match the live
+// table schema. Previous behavior stripped `pool`, `full_research`, AND
+// `data_grounding` together on ANY error whose message contained "column" —
+// but `data_grounding` was the only field actually missing from the deployed
+// table, so full_research (real content) was being thrown away as
+// collateral damage on every save. Now: only the specific column named in
+// the Postgres/PostgREST error is dropped and retried, full_research is
+// never removed by the auto-drop loop, and if every other field has to be
+// dropped, a last-resort raw-only row (still containing full_research) is
+// saved so nothing is lost.
 async function saveToSupabase(record) {
-  const { error } = await DOVIVE.from('dovive_phase5_research')
-    .upsert(record, { onConflict: 'asin,keyword' });
+  let attempt = { ...record };
+  const RAW_ONLY_FIELDS = ['asin', 'keyword', 'brand', 'bsr_rank', 'pool', 'full_research', 'researched_at', 'researched_by', 'phase'];
 
-  if (error) {
-    if (error.message?.includes('pool') || error.message?.includes('full_research') || error.message?.includes('data_grounding') || error.message?.includes('column')) {
-      console.log(`  NOTE: Missing columns in dovive_phase5_research — retrying with safe subset`);
-      const { pool, full_research, data_grounding, ...safeRecord } = record;
-      const { error: error2 } = await DOVIVE.from('dovive_phase5_research')
-        .upsert(safeRecord, { onConflict: 'asin,keyword' });
-      if (error2) throw new Error(`Save failed for ${record.asin}: ${error2.message}`);
-    } else {
-      throw new Error(`Save failed for ${record.asin}: ${error.message}`);
+  for (let i = 0; i < 8; i++) {
+    const { error } = await DOVIVE.from('dovive_phase5_research')
+      .upsert(attempt, { onConflict: 'asin,keyword' });
+    if (!error) return;
+
+    // Try to identify the specific offending column from the error message,
+    // e.g. "Could not find the 'data_grounding' column of 'dovive_phase5_research' in the schema cache"
+    const missingCol = error.message?.match(/'([a-zA-Z0-9_]+)'\s*column/i)?.[1]
+      || error.message?.match(/column\s+"?([a-zA-Z0-9_]+)"?\s+(?:of|does not exist)/i)?.[1];
+
+    if (missingCol && missingCol in attempt && missingCol !== 'full_research') {
+      console.log(`  NOTE: dovive_phase5_research is missing column '${missingCol}' — dropping just that field and retrying (full_research is preserved)`);
+      const { [missingCol]: _drop, ...rest } = attempt;
+      attempt = rest;
+      continue;
     }
+
+    // Couldn't isolate a single droppable column (or the culprit is
+    // full_research itself, which we refuse to drop silently) — fall back
+    // to a minimal raw-only row so the raw brief still lands in the DB.
+    console.error(`  WARNING: dovive_phase5_research save failed (${error.message}) — falling back to a raw-only row so full_research is not lost`);
+    const rawOnly = {};
+    for (const f of RAW_ONLY_FIELDS) if (f in record) rawOnly[f] = record[f];
+    const { error: error2 } = await DOVIVE.from('dovive_phase5_research')
+      .upsert(rawOnly, { onConflict: 'asin,keyword' });
+    if (error2) throw new Error(`Save failed for ${record.asin} even for the raw-only fallback: ${error2.message}`);
+    console.log(`  Saved raw-only fallback row for ${record.asin} (some structured fields were dropped due to a save error, but full_research is intact)`);
+    return;
   }
+  throw new Error(`Save failed for ${record.asin}: too many missing-column retries`);
 }
 
 // ─── Save to DASH products table ──────────────────────────────────────────────

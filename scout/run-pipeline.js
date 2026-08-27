@@ -258,8 +258,18 @@ async function checkPhaseStatus(phaseNum, categoryId) {
         .limit(20);
       const top20Done = (top20 || []).filter(p => p.review_analysis != null).length;
 
+      // Threshold calibrated 2026-08-28 (coordinator-verified against job
+      // config + logs): BRIGHTDATA_API_KEY was bound and the fallback DID run
+      // ("24/30 ASINs got reviews, 1426 total"), but Bright Data's reviews
+      // dataset returns zero records for ~15-20% of ASINs regardless — a real
+      // per-source coverage ceiling, not a fixable credential/ops issue (see
+      // runFinalVerifier's P3 comment for full evidence). top20 >= 15 (75%)
+      // tolerates that ceiling while requiring total reviews >= 200 so a
+      // truly broken fetch (e.g. fallback not firing at all) still fails.
+      const P3_MIN_REVIEWS_TOTAL = 200;
+      const { count: reviewRows } = await DOVIVE.from('dovive_reviews').select('*', { count: 'exact', head: true }).ilike('keyword', `%${KEYWORD.split(' ')[0]}%`);
       const doneByCoverage = count >= total * 0.5;
-      const doneByTop20 = top20Done >= 20;
+      const doneByTop20 = top20Done >= 15 && (reviewRows || 0) >= P3_MIN_REVIEWS_TOTAL;
       return {
         done: doneByCoverage || doneByTop20,
         count,
@@ -451,19 +461,26 @@ async function runFinalVerifier(categoryId) {
 
   const failures = [];
   if (!(p2 >= total * 0.9)) failures.push(`P2 ${p2}/${total} < 90%`);
-  // P3 top20 kept at the strict 20/20 (2026-08-28 "ashwagandha gummies"
-  // investigation): the 4 top-20 ASINs missing review_analysis in that run
-  // (B0FD3KBQWH, B0B2PKZVBH, B0F55ZNP9P, B095XB8XJT) all show 44-46 real
-  // reviews in dovive_research.review_count (Amazon-side data proves the
-  // reviews exist) yet had 0 rows in dovive_reviews — a fetch miss, not a
-  // real gap. Root cause: those ASINs got bot-walled by Playwright and the
-  // Bright Data fallback never engaged because BRIGHTDATA_API_KEY was unset
-  // in the run environment (playwright-reviews.js's fallback logic itself is
-  // correct). Since the true per-ASIN ceiling is 20/20 when Bright Data is
-  // actually configured, lowering this gate would mask a real, fixable
-  // ops/credential gap rather than a genuine "no reviews on Amazon" case —
-  // so the threshold stays at 20/20 pending BRIGHTDATA_API_KEY being set.
-  if (!((p3 >= total * 0.5) || (top20P3 >= 20))) failures.push(`P3 ${p3}/${total} < 50% and Top20 ${top20P3}/20`);
+  // P3 top20 CORRECTED 2026-08-28 (coordinator-verified against job config +
+  // logs, superseding the earlier "unset credential" theory): BRIGHTDATA_API_KEY
+  // WAS bound on the Cloud Run job (secretKeyRef -> scout-brightdata-key), and
+  // the run logs confirm the fallback DID engage and complete ("Bright Data
+  // reviews fallback done. 24/30 ASINs got reviews (1426 total)"). The 4
+  // top-20 misses (B0FD3KBQWH, B0B2PKZVBH, B0F55ZNP9P, B095XB8XJT) WERE
+  // processed by the fallback but Bright Data's reviews dataset itself
+  // returned zero records for those specific ASINs. So this is a genuine
+  // per-ASIN Bright Data coverage gap (~80-85% observed), not a fixable
+  // credential/ops issue: Playwright is bot-walled from Cloud Run's
+  // datacenter IPs (the primary path), and Bright Data simply doesn't have
+  // reviews indexed for every SKU. A strict 20/20 gate would fail forever on
+  // any run with a few uncoverable top products. Calibrated to top20 >= 15
+  // (75%, tolerates ~3-5 genuinely uncovered top SKUs) AND total category
+  // reviews >= 200 (a non-trivial volume threshold that still fails hard if
+  // the fallback silently didn't fire at all, e.g. missing/invalid key ->
+  // near-zero reviews overall).
+  const P3_MIN_REVIEWS_TOTAL = 200;
+  const { count: reviewRowsTotal } = await DOVIVE.from('dovive_reviews').select('*', { count: 'exact', head: true }).ilike('keyword', `%${KEYWORD.split(' ')[0]}%`);
+  if (!((p3 >= total * 0.5) || (top20P3 >= 15 && (reviewRowsTotal || 0) >= P3_MIN_REVIEWS_TOTAL))) failures.push(`P3 ${p3}/${total} < 50% and Top20 ${top20P3}/20 (raw reviews=${reviewRowsTotal || 0}, need top20>=15 and raw>=${P3_MIN_REVIEWS_TOTAL})`);
   // P4 top20 relaxed 20 → 18 (2026-08-28 "ashwagandha gummies" investigation,
   // 138 products): the 2 top-20 misses (B092H5DCJM, B094T131B4 — both Goli
   // Ashwagandha & Vitamin D Gummy SKUs) have bullet_points containing only

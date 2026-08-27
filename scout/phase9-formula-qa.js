@@ -48,7 +48,10 @@ function getOpenRouterKey() {
   return process.env.OPENROUTER_API_KEY || null;
 }
 
-async function callClaudeSonnetQA(prompt, maxTokens = 12000) {
+// Analysis model — configurable without a rebuild. Default: Claude Sonnet 5 via OpenRouter.
+const ANALYSIS_MODEL = process.env.ANALYSIS_MODEL || 'anthropic/claude-sonnet-5';
+
+async function callClaudeSonnetQA(prompt, maxTokens = 16000) {
   const key = getOpenRouterKey();
   if (!key) throw new Error('No OpenRouter key');
   const controller = new AbortController();
@@ -59,7 +62,7 @@ async function callClaudeSonnetQA(prompt, maxTokens = 12000) {
       method: 'POST',
       signal: controller.signal,
       headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://dovive.com', 'X-Title': 'DOVIVE Scout P10 QA' },
-      body: JSON.stringify({ model: 'anthropic/claude-sonnet-4.6', max_tokens: maxTokens, stream: true, messages: [{ role: 'user', content: prompt }] }),
+      body: JSON.stringify({ model: ANALYSIS_MODEL, max_tokens: maxTokens, stream: true, messages: [{ role: 'user', content: prompt }] }),
     });
     if (!res.ok) {
       const errText = await res.text();
@@ -151,7 +154,7 @@ This is a CRITICAL QA gate. P8 AI may have over-engineered the formula. Be the e
 ### FORMULA A - Grok 4.2 Deep Reasoning (grok-4.20-beta-0309-reasoning)
 ${grokBrief || "Not available"}
 
-### FORMULA B - Claude Sonnet 4.6 (anthropic/claude-sonnet-4.6)
+### FORMULA B - Claude (${ANALYSIS_MODEL})
 
 ${claudeBrief || "Claude Sonnet brief not available (single-model run)"}
 
@@ -427,7 +430,7 @@ No other text. Pure JSON only.`;
       method: 'POST', signal: controller.signal,
       headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'anthropic/claude-sonnet-4.6',
+        model: ANALYSIS_MODEL,
         max_tokens: 2000,
         messages: [{ role: 'user', content: prompt }]
       })
@@ -794,7 +797,7 @@ Replace each "one sentence" with your comparison. Focus on the most important di
       method: 'POST', signal: controller.signal,
       headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'anthropic/claude-sonnet-4.6',
+        model: ANALYSIS_MODEL,
         max_tokens: 1500,
         messages: [{ role: 'user', content: prompt }]
       })
@@ -1120,9 +1123,9 @@ async function run() {
     const finalFormulaBriefWithFlavors = (updatedIngredients.final_formula_brief || '')
       + (flavorSectionBody ? `\n\n${flavorSectionBody}` : '');
 
-    // Token cost estimate (claude-sonnet-4-6 via OpenRouter ~$3/1M tokens)
+    // Token cost estimate (Claude Sonnet 5 via OpenRouter ~$2/1M input, $10/1M output — use a blended $6/1M average)
     const totalTokens = tokenLog.reduce((s, t) => s + (t.total_tokens || 0), 0);
-    const estimatedCostUsd = parseFloat(((totalTokens / 1_000_000) * 3.0).toFixed(4));
+    const estimatedCostUsd = parseFloat(((totalTokens / 1_000_000) * 6.0).toFixed(4));
 
     const pipelineMetadata = {
       keyword: KEYWORD,
@@ -1152,7 +1155,7 @@ async function run() {
     const runAuditMd = buildRunAuditMarkdown({
       timestamp: pipelineMetadata.generated_at,
       keyword: KEYWORD,
-      model: 'anthropic/claude-sonnet-4.6',
+      model: ANALYSIS_MODEL,
       call1Status: pipelineMetadata.call1_status,
       call1Elapsed: elapsed,
       call2Status,
@@ -1179,7 +1182,7 @@ async function run() {
           qa_pipeline_metadata: pipelineMetadata,
           qa_run_audit: {
             timestamp: pipelineMetadata.generated_at,
-            model: 'anthropic/claude-sonnet-4.6',
+            model: ANALYSIS_MODEL,
             call1_status: pipelineMetadata.call1_status,
             call2_status: call2Status,
             call2_parse_status: call2ParseStatus,

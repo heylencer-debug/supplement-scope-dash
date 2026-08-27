@@ -1,5 +1,58 @@
 # Scout pipeline — Cloud Run Job deploy notes
 
+## 2026-08-28: Analysis phases migrated to Claude Sonnet 5 via OpenRouter
+
+**Trigger**: overnight task to switch the pipeline's ANALYSIS/reasoning phases from
+Claude Sonnet 4.6 to Claude Sonnet 5 (`anthropic/claude-sonnet-5` via OpenRouter,
+$2/$10 per 1M vs Sonnet 4.6's $3/$15, stronger reasoner). Purely a model-string
+change — the pipeline already calls OpenRouter over raw HTTPS, no SDK/structural
+change needed. Done while a live "turmeric gummies" test run was executing on the
+previous `:latest` image tag — this rebuild produces a NEW image and does not
+affect that in-flight run.
+
+**Audited every OpenRouter/model call across P4, P6, P8, P9, P10, P11** (grep for
+`openrouter`, `anthropic/claude`, `claude-sonnet`, `gpt-4o`, `openai/`, `model:`):
+
+| Phase | Call | Old model | New model | Notes |
+|---|---|---|---|---|
+| P6 product intelligence (`phase6-product-intelligence.js`) | scoring | `grok-3-mini` via **xAI direct** (`api.x.ai`), not OpenRouter | left as-is | Not a Claude/OpenRouter call at all — out of scope for this migration. Flagged for coordinator: swapping this to Claude Sonnet 5 would be a bigger design change (new provider for this phase), not requested explicitly. |
+| P8 formula brief (`phase8-formula-brief.js`) | Claude synthesis call (Grok 4.20 handles the other half, untouched) | `anthropic/claude-sonnet-4.6` | `anthropic/claude-sonnet-5` | via new `ANALYSIS_MODEL` env var |
+| P9 formula QA (`phase9-formula-qa.js`) | Call 1 (QA adjudication, streaming), Call 2 (competitor notes, `callClaudeSonnetQA` internal), Call 3 (competitor notes JSON) — 4 call sites total | `anthropic/claude-sonnet-4.6` | `anthropic/claude-sonnet-5` | via `ANALYSIS_MODEL`; bumped Call 1 default `maxTokens` 12000→16000 for richer Sonnet 5 output; cost estimate comment/multiplier updated to reflect Sonnet 5 blended $6/1M (was $3/1M flat) |
+| P10 competitive benchmarking (`phase10-competitive-benchmarking.js`) | draft (`callClaudeSonnet`) | `anthropic/claude-sonnet-4.6` | `anthropic/claude-sonnet-5` | via `ANALYSIS_MODEL`. Validation tier (`callClaudeOpus`, `anthropic/claude-opus-4.6`) **left untouched** — not requested, different model family |
+| P11 FDA compliance (`phase11-fda-compliance.js`) | validation (`callClaudeSonnet`) | `anthropic/claude-sonnet-4.6` | `anthropic/claude-sonnet-5` | via `ANALYSIS_MODEL`. Primary tier (`callClaudeOpus`, `anthropic/claude-opus-4.6`) **left untouched** — same reasoning as P10 |
+| P4 text extract (`phase4-text-extract.js`) | bullet-point structured extraction | `openai/gpt-4o` | **left as-is** | Confirmed this call only sends `bullet_points` plain text (no `image_url`/base64) — despite the filename it is NOT vision. It is a genuine text-analysis candidate for the swap, but the task explicitly scoped the swap list to P6/P8/P9/P10/P11 reasoning phases, so left untouched pending an explicit decision. |
+| P4 OCR (`ocr-phase4.js`) | supplement-facts image OCR | `anthropic/claude-haiku-4.5` | **left as-is** | Genuine vision call (`image_url` with base64 data), already on a cheap/fast Claude tier — out of scope, not GPT-4o as the task brief assumed. |
+| P5 deep research (`phase5-deep-research.js`) | — | Grok (`grok-4-fast` / `grok-4.20-beta-0309-reasoning`) | **not touched** | Explicit instruction not to touch — user's deliberate design from the 2026-08-28 P5 rebuild. |
+
+**Implementation pattern** (identical in all 4 edited files): added
+```js
+// Analysis model — configurable without a rebuild. Default: Claude Sonnet 5 via OpenRouter.
+const ANALYSIS_MODEL = process.env.ANALYSIS_MODEL || 'anthropic/claude-sonnet-5';
+```
+right after `getOpenRouterKey()`, then replaced every `model: 'anthropic/claude-sonnet-4.6'`
+request-body field (and the matching metadata/log strings) with `model: ANALYSIS_MODEL`.
+Lets `ANALYSIS_MODEL` be changed per-run or per-job-revision via env var, no rebuild
+required, without touching the Opus 4.6 calls in P10/P11.
+
+**Flagged for coordinator decision** (not acted on):
+1. P6 product intelligence uses Grok via xAI direct, not Claude/OpenRouter at all —
+   the task brief assumed it was an OpenRouter Claude call; it isn't. Left untouched.
+2. P4 text-extract (`phase4-text-extract.js`) is genuinely text-only (not vision)
+   despite its filename, and is architecturally identical to the swapped phases
+   (`openai/gpt-4o` via OpenRouter, structured JSON out). It was NOT swapped because
+   the task's explicit target list only named P6/P8/P9/P10/P11. Easy follow-up if
+   the coordinator wants full consistency.
+3. P10/P11 Opus 4.6 validation/primary-tier calls were left on Opus 4.6, not moved
+   to Sonnet 5 — only the Sonnet-tier calls in those two files were in scope.
+
+**Image rebuilt + Cloud Run Job updated**: build ID
+`052b5674-dbe6-4edd-9995-2e42908f3256`, digest
+`sha256:02b66d908e2d9d974002e4c1a1090310d9fa47f1558427b6afc8be7b9a97db6c`.
+`gcloud run jobs update dovive-scout --image ...:latest` applied;
+`timeoutSeconds` confirmed unchanged at `10800` after the update. **Job was NOT
+executed** — explicit instruction, the live "turmeric gummies" test run on the
+previous image tag was not touched or interrupted.
+
 ## 2026-08-28 correction: P3 gate re-calibrated (Bright Data coverage ceiling, not a credential gap)
 
 **Correction to the entry below**: the initial P3 investigation concluded

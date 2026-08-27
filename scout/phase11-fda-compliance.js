@@ -102,6 +102,10 @@ const NIH_ODS_MAP = {
 
 function getOpenRouterKey()  { return process.env.OPENROUTER_API_KEY || null; }
 
+// Analysis model — configurable without a rebuild. Default: Claude Sonnet 5 via OpenRouter.
+// Opus (primary tier) is intentionally left untouched — not part of this migration.
+const ANALYSIS_MODEL = process.env.ANALYSIS_MODEL || 'anthropic/claude-sonnet-5';
+
 async function callClaudeOpus(prompt, maxTokens = 12000) {
   const key = getOpenRouterKey();
   if (!key) throw new Error('OPENROUTER_API_KEY not set');
@@ -169,7 +173,7 @@ async function callClaudeSonnet(prompt, maxTokens = 8000) {
         'X-Title': 'DOVIVE Scout P12 FDA Compliance',
       },
       body: JSON.stringify({
-        model: 'anthropic/claude-sonnet-4.6',
+        model: ANALYSIS_MODEL,
         max_tokens: maxTokens,
         stream: true,
         messages: [{ role: 'user', content: prompt }],
@@ -621,7 +625,7 @@ async function run() {
     nih_coverage: { fetched: nihHits, no_page: nihMiss, failed: nihFail, total: ingredientNames.length },
     ingredients_reviewed: ingredientNames,
     generated_at: new Date().toISOString(),
-    models_used: { primary: 'anthropic/claude-opus-4.6', validation: 'anthropic/claude-sonnet-4.6' },
+    models_used: { primary: 'anthropic/claude-opus-4.6', validation: ANALYSIS_MODEL },
     data_sources: Object.fromEntries(
       Object.entries(nihData).filter(([,d]) => d.url).map(([name, d]) => [name, d.url])
     ),

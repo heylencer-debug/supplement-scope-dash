@@ -40,6 +40,10 @@ const FORCE = process.argv.includes('--force');
 
 function getOpenRouterKey()   { return process.env.OPENROUTER_API_KEY || null; }
 
+// Analysis model — configurable without a rebuild. Default: Claude Sonnet 5 via OpenRouter.
+// Opus (validation tier) is intentionally left untouched — not part of this migration.
+const ANALYSIS_MODEL = process.env.ANALYSIS_MODEL || 'anthropic/claude-sonnet-5';
+
 async function callClaudeSonnet(prompt, maxTokens = 12000) {
   const key = getOpenRouterKey();
   if (!key) throw new Error('OPENROUTER_API_KEY not set');
@@ -56,7 +60,7 @@ async function callClaudeSonnet(prompt, maxTokens = 12000) {
         'X-Title': 'DOVIVE Scout P11 Benchmarking',
       },
       body: JSON.stringify({
-        model: 'anthropic/claude-sonnet-4.6',
+        model: ANALYSIS_MODEL,
         max_tokens: maxTokens,
         stream: true,
         messages: [{ role: 'user', content: prompt }],
@@ -188,7 +192,7 @@ Produce this exact structure:
 
 # P11 COMPETITIVE FORMULA BENCHMARKING — ${keyword.toUpperCase()}
 *Data source: P4 OCR extraction + P10 adjusted formula*
-*Benchmarking model: Claude Sonnet 4.6 (draft) — to be validated by Claude Opus 4.6*
+*Benchmarking model: Claude (${ANALYSIS_MODEL}) (draft) — to be validated by Claude Opus 4.6*
 
 ## EXECUTIVE SUMMARY
 | Metric | Value |
@@ -446,7 +450,7 @@ async function run() {
     competitors_with_formula: withFormula.length,
     competitors_without_formula: withoutFormula.length,
     generated_at: new Date().toISOString(),
-    models_used: { draft: 'anthropic/claude-sonnet-4.6', validation: 'anthropic/claude-opus-4.6' },
+    models_used: { draft: ANALYSIS_MODEL, validation: 'anthropic/claude-opus-4.6' },
   };
 
   const updatedIngredients = {

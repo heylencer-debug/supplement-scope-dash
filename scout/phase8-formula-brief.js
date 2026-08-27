@@ -37,6 +37,9 @@ function getOpenRouterKey() {
   return process.env.OPENROUTER_API_KEY || null;
 }
 
+// Analysis model — configurable without a rebuild. Default: Claude Sonnet 5 via OpenRouter.
+const ANALYSIS_MODEL = process.env.ANALYSIS_MODEL || 'anthropic/claude-sonnet-5';
+
 // ─── DUAL AI Formulation ───────────────────────────────────────────────────────
 // P9 generates TWO independent formula briefs in parallel:
 //   1. Grok 4.2 Beta Reasoning  - deep scientific reasoning, like a PhD formulator
@@ -80,7 +83,7 @@ async function callClaudeSonnet(prompt) {
         'X-Title': 'DOVIVE Scout P8 Formula',
       },
       body: JSON.stringify({
-        model: 'anthropic/claude-sonnet-4.6',
+        model: ANALYSIS_MODEL,
         max_tokens: 16000,
         stream: true,
         messages: [{ role: 'user', content: prompt }],
@@ -1171,7 +1174,7 @@ async function saveToDB(categoryId, grokBrief, claudeBrief, marketData) {
       ai_generated_brief_grok:   grokBrief   || null,
       ai_generated_brief_claude: claudeBrief || null,
       formula_brief_model_grok:   'grok-4.20-beta-0309-reasoning',
-      formula_brief_model_claude: 'anthropic/claude-sonnet-4.6',
+      formula_brief_model_claude: ANALYSIS_MODEL,
       grok_chars:   grokBrief?.length   || 0,
       claude_chars: claudeBrief?.length || 0,
       generated_at: new Date().toISOString(),
@@ -1206,7 +1209,7 @@ async function saveToVault(grokBrief, claudeBrief) {
   }
   if (claudeBrief) {
     const p = `${dir}\\${date}-${KEYWORD.replace(/\s+/g, '-')}-claude-opus-brief.md`;
-    fs.writeFileSync(p, `# P9 Formula Brief (Claude Sonnet 4.6) - ${KEYWORD}\n**Date:** ${date}\n**Model:** anthropic/claude-sonnet-4.6\n\n---\n\n${claudeBrief}`, 'utf8');
+    fs.writeFileSync(p, `# P9 Formula Brief (Claude) - ${KEYWORD}\n**Date:** ${date}\n**Model:** ${ANALYSIS_MODEL}\n\n---\n\n${claudeBrief}`, 'utf8');
     console.log(`  Claude vault: ${p}`);
   }
 }
@@ -1253,7 +1256,7 @@ async function run() {
   // 3. Run DUAL formulation in parallel - Grok 4.2 Deep Reasoning + Claude Sonnet 4.6
   console.log("Running dual AI formulation in parallel...");
   console.log("  [Grok]   grok-4.20-beta-0309-reasoning - deep scientific thinking");
-  console.log("  [Claude] anthropic/claude-sonnet-4.6 via OpenRouter - 1M context synthesis\n");
+  console.log(`  [Claude] ${ANALYSIS_MODEL} via OpenRouter - 1M context synthesis\n`);
 
   const [grokResult, claudeResult] = await Promise.allSettled([
     callGrok42(prompt),

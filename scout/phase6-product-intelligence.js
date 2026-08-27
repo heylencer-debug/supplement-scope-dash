@@ -1,17 +1,17 @@
 ﻿/**
  * phase6-product-intelligence.js - v2 (Market Trends Edition)
- * P6: AI-powered product intelligence via xAI Grok
+ * P6: AI-powered product intelligence via Claude (OpenRouter)
  *
- * Per-product data sent to Grok:
+ * Per-product data sent to the model:
  *  - OCR supplement facts, title, claims, feature bullets
  *  - BSR current + 30d avg + 90d avg → pre-computed velocity
  *  - Price, servings → pre-computed price_per_serving
  *  - Monthly revenue, review count → pre-computed revenue/review ratio
  *  - Price vs category median → pre-computed price_positioning_tier
  *
- * Grok returns: extract type, dose, certs, bonus ingredients,
+ * Model returns: extract type, dose, certs, bonus ingredients,
  *               formula score, threat level, strengths, weaknesses
- * We merge Grok output with locally-computed market metrics.
+ * We merge the model's output with locally-computed market metrics.
  *
  * Usage:
  *   node phase6-product-intelligence.js              # skip already done
@@ -43,26 +43,34 @@ async function lookupCategoryId(keyword) {
   return cat.id;
 }
 
-// ─── xAI Key ─────────────────────────────────────────────────────────────────
+// ─── OpenRouter Key ──────────────────────────────────────────────────────────
 
-function getXaiKey() {
-  return process.env.XAI_API_KEY || null;
+function getOpenRouterKey() {
+  return process.env.OPENROUTER_API_KEY || null;
 }
 
-async function callGrok(prompt, maxTokens = 4096) {
-  const key = getXaiKey();
-  if (!key) throw new Error('No xAI key');
-  const res = await fetch('https://api.x.ai/v1/chat/completions', {
+// Analysis model — configurable without a rebuild. Default: Claude Sonnet 5 via OpenRouter.
+const ANALYSIS_MODEL = process.env.ANALYSIS_MODEL || 'anthropic/claude-sonnet-5';
+
+async function callGrok(prompt, maxTokens = 6000) {
+  const key = getOpenRouterKey();
+  if (!key) throw new Error('No OpenRouter key');
+  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+    headers: {
+      'Authorization': `Bearer ${key}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': 'https://dovive.com',
+      'X-Title': 'DOVIVE Scout P6 Product Intelligence',
+    },
     body: JSON.stringify({
-      model: 'grok-3-mini',
+      model: ANALYSIS_MODEL,
       max_tokens: maxTokens,
       messages: [{ role: 'user', content: prompt }],
     }),
   });
   const j = await res.json();
-  if (j.error) throw new Error(`Grok: ${j.error.message}`);
+  if (j.error) throw new Error(`OpenRouter: ${j.error.message || JSON.stringify(j.error)}`);
   return j.choices?.[0]?.message?.content || null;
 }
 
@@ -383,10 +391,10 @@ Scoring rules (generic - applies to ANY supplement category):
 - market_opportunity_gap: be specific to this category - what formula gap can DOVIVE exploit?
 - Return ONLY the JSON array. No other text.`;
 
-  const response = await callGrok(prompt, 4096);
-  if (!response) throw new Error('Empty Grok response');
+  const response = await callGrok(prompt, 6000);
+  if (!response) throw new Error('Empty AI response');
   const jsonMatch = response.match(/\[[\s\S]*\]/);
-  if (!jsonMatch) throw new Error('No JSON array in Grok response');
+  if (!jsonMatch) throw new Error('No JSON array in AI response');
   return JSON.parse(jsonMatch[0]);
 }
 
@@ -397,8 +405,8 @@ async function run() {
   console.log(`P6: PRODUCT INTELLIGENCE v2 - Market Trends Edition`);
   console.log(`${'═'.repeat(62)}\n`);
 
-  const xaiKey = getXaiKey();
-  console.log(`AI: ${xaiKey ? '✅ xAI Grok (grok-3-mini)' : '⚠️  No key - rule-based fallback'}`);
+  const xaiKey = getOpenRouterKey();
+  console.log(`AI: ${xaiKey ? `✅ Claude via OpenRouter (${ANALYSIS_MODEL})` : '⚠️  No key - rule-based fallback'}`);
 
   const CAT_ID = await lookupCategoryId(KEYWORD);
 
@@ -485,16 +493,16 @@ async function run() {
                 price_per_serving: pps,
                 price_per_mg_ashwagandha: (pps && ashwagandhaAmt) ? Math.round(pps / ashwagandhaAmt * 10000) / 10000 : null,
                 ...mm,
-                analysis_method: 'grok_ai_v2',
+                analysis_method: 'claude_ai_v2',
                 analyzed_at: new Date().toISOString(),
               },
             });
             aiCount++;
           }
         }
-        process.stdout.write(`✅ Grok AI (${batch.length})`);
+        process.stdout.write(`✅ Claude AI (${batch.length})`);
       } catch (e) {
-        process.stdout.write(`⚠️  Grok failed → rule-based | ${e.message.substring(0, 60)}`);
+        process.stdout.write(`⚠️  Claude AI failed → rule-based | ${e.message.substring(0, 60)}`);
         analyses = batch.map(p => ({ product: p, intel: ruleBasedAnalysis(p, marketMetricsMap[p.asin]) }));
         ruleCount += batch.length;
       }

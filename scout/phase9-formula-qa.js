@@ -685,52 +685,96 @@ Return ONLY a valid JSON object. One entry per ASIN. One sentence comparing thei
 `;
 }
 
+// Strip ```json fences / stray code fences from a section's raw text so
+// JSON.parse has the best chance of succeeding even when the model adds a
+// preamble or wraps the block in markdown.
+function stripFences(raw) {
+  return (raw || '')
+    .replace(/```json\s*/gi, '')
+    .replace(/```\s*/g, '')
+    .trim();
+}
+
+// Tolerant heading matcher — accepts "##"-"####", optional trailing colon,
+// case-insensitive, since models don't always reproduce the exact heading
+// markdown requested in the prompt. `nextHeadingNames` is the ordered list
+// of possible next heading names (without the leading #s) that terminate
+// this section.
+function matchCall2Section(text, headingName, nextHeadingNames) {
+  const next = nextHeadingNames.length
+    ? `(?:\\n#{2,4}\\s*(?:${nextHeadingNames.join('|')})|$)`
+    : '$';
+  const re = new RegExp(`#{2,4}\\s*${headingName}\\s*:?\\s*\\n?([\\s\\S]*?)${next}`, 'i');
+  return text.match(re)?.[1]?.trim() || null;
+}
+
 async function runCall2(keyword, grokBrief, claudeBrief, adjustedFormula, competitors, marketIntelText) {
   console.log(`\nRunning Call 2: Comprehensive Comparison + Flavor QA + Competitor Notes...`);
   const prompt = buildCall2Prompt(keyword, grokBrief, claudeBrief, adjustedFormula, competitors, marketIntelText);
   console.log(`  Prompt size: ${Math.round(prompt.length / 1000)}k chars`);
   const call2Start = Date.now();
-  const result = await callClaudeSonnetQA(prompt, 6000);
+  // ROOT CAUSE (confirmed via live "turmeric gummies" qa_pipeline_metadata.
+  // token_log — call 2 completion_tokens landed at EXACTLY 6000, the old
+  // cap): 6000 tokens was consistently exhausted by the 5 requested
+  // sections (large ingredient comparison table + flavor table + 3 JSON
+  // blocks), so generation was truncated before reaching later sections —
+  // every downstream parse failed as a direct consequence, not because of
+  // a parsing bug. Raised to match Call 1's budget (16000), which handles a
+  // comparably sized/structured deliverable successfully.
+  const CALL2_MAX_TOKENS = 16000;
+  const result = await callClaudeSonnetQA(prompt, CALL2_MAX_TOKENS);
   const call2Elapsed = Math.round((Date.now() - call2Start) / 1000);
-  console.log(`  Call 2 done: ${Math.round(result.length / 1000)}k chars (${call2Elapsed}s)`);
+  console.log(`  Call 2 done: ${Math.round((result || '').length / 1000)}k chars (${call2Elapsed}s)`);
 
-  // Parse sections from call 2
-  const comparisonMatch    = result.match(/## COMPREHENSIVE INGREDIENT COMPARISON([\s\S]*?)(?:\n## FLAVOR|$)/);
-  const flavorMatch        = result.match(/## FLAVOR & TASTE QA([\s\S]*?)(?:\n## FLAVOR_RECOMMENDATIONS_JSON|$)/);
-  const flavorJsonMatch    = result.match(/## FLAVOR_RECOMMENDATIONS_JSON([\s\S]*?)(?:\n## FLAVOR_SUMMARY_JSON|\n## COMPETITOR_NOTES_JSON|$)/);
-  const flavorSummaryMatch = result.match(/## FLAVOR_SUMMARY_JSON([\s\S]*?)(?:\n## COMPETITOR_NOTES_JSON|$)/);
-  const notesMatch         = result.match(/## COMPETITOR_NOTES_JSON([\s\S]*)/);
+  // Parse sections from call 2 — tolerant of heading-level drift (## vs
+  // ### vs ####), trailing colons, and case, since Sonnet 5 doesn't always
+  // reproduce the exact markdown requested in the prompt.
+  const headingOrder = [
+    'COMPREHENSIVE INGREDIENT COMPARISON',
+    'FLAVOR (?:&|AND) TASTE QA',
+    'FLAVOR_RECOMMENDATIONS_JSON',
+    'FLAVOR_SUMMARY_JSON',
+    'COMPETITOR_NOTES_JSON',
+  ];
+  const rawText = result || '';
+  const comprehensiveComparison = matchCall2Section(rawText, headingOrder[0], headingOrder.slice(1));
+  const flavorQA                = matchCall2Section(rawText, headingOrder[1], headingOrder.slice(2));
+  const flavorRaw               = matchCall2Section(rawText, headingOrder[2], headingOrder.slice(3)) || '';
+  const flavorSummaryRaw        = matchCall2Section(rawText, headingOrder[3], headingOrder.slice(4)) || '';
+  const notesRaw                = matchCall2Section(rawText, headingOrder[4], []) || '';
 
-  const comprehensiveComparison = comparisonMatch?.[1]?.trim() || null;
-  const flavorQA                = flavorMatch?.[1]?.trim() || null;
-  const flavorRaw               = flavorJsonMatch?.[1]?.trim() || '';
-  const flavorSummaryRaw        = flavorSummaryMatch?.[1]?.trim() || '';
-  const notesRaw                = notesMatch?.[1]?.trim() || '';
-
-  // Parse flavor recommendations JSON
+  // Parse flavor recommendations JSON — strip fences, tolerate leading
+  // prose/preamble by locating the [...] boundaries rather than requiring
+  // the whole block to be pure JSON.
   let flavorRecommendations = [];
   try {
-    const cleanFlavor = flavorRaw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    const cleanFlavor = stripFences(flavorRaw);
     const arr = cleanFlavor.match(/\[[\s\S]*\]/)?.[0];
     const parsed = arr ? JSON.parse(arr) : [];
     flavorRecommendations = Array.isArray(parsed) ? parsed : [];
-  } catch {}
+  } catch (e) {
+    console.warn(`  ⚠ flavor_recommendations_json parse failed (${e.message}) — falling back to raw-only; raw Call 2 text is preserved in call2_raw_output`);
+  }
 
-  // Parse flavor summary JSON
+  // Parse flavor summary JSON — same fence-stripping + boundary approach.
   let flavorSummary = null;
   try {
-    const cleanSummary = flavorSummaryRaw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    const cleanSummary = stripFences(flavorSummaryRaw);
     const obj = cleanSummary.match(/\{[\s\S]*\}/)?.[0];
     flavorSummary = obj ? JSON.parse(obj) : null;
-  } catch {}
+  } catch (e) {
+    console.warn(`  ⚠ flavor_summary_json parse failed (${e.message}) — falling back to raw-only; raw Call 2 text is preserved in call2_raw_output`);
+  }
 
-  // Parse competitor notes JSON
-  const jsonBlock = notesRaw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+  // Parse competitor notes JSON — same fence-stripping + boundary approach.
   let competitorNotes = {};
   try {
+    const jsonBlock = stripFences(notesRaw);
     const obj = jsonBlock.match(/\{[\s\S]*\}/)?.[0];
     competitorNotes = obj ? JSON.parse(obj) : {};
-  } catch {}
+  } catch (e) {
+    console.warn(`  ⚠ competitor_notes_json parse failed (${e.message}) — falling back to raw-only; raw Call 2 text is preserved in call2_raw_output`);
+  }
 
   console.log(`  Comprehensive comparison: ${comprehensiveComparison ? Math.round(comprehensiveComparison.length/1000)+'k chars OK' : 'MISSING'}`);
   console.log(`  Flavor QA: ${flavorQA ? Math.round(flavorQA.length/1000)+'k chars OK' : 'MISSING'}`);
@@ -753,10 +797,13 @@ async function runCall2(keyword, grokBrief, claudeBrief, adjustedFormula, compet
     ].filter(Boolean),
   };
   if (call2ParseStatus.missing_sections.length > 0) {
-    console.warn(`  ⚠ Call 2 parse failures: ${call2ParseStatus.missing_sections.join(', ')}`);
+    console.warn(`  ⚠ Call 2 parse failures: ${call2ParseStatus.missing_sections.join(', ')} — raw Call 2 output is still saved to formula_briefs.ingredients.call2_raw_output so nothing is lost`);
   }
 
-  return { comprehensiveComparison, flavorQA, flavorRecommendations, flavorSummary, competitorNotes, elapsed: call2Elapsed, parseStatus: call2ParseStatus };
+  // NEVER silently drop model output — the raw text is always returned
+  // (and persisted by the caller) regardless of how much structured
+  // parsing succeeded, mirroring the P5 full_research fix.
+  return { comprehensiveComparison, flavorQA, flavorRecommendations, flavorSummary, competitorNotes, elapsed: call2Elapsed, parseStatus: call2ParseStatus, rawOutput: rawText || null };
 }
 
 // ── Call 3: Competitor Notes ONLY - tiny focused JSON call ────────────────────
@@ -999,6 +1046,11 @@ async function run() {
   let call2Elapsed = null;
   let call2Status = 'not_started';
   let call2ParseStatus = null;
+  // Raw Call 2 model output — ALWAYS persisted to formula_briefs.ingredients
+  // (jsonb, no fixed schema, so unlike P5's SQL table this can't fail to
+  // save) regardless of parse success, so a parse miss on any sub-section
+  // never loses the underlying data.
+  let call2RawOutput = null;
 
   try {
     const c2 = await runCall2(KEYWORD, grokBrief, claudeBrief, adjustedFormula, competitors, marketIntelText);
@@ -1009,6 +1061,7 @@ async function run() {
     call2Notes = c2.competitorNotes || {};
     call2Elapsed = c2.elapsed || null;
     call2ParseStatus = c2.parseStatus || null;
+    call2RawOutput = c2.rawOutput || null;
     call2Status = (call2ParseStatus?.missing_sections?.length === 0) ? 'success' : 'partial';
   } catch (e) {
     console.error(`Call 2 failed: ${e.message}`);
@@ -1177,6 +1230,11 @@ async function run() {
           comprehensive_comparison: comprehensiveComparison,
           flavor_qa: flavorQA,
           flavor_recommendations: flavorRecommendations,
+          flavor_summary: flavorSummary,
+          // Raw Call 2 model output, always saved regardless of parse
+          // outcome — never silently drop model output (same principle as
+          // the P5 full_research fix).
+          call2_raw_output: call2RawOutput,
           final_formula_brief: finalFormulaBriefWithFlavors,
           qa_report: mergedQaReport,
           qa_pipeline_metadata: pipelineMetadata,

@@ -1,13 +1,17 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronLeft, ChevronRight, ClipboardCopy, FileText, Loader2, Package, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, ClipboardCopy, FileText, Loader2, Package, Trash2, Send, AlertCircle, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { useRecentCategories, CategoryWithImages } from "@/hooks/useCategoryAnalyses";
 import { useDeleteCategory } from "@/hooks/useDeleteCategory";
+import { useSubmitScoutJob, useScoutJobs } from "@/hooks/useScoutJobs";
+import { SCOUT_PHASE_NAMES, type ScoutJobRow } from "@/types/scoutJobs";
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -36,6 +40,29 @@ export default function NewAnalysis() {
   const deleteCategory = useDeleteCategory();
 
   const { data: recentCategories, isLoading: categoriesLoading } = useRecentCategories();
+
+  // New keyword submission -> scout_jobs cloud queue
+  const [keywordInput, setKeywordInput] = useState("");
+  const submitScoutJob = useSubmitScoutJob();
+  const { data: scoutJobs } = useScoutJobs();
+
+  const handleSubmitKeyword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const keyword = keywordInput.trim();
+    if (!keyword || submitScoutJob.isPending) return;
+    await submitScoutJob.mutateAsync({ keyword });
+    setKeywordInput("");
+  };
+
+  const jobStatusMeta: Record<ScoutJobRow["status"], { label: string; icon: typeof Clock; className: string }> = {
+    queued: { label: "Queued", icon: Clock, className: "bg-chart-2/10 text-chart-2 border-chart-2/20" },
+    claimed: { label: "Starting", icon: Loader2, className: "bg-chart-2/10 text-chart-2 border-chart-2/20" },
+    running: { label: "Running", icon: Loader2, className: "bg-primary/10 text-primary border-primary/20" },
+    complete: { label: "Complete", icon: CheckCircle2, className: "bg-chart-4/10 text-chart-4 border-chart-4/20" },
+    error: { label: "Failed", icon: XCircle, className: "bg-destructive/10 text-destructive border-destructive/20" },
+  };
+
+  const activeOrRecentJobs = (scoutJobs ?? []).slice(0, 5);
 
   // Get unique categories by name (most recent first)
   const uniqueCategories = recentCategories?.reduce((acc, cat) => {
@@ -130,9 +157,9 @@ export default function NewAnalysis() {
         </p>
       </div>
 
-      {/* Scout Notice */}
+      {/* New Keyword Submission -> Scout cloud queue */}
       <Card className="border-primary/20 bg-primary/5">
-        <CardContent className="p-6">
+        <CardContent className="p-6 space-y-4">
           <div className="flex items-start gap-4">
             <div className="p-2 rounded-full bg-primary/10 shrink-0">
               <FileText className="w-5 h-5 text-primary" />
@@ -140,10 +167,81 @@ export default function NewAnalysis() {
             <div>
               <p className="font-semibold text-foreground mb-1">New Keyword Research via Scout</p>
               <p className="text-sm text-muted-foreground">
-                New keyword research is powered by Scout. Contact your research agent to analyze a new keyword.
+                Submit a keyword to queue a full Scout pipeline run (Amazon scrape → Keepa → reviews → OCR →
+                deep research → formula brief → QA → benchmarking → FDA compliance).
               </p>
             </div>
           </div>
+
+          <form onSubmit={handleSubmitKeyword} className="flex gap-2">
+            <Input
+              value={keywordInput}
+              onChange={(e) => setKeywordInput(e.target.value)}
+              placeholder="e.g. Ashwagandha Gummies"
+              disabled={submitScoutJob.isPending}
+              className="bg-background"
+            />
+            <Button type="submit" disabled={!keywordInput.trim() || submitScoutJob.isPending}>
+              {submitScoutJob.isPending ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Send className="w-4 h-4 mr-2" />
+              )}
+              Queue Analysis
+            </Button>
+          </form>
+
+          {/* Recent/active queue status */}
+          {activeOrRecentJobs.length > 0 && (
+            <div className="space-y-2 pt-2 border-t border-primary/10">
+              {activeOrRecentJobs.map((job) => {
+                const meta = jobStatusMeta[job.status] ?? jobStatusMeta.queued;
+                const StatusIcon = meta.icon;
+                const totalPhases = job.total_phases ?? 12;
+                const phaseLabel =
+                  job.current_phase_name ??
+                  (job.current_phase ? SCOUT_PHASE_NAMES[job.current_phase] : null);
+                const inFlight = job.status === "queued" || job.status === "claimed" || job.status === "running";
+
+                return (
+                  <div
+                    key={job.id}
+                    className="flex items-center justify-between gap-3 rounded-lg border bg-background/60 px-3 py-2"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-foreground truncate">{job.keyword}</span>
+                        <Badge variant="outline" className={`text-xs shrink-0 gap-1 ${meta.className}`}>
+                          <StatusIcon className={`w-3 h-3 ${job.status === "running" || job.status === "claimed" ? "animate-spin" : ""}`} />
+                          {meta.label}
+                        </Badge>
+                      </div>
+                      {job.status === "running" && job.current_phase != null && (
+                        <div className="mt-1 space-y-1">
+                          <p className="text-xs text-muted-foreground">
+                            Phase {job.current_phase}/{totalPhases}
+                            {phaseLabel ? ` — ${phaseLabel}` : ""}
+                          </p>
+                          <Progress value={(job.current_phase / totalPhases) * 100} className="h-1.5" />
+                        </div>
+                      )}
+                      {job.status === "error" && job.error && (
+                        <p className="mt-1 text-xs text-destructive flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3 shrink-0" />
+                          {job.error}
+                        </p>
+                      )}
+                      {!inFlight && job.status !== "error" && (
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {formatDistanceToNow(new Date(job.updated_at), { addSuffix: true })}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </CardContent>
       </Card>
 

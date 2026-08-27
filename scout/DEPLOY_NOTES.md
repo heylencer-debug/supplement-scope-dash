@@ -284,12 +284,48 @@ function or into the worker directly, read
 function) or `process.env.BRIGHTDATA_API_KEY || process.env.BRIGHTDATA`
 (worker) so both secret names resolve.
 
-## 5. Wire the Lovable frontend
+## 5. Wire the Lovable frontend — DONE (frontend side; go-live still pending)
 
-Once the edge function's secrets are set and step 3's test run has confirmed
-real data lands correctly, "New Analysis" (or wherever a keyword is
-submitted) should POST to `trigger-scout-job` with `{ keyword }` instead of
-relying on a human running `node run-pipeline.js` on this Mac. Not built yet.
+`src/pages/NewAnalysis.tsx` now has a real keyword-submission form. On submit:
+1. Inserts a row into `scout_jobs` (status `'queued'`) — this insert is the
+   source of truth regardless of whether the trigger below succeeds.
+2. Calls `supabase.functions.invoke("trigger-scout-job", { body: { job_id, keyword } })`
+   best-effort. If the function isn't deployed yet or its secrets aren't set
+   (see step 4 above — still pending), the invoke error is swallowed and the
+   UI shows "Queued — cloud trigger pending setup" instead of an error toast,
+   since the row is still durably queued and will run once the cutover
+   finishes (or a job is picked up by the next manual `execute --wait`).
+
+Progress UI: same card polls `scout_jobs` every 5s (`useScoutJobs` hook) plus
+a Supabase Realtime subscription on the table for immediate updates between
+polls (mirrors the `usePipelineStatus.ts` polling precedent). Shows
+queued/claimed/running/complete/error badges, and for running jobs a
+"Phase X/12 — <phase name>" line + progress bar sourced from
+`current_phase`/`current_phase_name`/`total_phases` (written by
+`run-pipeline.js`'s `updateJobStatus()` hook, already built in the prior
+Cloud Run session).
+
+New files:
+- `src/types/scoutJobs.ts` — manual `ScoutJobRow`/`ScoutJobInsert` types +
+  `SCOUT_PHASE_NAMES` map, since `scout_jobs` isn't in the generated
+  `src/integrations/supabase/types.ts` (004 migration unapplied). Delete this
+  file and switch to `Tables<"scout_jobs">` once 004 lands and types are
+  regenerated.
+- `src/hooks/useScoutJobs.ts` — `useSubmitScoutJob()` (insert + best-effort
+  invoke), `useScoutJobs()` (polling + realtime list), `useActiveScoutJobs()`
+  (filtered to in-flight jobs only, for a compact status strip elsewhere if
+  needed).
+
+**Still gated on the user's manual steps** (unchanged from above — this
+frontend work does NOT depend on them, it degrades gracefully until they're
+done): the table query in `useScoutJobs` treats a missing-relation error
+(migration not applied) as an empty list rather than throwing, so the page
+renders fine today. Once 004 is applied + edge function secrets are set,
+submitting a keyword will actually queue a real Cloud Run execution with zero
+frontend changes needed.
+
+**Frontend go-live still requires the user's Lovable Publish** — this commit
+lands the code on `main`; it does not deploy the live Lovable app by itself.
 
 ## Playwright vs Amazon IP blocks — the known risk
 

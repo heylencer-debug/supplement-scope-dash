@@ -467,6 +467,47 @@ function saveOutput(ranked, date) {
   return outPath;
 }
 
+// ─── Save structured results to Supabase ───────────────────────────────────
+// One row per (scan_date, category_name) — upserted so re-running the same
+// day's scan updates scores instead of duplicating rows. See
+// scout/migrations/004_consolidated_cloud.sql for dovive_market_opportunities.
+async function saveOpportunitiesToSupabase(ranked, date) {
+  const rows = ranked.map((entry, i) => {
+    const m = entry.metrics;
+    return {
+      scan_date: date,
+      category_name: entry.name,
+      rank: i + 1,
+      total_score: m.totalScore,
+      score_breakdown: m.scores || null,
+      total_products: m.total,
+      total_revenue: m.totalRevenue,
+      avg_revenue: m.avgRevenue,
+      avg_rating: m.avgRating,
+      avg_price: m.avgPrice,
+      median_bsr: m.medianBsr,
+      growth_pct: m.growthPct,
+      rising_count: m.risingCount,
+      competition_gap_pct: m.competitionGapPct,
+      keepa_coverage_pct: m.keepaCoverage,
+      rationale: buildRationale(m),
+      raw_metrics: m, // full metrics object, for fields not broken out above
+    };
+  });
+
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/dovive_market_opportunities?on_conflict=scan_date,category_name`, {
+    method: 'POST',
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json',
+      Prefer: 'resolution=merge-duplicates,return=minimal',
+    },
+    body: JSON.stringify(rows),
+  });
+  if (!res.ok) throw new Error(`Upsert failed: ${res.status} ${await res.text()}`);
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function run() {
@@ -630,13 +671,23 @@ async function run() {
   if (ranked[1]) console.log(`  node run-pipeline.js --keyword "${ranked[1].name}"  ← 2nd pick`);
   console.log(`${'─'.repeat(62)}\n`);
 
-  // ── Step 8: Save markdown ───────────────────────────────────────────────────
+  // ── Step 8: Save markdown (local, human-readable copy) ─────────────────────
 
   try {
     const outPath = saveOutput(ranked, date);
     console.log(`✅ Saved: ${outPath}\n`);
   } catch (e) {
     console.warn(`⚠ Output save failed (non-fatal): ${e.message}\n`);
+  }
+
+  // ── Step 9: Save structured results to Supabase (dovive_market_opportunities) ─
+  // The markdown above is a local convenience copy only — this table is the
+  // source of truth so the dashboard can query/rank scan history over time.
+  try {
+    await saveOpportunitiesToSupabase(ranked, date);
+    console.log(`✅ Saved ${ranked.length} categories to dovive_market_opportunities\n`);
+  } catch (e) {
+    console.warn(`⚠ Supabase save failed (non-fatal): ${e.message}\n`);
   }
 
   console.log('✅ Phase 0 complete\n');

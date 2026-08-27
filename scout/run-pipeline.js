@@ -328,10 +328,12 @@ const PHASES = [
     }
   },
   {
-    num: 3, name: 'Reviews', description: 'Scrape and analyze customer reviews (Apify)',
+    num: 3, name: 'Reviews', description: 'Scrape and analyze customer reviews (Playwright)',
     run: async () => {
-      // Use Apify scraper — avoids Amazon CAPTCHA blocks
-      await runScript('apify-reviews.js', [KEYWORD]);
+      // 2026-08-27: Apify removed (user decision — Keepa, Bright Data
+      // fallback, and Playwright are the only valid sources now). Same
+      // dovive_reviews schema/output as before, see playwright-reviews.js.
+      await runScript('playwright-reviews.js', [KEYWORD]);
       console.log('\n→ Syncing reviews to dashboard (migrate-reviews-to-dash.js)...');
       await runScript('migrate-reviews-to-dash.js', [KEYWORD]);
     }

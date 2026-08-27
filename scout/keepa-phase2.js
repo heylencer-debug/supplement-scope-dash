@@ -279,7 +279,12 @@ async function main() {
         try {
           const parsed = parseKeepa(product);
           console.log(`  [${parsed.asin}] $${parsed.price_usd} | BSR: ${parsed.bsr_current} | ~${parsed.monthly_sales_est}/mo | Drops30: ${parsed.bsr_drops_30d}`);
-          await saveKeepa({ ...parsed, keyword: KEYWORD });
+          // Keep the raw Keepa API product object too (minus the huge csv/
+          // stats.current time-series arrays, which are what parseKeepa()
+          // already distilled above) so future features can re-mine fields
+          // this pipeline doesn't parse today without a fresh Keepa call.
+          const { csv, ...rawJsonLite } = product;
+          await saveKeepa({ ...parsed, keyword: KEYWORD, raw_json: rawJsonLite });
           await updateResearch(parsed.asin, parsed);
           success++;
         } catch (err) {

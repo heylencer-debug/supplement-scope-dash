@@ -27,3 +27,9 @@ dist-ssr
 scout/.env
 scout/node_modules/
 scout/output/
+scout/.amazon-cookies.json
+scout/.pipeline-lock-*
+scout/C:\\SirPercival-Vault*
+
+# Supabase CLI local state
+supabase/.temp/

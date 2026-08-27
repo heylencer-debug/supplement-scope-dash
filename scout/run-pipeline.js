@@ -27,6 +27,20 @@ const DASH = createClient(
 );
 const DOVIVE = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 const SCOUT_DIR = __dirname;
+
+// ─── Cloud Run Job progress reporting ────────────────────────────────────────
+// When run-pipeline.js is invoked by scout/cloud-worker.js (Cloud Run Job
+// one-shot mode), SCOUT_JOB_ID is set to the scout_jobs row being processed.
+// Best-effort only — never throws, never blocks the pipeline.
+const SCOUT_JOB_ID = process.env.SCOUT_JOB_ID || null;
+async function updateJobStatus(fields) {
+  if (!SCOUT_JOB_ID) return;
+  try {
+    await DOVIVE.from('scout_jobs').update({ ...fields, updated_at: new Date().toISOString() }).eq('id', SCOUT_JOB_ID);
+  } catch (e) {
+    console.warn(`⚠ scout_jobs status update failed (non-fatal): ${e.message}`);
+  }
+}
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 const OPENCLAW_GATEWAY = process.env.OPENCLAW_GATEWAY;
 const OPENCLAW_TOKEN = process.env.OPENCLAW_TOKEN;
@@ -428,6 +442,7 @@ async function run() {
   const phasesToRun = ONLY_PHASES || PHASES.map(p => p.num);
 
   await notify(`🔍 Scout pipeline started for "${KEYWORD}"\nPhases: P${phasesToRun.join(', P')} | ${USE_AI ? 'AI-Enhanced' : 'Rule-Based'}`);
+  await updateJobStatus({ status: 'running', started_at: new Date().toISOString(), total_phases: phasesToRun.length });
 
   // Phase 0: Market Opportunity Scan — runs before the main pipeline when --phase0 is passed with --keyword
   if (RUN_PHASE0) {
@@ -497,6 +512,7 @@ async function run() {
     }
 
     await notify(`▶️ P${phase.num} Starting: ${phase.name}`);
+    await updateJobStatus({ current_phase: phase.num, current_phase_name: phase.name });
 
     // Force-clear existing data so we get a clean overwrite
     if (FORCE && categoryId) {
@@ -514,6 +530,7 @@ async function run() {
       results.push({ phase: phase.num, name: phase.name, status: 'error', error: err.message });
       await notify(`🚨 P${phase.num} FAILED (${MAX_PHASE_RETRIES} retries exhausted): ${phase.name}\nKeyword: "${KEYWORD}"\nError: ${err.message?.slice(0,300)}\n\nPipeline STOPPED at P${phase.num}. Manual fix required.`);
       console.error('Pipeline stopped — all retries exhausted for this phase.');
+      await updateJobStatus({ status: 'error', error: `P${phase.num} ${phase.name}: ${err.message}`.slice(0, 2000), finished_at: new Date().toISOString() });
       break; // ALWAYS stop on any phase failure
     }
 
@@ -556,12 +573,14 @@ async function run() {
 
     const summary = `🔍 Scout Pipeline Done: "${KEYWORD}"\n✅ ${completed} complete | ⏭️ ${skipped} skipped | ❌ ${failed} failed\nTotal: ${Math.floor(totalElapsed / 60)}m ${totalElapsed % 60}s\n\nPhases:\n${results.map(r => `${r.status === 'complete' ? '✅' : r.status === 'skipped' ? '⏭️' : '❌'} P${r.phase}: ${r.name}`).join('\n')}`;
     await notify(summary);
+    await updateJobStatus({ status: 'complete', finished_at: new Date().toISOString() });
   } else {
     console.log(`\n${'═'.repeat(60)}`);
     console.log(`PIPELINE INCOMPLETE — "${KEYWORD}"`);
     console.log(`${'═'.repeat(60)}`);
     console.log('Verifier FAIL:', verifier.failures.join(' | '));
     await notify(`❌ Pipeline incomplete for "${KEYWORD}"\nVerifier FAIL:\n- ${verifier.failures.join('\n- ')}`);
+    await updateJobStatus({ status: 'error', error: `Verifier FAIL: ${verifier.failures.join(' | ')}`.slice(0, 2000), finished_at: new Date().toISOString() });
     process.exitCode = 2;
   }
 }
@@ -569,5 +588,6 @@ async function run() {
 run().catch(async (e) => {
   console.error('PIPELINE ERROR:', e.message);
   await notify(`❌ Pipeline crashed: ${e.message}`);
+  await updateJobStatus({ status: 'error', error: `Pipeline crashed: ${e.message}`.slice(0, 2000), finished_at: new Date().toISOString() });
   process.exit(1);
 });

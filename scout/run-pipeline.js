@@ -225,20 +225,53 @@ async function getCategoryId() {
   }
 }
 
+// 2026-08-28 (diagnose-first task): checkPhaseStatus/runFinalVerifier both
+// query `DASH.products WHERE category_id = X` with NO scoping to the ASINs
+// this run actually scraped — that field accumulates every product ever
+// synced into the category across every past run/seed. On a category with
+// prior history, coverage gates (P2/P3/P8 especially) end up validating
+// stale/old products that were never touched this run, not the run's own
+// output — producing failures ("P3 0/64") that contradict fresh, complete
+// raw data. getRunAsins() scopes coverage checks to the ASINs recorded in
+// dovive_research for THIS keyword's THIS run. Falls back to the full
+// category set only if the run-ASIN list can't be resolved (keeps the gate
+// from going blind on an edge case rather than silently skipping it).
+let _runAsinsCache = null;
+async function getRunAsins() {
+  if (_runAsinsCache) return _runAsinsCache;
+  try {
+    const { data, error } = await DOVIVE.from('dovive_research').select('asin').eq('keyword', KEYWORD);
+    if (error) throw error;
+    const asins = [...new Set((data || []).map(r => r.asin).filter(Boolean))];
+    _runAsinsCache = asins;
+    return asins;
+  } catch (e) {
+    console.warn(`  ⚠️ getRunAsins() failed (${e.message}) — falling back to whole-category scoping`);
+    _runAsinsCache = [];
+    return [];
+  }
+}
+
 async function checkPhaseStatus(phaseNum, categoryId) {
   if (FORCE) return { done: false, count: 0, total: 0 };
 
   const { count: total } = await DASH.from('products').select('*', { count: 'exact', head: true }).eq('category_id', categoryId);
   if (!total) return { done: false, count: 0, total: 0 };
 
+  // Run-scoped denominator/filter for P2/P3/P8 (see getRunAsins comment above).
+  // Empty runAsins => fall back to whole-category (`total`) behavior.
+  const runAsins = await getRunAsins();
+  const scoped = (q) => runAsins.length ? q.in('asin', runAsins) : q;
+  const runTotal = runAsins.length || total;
+
   switch (phaseNum) {
     case 1: return { done: total > 0, count: total, total, msg: `${total} products in DB` };
     case 2: {
-      const { count } = await DASH.from('products').select('*', { count: 'exact', head: true }).eq('category_id', categoryId).not('monthly_sales', 'is', null);
-      return { done: count >= total * 0.9, count, total, msg: `${count}/${total} have Keepa data` };
+      const { count } = await scoped(DASH.from('products').select('*', { count: 'exact', head: true }).eq('category_id', categoryId).not('monthly_sales', 'is', null));
+      return { done: count >= runTotal * 0.9, count, total: runTotal, msg: `${count}/${runTotal} (this run) have Keepa data` };
     }
     case 3: {
-      const { count } = await DASH.from('products').select('*', { count: 'exact', head: true }).eq('category_id', categoryId).not('review_analysis', 'is', null);
+      const { count } = await scoped(DASH.from('products').select('*', { count: 'exact', head: true }).eq('category_id', categoryId).not('review_analysis', 'is', null));
 
       // Directive (2026-08-28): playwright-reviews.js/run-pipeline caps review
       // scraping to REVIEWS_MAX_ASINS (default 30, Bright Data cost-capped
@@ -250,12 +283,12 @@ async function checkPhaseStatus(phaseNum, categoryId) {
       // playwright-reviews.js orders by rank_position/bsr ascending so the
       // capped batch IS the top-BSR set, making this a real completion
       // signal, not a loophole.
-      const { data: top20 } = await DASH.from('products')
+      const { data: top20 } = await scoped(DASH.from('products')
         .select('review_analysis')
         .eq('category_id', categoryId)
         .not('bsr_current', 'is', null)
         .order('bsr_current', { ascending: true })
-        .limit(20);
+        .limit(20));
       const top20Done = (top20 || []).filter(p => p.review_analysis != null).length;
 
       // Threshold calibrated 2026-08-28 (coordinator-verified against job
@@ -268,13 +301,13 @@ async function checkPhaseStatus(phaseNum, categoryId) {
       // truly broken fetch (e.g. fallback not firing at all) still fails.
       const P3_MIN_REVIEWS_TOTAL = 200;
       const { count: reviewRows } = await DOVIVE.from('dovive_reviews').select('*', { count: 'exact', head: true }).ilike('keyword', `%${KEYWORD.split(' ')[0]}%`);
-      const doneByCoverage = count >= total * 0.5;
+      const doneByCoverage = count >= runTotal * 0.5;
       const doneByTop20 = top20Done >= 15 && (reviewRows || 0) >= P3_MIN_REVIEWS_TOTAL;
       return {
         done: doneByCoverage || doneByTop20,
         count,
-        total,
-        msg: `${count}/${total} have review analysis | Top20: ${top20Done}/20`
+        total: runTotal,
+        msg: `${count}/${runTotal} (this run) have review analysis | Top20: ${top20Done}/20`
       };
     }
     case 4: {
@@ -341,10 +374,10 @@ async function checkPhaseStatus(phaseNum, categoryId) {
     }
     case 8: {
       // P8 = Packaging Intelligence (phase7-packaging-intelligence.js)
-      const { data: sample } = await DASH.from('products').select('marketing_analysis').eq('category_id', categoryId).not('marketing_analysis', 'is', null).limit(5);
+      const { data: sample } = await scoped(DASH.from('products').select('marketing_analysis').eq('category_id', categoryId).not('marketing_analysis', 'is', null).limit(5));
       const hasP8 = sample?.some(p => p.marketing_analysis?.packaging_intelligence);
-      const { count } = await DASH.from('products').select('*', { count: 'exact', head: true }).eq('category_id', categoryId).not('marketing_analysis', 'is', null);
-      return { done: hasP8 && count >= total * 0.9, count, total, msg: hasP8 ? `${count}/${total} have packaging data` : 'Packaging not run yet' };
+      const { count } = await scoped(DASH.from('products').select('*', { count: 'exact', head: true }).eq('category_id', categoryId).filter('marketing_analysis->packaging_intelligence', 'not.is', null));
+      return { done: hasP8 && count >= runTotal * 0.9, count, total: runTotal, msg: hasP8 ? `${count}/${runTotal} (this run) have packaging data` : 'Packaging not run yet' };
     }
     case 9: {
       // P9 = Formula Brief (phase8-formula-brief.js)
@@ -454,8 +487,21 @@ async function runFinalVerifier(categoryId) {
   const { count: total } = await DASH.from('products').select('*', { count: 'exact', head: true }).eq('category_id', categoryId);
   const q = async (col) => (await DASH.from('products').select('*', { count: 'exact', head: true }).eq('category_id', categoryId).not(col, 'is', null)).count || 0;
 
-  const p2 = await q('monthly_sales');
-  const p3 = await q('review_analysis');
+  // Run-scoped P2/P3/P8 (see getRunAsins()/checkPhaseStatus comment above —
+  // same root cause + same fix, applied here so the final verifier and the
+  // per-phase gate agree). `total` above is intentionally left as the whole
+  // accumulated category count for P4/P6 (unchanged, out of this task's
+  // explicit scope) and for the top-level `total` reported in metrics.
+  const runAsins = await getRunAsins();
+  const scopedQ = async (col) => {
+    let query = DASH.from('products').select('*', { count: 'exact', head: true }).eq('category_id', categoryId).not(col, 'is', null);
+    if (runAsins.length) query = query.in('asin', runAsins);
+    return (await query).count || 0;
+  };
+  const runTotal = runAsins.length || total;
+
+  const p2 = await scopedQ('monthly_sales');
+  const p3 = await scopedQ('review_analysis');
   const p4 = (await DASH.from('products').select('*', { count: 'exact', head: true }).eq('category_id', categoryId).gt('nutrients_count', 0)).count || 0;
   // P5 data lives in dovive_phase5_research (DOVIVE DB), not in DASH products table.
   // Gate on rows that actually HAVE content (full_research non-null), not just row
@@ -468,9 +514,15 @@ async function runFinalVerifier(categoryId) {
     .ilike('keyword', `%${KEYWORD.split(' ')[0]}%`)
     .not('full_research', 'is', null)).count || 0;
   const p6 = await q('marketing_analysis');
-  const p8 = (await DASH.from('products').select('*', { count: 'exact', head: true }).eq('category_id', categoryId).filter('marketing_analysis->packaging_intelligence', 'not.is', null)).count || 0;
+  const p8 = await (async () => {
+    let query = DASH.from('products').select('*', { count: 'exact', head: true }).eq('category_id', categoryId).filter('marketing_analysis->packaging_intelligence', 'not.is', null);
+    if (runAsins.length) query = query.in('asin', runAsins);
+    return (await query).count || 0;
+  })();
 
-  const { data: top20 } = await DASH.from('products').select('nutrients_count, review_analysis').eq('category_id', categoryId).not('bsr_current', 'is', null).order('bsr_current', { ascending: true }).limit(20);
+  let top20Query = DASH.from('products').select('nutrients_count, review_analysis').eq('category_id', categoryId).not('bsr_current', 'is', null).order('bsr_current', { ascending: true }).limit(20);
+  if (runAsins.length) top20Query = top20Query.in('asin', runAsins);
+  const { data: top20 } = await top20Query;
   const top20P4 = (top20 || []).filter(x => (x.nutrients_count || 0) > 0).length;
   const top20P3 = (top20 || []).filter(x => x.review_analysis != null).length;
 
@@ -482,7 +534,7 @@ async function runFinalVerifier(categoryId) {
   const p12 = !!(fb?.ingredients?.fda_compliance?.opus_analysis);
 
   const failures = [];
-  if (!(p2 >= total * 0.9)) failures.push(`P2 ${p2}/${total} < 90%`);
+  if (!(p2 >= runTotal * 0.9)) failures.push(`P2 ${p2}/${runTotal} (this run) < 90%`);
   // P3 top20 CORRECTED 2026-08-28 (coordinator-verified against job config +
   // logs, superseding the earlier "unset credential" theory): BRIGHTDATA_API_KEY
   // WAS bound on the Cloud Run job (secretKeyRef -> scout-brightdata-key), and
@@ -502,7 +554,7 @@ async function runFinalVerifier(categoryId) {
   // near-zero reviews overall).
   const P3_MIN_REVIEWS_TOTAL = 200;
   const { count: reviewRowsTotal } = await DOVIVE.from('dovive_reviews').select('*', { count: 'exact', head: true }).ilike('keyword', `%${KEYWORD.split(' ')[0]}%`);
-  if (!((p3 >= total * 0.5) || (top20P3 >= 15 && (reviewRowsTotal || 0) >= P3_MIN_REVIEWS_TOTAL))) failures.push(`P3 ${p3}/${total} < 50% and Top20 ${top20P3}/20 (raw reviews=${reviewRowsTotal || 0}, need top20>=15 and raw>=${P3_MIN_REVIEWS_TOTAL})`);
+  if (!((p3 >= runTotal * 0.5) || (top20P3 >= 15 && (reviewRowsTotal || 0) >= P3_MIN_REVIEWS_TOTAL))) failures.push(`P3 ${p3}/${runTotal} (this run) < 50% and Top20 ${top20P3}/20 (raw reviews=${reviewRowsTotal || 0}, need top20>=15 and raw>=${P3_MIN_REVIEWS_TOTAL})`);
   // P4 top20 relaxed 20 → 18 (2026-08-28 "ashwagandha gummies" investigation,
   // 138 products): the 2 top-20 misses (B092H5DCJM, B094T131B4 — both Goli
   // Ashwagandha & Vitamin D Gummy SKUs) have bullet_points containing only
@@ -523,13 +575,13 @@ async function runFinalVerifier(categoryId) {
   if (!(p5 >= p5Min)) failures.push(`P5 ${p5}/${p5Target} (need >= ${p5Min} with content)`);
   if (!(p6 >= total * 0.9)) failures.push(`P6 ${p6}/${total} < 90%`);
   if (!p7) failures.push('P7 market_intelligence missing');
-  if (!(p8 >= total * 0.9)) failures.push(`P8 ${p8}/${total} < 90%`);
+  if (!(p8 >= runTotal * 0.9)) failures.push(`P8 ${p8}/${runTotal} (this run) < 90%`);
   if (!p9) failures.push('P9 ai_generated_brief missing');
   if (!p10) failures.push('P10 qa_report missing');
   if (!p11) failures.push('P11 competitive_benchmarking missing');
   if (!p12) failures.push('P12 fda_compliance missing');
 
-  return { pass: failures.length === 0, failures, metrics: { total, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, top20P3, top20P4 } };
+  return { pass: failures.length === 0, failures, metrics: { total, runTotal, runAsinsCount: runAsins.length, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, top20P3, top20P4 } };
 }
 
 async function run() {

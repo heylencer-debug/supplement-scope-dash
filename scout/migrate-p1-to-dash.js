@@ -10,6 +10,7 @@
 
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
+const { resolveCategory } = require('./utils/category-resolver');
 
 const DOVIVE = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 const DASH = createClient(
@@ -32,16 +33,34 @@ function toTitleCase(str) {
 }
 
 async function getOrCreateCategory() {
-  // Check if category already exists by search_term
-  const { data: existing } = await DASH
-    .from('categories')
-    .select('id, name')
-    .eq('search_term', KEYWORD)
-    .limit(1);
-
-  if (existing?.length) {
-    console.log(`  → Category exists: "${existing[0].name}" (${existing[0].id})`);
-    return existing[0].id;
+  // 2026-08-28 (diagnose-first task): this used to do its OWN lookup
+  // (`.eq('search_term', KEYWORD).limit(1)`, no ORDER BY, no tie-break) —
+  // a SEPARATE, non-deterministic resolution path from the one every other
+  // phase uses (`utils/category-resolver.js` resolveCategory(), which
+  // does an exact search_term match with a deterministic highest-live-
+  // product-count tie-break when duplicates exist). Two duplicate
+  // "Magnesium Gummies" categories (same name AND search_term, created 34s
+  // apart) already exist in DASH from that non-determinism, and because
+  // `.limit(1)` with no ORDER BY has no guaranteed row order, this script
+  // could pick either one on a given run while resolveCategory() picked
+  // the other — split-brain writes (P1 -> category A, P2/P3/P4/verifier ->
+  // category B). Now delegates to the SAME resolveCategory() every other
+  // phase/verifier uses, so category resolution is identical everywhere.
+  // Only creates a brand-new row when resolveCategory() confirms none
+  // exists at all (keyword genuinely new).
+  try {
+    const cat = await resolveCategory(DASH, KEYWORD);
+    console.log(`  → Category resolved (${cat.method}): "${cat.name}" (${cat.id})`);
+    return cat.id;
+  } catch (e) {
+    // resolveCategory() throws "No category candidates found" (or ambiguous
+    // ties, which we do NOT want to silently resolve here) only when the
+    // keyword truly has zero existing categories. Any other error (ambiguous
+    // tie, DB error) should surface, not silently fall through to creating
+    // yet another duplicate.
+    if (!/No category candidates found/i.test(e.message)) {
+      throw e;
+    }
   }
 
   // Create new category

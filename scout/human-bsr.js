@@ -21,6 +21,8 @@ const fetch = require('node-fetch');
 const fs   = require('fs');
 const path = require('path');
 const brightData = require('./bright-data-amazon');
+const { createClient } = require('@supabase/supabase-js');
+const { resolveCategory } = require('./utils/category-resolver');
 
 const SUPABASE_URL  = process.env.SUPABASE_URL;
 const SUPABASE_KEY  = process.env.SUPABASE_KEY;
@@ -29,28 +31,42 @@ const KEYWORD_LABEL = process.argv[2] || 'magnesium gummies';
 // ── DASH live sync ────────────────────────────────────────────
 const DASH_URL = process.env.DASH_URL || SUPABASE_URL;
 const DASH_KEY = process.env.DASH_KEY || SUPABASE_KEY;
+const DASH_CLIENT = createClient(DASH_URL, DASH_KEY);
 let _dashCategoryId = null;
 
+// 2026-08-28 (diagnose-first task): this used to do its OWN `ilike.*keyword*`
+// name match + stale `total_products` column sort, and CREATE a new category
+// on a miss — a THIRD, independent get-or-create path alongside
+// migrate-p1-to-dash.js's (also since unified) and
+// utils/category-resolver.js's resolveCategory() (used by every downstream
+// phase + the final verifier). None of the three shared a DB unique
+// constraint, so a lookup miss on any one of them could mint a fresh
+// duplicate category row — confirmed root cause of two identical
+// "Magnesium Gummies" (same name AND search_term) rows in DASH. Now
+// delegates to the same resolveCategory() everyone else uses, so this
+// live per-product sync (called during scraping, before migrate-p1-to-dash
+// runs) can never again diverge from what P2/P3/P4/the verifier resolve to.
 async function getDashCategoryId(keyword) {
   if (_dashCategoryId) return _dashCategoryId;
-  const res = await fetch(`${DASH_URL}/rest/v1/categories?name=ilike.*${encodeURIComponent(keyword)}*&select=id,name,total_products`, {
-    headers: { apikey: DASH_KEY, Authorization: `Bearer ${DASH_KEY}` }
-  });
-  const cats = await res.json();
-  if (!cats.length) {
-    // Create category
-    const cr = await fetch(`${DASH_URL}/rest/v1/categories`, {
-      method: 'POST',
-      headers: { apikey: DASH_KEY, Authorization: `Bearer ${DASH_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=representation' },
-      body: JSON.stringify({ name: keyword.split(' ').map(w => w[0].toUpperCase() + w.slice(1)).join(' '), search_term: keyword, total_products: 0 })
-    });
-    const newCat = await cr.json();
-    _dashCategoryId = Array.isArray(newCat) ? newCat[0]?.id : newCat?.id;
-  } else {
-    // Pick largest
-    const sorted = cats.sort((a, b) => (b.total_products || 0) - (a.total_products || 0));
-    _dashCategoryId = sorted[0].id;
+  try {
+    const cat = await resolveCategory(DASH_CLIENT, keyword);
+    _dashCategoryId = cat.id;
+    return _dashCategoryId;
+  } catch (e) {
+    if (!/No category candidates found/i.test(e.message)) {
+      // Ambiguous tie or DB error — don't silently create a duplicate.
+      console.warn(`  ⚠️ getDashCategoryId resolve error for "${keyword}": ${e.message}`);
+      return null;
+    }
   }
+  // Create category (only reached when resolveCategory() confirms none exists)
+  const cr = await fetch(`${DASH_URL}/rest/v1/categories`, {
+    method: 'POST',
+    headers: { apikey: DASH_KEY, Authorization: `Bearer ${DASH_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+    body: JSON.stringify({ name: keyword.split(' ').map(w => w[0].toUpperCase() + w.slice(1)).join(' '), search_term: keyword, total_products: 0 })
+  });
+  const newCat = await cr.json();
+  _dashCategoryId = Array.isArray(newCat) ? newCat[0]?.id : newCat?.id;
   return _dashCategoryId;
 }
 

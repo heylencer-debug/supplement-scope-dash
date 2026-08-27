@@ -508,7 +508,13 @@ async function run() {
   console.log(`${'═'.repeat(60)}\n`);
 
   // Get category
-  const categoryId = await getCategoryId();
+  // NOTE: on a fresh keyword, the `categories` row does not exist yet at this
+  // point — P1 (human-bsr.js) lazily creates it on first product sync. So a
+  // null result here is expected and NOT fatal; `categoryId` is re-resolved
+  // after each phase below (and again right before the final verifier) so
+  // that once P1 creates the row, the rest of the run — and the final
+  // verifier — pick it up instead of staying stuck on a stale null.
+  let categoryId = await getCategoryId();
   if (!categoryId && (FROM_PHASE > 1 || RECOVER_SYNC)) {
     console.error('ERROR: Category not found. Run P1 first.');
     process.exit(1);
@@ -598,6 +604,14 @@ async function run() {
 
     try {
       await runPhaseWithRetry(phase, categoryId);
+
+      // Re-resolve category if it wasn't found yet (e.g. P1 just created it
+      // for the first time on this keyword) — keeps categoryId live for the
+      // rest of the loop and for the final verifier instead of staying null.
+      if (!categoryId) {
+        categoryId = await getCategoryId();
+      }
+
       const elapsed = Math.round((Date.now() - phaseStart) / 1000);
       console.log(`\n✅ P${phase.num} Complete (${elapsed}s)`);
       results.push({ phase: phase.num, name: phase.name, status: 'complete', elapsed });
@@ -633,6 +647,14 @@ async function run() {
     } catch (e) {
       console.error('Error updating category:', e.message);
     }
+  }
+
+  // Last-chance re-resolve: covers the case where categoryId was still null
+  // after the phase loop finished (e.g. --phases was scoped to phases that
+  // never re-triggered the resolve above). Only fails hard if the category
+  // genuinely doesn't exist.
+  if (!categoryId) {
+    categoryId = await getCategoryId();
   }
 
   const verifier = categoryId ? await runFinalVerifier(categoryId) : { pass: false, failures: ['category not resolved'], metrics: {} };

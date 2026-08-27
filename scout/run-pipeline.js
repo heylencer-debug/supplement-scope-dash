@@ -281,7 +281,19 @@ async function checkPhaseStatus(phaseNum, categoryId) {
       const top20Done = (top20 || []).filter(p => (p.nutrients_count || 0) > 0).length;
 
       const doneByCoverage = count >= total * 0.8;
-      const doneByTop20 = top20Done >= 20;
+      // Threshold calibrated 2026-08-27/28 from a real "ashwagandha gummies" run
+      // (138 products, top-20 BSR coverage 18/20). Per-ASIN investigation of the
+      // 2 top-20 misses (B092H5DCJM, B094T131B4 — both Goli Ashwagandha &
+      // Vitamin D Gummy SKUs) found their Amazon bullet_points contain ONLY
+      // marketing/certification claims (vegan, non-GMO, "Reduce Stress") with
+      // zero dosage/supplement-facts content — GPT-4o correctly extracted 0
+      // facts because Goli genuinely doesn't disclose a facts panel in text.
+      // That's a real Amazon-side gap, not a fetch/extraction bug (P4's
+      // bullet_points-not-null pre-filter and normalizeFacts/isValidFacts logic
+      // both behaved correctly). 18/20 (90%) reflects "some brands never
+      // disclose dosages" while still catching genuinely broken runs (e.g.
+      // 5/20 would still fail).
+      const doneByTop20 = top20Done >= 18;
       return {
         done: doneByCoverage || doneByTop20,
         count,
@@ -439,8 +451,28 @@ async function runFinalVerifier(categoryId) {
 
   const failures = [];
   if (!(p2 >= total * 0.9)) failures.push(`P2 ${p2}/${total} < 90%`);
+  // P3 top20 kept at the strict 20/20 (2026-08-28 "ashwagandha gummies"
+  // investigation): the 4 top-20 ASINs missing review_analysis in that run
+  // (B0FD3KBQWH, B0B2PKZVBH, B0F55ZNP9P, B095XB8XJT) all show 44-46 real
+  // reviews in dovive_research.review_count (Amazon-side data proves the
+  // reviews exist) yet had 0 rows in dovive_reviews — a fetch miss, not a
+  // real gap. Root cause: those ASINs got bot-walled by Playwright and the
+  // Bright Data fallback never engaged because BRIGHTDATA_API_KEY was unset
+  // in the run environment (playwright-reviews.js's fallback logic itself is
+  // correct). Since the true per-ASIN ceiling is 20/20 when Bright Data is
+  // actually configured, lowering this gate would mask a real, fixable
+  // ops/credential gap rather than a genuine "no reviews on Amazon" case —
+  // so the threshold stays at 20/20 pending BRIGHTDATA_API_KEY being set.
   if (!((p3 >= total * 0.5) || (top20P3 >= 20))) failures.push(`P3 ${p3}/${total} < 50% and Top20 ${top20P3}/20`);
-  if (!((p4 >= total * 0.8) || (top20P4 === 20))) failures.push(`P4 ${p4}/${total} and Top20 ${top20P4}/20`);
+  // P4 top20 relaxed 20 → 18 (2026-08-28 "ashwagandha gummies" investigation,
+  // 138 products): the 2 top-20 misses (B092H5DCJM, B094T131B4 — both Goli
+  // Ashwagandha & Vitamin D Gummy SKUs) have bullet_points containing only
+  // marketing/certification claims with zero dosage/supplement-facts content;
+  // GPT-4o correctly returned 0 facts. Confirmed real Amazon-side gap, not a
+  // P4 extraction bug — see checkPhaseStatus's case 4 for the full evidence.
+  // 18/20 (90%) tolerates that class of real gap while still failing hard on
+  // genuinely broken coverage (e.g. 5/20).
+  if (!((p4 >= total * 0.8) || (top20P4 >= 18))) failures.push(`P4 ${p4}/${total} and Top20 ${top20P4}/20`);
   if (!(p5 >= 20)) failures.push(`P5 ${p5}/20`);
   if (!(p6 >= total * 0.9)) failures.push(`P6 ${p6}/${total} < 90%`);
   if (!p7) failures.push('P7 market_intelligence missing');

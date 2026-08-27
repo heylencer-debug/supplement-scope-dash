@@ -1,5 +1,133 @@
 # Scout pipeline — Cloud Run Job deploy notes
 
+## 2026-08-28 update: P5 rebuild (grounded + parallel + off-Amazon scraping) + P3/P4 gate calibration
+
+**Trigger**: user feedback that "P5 is unnecessarily too heavy" (the previous
+version ran ~20 SEQUENTIAL `grok-4.20-reasoning` calls at 4000 tokens each and
+ate the entire 1-hour Cloud Run job timeout) and "Grok can't be relied on for
+updated brand details" (the old prompt asked the model to recall brand/product
+facts from memory instead of grounding on real scraped data). Separately, the
+last real cloud run for keyword "ashwagandha gummies" (138 products) failed
+only the P12 final verifier on top-20 review/facts coverage (16/20, 18/20),
+prompting an investigation into whether the gate was unrealistic.
+
+**1. `scout/phase5-deep-research.js` — rebuilt**:
+- Pool sizes now capped by `P5_TOP_COUNT` (default 5) and `P5_NEW_COUNT`
+  (default 3) → 8 products analyzed by default (was ~20), still covering both
+  the top-sellers pool and the new/fast-moving-brands pool.
+- New `fetchGroundingData()` pulls per-ASIN real data from `dovive_research`
+  (Bright Data product data + bullet_points), `dovive_ocr` (supplement facts),
+  `dovive_reviews` (real customer reviews), and `dovive_keepa` (price/BSR/
+  rating history) in parallel; `formatGroundingForPrompt()` /
+  `buildGroundedPrompt()` replace the old ~170-line "recall from memory"
+  essay prompt with a short prompt that instructs the model to SUMMARIZE the
+  supplied real facts (and say "not disclosed" instead of guessing).
+- New `findAndScrapeSource()` does live off-Amazon Playwright scraping per
+  ASIN: searches DuckDuckGo HTML for `"<brand> <title>"`, and only scrapes if
+  `pickConfidentResult()` finds an official brand-domain match or a known
+  major retailer (iHerb/Walmart/Vitamin Shoppe/GNC/Target) — otherwise
+  scraping is SKIPPED for that ASIN (flagged low-confidence) rather than
+  scraping an unverified page. Confident hits are scraped and parsed via
+  regex-based `extractSignalsFromText()` (no LLM call) for ingredients/
+  dosage/certifications/retail price, then saved to the new
+  `dovive_p5_sources` table. Reuses the playwright-extra + stealth launch
+  pattern from `playwright-reviews.js`/`human-bsr.js`.
+- Memory-fallback (Grok recalling from training data) is now ONLY used when
+  BOTH grounding data AND source scraping are unavailable for a product, and
+  the prompt explicitly flags every claim in that branch as
+  "(low confidence — from memory, not verified)".
+- Model tiers: routine grounded summarization uses `P5_FAST_MODEL` (default
+  `grok-4-fast`, 1600 max_tokens); the heavier `P5_REASONING_MODEL` (default
+  `grok-4.20-beta-0309-reasoning`, unchanged) is reserved for the
+  memory-fallback case only.
+- New `runPool(items, concurrency, worker)` — a small inline lane-based
+  concurrency helper (no new dependency) — runs the ~8 per-product analyses
+  in batches of `P5_CONCURRENCY` (default 5) instead of one sequential loop
+  with `setTimeout` throttles between every call.
+- CLI contract unchanged (`--keyword`, `--force`, `--pool top10|newbrands|both`)
+  and `run-pipeline.js`'s invocation of P5 (`runScript('phase5-deep-research.js', ...)`)
+  and `checkPhaseStatus` case 5 (row-count check against `dovive_phase5_research`)
+  needed no changes — confirmed by reading both.
+- Expected runtime: well under 10 minutes for the default 8-product run
+  (down from ~1 hour / timeout-exceeding before), given 5-way parallelism and
+  a fast-tier model for the common case.
+
+**2. New table `dovive_p5_sources`** (added additively to
+`scout/migrations/004_consolidated_cloud.sql`, NOT yet applied — same
+manual-dashboard-application policy as before):
+
+```sql
+CREATE TABLE IF NOT EXISTS dovive_p5_sources (
+  id bigint generated always as identity primary key,
+  asin text NOT NULL,
+  keyword text,
+  source_url text NOT NULL,
+  source_type text, -- 'brand_site' | 'iherb' | 'walmart' | 'retailer_other'
+  raw_html_excerpt text,
+  extracted jsonb, -- { ingredients, dosage, certifications, retail_price, ... }
+  scraped_at timestamptz DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_dovive_p5_sources_asin ON dovive_p5_sources(asin);
+CREATE INDEX IF NOT EXISTS idx_dovive_p5_sources_keyword ON dovive_p5_sources(keyword);
+
+ALTER TABLE dovive_p5_sources ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS anon_all_dovive_p5_sources ON dovive_p5_sources;
+CREATE POLICY anon_all_dovive_p5_sources ON dovive_p5_sources FOR ALL TO anon USING (true) WITH CHECK (true);
+```
+
+**3. `scout/run-pipeline.js` — P3/P4 gate investigation + calibration**:
+Investigated the "ashwagandha gummies" (138 products) top-20 BSR-ranked
+ASINs against `dovive_reviews` and `dovive_ocr` coverage. Found 6 gaps
+against a 20/20 ideal:
+- 4 missing reviews (B0FD3KBQWH, B0B2PKZVBH, B0F55ZNP9P, B095XB8XJT) — FETCH
+  MISS, not a real gap: `dovive_research.review_count` shows 44-46 real
+  Amazon reviews exist for every one of these ASINs, but `dovive_reviews` has
+  0 rows. Root cause: Playwright hit its bot-wall and the Bright Data
+  fallback in `playwright-reviews.js` never engaged because
+  `BRIGHTDATA_API_KEY`/`BRIGHTDATA` is unset in the run environment — this is
+  a missing credential, not a code bug (the fallback logic itself is
+  correct), so no code fix was made; the P3 top-20 gate was left at 20/20
+  (see below) so this remains a visible, fixable gap once the key is set.
+- 2 missing facts (B092H5DCJM, B094T131B4 — both "Goli Ashwagandha & Vitamin
+  D Gummy" SKUs) — REAL gap, confirmed: their `dovive_research.bullet_points`
+  contain only marketing/certification claims with zero dosage/
+  supplement-facts content; `phase4-text-extract.js` correctly processed both
+  and extracted health_claims/certifications but 0 supplement_facts, which is
+  genuinely how Goli lists this product on Amazon (no facts panel image). No
+  code fix — nothing to fetch that doesn't exist.
+
+Changes made:
+- `checkPhaseStatus` case 4 (~line 284): `top20Done >= 20` → `top20Done >= 18`,
+  with a comment citing the Goli B092H5DCJM/B094T131B4 evidence above (some
+  real top-20 products genuinely have no supplement-facts panel on Amazon).
+- `runFinalVerifier` P3 threshold: left UNCHANGED at `top20P3 >= 20` — the 4
+  review misses are real reviews that exist on Amazon and were simply not
+  fetched (missing Bright Data credential), so lowering this threshold would
+  mask a fixable gap rather than reflect an unrealistic bar. Comment added
+  explaining this.
+- `runFinalVerifier` P4 threshold: `top20P4 === 20` → `top20P4 >= 18` (also
+  changed the strict `===` to `>=` for consistency with checkPhaseStatus),
+  with a comment citing the Goli evidence. 90% top-20 facts coverage still
+  fails on genuinely broken data (e.g. a run with 5/20 facts coverage still
+  fails both the `>= total*0.8` overall check and the `>= 18` top-20 check).
+- Action item for the coordinator: set the real `BRIGHTDATA_API_KEY` secret
+  (see 2026-08-27 section below) so the P3 gate's 20/20 top-20 requirement
+  can actually be met on re-run.
+
+**4. Image rebuilt + Cloud Run Job updated** — `gcloud builds submit --tag
+us-central1-docker.pkg.dev/noodle-worker/dovive-scout/worker:latest
+--project noodle-worker --region us-central1 --timeout=1200s`, build
+`b173d671-a1be-40d6-b3f5-c0e39c76ca8f`, digest
+`sha256:cfb2d94bf482226266dd16d17c9c9d85b577ec689614288a7162296cfb739923`.
+`gcloud run jobs update dovive-scout --image ...:latest` applied; job
+`timeoutSeconds` confirmed unchanged at `10800` before and after the update.
+**Job was NOT executed** — no `gcloud run jobs execute` was run this session,
+per explicit instruction. `004_consolidated_cloud.sql` (now including the
+`dovive_p5_sources` table) still needs to be applied via the Supabase
+dashboard SQL editor before the next real run.
+
+---
+
 ## 2026-08-27 update: Bright Data fallback wired for P1 bot-wall recovery
 
 **Trigger**: the first real end-to-end Cloud Run execution (job

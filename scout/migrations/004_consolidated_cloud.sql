@@ -380,3 +380,26 @@ END $$;
 -- Safe for a public app: the frontend's anon/publishable key gets nothing.
 ALTER TABLE dovive_scout_config ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS anon_all_dovive_scout_config ON dovive_scout_config;
+
+-- ─── dovive_p5_sources — scout/phase5-deep-research.js (2026-08-28 rebuild)
+-- Off-Amazon grounding: one row per successful Playwright scrape of a brand
+-- site or major retailer (iHerb/Walmart/etc) for an analyzed ASIN. Discovery
+-- is imperfect — a row only exists here when the scraper found a confident
+-- official/retailer match; low-confidence/no-match ASINs are noted directly
+-- in the P5 research record instead (no row written here for those). ───────
+CREATE TABLE IF NOT EXISTS dovive_p5_sources (
+  id bigint generated always as identity primary key,
+  asin text NOT NULL,
+  keyword text,
+  source_url text NOT NULL,
+  source_type text, -- 'brand_site' | 'iherb' | 'walmart' | 'retailer_other'
+  raw_html_excerpt text,
+  extracted jsonb, -- { ingredients, dosage, certifications, retail_price, ... }
+  scraped_at timestamptz DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_dovive_p5_sources_asin ON dovive_p5_sources(asin);
+CREATE INDEX IF NOT EXISTS idx_dovive_p5_sources_keyword ON dovive_p5_sources(keyword);
+
+ALTER TABLE dovive_p5_sources ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS anon_all_dovive_p5_sources ON dovive_p5_sources;
+CREATE POLICY anon_all_dovive_p5_sources ON dovive_p5_sources FOR ALL TO anon USING (true) WITH CHECK (true);

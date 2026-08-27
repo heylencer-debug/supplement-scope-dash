@@ -357,7 +357,7 @@ BEGIN
   FOREACH t IN ARRAY ARRAY[
     'scout_jobs', 'dovive_keywords', 'dovive_research', 'dovive_history',
     'dovive_reviews', 'dovive_keepa', 'dovive_phase5_research', 'dovive_ocr',
-    'dovive_packaging_intelligence', 'dovive_scout_config',
+    'dovive_packaging_intelligence',
     'dovive_market_opportunities', 'dovive_jobs'
   ]
   LOOP
@@ -366,3 +366,9 @@ BEGIN
     EXECUTE format('CREATE POLICY anon_all_%I ON %I FOR ALL TO anon USING (true) WITH CHECK (true)', t, t);
   END LOOP;
 END $$;
+
+-- dovive_scout_config holds secrets (e.g. the Keepa API key): RLS on, and NO
+-- anon policy — only the service-role key (which bypasses RLS) can read it.
+-- Safe for a public app: the frontend's anon/publishable key gets nothing.
+ALTER TABLE dovive_scout_config ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS anon_all_dovive_scout_config ON dovive_scout_config;

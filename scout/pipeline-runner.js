@@ -40,8 +40,8 @@ if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR, { recursive: true });
 
 // DASH client for post-run coverage checks
 const DASH = createClient(
-  process.env.DASH_URL || 'https://jwkitkfufigldpldqtbq.supabase.co',
-  process.env.DASH_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp3a2l0a2Z1ZmlnbGRwbGRxdGJxIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MTA0NTY0NSwiZXhwIjoyMDc2NjIxNjQ1fQ.FjLFaMPE4VO5vVwFEAAvLiub3Xc1hhjsv9fd2jWFIAc'
+  process.env.DASH_URL || process.env.SUPABASE_URL,
+  process.env.DASH_KEY || process.env.SUPABASE_KEY
 );
 
 async function lookupCategoryId(keyword) {

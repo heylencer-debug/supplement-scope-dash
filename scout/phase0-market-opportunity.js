@@ -184,6 +184,9 @@ function countBsrDrops(bsrArr, days) {
 }
 
 async function getKeepaKey() {
+  // Secret-store first (Cloud Run: Secret Manager via env; local: .env);
+  // dovive_scout_config is a legacy fallback only.
+  if (process.env.KEEPA_API_KEY) return process.env.KEEPA_API_KEY.trim();
   if (!SUPABASE_URL || !SUPABASE_KEY) throw new Error('SUPABASE_URL/SUPABASE_KEY not set in .env');
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/dovive_scout_config?config_key=eq.keepa_api_key&select=config_value`,

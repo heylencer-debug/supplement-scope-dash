@@ -311,8 +311,15 @@ scrape gets blocked.
 1. **Run `scout/migrations/004_consolidated_cloud.sql`** in the
    `jwkitkfufigldpldqtbq` Supabase dashboard SQL editor — the one hard
    blocker. (Do NOT run `003_scout_jobs_cloud_run.sql` — superseded, targeted
-   the dead project.)
-2. Re-enter the Keepa API key into `dovive_scout_config` (see SQL above).
+   the dead project.) This migration also RLS-locks `dovive_scout_config` to
+   service-role only — see Security section below.
+2. **Paste the real Keepa API key** — two places, both currently
+   placeholders (see Security section below for why the DB table is no
+   longer the answer):
+   - `gcloud secrets versions add scout-keepa-key --project=noodle-worker --data-file=-`
+     (paste the key, Ctrl-D) — this is what the Cloud Run Job reads.
+   - `KEEPA_API_KEY=` line in `scout/.env` (and `~/Downloads/_env`) — for
+     local runs.
 3. `gcloud iam service-accounts keys create scout-invoker-key.json ...` (see
    above) — this session's sandbox refused to generate it.
 4. `npx --yes supabase secrets set` for the 5 edge-function secrets (step 4
@@ -320,10 +327,74 @@ scrape gets blocked.
 5. After 1-4: `gcloud run jobs execute dovive-scout --region=us-central1
    --project=noodle-worker --wait` against a real test row for the actual
    end-to-end test — not completed this session.
-6. Rotate the `jwkitkfufigldpldqtbq` service-role key eventually — it's been
-   sitting in plaintext in a committed file (`scout/human-bsr.js`) for a
-   while, and this session added two more places it's now duplicated
-   (`scout/.env`, the `scout-supabase-key` Secret Manager secret). Not urgent,
-   but worth doing since it's committed.
+6. **Rotate the `jwkitkfufigldpldqtbq` service_role key** — it's in git
+   history (was hardcoded in 15 files, all fixed this session — see Security
+   section) so history rewrite won't fully solve it; rotating the key itself
+   in the Supabase dashboard is the real fix. Nothing in code needs to change
+   afterward — every read is `process.env.SUPABASE_KEY` (or `DASH_KEY`
+   falling back to it) now, so just: rotate in dashboard → update the value
+   in `scout/.env`, `~/Downloads/_env`, and the `scout-supabase-key` Secret
+   Manager secret (`gcloud secrets versions add scout-supabase-key
+   --project=noodle-worker --data-file=-`).
 7. Decide/confirm which Lovable UI action should call `trigger-scout-job`
    (small frontend follow-up, not yet built).
+
+## Security hardening pass (2026-08-27)
+
+Audited every credential in `scout/*.js`, `scout/utils/*.js`,
+`supabase/functions/`, and `src/` for hardcoded keys, DB-stored secrets, or
+keys committed in plaintext. Findings and fixes:
+
+- **`dovive_scout_config` (Keepa key in a DB table, readable via anon key
+  before this pass)** — `004_consolidated_cloud.sql` now excludes this table
+  from the `anon` RLS policy loop (service-role only). `keepa-phase2.js` and
+  `phase0-market-opportunity.js` now read `process.env.KEEPA_API_KEY` first;
+  the table read is a legacy fallback that's effectively dead once the env
+  var is set (and can't be reached by the anon/frontend key regardless).
+  `KEEPA_API_KEY=` placeholder lines added to `scout/.env`,
+  `~/Downloads/_env`, and `scout/.env.example`.
+- **`jwkitkfufigldpldqtbq` service_role key hardcoded in plaintext across 15
+  files**: `scout/human-bsr.js`, `migrate-ocr-to-dash.js`,
+  `migrate-keepa-to-dash.js`, `migrate-p1-to-dash.js`,
+  `migrate-reviews-to-dash.js`, `phase5-deep-research.js`,
+  `phase7-packaging-intelligence.js`, `phase10-competitive-benchmarking.js`,
+  `phase11-fda-compliance.js`, `phase8-formula-brief.js`,
+  `phase6-market-analysis.js`, `phase6-product-intelligence.js`,
+  `run-pipeline.js`, `phase9-formula-qa.js`, `seed-category-analysis.js`
+  (this last one's copy of the key even had a typo'd `ref` — harmless bug,
+  now moot). All fixed the same way: the hardcoded `DASH_URL`/`DASH_KEY`
+  literal pair is now `process.env.DASH_URL || process.env.SUPABASE_URL` /
+  `process.env.DASH_KEY || process.env.SUPABASE_KEY`. Since the Scout DB and
+  the Lovable/DASH DB were consolidated onto the same project earlier this
+  session, `SUPABASE_URL`/`SUPABASE_KEY` (already in `scout/.env`) cover this
+  with zero new env vars required; `DASH_URL`/`DASH_KEY` remain available as
+  an explicit override if the two ever need to diverge again.
+- **Frontend (`src/`)**: only the `anon`/publishable key appears (in
+  `src/integrations/supabase/client.ts`, plus two components that duplicate
+  the literal instead of importing the constant — `MarketTrendsChat.tsx`,
+  `useCompetitiveAnalysis.ts`). The anon key is meant to be public
+  (RLS-gated), so this is not a security issue — left as-is, out of scope for
+  this pass (would be a small duplication cleanup, not a security fix).
+- **`supabase/functions/`**: no hardcoded credentials found (edge functions
+  already read `Deno.env.get(...)`).
+- **Other env-based secrets already correct**: `XAI_API_KEY`,
+  `OPENROUTER_API_KEY`, `OPENAI_API_KEY`, `AMAZON_EMAIL`/`AMAZON_PASSWORD`,
+  `OPENCLAW_TOKEN`, `MEM0_API_KEY` — all read from `process.env`, never
+  hardcoded in any `scout/*.js` file. `JUNGLE_SCOUT_API_KEY` lives in the
+  Dovive Supabase project's own function secrets (not touched, not a DB
+  table).
+- **New: `scout-keepa-key` GCP Secret Manager secret** created in project
+  `noodle-worker` (currently holds a placeholder value,
+  `REPLACE_ME_WITH_REAL_KEEPA_KEY`), the default compute service account
+  granted `roles/secretmanager.secretAccessor` on it, and the `dovive-scout`
+  Cloud Run Job updated (`--update-secrets=KEEPA_API_KEY=scout-keepa-key:latest`)
+  so `KEEPA_API_KEY` is now injected the same way the other 7 pipeline
+  secrets already are. **User action required**: paste the real Keepa key —
+  `gcloud secrets versions add scout-keepa-key --project=noodle-worker
+  --data-file=-` (paste key, then Ctrl-D), or via the GCP Secret Manager
+  console (Secret Manager → `scout-keepa-key` → New Version).
+- Net result: after this pass, the only remaining credential exposure is the
+  service_role key sitting in **git history** from before this fix — see item
+  6 above. Nothing in the *current* tree reads a secret from anywhere but
+  `process.env` (worker/local) or GCP Secret Manager (Cloud Run) or
+  `Deno.env` (edge functions).

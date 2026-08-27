@@ -312,8 +312,22 @@ async function checkPhaseStatus(phaseNum, categoryId) {
       };
     }
     case 5: {
-      const { count } = await DOVIVE.from('dovive_phase5_research').select('*', { count: 'exact', head: true }).ilike('keyword', `%${KEYWORD.split(' ')[0]}%`);
-      return { done: count >= 10, count, total: 20, msg: `${count}/20 deep research records (Top 10 BSR + Top 10 New Brands)` };
+      // P5 was deliberately slimmed (2026-08-28) from Top10+Top10=20 to
+      // P5_TOP_COUNT+P5_NEW_COUNT (default 5+3=8) — see phase5-deep-research.js
+      // header comment ("P5 too heavy" decision). Gate must track the slim
+      // target, not the old 20. Also gate on rows that actually HAVE content
+      // (full_research non-null), not just row existence — the P5 save-strip
+      // bug (fixed 2026-08-28) previously let empty rows count as "done".
+      const p5Target = (parseInt(process.env.P5_TOP_COUNT || '5', 10) + parseInt(process.env.P5_NEW_COUNT || '3', 10));
+      const { count } = await DOVIVE.from('dovive_phase5_research')
+        .select('*', { count: 'exact', head: true })
+        .ilike('keyword', `%${KEYWORD.split(' ')[0]}%`)
+        .not('full_research', 'is', null);
+      // Tolerate a small shortfall (occasional per-product scrape/AI failures
+      // are normal) — accept >= 6 or >= 75% of target, whichever is lower,
+      // but never require more than the target itself.
+      const p5Min = Math.min(p5Target, Math.max(6, Math.ceil(p5Target * 0.75)));
+      return { done: count >= p5Min, count, total: p5Target, msg: `${count}/${p5Target} deep research records WITH content (min ${p5Min})` };
     }
     case 6: {
       const { count } = await DASH.from('products').select('*', { count: 'exact', head: true }).eq('category_id', categoryId).not('marketing_analysis', 'is', null);
@@ -443,8 +457,16 @@ async function runFinalVerifier(categoryId) {
   const p2 = await q('monthly_sales');
   const p3 = await q('review_analysis');
   const p4 = (await DASH.from('products').select('*', { count: 'exact', head: true }).eq('category_id', categoryId).gt('nutrients_count', 0)).count || 0;
-  // P5 data lives in dovive_phase5_research (DOVIVE DB), not in DASH products table
-  const p5 = (await DOVIVE.from('dovive_phase5_research').select('*', { count: 'exact', head: true }).ilike('keyword', `%${KEYWORD.split(' ')[0]}%`)).count || 0;
+  // P5 data lives in dovive_phase5_research (DOVIVE DB), not in DASH products table.
+  // Gate on rows that actually HAVE content (full_research non-null), not just row
+  // existence — see checkPhaseStatus case 5 comment for the full "P5 too heavy" /
+  // save-strip-bug context.
+  const p5Target = (parseInt(process.env.P5_TOP_COUNT || '5', 10) + parseInt(process.env.P5_NEW_COUNT || '3', 10));
+  const p5Min = Math.min(p5Target, Math.max(6, Math.ceil(p5Target * 0.75)));
+  const p5 = (await DOVIVE.from('dovive_phase5_research')
+    .select('*', { count: 'exact', head: true })
+    .ilike('keyword', `%${KEYWORD.split(' ')[0]}%`)
+    .not('full_research', 'is', null)).count || 0;
   const p6 = await q('marketing_analysis');
   const p8 = (await DASH.from('products').select('*', { count: 'exact', head: true }).eq('category_id', categoryId).filter('marketing_analysis->packaging_intelligence', 'not.is', null)).count || 0;
 
@@ -490,7 +512,15 @@ async function runFinalVerifier(categoryId) {
   // 18/20 (90%) tolerates that class of real gap while still failing hard on
   // genuinely broken coverage (e.g. 5/20).
   if (!((p4 >= total * 0.8) || (top20P4 >= 18))) failures.push(`P4 ${p4}/${total} and Top20 ${top20P4}/20`);
-  if (!(p5 >= 20)) failures.push(`P5 ${p5}/20`);
+  // P5 was deliberately slimmed (2026-08-28, "P5 too heavy" decision) from
+  // Top10+Top10=20 to P5_TOP_COUNT+P5_NEW_COUNT (default 5+3=8 products) —
+  // see phase5-deep-research.js. The old hardcoded `>= 20` gate is stale and
+  // would fail every slim run forever. Now passes when P5 rows WITH REAL
+  // CONTENT (full_research non-null — never just row existence, so the fixed
+  // save-strip bug that used to produce empty rows can't silently satisfy
+  // this gate again) reach >= 75% of the configured target (min 6), tolerating
+  // occasional per-product AI/scrape failures without masking a broken run.
+  if (!(p5 >= p5Min)) failures.push(`P5 ${p5}/${p5Target} (need >= ${p5Min} with content)`);
   if (!(p6 >= total * 0.9)) failures.push(`P6 ${p6}/${total} < 90%`);
   if (!p7) failures.push('P7 market_intelligence missing');
   if (!(p8 >= total * 0.9)) failures.push(`P8 ${p8}/${total} < 90%`);

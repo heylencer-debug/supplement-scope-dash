@@ -1,5 +1,39 @@
 # Scout pipeline — Cloud Run Job deploy notes
 
+## 2026-08-28 correction: P3 gate re-calibrated (Bright Data coverage ceiling, not a credential gap)
+
+**Correction to the entry below**: the initial P3 investigation concluded
+`BRIGHTDATA_API_KEY` was unset for the "ashwagandha gummies" run and left the
+P3 top20 gate at a strict 20/20 pending the key being set. The coordinator
+verified this against the actual job config and run logs and found that
+conclusion was **wrong**: `BRIGHTDATA_API_KEY` WAS bound on the Cloud Run job
+(`secretKeyRef -> scout-brightdata-key`), and the logs show the fallback did
+engage and finish (`"Bright Data reviews fallback done. 24/30 ASINs got
+reviews (1426 total)"`). The 4 top-20 misses (B0FD3KBQWH, B0B2PKZVBH,
+B0F55ZNP9P, B095XB8XJT) were processed by the fallback, but Bright Data's
+reviews dataset itself returned zero records for those specific ASINs — a
+genuine per-ASIN coverage gap in the Bright Data source (~80-85% observed
+coverage), not a fixable ops/credential issue. Playwright is bot-walled from
+Cloud Run's datacenter IPs (the primary path), so Bright Data is the only
+real source, and it simply doesn't index reviews for every SKU.
+
+**Fix** (`scout/run-pipeline.js`, both `checkPhaseStatus` case 3 and
+`runFinalVerifier`): P3 top20 gate calibrated to `top20 >= 15` (75%,
+tolerates ~3-5 genuinely uncoverable top SKUs) **AND** raw review row count
+(`dovive_reviews` rows for the keyword) `>= 200` — the second condition keeps
+the gate honest: if the fallback silently doesn't fire at all (e.g. an
+invalid/expired key), raw review volume collapses toward zero and the gate
+still fails. Mirrors the P4 top20-relaxation approach and its reasoning is
+inlined as a code comment at both call sites.
+
+Image rebuilt + Cloud Run Job updated again since `run-pipeline.js` changed:
+build ID `6b5807c7-21c7-4135-97d2-44b984a8c9a7`, digest
+`sha256:33b20ec0e875033385a0225b46188b67dbcd94b724b88752786e97bb36afd1c2`,
+`timeoutSeconds` confirmed unchanged at `10800`. Job was **not executed**.
+Commit `5d32b16` on local `main` (one commit on top of `2c3feba` below) —
+push handled by the coordinator, not this session (git push is blocked by
+the auto-mode classifier for this agent).
+
 ## 2026-08-28 update: P5 rebuild (grounded + parallel + off-Amazon scraping) + P3/P4 gate calibration
 
 **Trigger**: user feedback that "P5 is unnecessarily too heavy" (the previous

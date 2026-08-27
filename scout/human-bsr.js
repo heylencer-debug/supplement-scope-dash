@@ -20,6 +20,7 @@ chromium.use(stealth());
 const fetch = require('node-fetch');
 const fs   = require('fs');
 const path = require('path');
+const brightData = require('./bright-data-amazon');
 
 const SUPABASE_URL  = process.env.SUPABASE_URL;
 const SUPABASE_KEY  = process.env.SUPABASE_KEY;
@@ -122,6 +123,55 @@ async function isBlocked(page) {
   if (url.includes('captcha') || url.includes('validatecaptcha')) return true;
   const captchaEl = await page.$('form[action*="captcha"], #captchacharacters');
   return !!captchaEl;
+}
+
+// ── Failure artifact capture (bot-wall diagnosis) ──────────────
+// Cheap diagnosis for cloud runs: on scrape failure, save a snippet of
+// page.content() (grepped for known bot-check/interstitial markers) and a
+// base64 screenshot into the scratch dir + console logs, so Cloud Run logs /
+// scout_jobs error detail show WHY the scrape failed (bot-wall vs. a real
+// selector/timeout bug) without needing cloud storage wiring.
+const BOT_WALL_MARKERS = [
+  'enter the characters',
+  'automated access',
+  'captcha',
+  'robot check',
+  'to discuss automated access',
+  'sorry, we just need to make sure',
+  'api-services-support@amazon.com',
+];
+const ARTIFACT_DIR = path.join(__dirname, 'output', 'failure-artifacts');
+
+async function captureFailureArtifact(page, label) {
+  const result = { label, matchedMarkers: [], contentSnippet: '', screenshotPath: null, error: null };
+  try {
+    const content = (await page.content()) || '';
+    const lower = content.toLowerCase();
+    result.matchedMarkers = BOT_WALL_MARKERS.filter(m => lower.includes(m));
+    result.contentSnippet = content.slice(0, 2000);
+
+    fs.mkdirSync(ARTIFACT_DIR, { recursive: true });
+    const ts = Date.now();
+    const safeLabel = label.replace(/[^a-z0-9_-]/gi, '_');
+    const shotPath = path.join(ARTIFACT_DIR, `${safeLabel}-${ts}.png`);
+    try {
+      await page.screenshot({ path: shotPath, fullPage: false });
+      result.screenshotPath = shotPath;
+    } catch (shotErr) {
+      result.error = `screenshot failed: ${shotErr.message}`;
+    }
+
+    console.log(`\n🚨 FAILURE ARTIFACT [${label}]`);
+    console.log(`   Bot-wall markers matched: ${result.matchedMarkers.length ? result.matchedMarkers.join(', ') : 'none'}`);
+    console.log(`   Page title: ${(await page.title().catch(() => '')).slice(0, 120)}`);
+    console.log(`   Page URL: ${page.url()}`);
+    console.log(`   Screenshot: ${result.screenshotPath || 'FAILED — ' + result.error}`);
+    console.log(`   Content snippet (first 2KB):\n${result.contentSnippet}`);
+  } catch (e) {
+    result.error = e.message;
+    console.log(`  ⚠ Failure artifact capture itself failed [${label}]: ${e.message}`);
+  }
+  return result;
 }
 
 // ── Cookie persistence ────────────────────────────────────────
@@ -304,12 +354,66 @@ async function scrapeProductDetail(context, asin, retries = 3) {
   return null;
 }
 
-// ── Main ──────────────────────────────────────────────────────
-async function main() {
+// ── Bright Data fallback (bot-wall recovery) ───────────────────
+// Writes to the SAME tables/columns as the Playwright path — dovive_research
+// and dovive_keywords — plus raw_json (dovive_research) carrying the full
+// raw Bright Data record, so every downstream phase (P2+) is unaffected.
+async function runBrightDataFallback(alreadyScraped) {
+  console.log('\n🛰️  Bright Data fallback engaged (BRIGHTDATA_API_KEY/BRIGHTDATA present)...');
+  await ensureKeyword(KEYWORD_LABEL); // dovive_keywords — same call as the Playwright path
+
+  const products = await brightData.searchAmazonByKeyword(KEYWORD_LABEL, { limit: 40, pages: 3 });
+  console.log(`  ✓ Bright Data returned ${products.length} products for "${KEYWORD_LABEL}"`);
+
+  const toScrape = products.filter(p => p.asin && !alreadyScraped.has(p.asin));
+  const skipped = products.length - toScrape.length;
+  console.log(`  ${toScrape.length} to save | ${skipped} already in DB`);
+
+  let saved = 0;
+  for (const p of toScrape) {
+    const record = {
+      asin:          p.asin,
+      keyword:       KEYWORD_LABEL,
+      title:         p.title || '',
+      brand:         p.brand || null,
+      description:   null,
+      bullet_points: p.bullet_points,
+      specs:         p.specs,
+      images:        p.images,
+      main_image:    p.main_image,
+      bsr:           p.bsRank || p.searchRank || null,
+      rank_position: p.searchRank || null,
+      rating:        p.rating,
+      review_count:  p.review_count,
+      price:         p.price,
+      category:      p.category || null,
+      is_sponsored:  !!p.sponsored,
+      source:        'bright-data-fallback-v1',
+      raw_json:      p.raw || null,
+      scraped_at:    new Date().toISOString(),
+    };
+    try {
+      await upsertProducts([record]);
+      await syncProductToDash(record);
+      saved++;
+      console.log(`  ✓ [${record.asin}] ${(record.title || '').slice(0, 55)}`);
+    } catch (err) {
+      console.error(`  → Save failed for ${record.asin}: ${err.message}`);
+    }
+  }
+
+  console.log(`\n✅ Bright Data fallback done. ${saved}/${toScrape.length} new products saved. (${skipped} skipped — already in DB)`);
+}
+
+// ── Playwright gather attempt (homepage → search → collect ASINs) ──
+// Returns { browser, context, toScrape, skipped } on success. On failure,
+// captures a failure artifact (page content + screenshot) before closing the
+// browser, then re-throws so the caller can retry / fall back.
+async function attemptPlaywrightGather(attemptNum, alreadyScraped) {
   const userAgent = pickRandom(USER_AGENTS);
   const viewport  = pickRandom(VIEWPORTS);
 
-  console.log(`\n📦 Phase 1 — human-bsr.js v4`);
+  console.log(`\n📦 Phase 1 — human-bsr.js v4 (Playwright attempt ${attemptNum}/3)`);
   console.log(`   Keyword: "${KEYWORD_LABEL}"`);
   console.log(`   UA: ${userAgent.slice(0, 60)}...`);
   console.log(`   Viewport: ${viewport.width}x${viewport.height}`);
@@ -331,134 +435,135 @@ async function main() {
 
   const page = await context.newPage();
 
-  // ── Step 0: Register keyword ─────────────────────────────────
-  console.log(`\n→ Registering keyword "${KEYWORD_LABEL}" in dashboard...`);
-  await ensureKeyword(KEYWORD_LABEL);
+  try {
+    // ── Step 1: Amazon homepage ───────────────────────────────────
+    console.log('→ Opening Amazon homepage...');
+    await page.goto('https://www.amazon.com', { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await sleep(rand(3000, 6000));
+    await saveCookies(context);
 
-  // ── Step 0b: Get already-scraped ASINs (resume support) ──────
-  const alreadyScraped = await getAlreadyScraped(KEYWORD_LABEL);
-  console.log(`  ✓ Already scraped: ${alreadyScraped.size} products (will skip these)`);
+    // Handle interstitial
+    const continueBtn = await page.$('input[value="Continue shopping"], a:has-text("Continue shopping")');
+    if (continueBtn) {
+      console.log('  → Interstitial detected. Clicking "Continue shopping"...');
+      await continueBtn.click();
+      await sleep(rand(4000, 7000));
+    }
 
-  // ── Step 1: Amazon homepage ───────────────────────────────────
-  console.log('→ Opening Amazon homepage...');
-  await page.goto('https://www.amazon.com', { waitUntil: 'domcontentloaded', timeout: 60000 });
-  await sleep(rand(3000, 6000));
-  await saveCookies(context);
-
-  // Handle interstitial
-  const continueBtn = await page.$('input[value="Continue shopping"], a:has-text("Continue shopping")');
-  if (continueBtn) {
-    console.log('  → Interstitial detected. Clicking "Continue shopping"...');
-    await continueBtn.click();
-    await sleep(rand(4000, 7000));
-  }
-
-  await humanScroll(page);
-  await sleep(rand(1500, 3000));
-  console.log('  Homepage loaded:', await page.title());
-
-  // Find search box
-  const searchSelectors = ['#twotabsearchtextbox', '#nav-search-bar-form input[type="text"]', 'input[name="field-keywords"]'];
-  let searchBox = null;
-  for (const sel of searchSelectors) {
-    searchBox = await page.$(sel);
-    if (searchBox) { console.log('  Found search box via:', sel); break; }
-  }
-  if (!searchBox) throw new Error('Search box not found');
-
-  // ── Step 2: Search ────────────────────────────────────────────
-  console.log(`\n→ Searching for "${KEYWORD_LABEL}"...`);
-  await page.evaluate(() => window.scrollTo(0, 0));
-  await sleep(rand(500, 1000));
-  await searchBox.scrollIntoViewIfNeeded();
-  await sleep(rand(500, 800));
-  await page.fill('#twotabsearchtextbox', '');
-  await page.type('#twotabsearchtextbox', KEYWORD_LABEL, { delay: rand(60, 130) });
-  await sleep(rand(700, 1200));
-  await page.keyboard.press('Enter');
-  await sleep(rand(4000, 6000));
-  await saveCookies(context);
-
-  console.log('  Search results:', await page.title());
-
-  // ── Step 3: Collect ASINs across pages ───────────────────────
-  const allGummies = [];
-
-  for (let pageNum = 1; pageNum <= 3; pageNum++) {
-    console.log(`\n→ Scanning page ${pageNum}...`);
     await humanScroll(page);
+    await sleep(rand(1500, 3000));
+    console.log('  Homepage loaded:', await page.title());
 
-    const pageItems = await page.evaluate((pNum) => {
-      const results = [];
-      const cards = document.querySelectorAll('[data-component-type="s-search-result"]');
-      cards.forEach((card, i) => {
-        if (card.querySelector('.puis-sponsored-label-text, [aria-label="Sponsored"]')) return;
-        const asin = card.getAttribute('data-asin');
-        if (!asin) return;
-        const titleEl = card.querySelector('h2 span, h2 a span');
-        const title = titleEl?.textContent?.trim() || '';
-        if (/gumm/i.test(title)) {
-          results.push({ asin, title, rank: (pNum - 1) * 48 + i + 1 });
+    // Find search box
+    const searchSelectors = ['#twotabsearchtextbox', '#nav-search-bar-form input[type="text"]', 'input[name="field-keywords"]'];
+    let searchBox = null;
+    for (const sel of searchSelectors) {
+      searchBox = await page.$(sel);
+      if (searchBox) { console.log('  Found search box via:', sel); break; }
+    }
+    if (!searchBox) throw new Error('Search box not found');
+
+    // ── Step 2: Search ────────────────────────────────────────────
+    console.log(`\n→ Searching for "${KEYWORD_LABEL}"...`);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await sleep(rand(500, 1000));
+    await searchBox.scrollIntoViewIfNeeded();
+    await sleep(rand(500, 800));
+    await page.fill('#twotabsearchtextbox', '');
+    await page.type('#twotabsearchtextbox', KEYWORD_LABEL, { delay: rand(60, 130) });
+    await sleep(rand(700, 1200));
+    await page.keyboard.press('Enter');
+    await sleep(rand(4000, 6000));
+    await saveCookies(context);
+
+    console.log('  Search results:', await page.title());
+
+    // ── Step 3: Collect ASINs across pages ───────────────────────
+    const allGummies = [];
+
+    for (let pageNum = 1; pageNum <= 3; pageNum++) {
+      console.log(`\n→ Scanning page ${pageNum}...`);
+      await humanScroll(page);
+
+      const pageItems = await page.evaluate((pNum) => {
+        const results = [];
+        const cards = document.querySelectorAll('[data-component-type="s-search-result"]');
+        cards.forEach((card, i) => {
+          if (card.querySelector('.puis-sponsored-label-text, [aria-label="Sponsored"]')) return;
+          const asin = card.getAttribute('data-asin');
+          if (!asin) return;
+          const titleEl = card.querySelector('h2 span, h2 a span');
+          const title = titleEl?.textContent?.trim() || '';
+          if (/gumm/i.test(title)) {
+            results.push({ asin, title, rank: (pNum - 1) * 48 + i + 1 });
+          }
+        });
+        return results;
+      }, pageNum);
+
+      console.log(`  Found ${pageItems.length} gummies on page ${pageNum}`);
+      pageItems.forEach(p => console.log(`    [${p.asin}] ${p.title.slice(0, 70)}`));
+      allGummies.push(...pageItems);
+
+      if (pageNum < 3) {
+        // Scroll to bottom first to reveal the Next button
+        await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+        await sleep(rand(1500, 2500));
+
+        const nextBtn = await page.$('.s-pagination-next:not(.s-pagination-disabled)');
+        if (!nextBtn) { console.log('  No more pages.'); break; }
+
+        // Scroll Next button into view and click it naturally
+        await nextBtn.scrollIntoViewIfNeeded();
+        await sleep(rand(800, 1500));
+        await nextBtn.click();
+
+        // Wait for new page to fully load
+        await page.waitForLoadState('domcontentloaded');
+        await sleep(rand(5000, 8000));
+
+        // Verify we actually got a new results page
+        const newTitle = await page.title();
+        const newCards = await page.evaluate(() =>
+          document.querySelectorAll('[data-component-type="s-search-result"]').length
+        );
+        console.log(`  → Page ${pageNum + 1} loaded: "${newTitle}" | ${newCards} cards`);
+
+        if (newCards === 0) {
+          console.log('  → No results on next page — stopping pagination.');
+          break;
         }
-      });
-      return results;
-    }, pageNum);
-
-    console.log(`  Found ${pageItems.length} gummies on page ${pageNum}`);
-    pageItems.forEach(p => console.log(`    [${p.asin}] ${p.title.slice(0, 70)}`));
-    allGummies.push(...pageItems);
-
-    if (pageNum < 3) {
-      // Scroll to bottom first to reveal the Next button
-      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-      await sleep(rand(1500, 2500));
-
-      const nextBtn = await page.$('.s-pagination-next:not(.s-pagination-disabled)');
-      if (!nextBtn) { console.log('  No more pages.'); break; }
-
-      // Scroll Next button into view and click it naturally
-      await nextBtn.scrollIntoViewIfNeeded();
-      await sleep(rand(800, 1500));
-      await nextBtn.click();
-
-      // Wait for new page to fully load
-      await page.waitForLoadState('domcontentloaded');
-      await sleep(rand(5000, 8000));
-
-      // Verify we actually got a new results page
-      const newTitle = await page.title();
-      const newCards = await page.evaluate(() =>
-        document.querySelectorAll('[data-component-type="s-search-result"]').length
-      );
-      console.log(`  → Page ${pageNum + 1} loaded: "${newTitle}" | ${newCards} cards`);
-
-      if (newCards === 0) {
-        console.log('  → No results on next page — stopping pagination.');
-        break;
       }
     }
+
+    // Deduplicate
+    const seenAsins = new Set();
+    const uniqueGummies = allGummies.filter(p => {
+      if (seenAsins.has(p.asin)) return false;
+      seenAsins.add(p.asin); return true;
+    });
+
+    // Filter out already-scraped
+    const toScrape = uniqueGummies.filter(p => !alreadyScraped.has(p.asin));
+    const skipped  = uniqueGummies.length - toScrape.length;
+
+    console.log(`\nTotal gummies: ${uniqueGummies.length} unique | ${skipped} already in DB | ${toScrape.length} to scrape`);
+
+    return { browser, context, toScrape, skipped };
+  } catch (err) {
+    await captureFailureArtifact(page, `p1-attempt${attemptNum}`);
+    try { await browser.close(); } catch (_) {}
+    throw err;
   }
+}
 
-  // Deduplicate
-  const seenAsins = new Set();
-  const uniqueGummies = allGummies.filter(p => {
-    if (seenAsins.has(p.asin)) return false;
-    seenAsins.add(p.asin); return true;
-  });
-
-  // Filter out already-scraped
-  const toScrape = uniqueGummies.filter(p => !alreadyScraped.has(p.asin));
-  const skipped  = uniqueGummies.length - toScrape.length;
-
-  console.log(`\nTotal gummies: ${uniqueGummies.length} unique | ${skipped} already in DB | ${toScrape.length} to scrape`);
-
+// ── Detail scrape + save (shared by every successful Playwright gather) ──
+async function runDetailScrapeAndSave(context, toScrape, skipped) {
   if (!toScrape.length) {
     console.log('✅ All products already scraped. Nothing to do.');
-    await browser.close();
     return;
   }
 
-  // ── Step 4: Scrape each product detail page ───────────────────
   let saved = 0;
   for (let i = 0; i < toScrape.length; i++) {
     const item = toScrape[i];
@@ -512,7 +617,51 @@ async function main() {
 
   await saveCookies(context);
   console.log(`\n✅ Done. ${saved}/${toScrape.length} new products saved. (${skipped} skipped — already in DB)`);
-  await browser.close();
+}
+
+// ── Main orchestrator ────────────────────────────────────────────
+// Playwright first (3 attempts, existing anti-detection behavior). On a
+// bot-wall failure across all 3 attempts, fall back to Bright Data IF a real
+// (non-placeholder) BRIGHTDATA_API_KEY/BRIGHTDATA key is present.
+async function main() {
+  console.log(`\n→ Registering keyword "${KEYWORD_LABEL}" in dashboard...`);
+  await ensureKeyword(KEYWORD_LABEL);
+
+  const alreadyScraped = await getAlreadyScraped(KEYWORD_LABEL);
+  console.log(`  ✓ Already scraped: ${alreadyScraped.size} products (will skip these)`);
+
+  let gathered = null;
+  let lastErr = null;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      gathered = await attemptPlaywrightGather(attempt, alreadyScraped);
+      break;
+    } catch (err) {
+      lastErr = err;
+      console.error(`  ✗ Playwright attempt ${attempt}/3 failed: ${err.message?.slice(0, 200)}`);
+      if (attempt < 3) await sleep(rand(5000, 10000));
+    }
+  }
+
+  if (gathered) {
+    try {
+      await runDetailScrapeAndSave(gathered.context, gathered.toScrape, gathered.skipped);
+    } finally {
+      try { await saveCookies(gathered.context); } catch (_) {}
+      try { await gathered.browser.close(); } catch (_) {}
+    }
+    return;
+  }
+
+  console.error('\n❌ All 3 Playwright attempts failed — see FAILURE ARTIFACT logs above for bot-wall evidence.');
+
+  if (brightData.isBrightDataConfigured()) {
+    await runBrightDataFallback(alreadyScraped);
+    return;
+  }
+
+  console.error('  Bright Data fallback NOT engaged — BRIGHTDATA_API_KEY/BRIGHTDATA is unset or still a placeholder.');
+  throw lastErr || new Error('Playwright scrape failed and Bright Data is not configured');
 }
 
 main().catch(err => { console.error('Fatal:', err.message); process.exit(1); });

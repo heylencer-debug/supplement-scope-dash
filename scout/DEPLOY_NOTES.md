@@ -1,5 +1,134 @@
 # Scout pipeline — Cloud Run Job deploy notes
 
+## 2026-08-27 update: Bright Data fallback wired for P1 bot-wall recovery
+
+**Trigger**: the first real end-to-end Cloud Run execution (job
+`dovive-scout-s2zjx`, keyword "magnesium glycinate gummies") failed in Phase 1
+(`human-bsr.js`) — homepage loaded, search box found, but
+`elementHandle.scrollIntoViewIfNeeded` timed out (element never became
+visible) across all 3 retry attempts, so no products were ever written and
+the pipeline correctly failed downstream with `Verifier FAIL: category not
+resolved`. Working hypothesis going in: Amazon bot-walls Cloud Run's
+datacenter egress IPs after the search request (Google Cloud IPs read as
+datacenter, not residential, to Amazon's bot detection) — same risk flagged
+in the "Playwright vs Amazon IP blocks" section below, now hit for real.
+**Not re-confirmed this session** — diagnosis is still the working hypothesis
+from the timeout signature; the job was NOT re-run (Bright Data key is still
+a placeholder, see below), so no fresh failure-artifact evidence (screenshot/
+page-content bot-wall markers) exists yet. That evidence will show up in
+Cloud Run logs automatically the next time P1 fails, now that the logging
+below ships.
+
+**1. Failure-artifact logging (`scout/human-bsr.js`)** — on any Playwright
+gather failure, `captureFailureArtifact(page, label)` now logs: matched
+bot-wall markers (grepped from `page.content()` against a list including
+"enter the characters", "automated access", "captcha", "robot check", "sorry,
+we just need to make sure", "api-services-support@amazon.com"), a 2KB content
+snippet, page title/URL, and saves a screenshot to
+`scout/output/failure-artifacts/p1-attempt<N>-<ts>.png` (local disk — no
+cloud storage wiring, logging to Cloud Run stdout is the minimum bar per
+task scope). Fires from `attemptPlaywrightGather()`'s catch block before the
+browser closes.
+
+**2. `scout/bright-data-amazon.js` (new file)** — Node/CommonJS port of
+`~/getnoodle/supabase/functions/bright-data-amazon-product/index.ts`'s
+keyword-search + hydration logic (that function's Deno-only bits — `Deno.serve`,
+CORS headers, JWT auth lockdown, `chargeUserOrLog` billing — are irrelevant
+here and were dropped; the scrape/normalize logic is ported close to 1:1).
+Exports `isBrightDataConfigured()`, `getApiKey()`,
+`searchAmazonByKeyword(keyword, { locale, limit, pages })`. Two-call flow,
+same as getnoodle: (a) `SEARCH_DATASET` (`gd_lwdb4vjm1ehb499uxs`) for keyword
+discovery → ASINs in Amazon relevance order, (b) `PRODUCTS_DATASET`
+(`gd_l7q7dkf244hwjntr0`) to hydrate each ASIN to full product data (images,
+bullets/features, specs, rating, price, bsRank). getnoodle does NOT have a
+third/separate call for images/bullets — the Products dataset's own hydrate
+response carries those fields, so this port does the same (no extra dataset
+call invented). Reads the key via
+`process.env.BRIGHTDATA_API_KEY || process.env.BRIGHTDATA` so both secret
+names resolve. `isBrightDataConfigured()` returns false for unset AND for any
+value still matching `/^REPLACE_ME/i` (the placeholder pattern used below),
+so the fallback never fires against a fake key.
+
+**3. Fallback wiring in `scout/human-bsr.js`** — `main()` restructured:
+  - `attemptPlaywrightGather(attemptNum, alreadyScraped)` now wraps the
+    existing homepage→search→paginate→collect-ASINs flow (unchanged
+    anti-detection behavior — UA rotation, cookie persistence, human scroll,
+    CAPTCHA detection) in a try/catch. On failure it calls
+    `captureFailureArtifact()` then closes the browser and re-throws.
+  - `main()` retries this 3x (same retry count as before, now explicit
+    rather than implicit inside the old monolithic function), sleeping
+    5-10s between attempts.
+  - `runDetailScrapeAndSave(context, toScrape, skipped)` — the old Step 4
+    per-product detail scrape + `dovive_research`/`dovive_history` upsert +
+    DASH sync, extracted unchanged so both the Playwright success path and
+    (implicitly, via its own save loop) the Bright Data path share the same
+    `upsertProducts()`/`syncProductToDash()` calls.
+  - If all 3 Playwright attempts fail AND `brightData.isBrightDataConfigured()`
+    is true, `runBrightDataFallback(alreadyScraped)` runs: calls
+    `ensureKeyword()` (same `dovive_keywords` upsert as the Playwright path),
+    `searchAmazonByKeyword(KEYWORD_LABEL, { limit: 40, pages: 3 })`, maps each
+    normalized product to the exact `dovive_research` column set (`asin`,
+    `keyword`, `title`, `brand`, `bullet_points`, `specs`, `images`,
+    `main_image`, `bsr`, `rank_position`, `rating`, `review_count`, `price`,
+    `category`, `is_sponsored`, `source: 'bright-data-fallback-v1'`,
+    `raw_json: <full raw Bright Data record>`), then calls the SAME
+    `upsertProducts()` + `syncProductToDash()` functions the Playwright path
+    uses. **No downstream phase (P2+) needs any change** — they only ever
+    read `dovive_research`/`dovive_history` rows and don't know which scrape
+    method wrote them.
+  - If all 3 Playwright attempts fail AND Bright Data is not configured
+    (unset or placeholder), behavior is unchanged from before: the script
+    throws and exits non-zero, same as today.
+
+**4. Schema — `raw_json` column added to `dovive_research`**
+(`scout/migrations/004_consolidated_cloud.sql`): added to the `CREATE TABLE`
+definition plus a defensive `ALTER TABLE dovive_research ADD COLUMN IF NOT
+EXISTS raw_json jsonb;` right after it (idempotent — safe to re-run against a
+DB that already has the table without this column). **Still NOT applied** —
+same DDL policy as always (dashboard SQL editor only, see the "Still NOT
+applied" section further down). The Bright Data fallback path writes
+`raw_json`; until 004 is (re-)run with this column, a live fallback save
+would 400 on that field — not a concern yet since Bright Data hasn't been
+exercised end-to-end (placeholder key, job not re-run this session).
+
+**5. GCP Secret Manager — `scout-brightdata-key`** created in project
+`noodle-worker` (same pattern as `scout-keepa-key`), currently holds
+`REPLACE_ME_WITH_REAL_BRIGHTDATA_KEY`. Default compute service account
+(`557092350372-compute@developer.gserviceaccount.com`) granted
+`roles/secretmanager.secretAccessor`. `dovive-scout` Cloud Run Job updated
+with `--update-secrets=BRIGHTDATA_API_KEY=scout-brightdata-key:latest` — this
+is now the 8th pipeline secret bound to the Job. **User action required** —
+the real key already exists as the Dovive Supabase project's edge function
+secret `BRIGHTDATA` (not readable from this session); paste it into GCP
+Secret Manager the same way the Keepa key placeholder gets replaced:
+```bash
+gcloud secrets versions add scout-brightdata-key --project=noodle-worker --data-file=-
+```
+(paste the real Bright Data key, then Ctrl-D). No Cloud Run Job update needed
+after that — it always reads `:latest`.
+
+**6. Image rebuilt + Cloud Run Job updated** — `gcloud builds submit` (per
+the standing "no local Docker" note below) rebuilt
+`us-central1-docker.pkg.dev/noodle-worker/dovive-scout/worker:latest` with
+`bright-data-amazon.js` + the `human-bsr.js` changes baked in (build ID
+`cd714ca7-c36e-42fb-8f8a-3151e8bf142b`, new image digest
+`sha256:979e0905db8d72ac208b445108e0571865167c1e3d4a1cfe9ed82fe1cfd24425`),
+pushed, and `gcloud run jobs update dovive-scout --image ...:latest` run to
+point the Job at it. Shipped regardless of the placeholder key — the code is
+live in the image; the fallback simply won't engage (falls straight through
+to the pre-existing throw/exit-1 behavior) until the real key is pasted in.
+
+**Per task scope: the cloud job was NOT re-run this session.** Running it now
+with a placeholder Bright Data key would either fail identically (if Amazon
+still bot-walls) with no new information, or silently prove nothing about the
+fallback path. Next real test, once the user pastes the real key:
+```bash
+gcloud run jobs execute dovive-scout --region=us-central1 --project=noodle-worker --wait
+```
+watch for either "🚨 FAILURE ARTIFACT" log lines confirming the bot-wall
+diagnosis, or (if Playwright succeeds this time) no fallback engagement at
+all — both are useful signal.
+
 ## 2026-08-27 update: Apify dropped; Jungle Scout KEPT (reversed mid-session)
 
 User decision, final: **Keepa, Jungle Scout, Bright Data (fallback), and this

@@ -123,9 +123,17 @@ CREATE TABLE IF NOT EXISTS dovive_research (
   is_sponsored boolean DEFAULT false,
   url text,
   source text,
+  raw_json jsonb,
   scraped_at timestamptz DEFAULT now(),
   UNIQUE(asin, keyword)
 );
+-- raw_json (2026-08-27): full raw response payload from whichever scrape
+-- method wrote this row (Bright Data fallback path in scout/bright-data-amazon.js
+-- via scout/human-bsr.js). NULL for rows written by the Playwright path
+-- (which already has enough structured columns). ADD COLUMN IF NOT EXISTS so
+-- this is safe to re-run against a DB that already has the table from before
+-- this column existed.
+ALTER TABLE dovive_research ADD COLUMN IF NOT EXISTS raw_json jsonb;
 CREATE INDEX IF NOT EXISTS idx_dovive_research_keyword ON dovive_research(keyword);
 CREATE INDEX IF NOT EXISTS idx_dovive_research_asin ON dovive_research(asin);
 

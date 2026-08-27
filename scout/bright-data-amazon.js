@@ -18,6 +18,12 @@ const BD_SCRAPE_BASE = 'https://api.brightdata.com/datasets/v3/scrape';
 // Bright Data dataset IDs — same as getnoodle's bright-data-amazon-product fn.
 const PRODUCTS_DATASET = 'gd_l7q7dkf244hwjntr0';   // Products by URL (sync /scrape, full media)
 const SEARCH_DATASET   = 'gd_lwdb4vjm1ehb499uxs';  // Products Search by URL (sync /scrape, listings)
+const REVIEWS_DATASET  = 'gd_le8e811kzy4ggddlq';   // Amazon Reviews — same as getnoodle's
+                                                    // bright-data-amazon-reviews fn. That fn only
+                                                    // ever uses the async /trigger endpoint (not
+                                                    // /scrape) because the reviews dataset doesn't
+                                                    // reliably answer sync — mirrored below.
+const TRIGGER_BASE = 'https://api.brightdata.com/datasets/v3/trigger';
 
 function getApiKey() {
   return process.env.BRIGHTDATA_API_KEY || process.env.BRIGHTDATA || null;
@@ -253,8 +259,107 @@ async function searchAmazonByKeyword(keyword, opts = {}) {
   return products;
 }
 
+/**
+ * Trigger an async Bright Data collection (raw array body, per the reviews
+ * dataset's documented contract — NOT the {input:[...]} shape /scrape uses)
+ * and poll to completion. Reuses bdAwaitSnapshot's polling loop.
+ */
+async function bdTriggerAndAwait(datasetId, inputArray, apiKey, deadlineMs = 180000) {
+  const url = `${TRIGGER_BASE}?dataset_id=${datasetId}&include_errors=true`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
+  let text = '';
+  let ok = false;
+  let status = 0;
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(inputArray),
+      signal: controller.signal,
+    });
+    status = res.status;
+    ok = res.ok;
+    text = await res.text();
+  } finally {
+    clearTimeout(timeoutId);
+  }
+  if (!ok) throw new Error(`Bright Data /trigger failed [${status}]: ${text.slice(0, 400)}`);
+  let snapshotId;
+  try {
+    const parsed = JSON.parse(text);
+    snapshotId = parsed?.snapshot_id || parsed?.snapshotId || parsed?.id;
+  } catch (_) { /* fall through to error below */ }
+  if (!snapshotId) throw new Error(`Bright Data /trigger returned no snapshot_id: ${text.slice(0, 200)}`);
+  return bdAwaitSnapshot(String(snapshotId), apiKey, deadlineMs);
+}
+
+function reviewsProductUrl(asin, locale) {
+  const tld = locale === 'UK' ? 'co.uk' : 'com';
+  // Per the reviews dataset's own docs (and getnoodle's bright-data-amazon-reviews fn):
+  // /product-reviews/ URLs return 0 records — /dp/{asin} is the one that works.
+  return `https://www.amazon.${tld}/dp/${asin}/`;
+}
+
+function normaliseReview(r, asinFallback) {
+  const rating = Number(r?.rating ?? r?.stars ?? r?.review_rating);
+  const asin = (r?.asin && /^[A-Z0-9]{10}$/i.test(String(r.asin)))
+    ? String(r.asin).toUpperCase()
+    : (extractAsin(String(r?.url || r?.input?.url || r?.product_url || '')) || asinFallback);
+  return {
+    asin,
+    rating: Number.isFinite(rating) ? rating : null,
+    title: String(r?.review_title ?? r?.title ?? '').trim() || null,
+    body: String(r?.review_text ?? r?.body ?? r?.text ?? r?.content ?? '').trim() || null,
+    date_text: r?.review_date ?? r?.date ?? r?.timestamp ?? null,
+    reviewer_name: String(r?.reviewer_name ?? r?.author ?? r?.user_name ?? 'Anonymous').trim(),
+    verified_purchase: Boolean(r?.verified_purchase ?? r?.verified ?? false),
+    helpful_votes: Number(r?.helpful_count ?? r?.helpful_votes ?? r?.helpful ?? 0) || 0,
+    raw: r,
+  };
+}
+
+/**
+ * Fetch reviews for a batch of ASINs via Bright Data (Phase 3 fallback when
+ * Amazon bot-walls Playwright's own /product-reviews/{asin} scrape from a
+ * Cloud Run IP). Bright Data's own batch limit is 20 ASINs per /trigger call
+ * (see getnoodle's bright-data-amazon-reviews fn) — caller is responsible for
+ * chunking beyond that.
+ *
+ * @param {string[]} asins
+ * @param {{ locale?: string }} opts
+ * @returns {Promise<Map<string, object[]>>} asin -> array of normalised reviews
+ */
+async function fetchAmazonReviews(asins, opts = {}) {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error('BRIGHTDATA_API_KEY / BRIGHTDATA not set');
+  if (!asins.length) return new Map();
+  if (asins.length > 20) throw new Error('Bright Data reviews batch limit is 20 ASINs per call — chunk upstream.');
+
+  const locale = String(opts.locale || 'US').toUpperCase();
+  const input = asins.map((a) => ({ url: reviewsProductUrl(a, locale) }));
+  const records = await bdTriggerAndAwait(REVIEWS_DATASET, input, apiKey);
+  console.log(`[bright-data] reviews for ${asins.length} ASIN(s) → ${records.length} raw records`);
+
+  const byAsin = new Map(asins.map((a) => [a, []]));
+  for (const r of records) {
+    if (!r || typeof r !== 'object' || r.error) continue;
+    const norm = normaliseReview(r, null);
+    if (!norm.asin || !byAsin.has(norm.asin)) continue;
+    // Skip pure block-signal artifacts (no rating, no body, no title).
+    if (norm.rating == null && !norm.body && !norm.title) continue;
+    byAsin.get(norm.asin).push(norm);
+  }
+  return byAsin;
+}
+
 module.exports = {
   isBrightDataConfigured,
   getApiKey,
   searchAmazonByKeyword,
+  fetchAmazonReviews,
 };

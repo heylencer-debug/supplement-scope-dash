@@ -4,6 +4,23 @@
  * Pulls product images from dovive_research → sends to Claude Haiku 4.5 Vision (via OpenRouter)
  * → extracts structured supplement facts → saves to dovive_ocr table
  *
+ * Image source note (2026-08-28): this already reads dovive_research.images,
+ * which the Bright Data fallback (bright-data-amazon.js normaliseProduct)
+ * populates the same as the Playwright path — the full Amazon PDP image
+ * gallery, source-agnostic. There is no separate "supplement facts label"
+ * scrape to wire; whatever gallery images Bright Data/Playwright captured is
+ * what OCR has to work with, same as before.
+ *
+ * REAL LIMITATION: neither Bright Data's Products dataset nor Amazon itself
+ * labels which gallery image *is* the facts panel — it's just "image #N" in
+ * whatever order the listing has it, commonly slots 2-7 for supplement
+ * products but not guaranteed. Scanning more images per product raises the
+ * odds of catching it (bumped 5→8 below) at the cost of more OCR calls; there
+ * is no way to guarantee 100% capture without a dedicated per-listing crawl
+ * Bright Data doesn't offer for this dataset. OCR already picks whichever
+ * image comes back `has_supplement_facts: true`, so this only affects recall
+ * on listings where the facts panel is the 6th-8th photo.
+ *
  * Usage: node ocr-phase4.js "<keyword>" [--test]
  */
 
@@ -172,7 +189,7 @@ async function main() {
     let bestImageIdx = 0;
     let bestImageUrl = images[0];
 
-    for (let imgIdx = 0; imgIdx < Math.min(images.length, 5); imgIdx++) {
+    for (let imgIdx = 0; imgIdx < Math.min(images.length, 8); imgIdx++) {
       const imageUrl = images[imgIdx];
       // Skip invalid URLs
       if (!imageUrl || !imageUrl.startsWith('http')) {

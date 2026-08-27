@@ -14,12 +14,13 @@
  * Same CLI contract as apify-reviews.js (positional keyword arg) so
  * run-pipeline.js only needed a one-line script-name swap for Phase 3.
  *
- * Fallback note: if Amazon blocks these requests from a Cloud Run IP
- * (see scout/DEPLOY_NOTES.md — datacenter IPs get blocked more than
- * residential ones), the documented next step is Bright Data's Amazon
- * reviews dataset, not more stealth tweaks here. Not built yet — this file
- * is the "minimum to keep the pipeline functional" version; a full Bright
- * Data reviews port is a follow-up if this doesn't get through reliably.
+ * Bright Data fallback (2026-08-28): when Amazon bot-walls these requests
+ * from a Cloud Run datacenter IP — same root cause confirmed on P1 — any
+ * ASIN that Playwright got zero reviews for is retried via Bright Data's
+ * Amazon Reviews dataset (bright-data-amazon.js:fetchAmazonReviews),
+ * mirroring the P1 pattern in human-bsr.js (Playwright first, auto-fallback
+ * when BRIGHTDATA_API_KEY/BRIGHTDATA is configured and real results are
+ * missing). Batched 20 ASINs per Bright Data call (its own hard limit).
  *
  * Usage:
  *   node playwright-reviews.js                          — all ASINs
@@ -31,6 +32,7 @@ const { chromium } = require('playwright-extra');
 const stealth = require('puppeteer-extra-plugin-stealth');
 chromium.use(stealth());
 const fetch = require('node-fetch');
+const brightData = require('./bright-data-amazon');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
@@ -57,7 +59,11 @@ async function isBlocked(page) {
 
 // ── Fetch ASINs from Supabase ─────────────────────────────────────────────────
 async function getAsins() {
-  let url = `${SUPABASE_URL}/rest/v1/dovive_research?select=asin,keyword,title&order=scraped_at.desc`;
+  // Order by BSR rank (nulls last) instead of scraped_at — with MAX_ASINS
+  // capping the batch, this guarantees the top-ranked products (the ones
+  // P4/P11's "top 20 BSR" gates care about) get reviews first regardless of
+  // how many total products the category has.
+  let url = `${SUPABASE_URL}/rest/v1/dovive_research?select=asin,keyword,title,bsr,rank_position&order=rank_position.asc.nullslast,bsr.asc.nullslast`;
   if (KEYWORD_FILTER) url += `&keyword=eq.${encodeURIComponent(KEYWORD_FILTER)}`;
 
   const res = await fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } });
@@ -194,6 +200,38 @@ async function saveReviewsWrapper(asin, reviews) {
   await saveReviews(asin, _keywordForSave, reviews);
 }
 
+// ── Bright Data fallback (bot-wall recovery, mirrors P1's pattern) ────────────
+async function runBrightDataFallback(zeroReviewRows) {
+  if (!zeroReviewRows.length) return { saved: 0, asinsWithReviews: 0 };
+  console.log(`\n🛰️  Bright Data reviews fallback engaged for ${zeroReviewRows.length} ASIN(s) that got 0 reviews via Playwright...`);
+
+  let totalSaved = 0, asinsWithReviews = 0;
+  const CHUNK = 20; // Bright Data reviews dataset hard limit per /trigger call
+  for (let i = 0; i < zeroReviewRows.length; i += CHUNK) {
+    const chunk = zeroReviewRows.slice(i, i + CHUNK);
+    const asins = chunk.map(r => r.asin);
+    try {
+      const byAsin = await brightData.fetchAmazonReviews(asins);
+      for (const row of chunk) {
+        const reviews = byAsin.get(row.asin) || [];
+        if (!reviews.length) continue;
+        try {
+          const saved = await saveReviews(row.asin, row.keyword || KEYWORD_FILTER, reviews);
+          totalSaved += saved;
+          asinsWithReviews++;
+          console.log(`  ✓ [${row.asin}] ${saved} reviews saved via Bright Data`);
+        } catch (err) {
+          console.error(`  → Save failed for ${row.asin}: ${err.message}`);
+        }
+      }
+    } catch (err) {
+      console.error(`  ✗ Bright Data batch failed (${asins.length} ASINs): ${err.message}`);
+    }
+  }
+  console.log(`\n✅ Bright Data reviews fallback done. ${asinsWithReviews}/${zeroReviewRows.length} ASINs got reviews (${totalSaved} total).`);
+  return { saved: totalSaved, asinsWithReviews };
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 async function main() {
   console.log(`\n💬 Phase 3 — playwright-reviews.js`);
@@ -221,6 +259,7 @@ async function main() {
   });
 
   let done = 0, failed = 0, totalReviews = 0;
+  const zeroReviewRows = [];
 
   for (const row of toScrape) {
     _keywordForSave = row.keyword || KEYWORD_FILTER;
@@ -230,21 +269,31 @@ async function main() {
       totalReviews += count;
       done++;
       console.log(`  ✓ ${count} reviews saved`);
+      if (count === 0) zeroReviewRows.push(row);
     } catch (err) {
       failed++;
       console.error(`  ✗ ${err.message}`);
+      zeroReviewRows.push(row);
     }
     await sleep(rand(2000, 5000));
   }
 
   await browser.close();
 
-  console.log(`\n✅ Done — ASINs: ${done} ok / ${failed} failed | Total reviews: ${totalReviews}`);
-  if (failed > toScrape.length / 2) {
-    console.warn('⚠ More than half the ASINs failed — if these look like CAPTCHA/block pages,');
+  console.log(`\n✅ Playwright pass done — ASINs: ${done} ok / ${failed} failed | Total reviews: ${totalReviews}`);
+  if (zeroReviewRows.length > toScrape.length / 2) {
+    console.warn('⚠ More than half the ASINs got 0 reviews — if these look like CAPTCHA/block pages,');
     console.warn('  this is likely a datacenter-IP block (see scout/DEPLOY_NOTES.md).');
-    console.warn('  Bright Data\'s Amazon reviews dataset is the documented fallback, not more stealth tweaks.');
   }
+
+  if (zeroReviewRows.length && brightData.isBrightDataConfigured()) {
+    const { saved } = await runBrightDataFallback(zeroReviewRows);
+    totalReviews += saved;
+  } else if (zeroReviewRows.length) {
+    console.error(`  Bright Data fallback NOT engaged for ${zeroReviewRows.length} zero-review ASIN(s) — BRIGHTDATA_API_KEY/BRIGHTDATA is unset or still a placeholder.`);
+  }
+
+  console.log(`\n🏁 Phase 3 complete — total reviews saved (Playwright + Bright Data): ${totalReviews}`);
 }
 
 main().catch(err => { console.error('Fatal:', err); process.exit(1); });

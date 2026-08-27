@@ -239,8 +239,33 @@ async function checkPhaseStatus(phaseNum, categoryId) {
     }
     case 3: {
       const { count } = await DASH.from('products').select('*', { count: 'exact', head: true }).eq('category_id', categoryId).not('review_analysis', 'is', null);
-      // Require ≥50% coverage before considering P3 done (avoid skipping on partial Apify runs)
-      return { done: count >= total * 0.5, count, total, msg: `${count}/${total} have review analysis` };
+
+      // Directive (2026-08-28): playwright-reviews.js/run-pipeline caps review
+      // scraping to REVIEWS_MAX_ASINS (default 30, Bright Data cost-capped
+      // fallback batches of 20) to control Cloud Run runtime + Bright Data
+      // spend — it's deliberately NOT trying to cover every product in the
+      // category. A flat 50%-of-total gate is unrealistic once `total`
+      // exceeds ~60 products (the cap can never reach it), so — same as P4 —
+      // top-20-BSR coverage is also accepted. getAsins() in
+      // playwright-reviews.js orders by rank_position/bsr ascending so the
+      // capped batch IS the top-BSR set, making this a real completion
+      // signal, not a loophole.
+      const { data: top20 } = await DASH.from('products')
+        .select('review_analysis')
+        .eq('category_id', categoryId)
+        .not('bsr_current', 'is', null)
+        .order('bsr_current', { ascending: true })
+        .limit(20);
+      const top20Done = (top20 || []).filter(p => p.review_analysis != null).length;
+
+      const doneByCoverage = count >= total * 0.5;
+      const doneByTop20 = top20Done >= 20;
+      return {
+        done: doneByCoverage || doneByTop20,
+        count,
+        total,
+        msg: `${count}/${total} have review analysis | Top20: ${top20Done}/20`
+      };
     }
     case 4: {
       // Strict P4 quality gate: only count rows with actual nutrients extracted.
@@ -401,8 +426,9 @@ async function runFinalVerifier(categoryId) {
   const p6 = await q('marketing_analysis');
   const p8 = (await DASH.from('products').select('*', { count: 'exact', head: true }).eq('category_id', categoryId).filter('marketing_analysis->packaging_intelligence', 'not.is', null)).count || 0;
 
-  const { data: top20 } = await DASH.from('products').select('nutrients_count').eq('category_id', categoryId).not('bsr_current', 'is', null).order('bsr_current', { ascending: true }).limit(20);
+  const { data: top20 } = await DASH.from('products').select('nutrients_count, review_analysis').eq('category_id', categoryId).not('bsr_current', 'is', null).order('bsr_current', { ascending: true }).limit(20);
   const top20P4 = (top20 || []).filter(x => (x.nutrients_count || 0) > 0).length;
+  const top20P3 = (top20 || []).filter(x => x.review_analysis != null).length;
 
   const { data: fb } = await DASH.from('formula_briefs').select('ingredients').eq('category_id', categoryId).single();
   const p7 = !!(fb?.ingredients?.market_intelligence?.ai_market_analysis);
@@ -413,7 +439,7 @@ async function runFinalVerifier(categoryId) {
 
   const failures = [];
   if (!(p2 >= total * 0.9)) failures.push(`P2 ${p2}/${total} < 90%`);
-  if (!(p3 >= total * 0.5)) failures.push(`P3 ${p3}/${total} < 50%`);
+  if (!((p3 >= total * 0.5) || (top20P3 >= 20))) failures.push(`P3 ${p3}/${total} < 50% and Top20 ${top20P3}/20`);
   if (!((p4 >= total * 0.8) || (top20P4 === 20))) failures.push(`P4 ${p4}/${total} and Top20 ${top20P4}/20`);
   if (!(p5 >= 20)) failures.push(`P5 ${p5}/20`);
   if (!(p6 >= total * 0.9)) failures.push(`P6 ${p6}/${total} < 90%`);
@@ -424,7 +450,7 @@ async function runFinalVerifier(categoryId) {
   if (!p11) failures.push('P11 competitive_benchmarking missing');
   if (!p12) failures.push('P12 fda_compliance missing');
 
-  return { pass: failures.length === 0, failures, metrics: { total, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, top20P4 } };
+  return { pass: failures.length === 0, failures, metrics: { total, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, top20P3, top20P4 } };
 }
 
 async function run() {

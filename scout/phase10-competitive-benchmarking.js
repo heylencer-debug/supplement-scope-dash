@@ -71,7 +71,7 @@ async function callClaudeSonnet(prompt, maxTokens = 12000) {
       throw new Error(`Claude Sonnet error ${res.status}: ${errText.slice(0, 200)}`);
     }
     let output = '';
-    let promptTokens = 0, completionTokens = 0;
+    let promptTokens = 0, completionTokens = 0, finishReason = null;
     const text = await res.text();
     for (const line of text.split('\n')) {
       if (!line.startsWith('data: ')) continue;
@@ -82,14 +82,20 @@ async function callClaudeSonnet(prompt, maxTokens = 12000) {
         if (j.error) throw new Error(`Claude Sonnet error: ${j.error.message || JSON.stringify(j.error)}`);
         const delta = j.choices?.[0]?.delta?.content;
         if (delta) output += delta;
+        if (j.choices?.[0]?.finish_reason) finishReason = j.choices[0].finish_reason;
         if (j.usage) { promptTokens = j.usage.prompt_tokens || 0; completionTokens = j.usage.completion_tokens || 0; }
       } catch (e) {
         if (e.message.startsWith('Claude Sonnet error')) throw e;
       }
     }
-    if (promptTokens || completionTokens) console.log(`  Tokens: ${promptTokens}→${completionTokens}`);
+    if (promptTokens || completionTokens) console.log(`  Tokens: ${promptTokens}→${completionTokens}${finishReason ? ` (finish_reason: ${finishReason})` : ''}`);
     console.log(`  ✅ Claude Sonnet done (${Math.round((Date.now()-start)/1000)}s, ${Math.round(output.length/1000)}k chars)`);
-    return output || null;
+    if (!output) {
+      console.warn(`  ⚠ Claude Sonnet returned EMPTY output (finish_reason: ${finishReason || 'unknown'}, completion_tokens: ${completionTokens}) — likely max_tokens too low or all budget consumed before content. NOT coercing to null silently.`);
+    }
+    // Never silently coerce empty-but-real responses to null — an empty string is diagnosable,
+    // null looks identical to "never called". Caller decides how to handle empties.
+    return output;
   } finally {
     clearTimeout(timeout);
   }
@@ -122,7 +128,7 @@ async function callClaudeOpus(prompt, maxTokens = 12000) {
       throw new Error(`Claude Opus error ${res.status}: ${errText.slice(0, 200)}`);
     }
     let output = '';
-    let promptTokens = 0, completionTokens = 0;
+    let promptTokens = 0, completionTokens = 0, finishReason = null;
     const text = await res.text();
     for (const line of text.split('\n')) {
       if (!line.startsWith('data: ')) continue;
@@ -133,14 +139,18 @@ async function callClaudeOpus(prompt, maxTokens = 12000) {
         if (j.error) throw new Error(`Claude Opus error: ${j.error.message || JSON.stringify(j.error)}`);
         const delta = j.choices?.[0]?.delta?.content;
         if (delta) output += delta;
+        if (j.choices?.[0]?.finish_reason) finishReason = j.choices[0].finish_reason;
         if (j.usage) { promptTokens = j.usage.prompt_tokens || 0; completionTokens = j.usage.completion_tokens || 0; }
       } catch (e) {
         if (e.message.startsWith('Claude Opus error')) throw e;
       }
     }
-    if (promptTokens || completionTokens) console.log(`  Tokens: ${promptTokens}→${completionTokens}`);
+    if (promptTokens || completionTokens) console.log(`  Tokens: ${promptTokens}→${completionTokens}${finishReason ? ` (finish_reason: ${finishReason})` : ''}`);
     console.log(`  ✅ Claude Opus done (${Math.round((Date.now()-start)/1000)}s, ${Math.round(output.length/1000)}k chars)`);
-    return output || null;
+    if (!output) {
+      console.warn(`  ⚠ Claude Opus returned EMPTY output (finish_reason: ${finishReason || 'unknown'}, completion_tokens: ${completionTokens})`);
+    }
+    return output;
   } finally {
     clearTimeout(timeout);
   }
@@ -422,16 +432,40 @@ async function run() {
   }
 
   // ── Call 1: Claude Sonnet drafts the benchmarking ─────────────────────────
+  // ROOT CAUSE (2026-08-28): this call used max_tokens=10000, too low for a full
+  // competitor-by-competitor draft across up to 50 products — the model's completion
+  // budget ran out before/without producing content, callClaudeSonnet returned an
+  // empty string which got coerced to `null` (`output || null`) and persisted as
+  // literal null in sonnet_draft/formula_score, even though the downstream Opus
+  // validation call (smaller task, smaller budget) succeeded fine. Same class of bug
+  // as the P9 Call2 truncation fix (6000→16000 tokens, commit 59cf9a3). Fix: raise the
+  // budget to 16000 (matching P9's proven ceiling) and retry once on empty output
+  // before giving up — never let the raw draft silently end up null.
   console.log(`\nCall 1: Claude Sonnet 4.6 drafting ingredient comparison (${withFormula.length} competitors with OCR data)...`);
   const sonnetPrompt = buildSonnetDraftPrompt(adjustedFormula, withFormula, KEYWORD);
   console.log(`  Prompt: ${Math.round(sonnetPrompt.length / 1000)}k chars`);
-  const sonnetDraft = await callClaudeSonnet(sonnetPrompt, 10000);
+  let sonnetDraft = await callClaudeSonnet(sonnetPrompt, 16000);
+  if (!sonnetDraft) {
+    console.warn(`  ⚠ Sonnet draft came back empty — retrying once with a larger token budget (20000)...`);
+    sonnetDraft = await callClaudeSonnet(sonnetPrompt, 20000);
+  }
+  if (!sonnetDraft) {
+    console.error(`  ❌ Sonnet draft still empty after retry — persisting explicit error marker instead of null so this is diagnosable, not silently lost.`);
+    sonnetDraft = '[ERROR: Claude Sonnet returned empty output for the competitive benchmarking draft after 2 attempts — check OpenRouter logs / token budget / finish_reason above.]';
+  }
 
   // ── Call 2: Claude Opus validates ─────────────────────────────────────────
   console.log(`\nCall 2: Claude Opus 4.6 validating Sonnet's analysis...`);
   const opusPrompt = buildOpusValidationPrompt(adjustedFormula, withFormula, sonnetDraft, KEYWORD);
   console.log(`  Prompt: ${Math.round(opusPrompt.length / 1000)}k chars`);
-  const opusValidation = await callClaudeOpus(opusPrompt, 8000);
+  let opusValidation = await callClaudeOpus(opusPrompt, 12000);
+  if (!opusValidation) {
+    console.warn(`  ⚠ Opus validation came back empty — retrying once with a larger token budget (16000)...`);
+    opusValidation = await callClaudeOpus(opusPrompt, 16000);
+  }
+  if (!opusValidation) {
+    opusValidation = '[ERROR: Claude Opus returned empty output for the competitive benchmarking validation after 2 attempts — check OpenRouter logs / token budget / finish_reason above.]';
+  }
 
   // ── Parse scores ──────────────────────────────────────────────────────────
   const formulaScore = parseScore(sonnetDraft);

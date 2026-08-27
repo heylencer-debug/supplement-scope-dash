@@ -151,7 +151,8 @@ async function callClaudeOpus(prompt, maxTokens = 12000) {
     }
     if (promptTokens || completionTokens) console.log(`  Tokens: ${promptTokens}→${completionTokens}`);
     console.log(`  ✅ Claude Opus done (${Math.round((Date.now()-start)/1000)}s, ${Math.round(output.length/1000)}k chars)`);
-    return output || null;
+    if (!output) console.warn(`  ⚠ Claude Opus returned EMPTY output — likely max_tokens too low or budget consumed before content.`);
+    return output;
   } finally {
     clearTimeout(timeout);
   }
@@ -202,7 +203,8 @@ async function callClaudeSonnet(prompt, maxTokens = 8000) {
     }
     if (promptTokens || completionTokens) console.log(`  Tokens: ${promptTokens}→${completionTokens}`);
     console.log(`  ✅ Claude Sonnet done (${Math.round((Date.now()-start)/1000)}s, ${Math.round(output.length/1000)}k chars)`);
-    return output || null;
+    if (!output) console.warn(`  ⚠ Claude Sonnet returned EMPTY output — likely max_tokens too low or budget consumed before content.`);
+    return output;
   } finally {
     clearTimeout(timeout);
   }
@@ -587,16 +589,33 @@ async function run() {
   console.log(`  NIH data: ${nihHits} fetched | ${nihMiss} no page | ${nihFail} failed`);
 
   // ── Call 1: Claude Opus primary analysis ──────────────────────────────────
+  // Same class of bug as P9 Call2 / P10(P11) sonnet_draft truncation (2026-08-28):
+  // low max_tokens can leave output empty, which used to be coerced to `null` and
+  // persisted that way. Raised budgets + retry-once + never-null guard applied here too.
   console.log(`\nCall 1: Claude Opus 4.6 primary compliance analysis...`);
   const opusPrompt = buildOpusPrimaryPrompt(adjustedFormula, nihData, KEYWORD);
   console.log(`  Prompt: ${Math.round(opusPrompt.length / 1000)}k chars`);
-  const opusAnalysis = await callClaudeOpus(opusPrompt, 10000);
+  let opusAnalysis = await callClaudeOpus(opusPrompt, 16000);
+  if (!opusAnalysis) {
+    console.warn(`  ⚠ Opus primary analysis came back empty — retrying once with a larger token budget (20000)...`);
+    opusAnalysis = await callClaudeOpus(opusPrompt, 20000);
+  }
+  if (!opusAnalysis) {
+    opusAnalysis = '[ERROR: Claude Opus returned empty output for the FDA compliance primary analysis after 2 attempts — check OpenRouter logs / token budget / finish_reason above.]';
+  }
 
   // ── Call 2: Claude Sonnet validation ──────────────────────────────────────
   console.log(`\nCall 2: Claude Sonnet 4.6 validating Claude Opus findings...`);
   const sonnetPrompt = buildSonnetValidationPrompt(adjustedFormula, nihData, opusAnalysis, KEYWORD);
   console.log(`  Prompt: ${Math.round(sonnetPrompt.length / 1000)}k chars`);
-  const sonnetValidation = await callClaudeSonnet(sonnetPrompt, 6000);
+  let sonnetValidation = await callClaudeSonnet(sonnetPrompt, 12000);
+  if (!sonnetValidation) {
+    console.warn(`  ⚠ Sonnet validation came back empty — retrying once with a larger token budget (16000)...`);
+    sonnetValidation = await callClaudeSonnet(sonnetPrompt, 16000);
+  }
+  if (!sonnetValidation) {
+    sonnetValidation = '[ERROR: Claude Sonnet returned empty output for the FDA compliance validation after 2 attempts — check OpenRouter logs / token budget / finish_reason above.]';
+  }
 
   // ── Parse results ──────────────────────────────────────────────────────────
   const complianceScore  = parseComplianceScore(opusAnalysis);

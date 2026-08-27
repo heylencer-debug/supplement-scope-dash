@@ -107,6 +107,18 @@ async function notify(message) {
   }
 }
 
+// ─── Deliverable-completeness helper (P11/P12 verifier alignment, 2026-08-28) ──
+// A phase's dual-AI output is only "genuinely complete" when it has a real
+// (non-empty, non-error-marker) draft/primary text AND a real validation text.
+// Checking a single arbitrary field (e.g. just `.sonnet_draft`) is brittle —
+// it also doesn't confirm the deliverable is actually usable. This does NOT
+// loosen anything: it still fails when the model text is missing, empty, or
+// is one of the explicit "[ERROR: ...]" placeholders the phases now persist
+// instead of null when a model call comes back empty after retries.
+function isRealModelText(t) {
+  return typeof t === 'string' && t.trim().length > 0 && !t.trim().startsWith('[ERROR:');
+}
+
 // ─── Run a script with live output ───────────────────────────────────────────
 
 function runScript(scriptPath, args = []) {
@@ -388,14 +400,16 @@ async function checkPhaseStatus(phaseNum, categoryId) {
     case 11: {
       // P11 = Competitive Formula Benchmarking (phase10-competitive-benchmarking.js)
       const { data: fb } = await DASH.from('formula_briefs').select('ingredients').eq('category_id', categoryId).single();
-      const hasBenchmarking = !!(fb?.ingredients?.competitive_benchmarking?.sonnet_draft);
-      return { done: hasBenchmarking, count: hasBenchmarking ? 1 : 0, total: 1, msg: hasBenchmarking ? 'Competitive benchmarking exists' : 'Benchmarking not run yet' };
+      const cb = fb?.ingredients?.competitive_benchmarking;
+      const hasBenchmarking = !!cb && isRealModelText(cb.sonnet_draft) && isRealModelText(cb.opus_validation);
+      return { done: hasBenchmarking, count: hasBenchmarking ? 1 : 0, total: 1, msg: hasBenchmarking ? 'Competitive benchmarking exists (draft + validation)' : 'Benchmarking not run yet, or draft/validation empty' };
     }
     case 12: {
       // P12 = FDA Compliance (phase11-fda-compliance.js)
       const { data: fb } = await DASH.from('formula_briefs').select('ingredients').eq('category_id', categoryId).single();
-      const hasCompliance = !!(fb?.ingredients?.fda_compliance?.opus_analysis);
-      return { done: hasCompliance, count: hasCompliance ? 1 : 0, total: 1, msg: hasCompliance ? `FDA compliance exists (score: ${fb.ingredients.fda_compliance.compliance_score}/100)` : 'FDA compliance not run yet' };
+      const fc = fb?.ingredients?.fda_compliance;
+      const hasCompliance = !!fc && isRealModelText(fc.opus_analysis) && isRealModelText(fc.sonnet_validation);
+      return { done: hasCompliance, count: hasCompliance ? 1 : 0, total: 1, msg: hasCompliance ? `FDA compliance exists (score: ${fc.compliance_score}/100)` : 'FDA compliance not run yet, or analysis/validation empty' };
     }
     default: return { done: false, count: 0, total: 0 };
   }
@@ -530,8 +544,13 @@ async function runFinalVerifier(categoryId) {
   const p7 = !!(fb?.ingredients?.market_intelligence?.ai_market_analysis);
   const p9 = !!(fb?.ingredients?.ai_generated_brief);
   const p10 = !!(fb?.ingredients?.qa_report);
-  const p11 = !!(fb?.ingredients?.competitive_benchmarking?.sonnet_draft);
-  const p12 = !!(fb?.ingredients?.fda_compliance?.opus_analysis);
+  // P11/P12 (2026-08-28): check the deliverable is genuinely complete (real
+  // draft/primary text AND real validation text), not one arbitrary
+  // intermediate field — see isRealModelText() above.
+  const cb11 = fb?.ingredients?.competitive_benchmarking;
+  const p11 = !!cb11 && isRealModelText(cb11.sonnet_draft) && isRealModelText(cb11.opus_validation);
+  const fc12 = fb?.ingredients?.fda_compliance;
+  const p12 = !!fc12 && isRealModelText(fc12.opus_analysis) && isRealModelText(fc12.sonnet_validation);
 
   const failures = [];
   if (!(p2 >= runTotal * 0.9)) failures.push(`P2 ${p2}/${runTotal} (this run) < 90%`);

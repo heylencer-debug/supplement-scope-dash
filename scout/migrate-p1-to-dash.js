@@ -76,12 +76,76 @@ async function getOrCreateCategory() {
   return data.id;
 }
 
+/**
+ * 2026-08-28 (stale-duplicate-products cleanup task): resolveCategory()'s
+ * exact search_term match is CASE-SENSITIVE. Over the pipeline's history,
+ * the same conceptual category ("ashwagandha gummies") has been created
+ * multiple times with different casing (e.g. "Ashwagandha Gummies" back in
+ * March vs "ashwagandha gummies" in a later run) — each one is a genuinely
+ * separate `categories` row with its own `id`, so the SAME ASIN can get a
+ * fresh `products` row inserted under the new category id every time the
+ * casing drifts, while its old row (with stale price/title) sits orphaned
+ * under the old category id forever. The dashboard's price aggregation has
+ * no way to tell these apart from real products, so a single old $607
+ * orphan can blow up a category's average price next to real $10-30 rows.
+ * This does NOT rename/merge the duplicate `categories` rows themselves
+ * (that's a separate, riskier cleanup — other phases/tables may reference
+ * those ids) — it only self-heals `products`: on every re-run, before
+ * writing this run's rows, delete any pre-existing `products` rows for the
+ * SAME ASINs sitting under a SIBLING category (same name/search_term,
+ * case-insensitive, different id), so no orphan can survive a re-run.
+ */
+async function findSiblingCategoryIds(categoryId, categoryName) {
+  const normalized = (categoryName || KEYWORD || '').trim().toLowerCase();
+  if (!normalized) return [];
+
+  const [byName, bySearchTerm] = await Promise.all([
+    DASH.from('categories').select('id,name').ilike('name', categoryName || ''),
+    DASH.from('categories').select('id,search_term').ilike('search_term', KEYWORD || ''),
+  ]);
+
+  const siblingIds = new Set();
+  for (const c of (byName.data || [])) {
+    if (c.id !== categoryId && (c.name || '').trim().toLowerCase() === normalized) siblingIds.add(c.id);
+  }
+  for (const c of (bySearchTerm.data || [])) {
+    if (c.id !== categoryId && (c.search_term || '').trim().toLowerCase() === normalized) siblingIds.add(c.id);
+  }
+  return [...siblingIds];
+}
+
+async function cleanupCrossCategoryOrphans(categoryId, categoryName, asins) {
+  if (!asins.length) return 0;
+  const siblingIds = await findSiblingCategoryIds(categoryId, categoryName);
+  if (!siblingIds.length) return 0;
+
+  const { data: orphans, error } = await DASH
+    .from('products')
+    .select('id,asin,category_id')
+    .in('category_id', siblingIds)
+    .in('asin', asins);
+  if (error) {
+    console.error(`  WARN: cross-category orphan lookup failed: ${error.message}`);
+    return 0;
+  }
+  if (!orphans?.length) return 0;
+
+  const { error: delErr } = await DASH.from('products').delete().in('id', orphans.map(o => o.id));
+  if (delErr) {
+    console.error(`  WARN: failed to delete ${orphans.length} cross-category orphan(s): ${delErr.message}`);
+    return 0;
+  }
+  console.log(`  → Removed ${orphans.length} stale orphan row(s) from ${siblingIds.length} duplicate categor${siblingIds.length === 1 ? 'y' : 'ies'} sharing this keyword`);
+  return orphans.length;
+}
+
 async function run() {
   console.log(`\n=== P1 Migration: dovive_research → supplement-scope-dash ===`);
   console.log(`Keyword: "${KEYWORD}"\n`);
 
   // 1. Get or create the DASH category
   const categoryId = await getOrCreateCategory();
+  const { data: catRow } = await DASH.from('categories').select('name').eq('id', categoryId).single();
 
   // 2. Fetch P1 products from dovive_research
   const { data: products, error: fetchErr } = await DOVIVE
@@ -104,6 +168,11 @@ async function run() {
     .eq('category_id', categoryId);
   const existingAsins = new Set((existing || []).map(p => p.asin));
   console.log(`Already in DASH: ${existingAsins.size} products`);
+
+  // 3b. Self-heal: purge any stale rows for these ASINs sitting under a
+  // duplicate sibling category (see cleanupCrossCategoryOrphans doc above).
+  const allAsins = [...new Set(products.map(p => p.asin).filter(Boolean))];
+  const orphansRemoved = await cleanupCrossCategoryOrphans(categoryId, catRow?.name, allAsins);
 
   // 4. Map + upsert products
   let migrated = 0;
@@ -154,15 +223,18 @@ async function run() {
       updated_at: new Date().toISOString(),
     };
 
-    const { error } = await DASH.from('products').insert(row);
+    // 2026-08-28: write via upsert directly (was insert-then-catch-fallback-
+    // to-upsert) — same net effect on a re-run within THIS category since
+    // there's a unique constraint on (asin, category_id) elsewhere in the
+    // pipeline (see human-bsr.js's on_conflict=asin,category_id), but this
+    // is the explicit, intended path rather than relying on an insert error
+    // as a side channel. Re-running this script for the SAME category now
+    // always UPDATEs the existing row in place — never leaves an orphan.
+    const { error } = await DASH.from('products').upsert(row, { onConflict: 'asin,category_id' });
     if (error) {
-      // Try upsert on conflict
-      const { error: upsertErr } = await DASH.from('products').upsert(row, { onConflict: 'asin,category_id' });
-      if (upsertErr) {
-        console.error(`  ERROR ${p.asin}: ${upsertErr.message}`);
-        errors++;
-        continue;
-      }
+      console.error(`  ERROR ${p.asin}: ${error.message}`);
+      errors++;
+      continue;
     }
     migrated++;
     if (migrated % 20 === 0) console.log(`  ${migrated} migrated...`);
@@ -172,9 +244,10 @@ async function run() {
   console.log(`Migrated: ${migrated}`);
   console.log(`Skipped (already in DASH): ${skipped}`);
   console.log(`Errors: ${errors}`);
+  console.log(`Cross-category orphans removed: ${orphansRemoved}`);
   console.log(`Category ID: ${categoryId}`);
 
-  return { categoryId, migrated, skipped, errors };
+  return { categoryId, migrated, skipped, errors, orphansRemoved };
 }
 
 run().catch(console.error);

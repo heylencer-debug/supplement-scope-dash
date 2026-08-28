@@ -265,21 +265,25 @@ export default function NewAnalysis() {
                   >
                     {/* Action Buttons */}
                     <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        className="pearl-quiet h-7 w-7 backdrop-blur-sm"
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 backdrop-blur-sm"
                         onClick={(e) => handleCopyAsins(e, cat.id)}
                         title="Copy ASINs"
                       >
                         <ClipboardCopy className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        className="pearl-quiet h-7 w-7 backdrop-blur-sm hover:text-destructive"
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 backdrop-blur-sm hover:text-destructive"
                         onClick={(e) => handleDeleteClick(e, cat)}
                         disabled={deleteCategory.isPending}
                         title="Delete category"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      </Button>
                     </div>
 
                     {/* Product Images Grid */}
@@ -381,33 +385,35 @@ export default function NewAnalysis() {
                     Showing {startIndex + 1}-{Math.min(startIndex + itemsPerPage, uniqueCategories.length)} of {uniqueCategories.length} categories
                   </p>
                   <div className="flex items-center gap-2">
-                    <button
-                      className="pearl-secondary"
+                    <Button
+                      variant="secondary"
                       onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                       disabled={currentPage === 1}
                     >
                       <ChevronLeft className="h-4 w-4 mr-1" />
                       Previous
-                    </button>
+                    </Button>
                     <div className="flex items-center gap-1">
                       {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                        <button
+                        <Button
                           key={page}
-                          className={currentPage === page ? "pearl-button w-8 h-8 !p-0" : "pearl-quiet w-8 h-8 !p-0"}
+                          variant={currentPage === page ? "default" : "ghost"}
+                          size="icon"
+                          className="w-8 h-8"
                           onClick={() => setCurrentPage(page)}
                         >
                           {page}
-                        </button>
+                        </Button>
                       ))}
                     </div>
-                    <button
-                      className="pearl-secondary"
+                    <Button
+                      variant="secondary"
                       onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                       disabled={currentPage === totalPages}
                     >
                       Next
                       <ChevronRight className="h-4 w-4 ml-1" />
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}
@@ -426,15 +432,16 @@ export default function NewAnalysis() {
         description={`Are you sure you want to delete "${categoryToDelete?.name ?? ""}"?`}
         footer={
           <>
-            <button
-              className="pearl-secondary"
+            <Button
+              variant="secondary"
               onClick={() => setCategoryToDelete(null)}
               disabled={deleteCategory.isPending}
             >
               Cancel
-            </button>
-            <button
-              className="pearl-secondary text-destructive"
+            </Button>
+            <Button
+              variant="secondary"
+              className="text-destructive"
               onClick={confirmDelete}
               disabled={deleteCategory.isPending}
             >
@@ -446,7 +453,7 @@ export default function NewAnalysis() {
               ) : (
                 "Delete"
               )}
-            </button>
+            </Button>
           </>
         }
       >

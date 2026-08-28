@@ -253,6 +253,34 @@ async function run() {
     if (migrated % 20 === 0) console.log(`  ${migrated} migrated...`);
   }
 
+  // 5. Self-heal the category row itself: the dashboard's "Recently
+  // Analyzed Categories" grid was reading this row directly (stale
+  // `total_products` written once at category creation, stale
+  // `updated_at`/`last_scanned` never bumped by this script) — a genuine
+  // new run (e.g. 139 fresh products) could sit invisibly behind an old
+  // duplicate category showing a months-old timestamp. Refresh with the
+  // real live count + "now" so this row stays honest for anything that
+  // reads it directly instead of recomputing counts itself.
+  const { count: finalCount, error: finalCountErr } = await DASH
+    .from('products')
+    .select('*', { count: 'exact', head: true })
+    .eq('category_id', categoryId);
+
+  if (finalCountErr) {
+    console.error(`  WARN: failed to recount products for category refresh: ${finalCountErr.message}`);
+  } else {
+    const { error: catRefreshErr } = await DASH.from('categories').update({
+      total_products: finalCount || 0,
+      updated_at: new Date().toISOString(),
+      last_scanned: new Date().toISOString(),
+    }).eq('id', categoryId);
+    if (catRefreshErr) {
+      console.error(`  WARN: failed to refresh category row: ${catRefreshErr.message}`);
+    } else {
+      console.log(`  → Category row refreshed: total_products=${finalCount || 0}, updated_at=now`);
+    }
+  }
+
   console.log(`\n=== DONE ===`);
   console.log(`Migrated: ${migrated}`);
   console.log(`Skipped (already in DASH): ${skipped}`);

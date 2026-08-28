@@ -56,13 +56,10 @@ export default function NewAnalysis() {
 
   const activeOrRecentJobs = (scoutJobs ?? []).slice(0, 5);
 
-  // Get unique categories by name (most recent first)
-  const uniqueCategories = recentCategories?.reduce((acc, cat) => {
-    if (!acc.find(a => a.name === cat.name)) {
-      acc.push(cat);
-    }
-    return acc;
-  }, [] as CategoryWithImages[]) ?? [];
+  // useRecentCategories already dedupes case-insensitively (junk-stripped
+  // name, keeping the richest sibling) and sorts by real recency — no
+  // further client-side reduce needed here.
+  const uniqueCategories = recentCategories ?? [];
 
   // Pagination calculations
   const totalPages = Math.ceil(uniqueCategories.length / itemsPerPage);
@@ -316,10 +313,25 @@ export default function NewAnalysis() {
                           {cat.name}
                         </h3>
                         {(() => {
+                          // Prefer the real latest scout_jobs status for this
+                          // category's keyword over a hardcoded/heuristic badge.
+                          if (cat.job_status && jobStatusMeta[cat.job_status]) {
+                            const meta = jobStatusMeta[cat.job_status];
+                            const StatusIcon = meta.icon;
+                            return (
+                              <Badge variant="outline" className={`text-xs shrink-0 gap-1 ${meta.className}`}>
+                                <StatusIcon className={`h-3 w-3 ${cat.job_status === "running" || cat.job_status === "claimed" ? "animate-spin" : ""}`} />
+                                {meta.label}
+                              </Badge>
+                            );
+                          }
+
+                          // Legacy fallback for categories with no matching
+                          // scout_jobs row (pre-dates the cloud job queue).
                           const isComplete = cat.total_products && cat.total_products > 0;
-                          const createdAt = cat.created_at ? new Date(cat.created_at) : null;
-                          const hoursSinceCreation = createdAt ? (Date.now() - createdAt.getTime()) / (1000 * 60 * 60) : 0;
-                          const isCancelled = !isComplete && hoursSinceCreation > 12;
+                          const recencyAt = cat.updated_at ? new Date(cat.updated_at) : null;
+                          const hoursSinceActivity = recencyAt ? (Date.now() - recencyAt.getTime()) / (1000 * 60 * 60) : 0;
+                          const isCancelled = !isComplete && hoursSinceActivity > 12;
 
                           if (isComplete) {
                             return (
@@ -348,9 +360,9 @@ export default function NewAnalysis() {
                           <Package className="w-3.5 h-3.5" />
                           <span>{cat.total_products || 0} products</span>
                         </div>
-                        {cat.created_at && (
+                        {cat.updated_at && (
                           <span className="text-xs">
-                            {formatDistanceToNow(new Date(cat.created_at), { addSuffix: true })}
+                            {formatDistanceToNow(new Date(cat.updated_at), { addSuffix: true })}
                           </span>
                         )}
                       </div>

@@ -738,14 +738,30 @@ async function run() {
   const skipped = results.filter(r => r.status === 'skipped').length;
   const failed = results.filter(r => r.status === 'error').length;
 
-  // Update DASH categories table with latest run_timestamp & updated_at
+  // Update DASH categories table with latest run_timestamp, updated_at, and
+  // a HONEST total_products (real COUNT of `products` rows for this
+  // category, not a stale write-once value) — the "Recently Analyzed
+  // Categories" grid reads this row directly, and previously only
+  // run_timestamp/updated_at got refreshed here while total_products was
+  // never touched after category creation, so re-runs kept showing the
+  // original (often 0 or partial) product count from the first run.
   if (categoryId) {
     try {
-      const { error } = await DASH.from('categories').update({ run_timestamp: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', categoryId);
+      const { count } = await DASH
+        .from('products')
+        .select('*', { count: 'exact', head: true })
+        .eq('category_id', categoryId);
+
+      const { error } = await DASH.from('categories').update({
+        run_timestamp: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        last_scanned: new Date().toISOString(),
+        total_products: count || 0,
+      }).eq('id', categoryId);
       if (error) {
         console.error('Failed to update category run_timestamp:', error.message);
       } else {
-        console.log('Category run_timestamp updated in DASH');
+        console.log(`Category refreshed in DASH: total_products=${count || 0}, run_timestamp/updated_at=now`);
       }
     } catch (e) {
       console.error('Error updating category:', e.message);

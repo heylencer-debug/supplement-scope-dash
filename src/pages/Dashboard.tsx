@@ -452,7 +452,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-4 md:space-y-6 pb-12 md:pb-16 overflow-x-hidden bg-background text-foreground text-[13px]">
+    <div className="takeout-mode space-y-4 md:space-y-6 p-3 md:p-6 pb-12 md:pb-16 overflow-x-hidden bg-background text-foreground text-[13px]">
       {/* SECTION 1: Hero Header with Executive Summary */}
       <div className="animate-fade-in">
         <HeroHeader
@@ -479,13 +479,13 @@ export default function Dashboard() {
       )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="pearl-tab-lift grid w-full grid-cols-6 h-auto bg-transparent">
-          <TabsTrigger className="pearl-tab" value="products">📦 Products</TabsTrigger>
-          <TabsTrigger className="pearl-tab" value="market">📈 Market</TabsTrigger>
-          <TabsTrigger className="pearl-tab" value="qa">🔬 QA Review</TabsTrigger>
-          <TabsTrigger className="pearl-tab" value="validation">⚖️ Compliance</TabsTrigger>
-          <TabsTrigger className="pearl-tab" value="manufacturer">🏭 Manufacturer</TabsTrigger>
-          <TabsTrigger className="pearl-tab" value="data-audit">🔍 Data Audit</TabsTrigger>
+        <TabsList className="takeout-tabs-list w-full h-auto justify-start">
+          <TabsTrigger className="takeout-tab" value="products">📦 Products</TabsTrigger>
+          <TabsTrigger className="takeout-tab" value="market">📈 Market</TabsTrigger>
+          <TabsTrigger className="takeout-tab" value="qa">🔬 QA Review</TabsTrigger>
+          <TabsTrigger className="takeout-tab" value="validation">⚖️ Compliance</TabsTrigger>
+          <TabsTrigger className="takeout-tab" value="manufacturer">🏭 Manufacturer</TabsTrigger>
+          <TabsTrigger className="takeout-tab" value="data-audit">🔍 Data Audit</TabsTrigger>
         </TabsList>
 
         <TabsContent value="products" className="space-y-6 md:space-y-10 mt-4">

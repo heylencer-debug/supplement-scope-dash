@@ -151,7 +151,7 @@ export default function NewAnalysis() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-10">
+    <div className="takeout-mode max-w-4xl mx-auto space-y-10 bg-background text-foreground px-3 md:px-4 pt-3 md:pt-4 pb-8 rounded-xl">
       <div className="text-center space-y-3">
         <h1 className="text-3xl font-bold text-foreground">Market Analysis</h1>
         <p className="text-muted-foreground">

@@ -77,7 +77,7 @@ export function KPIMetricsGrid({
       {kpis.map((kpi, idx) => (
         <div
           key={idx}
-          className="rounded-md border border-border bg-card px-3 py-2.5 opacity-0 animate-fade-in"
+          className="takeout-metric-chip rounded-md border border-border bg-card px-3 py-2.5 opacity-0 animate-fade-in flex-col items-start gap-0"
           style={{ animationDelay: `${idx * 100}ms`, animationFillMode: 'forwards' }}
         >
           {isLoading ? (
@@ -91,8 +91,17 @@ export function KPIMetricsGrid({
               <p className="text-[9.5px] uppercase tracking-wide text-muted-foreground/70 mb-1">
                 {kpi.label}
               </p>
-              <p className="text-[17px] font-extrabold text-foreground leading-none">
-                {kpi.value !== null ? kpi.value : <LoadingPulse />}
+              <p className="text-[17px] font-extrabold text-foreground leading-none flex items-center gap-1.5">
+                {kpi.value !== null ? (
+                  <>
+                    {kpi.label === "Opportunity Score" && (
+                      <TrendingUp className="takeout-metric-arrow h-3 w-3" />
+                    )}
+                    {kpi.value}
+                  </>
+                ) : (
+                  <LoadingPulse />
+                )}
               </p>
               {kpi.subtext && (
                 <p className={`text-[10px] mt-1 ${(kpi as any).subtextColor || "text-muted-foreground"}`}>

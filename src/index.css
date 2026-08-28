@@ -28,6 +28,8 @@
     --brand-smoke: 0 0% 95%;       /* #F2F2F2 */
     --brand-border: 0 0% 91%;      /* #E7E7E7 */
     --brand-border-2: 0 0% 86%;    /* #DCDCDC */
+    --overlay-bg: rgba(0, 0, 0, 0.6);
+    --overlay-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
     --brand-muted: 0 0% 42%;       /* #6B6B6B */
     --brand-muted-2: 0 0% 60%;     /* #9A9A9A */
 
@@ -90,6 +92,18 @@
     --pearl-s-bounce: 50%;
     --pearl-s-arc: 12%;
     --pearl-s-cap: 30%;
+
+    /* Brand iris-surface tokens — getnoodle's own literal hex values
+       (src/index.css lines 360/363/369/393), ported verbatim for
+       .brand-iris-surface / .brand-glass. New tokens, nothing else in this
+       repo references them, so no collision risk with the existing
+       HSL-triplet --brand-* tokens above. */
+    --brand-iris-magenta: #FC55F9;
+    --brand-iris-cyan: #00ECFF;
+    --brand-iris-purple: #6D28D9;
+    --brand-iris-grain: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNjAiIGhlaWdodD0iMTYwIj48ZmlsdGVyIGlkPSJuIiB4PSIwIiB5PSIwIiBjb2xvci1pbnRlcnBvbGF0aW9uLWZpbHRlcnM9InNSR0IiPjxmZVR1cmJ1bGVuY2UgdHlwZT0iZnJhY3RhbE5vaXNlIiBiYXNlRnJlcXVlbmN5PSIyLjIiIG51bU9jdGF2ZXM9IjEiIHN0aXRjaFRpbGVzPSJzdGl0Y2giLz48ZmVDb2xvck1hdHJpeCB0eXBlPSJtYXRyaXgiIHZhbHVlcz0iMCAwIDAgMCAwICAwIDAgMCAwIDAgIDAgMCAwIDAgMCAgMC4zMyAwLjMzIDAuMzMgMCAwIi8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsdGVyPSJ1cmwoI24pIiBvcGFjaXR5PSIwLjciLz48L3N2Zz4=");
+    --brand-mesh-base: hsl(var(--brand-smoke));
+    --brand-mesh-foreground: hsl(var(--brand-ink));
 
     /* Light sidebar - white w/ electric accent */
     --sidebar-background: var(--brand-white);
@@ -591,5 +605,199 @@
   [data-pearl-scope='sidepanel'] .pearl-button,
   [data-pearl-scope='sidepanel'] .pearl-quiet {
     min-height: var(--pearl-h);
+  }
+}
+
+/* ============================================================
+   TAKEOUT DARK MODE — dashboard work-surface only.
+   Scoped under `.takeout-mode` (never `.dark`, which is unused
+   elsewhere but reserved). Re-points every shadcn/Pearl token to a
+   near-black "Noodle Takeout" palette so existing Card/Badge/Button
+   components go dark for free, plus a small set of purpose-built
+   classes for the tab bar, sidebar nav, score badges, metric chips,
+   and search field seen in the reference design.
+   Exact hex sources: --brand-ink #1A1A1A, --brand-neon #F3FE00,
+   --brand-electric #2226F7, --brand-smoke #F2F2F2 (all pre-existing
+   above). Card/canvas/border shades below are derived near-black
+   greys picked to match the reference screenshot.
+   ============================================================ */
+@layer base {
+  .takeout-mode {
+    --takeout-canvas: 0 0% 7%;      /* ~#121212 near-black canvas */
+    --takeout-panel: 0 0% 11%;      /* ~#1c1c1c card bg */
+    --takeout-panel-2: 0 0% 14%;    /* ~#242424 slightly lighter panel (active pill, insets) */
+    --takeout-hairline: 0 0% 100%;  /* white, used at low opacity for hairline borders */
+    --takeout-cyan: 172 66% 50%;    /* #2DD4BF-ish teal for brand names */
+
+    --background: var(--takeout-canvas);
+    --foreground: var(--brand-smoke);
+
+    --card: var(--takeout-panel);
+    --card-foreground: var(--brand-smoke);
+
+    --popover: var(--takeout-panel);
+    --popover-foreground: var(--brand-smoke);
+
+    --primary: var(--brand-neon);
+    --primary-foreground: var(--brand-ink);
+
+    --secondary: var(--takeout-panel-2);
+    --secondary-foreground: var(--brand-smoke);
+
+    --muted: var(--takeout-panel-2);
+    --muted-foreground: 0 0% 65%;
+
+    --accent: var(--brand-neon);
+    --accent-foreground: var(--brand-ink);
+
+    --border: 0 0% 22%;
+    --input: 0 0% 20%;
+    --ring: var(--brand-neon);
+
+    --sidebar-background: var(--takeout-canvas);
+    --sidebar-foreground: var(--brand-smoke);
+    --sidebar-primary: var(--brand-neon);
+    --sidebar-primary-foreground: var(--brand-ink);
+    --sidebar-accent: var(--takeout-panel-2);
+    --sidebar-accent-foreground: var(--brand-smoke);
+    --sidebar-border: 0 0% 22%;
+    --sidebar-ring: var(--brand-neon);
+
+    background: hsl(var(--takeout-canvas));
+    color: hsl(var(--brand-smoke));
+    border-radius: var(--radius-lg);
+  }
+
+  /* Top tab bar — plain text tabs, neon text + neon underline when active.
+     Deliberately NOT reusing .pearl-tab (filled ink pill) — the reference
+     uses a flat underline style instead. */
+  .takeout-tabs-list {
+    display: flex;
+    gap: 24px;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid hsl(var(--takeout-hairline) / 0.1);
+    border-radius: 0;
+    padding: 0 0 10px 0;
+    justify-content: flex-start;
+  }
+  .takeout-tab {
+    flex: none;
+    padding: 4px 2px 10px 2px;
+    background: transparent;
+    border-radius: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: 0 0% 65%;
+    color: hsl(0 0% 65%);
+    border-bottom: 2px solid transparent;
+    transition: color 150ms ease, border-color 150ms ease;
+    white-space: nowrap;
+  }
+  .takeout-tab[data-state='active'] {
+    color: hsl(var(--brand-neon));
+    border-bottom-color: hsl(var(--brand-neon));
+    background: transparent;
+    box-shadow: none;
+  }
+
+  /* Sidebar nav item — neon left bar + neon icon/text on a lighter dark pill
+     when active. */
+  .takeout-sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: var(--radius-md);
+    border-left: 3px solid transparent;
+    color: hsl(0 0% 75%);
+    font-size: 13px;
+    font-weight: 600;
+    transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
+  }
+  .takeout-sidebar-item.active {
+    background: hsl(var(--takeout-panel-2));
+    border-left-color: hsl(var(--brand-neon));
+    color: hsl(var(--brand-neon));
+  }
+
+  /* Circular neon score badge — e.g. Opportunity/Noodle Score. */
+  .takeout-score-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 34px;
+    height: 34px;
+    padding: 0 6px;
+    border-radius: 999px;
+    border: 1.5px solid hsl(var(--brand-neon));
+    color: hsl(var(--brand-neon));
+    font-weight: 800;
+    font-size: 13px;
+    background: hsl(var(--brand-neon) / 0.06);
+    line-height: 1;
+  }
+
+  /* Dark inset metric chip — small neon trend arrow + white bold value +
+     gray label. */
+  .takeout-metric-chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    border-radius: var(--radius-sm, 6px);
+    background: hsl(var(--takeout-canvas));
+    border: 1px solid hsl(var(--takeout-hairline) / 0.08);
+  }
+  .takeout-metric-chip .takeout-metric-arrow {
+    color: hsl(var(--brand-neon));
+    flex-shrink: 0;
+  }
+  .takeout-metric-chip .takeout-metric-value {
+    color: hsl(var(--brand-smoke));
+    font-weight: 700;
+    font-size: 12px;
+    line-height: 1.1;
+  }
+  .takeout-metric-chip .takeout-metric-label {
+    color: hsl(0 0% 60%);
+    font-size: 10px;
+    line-height: 1.1;
+  }
+
+  /* Brand name under a product title. */
+  .takeout-brand {
+    color: hsl(var(--takeout-cyan));
+    font-weight: 600;
+  }
+
+  /* Dark inset search field. */
+  .takeout-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-radius: var(--radius-md);
+    background: hsl(var(--takeout-panel));
+    border: 1px solid hsl(var(--takeout-hairline) / 0.1);
+    color: hsl(0 0% 65%);
+  }
+  .takeout-search input {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: hsl(var(--brand-smoke));
+    font-size: 13px;
+    width: 100%;
+  }
+  .takeout-search input::placeholder {
+    color: hsl(0 0% 55%);
+  }
+
+  /* Card surface used for takeout product/benchmark cards. */
+  .takeout-card {
+    background: hsl(var(--takeout-panel));
+    border: 1px solid hsl(var(--takeout-hairline) / 0.08);
+    border-radius: var(--radius-lg);
   }
 }

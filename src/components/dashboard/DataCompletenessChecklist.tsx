@@ -89,7 +89,11 @@ export function DataCompletenessChecklist({ keyword }: DataCompletenessChecklist
               onClick={() => setActivePhase(phase)}
               className={cn("check-item w-full text-left cursor-pointer", ok ? "done" : "warn")}
             >
-              <div className="dot" />
+              {ok ? (
+                <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: "hsl(var(--brand-neon))" }} />
+              ) : (
+                <div className="dot" />
+              )}
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="ci-title text-xs font-bold text-muted-foreground tracking-wide">P{phase.phase}</span>

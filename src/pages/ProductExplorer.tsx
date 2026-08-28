@@ -352,7 +352,7 @@ export default function ProductExplorer() {
   }
 
   return (
-    <div className="takeout-mode space-y-8 bg-background text-foreground p-3 md:p-6 rounded-xl">
+    <div className="space-y-8">
       {/* Bulk Analysis Progress Banner */}
       {bulkProgress.status !== "idle" && (
         <BulkAnalysisProgress 

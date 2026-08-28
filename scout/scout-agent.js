@@ -1599,12 +1599,12 @@ Be specific. Use the actual data. Plain English — no jargon.`;
     // Uncapped to 32000 — no blind retry-on-length; the cap itself was the
     // truncation cause. Substantial truncated content is kept as-is
     // (logged); only genuinely empty/near-empty output gets one retry.
-    let { content, finishReason } = await doCall(32000);
+    let { content, finishReason } = await doCall(64000);
     if (finishReason === 'length' && content.length > 500) {
       log('[NOTE: output reached token ceiling] — keeping truncated-but-substantial content', 'info');
     } else if (content.length < 500) {
       log('AI summary near-empty — retrying once at same budget...', 'warn');
-      const retry = await doCall(32000);
+      const retry = await doCall(64000);
       if (retry.content) content = retry.content;
     }
     if (!content) {

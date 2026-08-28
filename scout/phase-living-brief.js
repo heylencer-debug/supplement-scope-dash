@@ -290,7 +290,7 @@ Format clearly with each distinct point on a new line.`;
     // 5. Evaluate feedback with Claude
     console.log(`     🤖 Evaluating feedback with Claude...`);
     const prompt = buildEvaluationPrompt(KEYWORD, currentFormula, fullFeedbackText);
-    const evaluation = await callClaude(prompt, 32000);
+    const evaluation = await callClaude(prompt, 64000);
 
     // Parse verdict
     const verdictMatch = evaluation.match(/##\s*OVERALL VERDICT\s*\n+\[?(ACCEPTED|PARTIALLY ACCEPTED|QUESTIONED|REJECTED)\]?/i);

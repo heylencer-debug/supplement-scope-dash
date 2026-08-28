@@ -455,7 +455,7 @@ Scoring guidance (generic - applies to ANY supplement category; use judgment, no
 - market_opportunity_gap: be specific to this category and, where the review sentiment reveals an unmet need or recurring complaint, name it directly — what formula gap can DOVIVE exploit?
 - Return ONLY the JSON array. No other text.`;
 
-  const response = await callGrok(prompt, 32000);
+  const response = await callGrok(prompt, 64000);
   if (!response) throw new Error('Empty AI response');
   const jsonMatch = response.match(/\[[\s\S]*\]/);
   if (!jsonMatch) throw new Error('No JSON array in AI response');

@@ -592,7 +592,7 @@ async function run() {
   console.log(`\nCall 2: Claude (via OpenRouter) validating Sonnet's analysis...`);
   const opusPrompt = buildOpusValidationPrompt(adjustedFormula, withFormula, sonnetDraft, KEYWORD);
   console.log(`  Prompt: ${Math.round(opusPrompt.length / 1000)}k chars`);
-  let opusValidation = await callClaudeOpus(opusPrompt, 32000);
+  let opusValidation = await callClaudeOpus(opusPrompt, 64000);
   if (!opusValidation) {
     opusValidation = '[ERROR: Claude Opus returned empty output for the competitive benchmarking validation — check OpenRouter logs / token budget / finish_reason above.]';
   }

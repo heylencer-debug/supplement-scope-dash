@@ -172,7 +172,7 @@ async function callClaudeOpusOnce(prompt, maxTokens) {
 // No blind retry-on-length: cap itself caused truncation. finish_reason=length
 // WITH substantial content is kept as-is (logged); only near-empty output
 // gets one retry at the same (generous) budget.
-async function callClaudeOpus(prompt, maxTokens = 32000) {
+async function callClaudeOpus(prompt, maxTokens = 64000) {
   let { output, finishReason } = await callClaudeOpusOnce(prompt, maxTokens);
   const len = (output || '').length;
   if (finishReason === 'length' && len > 500) {
@@ -245,7 +245,7 @@ async function callClaudeSonnetOnce(prompt, maxTokens) {
 // No blind retry-on-length: cap itself caused truncation. finish_reason=length
 // WITH substantial content is kept as-is (logged); only near-empty output
 // gets one retry at the same (generous) budget.
-async function callClaudeSonnet(prompt, maxTokens = 32000) {
+async function callClaudeSonnet(prompt, maxTokens = 64000) {
   let { output, finishReason } = await callClaudeSonnetOnce(prompt, maxTokens);
   const len = (output || '').length;
   if (finishReason === 'length' && len > 500) {
@@ -654,7 +654,7 @@ async function run() {
   console.log(`\nCall 2: Claude (via OpenRouter) validating Claude Opus findings...`);
   const sonnetPrompt = buildSonnetValidationPrompt(adjustedFormula, nihData, opusAnalysis, KEYWORD);
   console.log(`  Prompt: ${Math.round(sonnetPrompt.length / 1000)}k chars`);
-  let sonnetValidation = await callClaudeSonnet(sonnetPrompt, 32000);
+  let sonnetValidation = await callClaudeSonnet(sonnetPrompt, 64000);
   if (!sonnetValidation) {
     sonnetValidation = '[ERROR: Claude Sonnet returned empty output for the FDA compliance validation — check OpenRouter logs / token budget / finish_reason above.]';
   }

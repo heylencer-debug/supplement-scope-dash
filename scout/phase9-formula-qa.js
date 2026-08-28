@@ -1070,7 +1070,7 @@ async function run() {
   // (finish_reason=length on both the initial call and the 24000-token
   // retry, reasoning-tokens disease) — raised to 32000 as the base budget,
   // matching P10/P11's confirmed-safe safety net.
-  const qaReport = await callClaudeSonnetQA(prompt, 32000, VALIDATION_MODEL);
+  const qaReport = await callClaudeSonnetQA(prompt, 64000, VALIDATION_MODEL);
   const elapsed = Math.round((Date.now() - startTime) / 1000);
   console.log(`  âœ… Done (${elapsed}s, ${Math.round(qaReport.length / 1000)}k chars)\n`);
 

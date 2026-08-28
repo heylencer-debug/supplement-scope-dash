@@ -795,7 +795,7 @@ async function run() {
     return;
   }
 
-  const { context: browserContext, close: closeBrowser } = await launchBrowserContext({ label: 'P5 browser' });
+  const { context: browserContext, close: closeBrowser } = await launchBrowserContext({ label: 'P5 browser', useProxy: true });
 
   const overallStart = Date.now();
   let done = 0, failed = 0;

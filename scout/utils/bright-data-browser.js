@@ -59,7 +59,7 @@ function getBrightDataProxy() {
  *   headless Playwright browser exactly as before, so behavior is
  *   unchanged until credentials are provisioned.
  */
-async function launchBrowserContext({ label = 'browser', blockMedia = true, localContextOptions = {} } = {}) {
+async function launchBrowserContext({ label = 'browser', blockMedia = true, useProxy = false, localContextOptions = {} } = {}) {
   const wss = getBrightDataBrowserWSS();
 
   if (wss) {
@@ -87,8 +87,11 @@ async function launchBrowserContext({ label = 'browser', blockMedia = true, loca
   }
 
   // ISP/residential proxy path — local Chromium routed through Bright Data's
-  // residential IP. Preferred for non-Amazon (search + brand pages) when no WSS.
-  const proxy = getBrightDataProxy();
+  // residential IP. ONLY for opted-in NON-AMAZON callers (P5 search + brand
+  // pages). Amazon (P1) must NOT use this: a single ISP IP is bot-walled by
+  // Amazon, and P1 already has the Bright Data Datasets API as its real path.
+  // Gate on opts.useProxy so P1's launchBrowserContext never picks it up.
+  const proxy = useProxy ? getBrightDataProxy() : null;
   if (proxy) {
     try {
       console.log(`  [${label}] launching local Playwright via Bright Data ISP proxy (${proxy.server})...`);

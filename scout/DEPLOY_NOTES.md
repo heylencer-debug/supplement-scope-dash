@@ -1,5 +1,121 @@
 # Scout pipeline — Cloud Run Job deploy notes
 
+## 2026-08-28 follow-up 3: full-repo Sonnet-5 sweep + truncation-hardening audit (final pass)
+
+**Trigger**: coordinator-requested full audit to guarantee zero remaining
+non-Sonnet-5 model strings anywhere in scout/*.js (active code), and that
+every LLM call site has finish_reason logging + retry-once-on-truncation +
+never-silent-null persistence. Ran concurrently with another in-flight
+migration pass touching the same files (P5/P6/P8/P9/P10/P11/living-brief) —
+edits converged on the same design (ANALYSIS_MODEL via OpenRouter,
+finish_reason logging, retry-once, `[ERROR: truncated/empty]` marker) and
+were captured together in commit `f1308ed`.
+
+**Additional files/gaps this pass found and closed** (beyond what the other
+concurrent pass covered):
+- `scout/scout-agent.js` (`node start.js` long-running process, separate from
+  `run-pipeline.js`) — its P0 market-opportunity AI summary call was still on
+  `anthropic/claude-3.5-sonnet` with no finish_reason/retry handling. Now
+  uses `ANALYSIS_MODEL` (default `anthropic/claude-sonnet-5`), logs
+  finish_reason, retries once at 3000 tokens (up from 1500/2000), and returns
+  `[ERROR: truncated/empty]` instead of a generic failure string if still
+  empty after retry.
+- `scout/phase6-product-intelligence.js` `callGrok()` had already been
+  migrated to `ANALYSIS_MODEL` by the concurrent pass but had no
+  finish_reason logging or retry-on-truncation — added both (retry once at
+  1.5x max_tokens), consistent with every other analysis phase.
+- `scout/phase5-deep-research.js` `callGrok()` likewise lacked finish_reason
+  logging/retry — added (retry once at 1.5x maxTokens); the existing
+  "throw on empty" behavior in `researchOneProduct()` is preserved as the
+  correct never-silent-null guard for this per-product call.
+- `scout/phase8-formula-brief.js` — confirmed `callGrok42` (Draft A) and
+  `callClaudeSonnet` (Draft B) both now route through OpenRouter on
+  `ANALYSIS_MODEL`, both log finish_reason and retry once, and both return an
+  explicit `[ERROR: truncated/empty]` marker instead of throwing/nulling on
+  persistent failure. Cosmetic: all "Grok 4.2" / "Claude Sonnet 4.6" console
+  labels and vault filenames relabeled "Draft A" / "Draft B" since both are
+  now the same underlying model.
+- `scout/phase9-formula-qa.js` — confirmed already fully compliant (16000
+  budget, `callClaudeSonnetQAOnce`/`callClaudeSonnetQA` retry split, raw
+  output always persisted). One label fixed: the Call 1 prompt's "FORMULA A"
+  header still said "Grok 4.2 Deep Reasoning" — now says "Claude Draft A
+  (${ANALYSIS_MODEL})" to match reality post-P8-migration.
+- `scout/phase10-competitive-benchmarking.js` / `phase11-fda-compliance.js` —
+  confirmed the validation/primary-tier `callClaudeOpus` functions (already
+  hardened with retry+finish_reason+error-marker by the concurrent pass) now
+  also point `model:` at `ANALYSIS_MODEL` instead of
+  `anthropic/claude-opus-4.6`. **Same-model-validation tradeoff, flagged per
+  explicit instruction**: draft and validation are now BOTH Sonnet 5 in P10
+  and BOTH Sonnet 5 in P11 (primary + validation) — the adversarial
+  cross-check no longer benefits from a genuinely different model's
+  independent perspective; it can still catch a draft's own
+  arithmetic/omission errors on a fresh read of the source data, but this is
+  weaker than true dual-model validation. Proceeding anyway per explicit
+  instruction to eliminate all non-Sonnet-5 strings. All "Claude Opus 4.6" /
+  "Claude Sonnet 4.6" text labels in prompts/console output/report headers
+  relabeled to avoid an inaccurate self-description in generated reports.
+- `scout/phase-living-brief.js` — `callClaude` / `callClaudeWithImages` were
+  on `anthropic/claude-sonnet-4.6` with no retry/finish_reason handling.
+  Split into `*Once` helpers + wrapper, added finish_reason logging,
+  retry-once at 1.5x max_tokens, and `[ERROR: truncated/empty]` fallback
+  (previously threw a bare "empty response" error on failure — behavior
+  changed to non-throwing so callers that don't wrap it in try/catch don't
+  crash the feedback-loop CLI; verified the two call sites at lines
+  ~256/~272 don't rely on the throw for control flow).
+- `scout/phase4-text-extract.js` / `scout/ocr-phase4.js` — confirmed already
+  migrated to `ANALYSIS_MODEL` by the concurrent pass (gpt-4o →
+  ANALYSIS_MODEL, claude-haiku-4.5 → ANALYSIS_MODEL respectively); added
+  finish_reason logging + retry-once (2000→4000 tokens) to both, which
+  neither had before.
+- `scout/phase6-market-analysis.js` — confirmed already migrated off
+  `api.x.ai`/Grok to OpenRouter/`ANALYSIS_MODEL` by the concurrent pass
+  (max_tokens 8000→16000); retry-once + finish_reason logging already
+  present.
+
+**Final confirmation grep** (`grep -rniE "api\.x\.ai|grok-|openai/gpt|
+api\.openai\.com|claude-opus-4\.6|claude-haiku-4\.5|claude-sonnet-4\.6|
+claude-3\.5-sonnet" --include="*.js" .`, excluding node_modules): zero
+matches in active code — only two historical comment lines remain
+(`phase8-formula-brief.js`, `phase5-deep-research.js`) documenting the
+migration itself, not live model strings.
+
+**Truncation-hardening table** (file → call → old max_tokens → new
+max_tokens → finish_reason+retry):
+| File | Call | Old max_tokens | New max_tokens | finish_reason + retry |
+|---|---|---|---|---|
+| phase5-deep-research.js | callGrok (P5 grounded brief) | 1600 (default; actual 2800/4000) | unchanged budgets, added retry@1.5x | now yes (was no) |
+| phase6-product-intelligence.js | callGrok (batch scorecard) | 6000 | unchanged, retry@1.5x | now yes (was no) |
+| phase6-market-analysis.js | callGrok (market intel doc) | 8000 | 16000, retry@1.5x | yes (added this pass) |
+| phase4-text-extract.js | extractFromText | 1000 | 2000, retry@4000 | now yes (was no) |
+| ocr-phase4.js | analyzeImageWithGPT (vision) | 1000 | 2000, retry@4000 | now yes (was no) |
+| phase8-formula-brief.js | callGrok42 (Draft A) | 16000 | unchanged, retry@1.25x | now yes (was no) |
+| phase8-formula-brief.js | callClaudeSonnet (Draft B) | 16000 | unchanged, retry@20000 | now yes (was no, threw instead) |
+| phase9-formula-qa.js | callClaudeSonnetQA (Call 1) | 16000 | unchanged | already compliant, verified |
+| phase9-formula-qa.js | runCall2 | 16000 | unchanged | already compliant, verified |
+| phase9-formula-qa.js | competitor-notes JSON call | 2000 | unchanged | no retry/finish_reason, but has JSON-parse fallback to `{}` — acceptable for this small non-critical field per judgment call |
+| phase10-competitive-benchmarking.js | callClaudeSonnet (draft) | 16000→20000 | unchanged | already compliant, verified |
+| phase10-competitive-benchmarking.js | callClaudeOpus (now Sonnet-5 validation) | 12000→16000 | unchanged | already compliant, verified |
+| phase11-fda-compliance.js | callClaudeOpus (now Sonnet-5 primary) | 16000→20000 | unchanged | already compliant, verified |
+| phase11-fda-compliance.js | callClaudeSonnet (validation) | 12000→16000 | unchanged | already compliant, verified |
+| phase-living-brief.js | callClaude (feedback eval) | 8000/10000 | unchanged, retry@1.5x | now yes (was no) |
+| phase-living-brief.js | callClaudeWithImages (image feedback) | 8000/4000 | unchanged, retry@1.5x | now yes (was no) |
+| scout-agent.js | P0 AI market summary | 1500 | 2000, retry@3000 | now yes (was no) |
+
+**Image rebuilt + Cloud Run Job updated**: `gcloud builds submit --tag
+us-central1-docker.pkg.dev/noodle-worker/dovive-scout/worker:latest
+--project noodle-worker --region us-central1 --timeout=1200s` → digest
+`sha256:b8c8fbb07411b713392fe22d1643b50c2abdf0718381514344ee257580b6bb20`.
+`gcloud run jobs update dovive-scout --image ...:latest --region us-central1
+--project noodle-worker` applied; `timeoutSeconds` confirmed unchanged at
+`10800`. Job was **NOT executed** — no `gcloud run jobs execute` run, per
+instruction (a run may be idle; user validates directly).
+
+**Commits**: this pass's edits landed inside the already-in-flight commit
+`f1308ed` (`feat(scout): standardize on Claude Sonnet 5 (1M ctx), harden
+output truncation, widen input caps`), pushed to `origin/main` on top of
+`0928201`. `node -c` verified syntax-clean on every touched file before
+push.
+
 ## 2026-08-28 follow-up 2: P5 also migrated to Claude Sonnet 5 via OpenRouter (Grok fully out)
 
 **Trigger**: user decision to remove Grok from P5 too — the 2026-08-28 P5

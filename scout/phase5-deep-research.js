@@ -162,6 +162,7 @@ async function fetchGroundingData(asin, keyword) {
     DOVIVE.from('dovive_keepa')
       .select('price_usd, bsr_current, bsr_drops_30d, bsr_drops_90d, bsr_history_30d')
       .eq('asin', asin).limit(1).maybeSingle(),
+
   ]);
 
   const research = researchRes.data || null;
@@ -172,6 +173,23 @@ async function fetchGroundingData(asin, keyword) {
   const hasRealData = !!(research || ocrRows.length || reviews.length || keepa);
 
   return { research, ocrRows, reviews, keepa, hasRealData };
+}
+
+// 2026-08-28 FIX: bsr_history_30d was fetched but never rendered into the
+// prompt — only static current/30d/90d drop-counts were shown. A momentum
+// trend line is richer signal than a static count for the MARKET POSITION
+// section. Summarizes {date, rank}[] into a compact trajectory string.
+function summarizeBsrTrend(history) {
+  if (!Array.isArray(history) || history.length < 2) return null;
+  const sorted = [...history].filter(p => p && p.rank != null).sort((a, b) => new Date(a.date) - new Date(b.date));
+  if (sorted.length < 2) return null;
+  const first = sorted[0];
+  const last = sorted[sorted.length - 1];
+  const best = sorted.reduce((m, p) => (p.rank < m.rank ? p : m), sorted[0]);
+  const worst = sorted.reduce((m, p) => (p.rank > m.rank ? p : m), sorted[0]);
+  const pctChange = first.rank > 0 ? Math.round(((first.rank - last.rank) / first.rank) * 100) : 0;
+  const direction = last.rank < first.rank ? 'improved (rank dropped, better)' : last.rank > first.rank ? 'worsened (rank rose, worse)' : 'flat';
+  return `Over the last ${sorted.length} tracked days, BSR ${direction} from #${first.rank.toLocaleString()} (${first.date}) to #${last.rank.toLocaleString()} (${last.date}) — ${pctChange >= 0 ? 'improvement' : 'decline'} of ${Math.abs(pctChange)}%. Best rank in window: #${best.rank.toLocaleString()} (${best.date}). Worst: #${worst.rank.toLocaleString()} (${worst.date}).`;
 }
 
 function formatGroundingForPrompt(grounding) {
@@ -208,9 +226,11 @@ Price: $${research.price || 'N/A'} | Rating: ${research.rating || 'N/A'} (${rese
   }
 
   if (keepa) {
+    const trend = summarizeBsrTrend(keepa.bsr_history_30d);
     parts.push(`**Keepa price/BSR history:**
 Current price: $${keepa.price_usd || 'N/A'} | Current BSR: ${keepa.bsr_current || 'N/A'}
-BSR drops (30d/90d — proxy for sales velocity): ${keepa.bsr_drops_30d ?? 'N/A'} / ${keepa.bsr_drops_90d ?? 'N/A'}`);
+BSR drops (30d/90d — proxy for sales velocity): ${keepa.bsr_drops_30d ?? 'N/A'} / ${keepa.bsr_drops_90d ?? 'N/A'}
+30-day BSR trajectory: ${trend || 'Not enough tracked history to compute a trend.'}`);
   } else {
     parts.push('**Keepa price/BSR history:** Not available in dovive_keepa.');
   }

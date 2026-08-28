@@ -634,6 +634,34 @@ async function compileMarketData(categoryId) {
   const p5Research = await fetchP5DeepResearch(KEYWORD);
   console.log(`  P5 records: ${p5Research.length}`);
 
+  // 2026-08-28 FIX (audit item #7): fetchP5DeepResearch only pulls P5's
+  // synthesized full_research text — the raw scraped brand-page excerpt
+  // (dovive_p5_sources.raw_html_excerpt) with exact dose/certification
+  // wording was never queried anywhere downstream. Attach a short excerpt
+  // per ASIN so P8 can use it when the synthesis is thin. Never throws.
+  try {
+    const p5Asins = p5Research.map(r => r.asin).filter(Boolean);
+    if (p5Asins.length) {
+      const { data: p5Sources } = await DOVIVE.from('dovive_p5_sources')
+        .select('asin, source_url, raw_html_excerpt')
+        .in('asin', p5Asins);
+      const excerptByAsin = {};
+      for (const s of (p5Sources || [])) {
+        if (s.raw_html_excerpt) excerptByAsin[s.asin] = s;
+      }
+      for (const r of p5Research) {
+        const src = excerptByAsin[r.asin];
+        if (src) {
+          r.raw_source_excerpt = src.raw_html_excerpt.substring(0, 1500);
+          r.raw_source_url = src.source_url;
+        }
+      }
+      console.log(`  P5 raw source excerpts attached: ${Object.keys(excerptByAsin).length}`);
+    }
+  } catch (e) {
+    console.warn('  ⚠️ P5 raw source excerpt fetch failed (non-fatal):', e.message);
+  }
+
   // ── Full Packaging Intelligence from P8 ──────────────────────────────────
   console.log('  Extracting full P8 packaging intelligence...');
   const perProductPackagingIntel = extractPackagingIntelligence(allProducts);
@@ -764,7 +792,8 @@ function buildPrompt(marketData) {
 **Key Weaknesses:** ${r.key_weaknesses || 'N/A'}
 **DOVIVE Competitive Angle:** ${r.competitor_angle || 'N/A'}
 **Certifications:** ${Array.isArray(r.certifications) ? r.certifications.join(', ') : 'None found'} (third-party tested: ${r.third_party_tested ? 'yes' : 'no/unknown'})
-**Full Research Brief:** ${(r.full_research || '').substring(0, 2500) || 'N/A'}
+**Full Research Brief:** ${(r.full_research || '').substring(0, 2500) || 'N/A'}${r.raw_source_excerpt ? `
+**Raw Brand-Page Excerpt (primary source, exact wording — ${r.raw_source_url || 'source unknown'}):** ${r.raw_source_excerpt}` : ''}
 `).join('\n---\n')
     : '⚠️ P5 deep research not yet run for this keyword. Run phase5-deep-research.js first.';
 

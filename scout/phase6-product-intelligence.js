@@ -31,6 +31,46 @@ const DASH = createClient(
   process.env.DASH_KEY || process.env.SUPABASE_KEY
 );
 
+// DOVIVE client — raw reviews live in dovive_reviews (DOVIVE Supabase), same
+// pattern as phase5-deep-research.js/phase6-market-analysis.js.
+const DOVIVE = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+// 2026-08-28 FIX (audit item #6): P6a scored products on catalog data alone —
+// zero review signal reached key_strengths/key_weaknesses/market_opportunity_gap.
+// Fetches a small (5 pos + 5 crit by helpfulness) review slice per ASIN, cheap
+// and batch-scoped. Never throws — returns {} on failure so the batch still runs.
+async function fetchReviewSentimentMap(asins) {
+  if (!asins.length) return {};
+  try {
+    const { data } = await DOVIVE.from('dovive_reviews')
+      .select('asin, rating, title, body, helpful_votes')
+      .in('asin', asins)
+      .order('helpful_votes', { ascending: false })
+      .limit(asins.length * 20);
+    const map = {};
+    for (const asin of asins) map[asin] = { positive: [], critical: [] };
+    for (const r of (data || [])) {
+      const bucket = map[r.asin];
+      if (!bucket) continue;
+      if (r.rating >= 4 && bucket.positive.length < 5) bucket.positive.push(r);
+      else if (r.rating <= 2 && bucket.critical.length < 5) bucket.critical.push(r);
+    }
+    return map;
+  } catch (e) {
+    console.warn('  ⚠️ Review sentiment fetch failed (non-fatal):', e.message);
+    return {};
+  }
+}
+
+function formatReviewSentiment(bucket) {
+  if (!bucket || (!bucket.positive.length && !bucket.critical.length)) return 'No reviews available.';
+  const fmt = r => `[${r.rating}★] "${(r.title || '').slice(0, 80)}" — ${(r.body || '').slice(0, 250)}`;
+  const parts = [];
+  if (bucket.positive.length) parts.push(`Positive: ${bucket.positive.map(fmt).join(' | ')}`);
+  if (bucket.critical.length) parts.push(`Critical: ${bucket.critical.map(fmt).join(' | ')}`);
+  return parts.join('\n');
+}
+
 const KEYWORD    = process.argv.includes('--keyword') ? process.argv[process.argv.indexOf('--keyword') + 1] : 'ashwagandha gummies';
 const TOP_N      = process.argv.includes('--top')   ? parseInt(process.argv[process.argv.indexOf('--top')   + 1]) : 999;
 const FORCE      = process.argv.includes('--force');
@@ -335,7 +375,7 @@ function ruleBasedAnalysis(product, marketMetrics) {
 
 // ─── Grok batch analysis ──────────────────────────────────────────────────────
 
-async function analyzeWithGrok(products, marketMetricsMap, categoryMedianPrice) {
+async function analyzeWithGrok(products, marketMetricsMap, categoryMedianPrice, reviewSentimentMap = {}) {
   const productList = products.map((p, i) => {
     const mm = marketMetricsMap[p.asin];
     const price = parseFloat(p.price || 0);
@@ -348,13 +388,15 @@ BSR: ${p.bsr_current?.toLocaleString() || 'N/A'} | Price: $${price || 'N/A'} | R
 Revenue: $${(p.monthly_revenue || 0).toLocaleString()}/mo | Sales: ${(p.monthly_sales || 0).toLocaleString()}/mo
 Servings: ${servings || 'N/A'} | Price/Serving: $${pricePerServing}
 --- MARKET SIGNALS (pre-computed) ---
-BSR Trend: ${mm.bsr_trend_label} | Velocity Score: ${mm.velocity_score > 0 ? '+' : ''}${mm.velocity_score}%
+BSR Trend (30d/90d): ${mm.bsr_trend_label} | Velocity Score: ${mm.velocity_score > 0 ? '+' : ''}${mm.velocity_score}%
 Price Tier: ${TIER_LABELS[mm.price_positioning_tier]} (category median: $${categoryMedianPrice?.toFixed(2)})
 Revenue/Review Ratio: $${mm.revenue_per_review || 'N/A'}/review (${mm.revenue_per_review_label})
 --- FORMULA DATA ---
 Claims: ${(p.claims_on_label || []).join(', ') || 'N/A'}
 Feature Bullets: ${(p.feature_bullets_text || '').substring(0, 1200) || 'N/A'}
-Supplement Facts (OCR): ${(p.supplement_facts_raw || '').substring(0, 2500) || 'Not available'}`;
+Supplement Facts (OCR): ${(p.supplement_facts_raw || '').substring(0, 2500) || 'Not available'}
+--- REVIEW SENTIMENT (real customer voice, up to 5 positive + 5 critical) ---
+${formatReviewSentiment(reviewSentimentMap[p.asin])}`;
   }).join('\n═══\n');
 
   const prompt = `You are a supplement industry expert analyzing competitor supplement products for DOVIVE brand's product development team.
@@ -394,16 +436,11 @@ Return ONLY a valid JSON array with exactly ${products.length} objects:
   }
 ]
 
-Scoring rules (generic - applies to ANY supplement category):
-- formula_quality_score: start at 5
-  +3: branded/premium ingredient form (KSM-66, Liposomal, Magnesium Glycinate, Creatine Monohydrate, Type I&III Hydrolyzed, etc.)
-  +2: clinical/effective dose of primary active (relative to category norms)
-  +1: 3rd-party tested (NSF, USP, Informed Sport, etc.)
-  +0.5: additional meaningful certifications
-  -0.5: proprietary blend (hides doses)
-  -1: unknown/unspecified primary active form
-- competitor_threat_level: BSR<1000 = Very High; BSR<5000 AND score≥7 = High; BSR<20000 = Medium; else Low
-- market_opportunity_gap: be specific to this category - what formula gap can DOVIVE exploit?
+Scoring guidance (generic - applies to ANY supplement category; use judgment, not a mechanical checklist):
+- formula_quality_score (1-10): reason like a category expert would. Weigh things such as whether the ingredient form is a branded/clinically-studied grade (e.g. KSM-66, Liposomal, Magnesium Glycinate, Creatine Monohydrate, Type I&III Hydrolyzed) vs a generic/unspecified one, whether the dose is clinically meaningful for THIS category (not just present), real third-party testing/certifications, and whether a proprietary blend is hiding doses the consumer would want to see. Ground the score in what actually differentiates a strong product in this specific category — don't apply a flat point formula across unrelated categories.
+- competitor_threat_level: consider BSR strength, formula quality, and review sentiment together (very low BSR + strong formula + genuinely positive reviews = Very High/High threat; weak formula or a pattern of real complaints in the review sentiment above should pull the threat level down even if BSR looks strong).
+- key_strengths/key_weaknesses: ground at least one of each in the REVIEW SENTIMENT above when real complaint/praise patterns exist there — don't infer purely from the catalog data if actual customer voice is available.
+- market_opportunity_gap: be specific to this category and, where the review sentiment reveals an unmet need or recurring complaint, name it directly — what formula gap can DOVIVE exploit?
 - Return ONLY the JSON array. No other text.`;
 
   const response = await callGrok(prompt, 6000);
@@ -489,7 +526,8 @@ async function run() {
 
     if (xaiKey) {
       try {
-        const grokResults = await analyzeWithGrok(batch, marketMetricsMap, categoryMedianPrice);
+        const reviewSentimentMap = await fetchReviewSentimentMap(batch.map(p => p.asin));
+        const grokResults = await analyzeWithGrok(batch, marketMetricsMap, categoryMedianPrice, reviewSentimentMap);
         for (let i = 0; i < batch.length; i++) {
           const gr = grokResults.find((r) => r.asin === batch[i].asin) || grokResults[i];
           if (gr) {

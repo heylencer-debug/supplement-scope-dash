@@ -67,6 +67,7 @@ Extract structured supplement information from this text. Return a JSON object:
 }
 
 Extract every ingredient and dose mentioned. If no specific doses are mentioned, still list the ingredients.
+Do not include any ingredient not explicitly named in the bullet points above — never invent or infer an ingredient from general supplement-category knowledge.
 Return ONLY valid JSON, no markdown.`;
 
   for (let attempt = 1; attempt <= retries; attempt++) {

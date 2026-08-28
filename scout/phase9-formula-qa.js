@@ -14,7 +14,9 @@
  *   - Full QA report saved to formula_briefs.ingredients.qa_report
  *   - Adjusted formula saved to formula_briefs.ingredients.adjusted_formula
  *   - Per-product comparison notes saved to products.marketing_analysis.qa_comparison_note
- *   - Vault: C:\SirPercival-Vault\07_ai-systems\agents\scout\qa-reports\
+ *   - Vault (local dev only, best-effort): C:\SirPercival-Vault\07_ai-systems\agents\scout\qa-reports\
+ *   - P6 market intelligence is loaded from Supabase (market_intelligence table,
+ *     falling back to formula_briefs.brief_type='market_analysis') — NOT the vault.
  *
  * Usage:
  *   node phase9-formula-qa.js --keyword "ashwagandha gummies"
@@ -140,13 +142,32 @@ async function callClaudeSonnetQA(prompt, maxTokens = 32000, model = ANALYSIS_MO
 
 // â"€â"€â"€ Load P6 market intelligence from vault â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
-function loadMarketIntelFromVault(keyword) {
-  const slug = keyword.replace(/\s+/g, '-').toLowerCase();
-  const dir = 'C:\\SirPercival-Vault\\07_ai-systems\\agents\\scout\\market-intelligence';
-  if (!fs.existsSync(dir)) return null;
-  const files = fs.readdirSync(dir).filter(f => f.includes(slug)).sort().reverse();
-  if (!files.length) return null;
-  return fs.readFileSync(path.join(dir, files[0]), 'utf8');
+// 2026-08-28 FIX: this used to read C:\SirPercival-Vault\... which does not
+// exist on Cloud Run, silently degrading P9's market-context input to
+// 'Not available' on every cloud run. Load from Supabase the same way P8's
+// compileMarketData() does — market_intelligence table first, then the
+// formula_briefs(brief_type='market_analysis') fallback saved by
+// phase6-market-analysis.js. Returns null (graceful fallback) if neither
+// source has data yet.
+async function loadMarketIntelFromDB(categoryId) {
+  const { data: marketIntelDoc } = await DASH.from('market_intelligence')
+    .select('ai_market_analysis, generated_at')
+    .eq('category_id', categoryId)
+    .order('generated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (marketIntelDoc?.ai_market_analysis) return marketIntelDoc.ai_market_analysis;
+
+  const { data: fbDoc } = await DASH.from('formula_briefs')
+    .select('ingredients, created_at')
+    .eq('category_id', categoryId)
+    .eq('brief_type', 'market_analysis')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (fbDoc?.ingredients?.ai_generated_brief) return fbDoc.ingredients.ai_generated_brief;
+
+  return null;
 }
 
 // â"€â"€â"€ Build QA prompt â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
@@ -1000,8 +1021,8 @@ async function run() {
 
   // Load P6 market intelligence
   console.log(`Loading P6 market intelligence...`);
-  const marketIntel = loadMarketIntelFromVault(KEYWORD);
-  console.log(`  ${marketIntel ? `OK Loaded from vault (${Math.round(marketIntel.length / 1000)}k chars)` : 'Not found in vault - P10 will run without market context'}`);
+  const marketIntel = await loadMarketIntelFromDB(CAT_ID);
+  console.log(`  ${marketIntel ? `OK Loaded from Supabase (${Math.round(marketIntel.length / 1000)}k chars)` : 'Not found in DB - P10 will run without market context'}`);
 
   // Load top 10 competitors
   console.log(`Loading top 10 competitors with formulas...`);
@@ -1345,22 +1366,30 @@ async function run() {
   }
 
   // â"€â"€ Save to vault â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
-  console.log(`\nSaving to vault...`);
-  const date = new Date().toISOString().split('T')[0];
-  const slug = KEYWORD.replace(/\s+/g, '-').toLowerCase();
-  const vaultDir = 'C:\\SirPercival-Vault\\07_ai-systems\\agents\\scout\\qa-reports';
-  if (!fs.existsSync(vaultDir)) fs.mkdirSync(vaultDir, { recursive: true });
-  const vaultPath = path.join(vaultDir, `${date}-${slug}-qa-report.md`);
-  fs.writeFileSync(vaultPath, [
-    `# P9 Formula QA Report — ${KEYWORD}`,
-    `Generated: ${new Date().toISOString()}`,
-    `Verdict: ${verdict.verdict} | Score: ${verdict.score}/10`,
-    `Call 1 elapsed: ${elapsed}s | Call 2 elapsed: ${call2Elapsed ?? 'N/A'}s`,
-    `Flavor recommendations: ${flavorCount} (high-conf: ${flavorRecommendations.filter(f => (f.confidence ?? 0) >= 50).length})`,
-    ``,
-    mergedQaReport,
-  ].join('\n'));
-  console.log(`  âœ… ${vaultPath}`);
+  // 2026-08-28 FIX: this Windows-path vault write doesn't exist on Cloud Run.
+  // The report is already persisted to Supabase (formula_briefs.ingredients.qa_report)
+  // above, so this is purely a local-dev convenience — guard it so a missing/
+  // unwritable path never crashes the pipeline on cloud.
+  try {
+    console.log(`\nSaving to vault (local dev only)...`);
+    const date = new Date().toISOString().split('T')[0];
+    const slug = KEYWORD.replace(/\s+/g, '-').toLowerCase();
+    const vaultDir = 'C:\\SirPercival-Vault\\07_ai-systems\\agents\\scout\\qa-reports';
+    if (!fs.existsSync(vaultDir)) fs.mkdirSync(vaultDir, { recursive: true });
+    const vaultPath = path.join(vaultDir, `${date}-${slug}-qa-report.md`);
+    fs.writeFileSync(vaultPath, [
+      `# P9 Formula QA Report — ${KEYWORD}`,
+      `Generated: ${new Date().toISOString()}`,
+      `Verdict: ${verdict.verdict} | Score: ${verdict.score}/10`,
+      `Call 1 elapsed: ${elapsed}s | Call 2 elapsed: ${call2Elapsed ?? 'N/A'}s`,
+      `Flavor recommendations: ${flavorCount} (high-conf: ${flavorRecommendations.filter(f => (f.confidence ?? 0) >= 50).length})`,
+      ``,
+      mergedQaReport,
+    ].join('\n'));
+    console.log(`  âœ… ${vaultPath}`);
+  } catch (vaultErr) {
+    console.log(`  Vault write skipped (not available in this environment): ${vaultErr.message}`);
+  }
 
   // â"€â"€ Preview â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
   console.log(`\n${'â•'.repeat(62)}`);

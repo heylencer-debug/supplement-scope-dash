@@ -31,6 +31,10 @@ const DASH = createClient(
   process.env.DASH_KEY || process.env.SUPABASE_KEY
 );
 
+// DOVIVE client — P5's off-Amazon research (dovive_phase5_research / dovive_p5_sources)
+// lives here, same as phase5-deep-research.js/phase8-formula-brief.js.
+const DOVIVE = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
 const KEYWORD = process.argv.includes('--keyword')
   ? process.argv[process.argv.indexOf('--keyword') + 1]
   : 'ashwagandha gummies';
@@ -187,16 +191,68 @@ async function callClaudeOpus(prompt, maxTokens = 16000) {
   }
 }
 
+// 2026-08-28 FIX (audit item #2): P10 never surfaced P5's off-Amazon research
+// (live retail pricing, official brand-site claims/certifications) anywhere,
+// even though the phase's own "Market claim we can make" / value-proposition
+// fields are necessarily Amazon-listing-price-only without it. Pulls a thin,
+// clearly-labeled reference slice — NOT used for ingredient-dose verdicts
+// (those stay strictly OCR-grounded per the existing anti-hallucination
+// design), only for pricing-position/claims context. Never throws.
+async function fetchP5OffAmazonData(asins, keyword) {
+  if (!asins.length) return {};
+  try {
+    const firstWord = keyword.split(' ')[0].toLowerCase();
+    const [researchRes, sourcesRes] = await Promise.all([
+      DOVIVE.from('dovive_phase5_research')
+        .select('asin, competitor_angle, key_strengths, key_weaknesses, certifications')
+        .in('asin', asins)
+        .or(`keyword.ilike.%${firstWord}%,keyword.ilike.%${keyword}%`),
+      DOVIVE.from('dovive_p5_sources')
+        .select('asin, source_url, source_type, extracted')
+        .in('asin', asins),
+    ]);
+    const byAsin = {};
+    for (const r of (researchRes.data || [])) {
+      byAsin[r.asin] = { ...(byAsin[r.asin] || {}), research: r };
+    }
+    for (const s of (sourcesRes.data || [])) {
+      byAsin[s.asin] = { ...(byAsin[s.asin] || {}), source: s };
+    }
+    return byAsin;
+  } catch (e) {
+    console.warn('  ⚠️ P5 off-Amazon data fetch failed (non-fatal, P10 continues OCR-only):', e.message);
+    return {};
+  }
+}
+
+function formatP5OffAmazonBlock(p5Entry) {
+  if (!p5Entry) return null;
+  const parts = [];
+  if (p5Entry.source) {
+    const ex = p5Entry.source.extracted || {};
+    parts.push(`Off-Amazon retail price: ${ex.retail_price || 'N/A'} | Off-Amazon certifications: ${(ex.certifications || []).join(', ') || 'N/A'} | Source: ${p5Entry.source.source_url || 'N/A'} (${p5Entry.source.source_type || 'brand/retail page'})`);
+  }
+  if (p5Entry.research) {
+    const r = p5Entry.research;
+    if (r.competitor_angle) parts.push(`P5 competitive angle: ${r.competitor_angle.slice(0, 400)}`);
+    if (r.key_strengths?.length) parts.push(`P5 key strengths: ${r.key_strengths.slice(0, 3).join('; ')}`);
+    if (r.key_weaknesses?.length) parts.push(`P5 key weaknesses: ${r.key_weaknesses.slice(0, 3).join('; ')}`);
+  }
+  return parts.length ? parts.join('\n') : null;
+}
+
 // ─── Build Sonnet Draft Prompt ─────────────────────────────────────────────────
 
-function buildSonnetDraftPrompt(adjustedFormula, competitors, keyword) {
+function buildSonnetDraftPrompt(adjustedFormula, competitors, keyword, p5Data = {}) {
   const compSection = competitors.map((c, i) => {
     const nutrients = c.all_nutrients
       ? (typeof c.all_nutrients === 'string' ? c.all_nutrients : JSON.stringify(c.all_nutrients, null, 2))
       : null;
     const sf = c.supplement_facts_raw || '';
     const hasFormula = nutrients || sf;
-    if (!hasFormula) return `### COMPETITOR ${i+1}: ${c.brand || 'Unknown'} [${c.asin}]\nBSR: ${c.bsr_current} | $${c.price} | $${(c.monthly_revenue||0).toLocaleString()}/mo\n⚠ NO FORMULA DATA — skip comparison, list as "Formula not extracted"\n`;
+    const p5Block = formatP5OffAmazonBlock(p5Data[c.asin]);
+    const p5Section = p5Block ? `\nOff-Amazon Intelligence (P5, reference only — do NOT use for ingredient-dose verdicts, only for pricing/claims context):\n${p5Block}\n` : '';
+    if (!hasFormula) return `### COMPETITOR ${i+1}: ${c.brand || 'Unknown'} [${c.asin}]\nBSR: ${c.bsr_current} | $${c.price} | $${(c.monthly_revenue||0).toLocaleString()}/mo\n⚠ NO FORMULA DATA — skip comparison, list as "Formula not extracted"\n${p5Section}`;
     return `### COMPETITOR ${i+1}: ${c.brand || 'Unknown'} [${c.asin}]
 BSR: ${c.bsr_current?.toLocaleString()} | Price: $${c.price} | Revenue: $${(c.monthly_revenue||0).toLocaleString()}/mo
 Rating: ${c.rating_value}⭐ (${(c.rating_count||0).toLocaleString()} reviews)
@@ -207,7 +263,7 @@ ${sf.slice(0, 2500) || 'Not available'}
 
 Structured nutrients:
 ${nutrients ? nutrients.slice(0, 2000) : 'Not available'}
-`;
+${p5Section}`;
   }).join('\n---\n');
 
   return `You are a senior supplement formulator with expertise in competitive formula analysis.
@@ -218,6 +274,7 @@ ${nutrients ? nutrients.slice(0, 2000) : 'Not available'}
 3. Every dose you cite MUST appear in the provided supplement facts text above it.
 4. If you are unsure about a comparison, write "NEEDS_VERIFICATION: [reason]" instead of guessing.
 5. Do NOT use your training knowledge of what a product "typically contains" — only use the data here.
+6. "Off-Amazon Intelligence (P5)" blocks, where present, are reference-only context for pricing/claims — never use them as a source for an ingredient dose comparison; doses come exclusively from the OCR Supplement Facts / Structured nutrients above them.
 
 ## DOVIVE FINAL FORMULA (from P10 QA — this is the ground truth)
 ${adjustedFormula || 'ERROR: No adjusted formula found. Cannot benchmark.'}
@@ -472,8 +529,12 @@ async function run() {
   // as the P9 Call2 truncation fix (6000→16000 tokens, commit 59cf9a3). Fix: raise the
   // budget to 16000 (matching P9's proven ceiling) and retry once on empty output
   // before giving up — never let the raw draft silently end up null.
+  console.log(`Fetching P5 off-Amazon intelligence (reference-only pricing/claims context)...`);
+  const p5Data = await fetchP5OffAmazonData(withFormula.map(c => c.asin), KEYWORD);
+  console.log(`  ${Object.keys(p5Data).length} competitors have P5 off-Amazon data\n`);
+
   console.log(`\nCall 1: Claude (via OpenRouter) drafting ingredient comparison (${withFormula.length} competitors with OCR data)...`);
-  const sonnetPrompt = buildSonnetDraftPrompt(adjustedFormula, withFormula, KEYWORD);
+  const sonnetPrompt = buildSonnetDraftPrompt(adjustedFormula, withFormula, KEYWORD, p5Data);
   console.log(`  Prompt: ${Math.round(sonnetPrompt.length / 1000)}k chars`);
   // 2026-08-28 FIX: 16000/20000 both failed with the FULL budget consumed
   // and ZERO visible output chars (see callClaudeSonnet's reasoning:false

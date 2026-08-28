@@ -298,6 +298,8 @@ function buildPrompt(ctx, keyword, rawReviews) {
 
   return `You are a senior market intelligence analyst for DOVIVE, a supplement brand entering the ${keyword} market on Amazon US. Your job is to produce a comprehensive, CMO-ready market intelligence report that will directly inform product formulation and go-to-market strategy.
 
+Ground every claim in the MARKET DATA provided below — do not invent statistics, trends, or consumer sentiment that isn't supported by this data. If a section's underlying data is thin or missing (e.g. no reviews, no OCR dosage data), say so explicitly rather than writing generic supplement-market boilerplate to fill the gap.
+
 ## MARKET DATA — ${keyword.toUpperCase()} (Amazon US)
 
 ### Category Overview
@@ -327,10 +329,10 @@ ${ctx.servingSizeNorm}
 ${ctx.dosageTable}
 
 ### Raw Customer Reviews — POSITIVE (Voice of Customer)
-${positiveReviewSample || 'Reviews not yet available — run P3 first'}
+${positiveReviewSample || 'No positive reviews found in the database for this category.'}
 
 ### Raw Customer Reviews — CRITICAL (Pain Points)
-${criticalReviewSample || 'Reviews not yet available — run P3 first'}
+${criticalReviewSample || 'No critical reviews found in the database for this category.'}
 
 ### Price Range Distribution
 <$15: ${ctx.priceRanges.under15} | $15-20: ${ctx.priceRanges['15to20']} | $20-25: ${ctx.priceRanges['20to25']} | $25-30: ${ctx.priceRanges['25to30']} | >$30: ${ctx.priceRanges.over30}
@@ -506,8 +508,13 @@ async function run() {
   console.log(`  Top bonus ingredient: ${ctx.topBonusIngredients[0] || 'None'}`);
   console.log(`  Rising stars: ${ctx.velocities.rocket + ctx.velocities.rising} products\n`);
 
+  // Fetch raw reviews for real consumer-voice grounding
+  console.log(`Fetching raw reviews...`);
+  const rawReviews = await fetchRawReviews(CAT_ID);
+  console.log(`  ${rawReviews.positive.length} positive / ${rawReviews.critical.length} critical reviews loaded\n`);
+
   // Build prompt
-  const prompt = buildPrompt(ctx, KEYWORD);
+  const prompt = buildPrompt(ctx, KEYWORD, rawReviews);
   console.log(`Calling ${ANALYSIS_MODEL} via OpenRouter... prompt: ${Math.round(prompt.length / 1000)}k chars`);
   const startTime = Date.now();
   const report = await callGrok(prompt, 16000);

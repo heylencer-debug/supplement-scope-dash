@@ -281,8 +281,16 @@ export default function Dashboard() {
           target_price: formulaBrief.target_price ?? undefined,
           servings_per_container: formulaBrief.servings_per_container ?? undefined,
         } : undefined,
-        top_strengths: fbKeyDifferentiators?.map(d => ({ strength: d })),
-        top_weaknesses: fbRiskFactors?.map(r => ({ weakness: r })),
+        // Primary source is formula_briefs (fbKeyDifferentiators/fbRiskFactors);
+        // only fall back to the legacy category_analyses.top_strengths/top_weaknesses
+        // columns when formula_briefs has nothing (that table is "frequently empty" —
+        // see the note above dashboardData).
+        top_strengths: fbKeyDifferentiators?.length
+          ? fbKeyDifferentiators.map(d => ({ strength: d }))
+          : (analysis?.top_strengths as Array<{ strength?: string; description?: string }> | null) ?? undefined,
+        top_weaknesses: fbRiskFactors?.length
+          ? fbRiskFactors.map(r => ({ weakness: r }))
+          : (analysis?.top_weaknesses as Array<{ weakness?: string; description?: string }> | null) ?? undefined,
         market_summary: marketSummaryParsed,
         products_snapshot: analysis?.products_snapshot as {
           formula_references?: Array<{
@@ -521,7 +529,12 @@ export default function Dashboard() {
         opportunityIndex={analysis?.opportunity_index || 0}
         opportunityTier={analysis?.opportunity_tier || null}
         opportunityTierLabel={analysis?.opportunity_tier_label || null}
-        executiveSummary={analysis?.executive_summary || null}
+        // Primary source: formula_briefs.positioning (current pipeline data).
+        // Falls back to the legacy category_analyses.executive_summary column,
+        // which is "frequently empty" per the dashboardData memo's own note.
+        // recommendation/opportunityIndex/opportunityTier have no formula_briefs
+        // equivalent field today, so they remain category_analyses-sourced.
+        executiveSummary={formulaBrief?.positioning || analysis?.executive_summary || null}
         topProducts={products?.slice(0, 5).map(p => ({
           main_image_url: p.main_image_url,
           brand: p.brand,
@@ -571,6 +584,7 @@ export default function Dashboard() {
       <ScrollAnimate delay={50} variant="scale-up" duration={600}>
         <EnhancedBenchmarkComparison
           categoryId={category?.id}
+          keyword={categoryName || undefined}
           analysisData={dashboardData.benchmarkData}
           isLoading={productsLoading}
         />

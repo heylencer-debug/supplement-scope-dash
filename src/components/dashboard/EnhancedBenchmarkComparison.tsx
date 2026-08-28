@@ -27,6 +27,7 @@ import { useCompetitiveAnalysis } from "@/hooks/useCompetitiveAnalysis";
 import { BrandCard } from "@/components/ui/brand-card";
 import { SidePanelShell } from "@/components/ui/side-panel-shell";
 import { CompetitiveAnalysisResults } from "@/components/dashboard/CompetitiveAnalysisResults";
+import { useP5SourcesForKeyword } from "@/hooks/useP5Sources";
 interface VersionInfo {
   versionNumber: number;
   isActive: boolean;
@@ -35,6 +36,8 @@ interface VersionInfo {
 
 interface EnhancedBenchmarkComparisonProps {
   categoryId?: string;
+  /** Category keyword/search term — used to fetch off-Amazon P5 sources (dovive_p5_sources). */
+  keyword?: string;
   analysisData?: {
     key_insights?: {
       go_to_market?: {
@@ -1343,12 +1346,14 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
 
 export function EnhancedBenchmarkComparison({
   categoryId,
+  keyword,
   analysisData,
   isLoading = false,
   formulaVersionId,
   versionInfo,
 }: EnhancedBenchmarkComparisonProps) {
   const { data: products, isLoading: productsLoading } = useProducts(categoryId);
+  const { data: p5Sources } = useP5SourcesForKeyword(keyword);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -1761,28 +1766,31 @@ export function EnhancedBenchmarkComparison({
     return 'Pending analysis';
   };
 
-  // NEW: Get Our Concept Strengths from multiple sources
+  // Get Our Concept Strengths from multiple sources — formula_briefs (current
+  // pipeline data) is the primary source; analysisData.top_strengths is only
+  // populated from the legacy category_analyses table as a fallback when
+  // formula_briefs has nothing (see Dashboard.tsx's dashboardData memo).
   const getOurStrengths = (): string[] => {
     const strengths: string[] = [];
-    
-    // Source 1: top_strengths from category_analyses
-    const topStrengths = analysisData?.top_strengths;
-    if (topStrengths && Array.isArray(topStrengths)) {
-      topStrengths.slice(0, 3).forEach(s => {
-        if (s.strength) strengths.push(s.strength);
+
+    // Source 1: key_differentiators from formula_brief (current pipeline)
+    const differentiators = analysisData?.formula_brief?.key_differentiators;
+    if (differentiators && Array.isArray(differentiators)) {
+      differentiators.slice(0, 3).forEach(d => {
+        if (!strengths.includes(d)) strengths.push(d);
       });
     }
-    
-    // Source 2: key_differentiators from formula_brief
+
+    // Source 2: top_strengths — legacy category_analyses fallback only
     if (strengths.length < 3) {
-      const differentiators = analysisData?.formula_brief?.key_differentiators;
-      if (differentiators && Array.isArray(differentiators)) {
-        differentiators.slice(0, 3 - strengths.length).forEach(d => {
-          if (!strengths.includes(d)) strengths.push(d);
+      const topStrengths = analysisData?.top_strengths;
+      if (topStrengths && Array.isArray(topStrengths)) {
+        topStrengths.slice(0, 3 - strengths.length).forEach(s => {
+          if (s.strength && !strengths.includes(s.strength)) strengths.push(s.strength);
         });
       }
     }
-    
+
     // Source 3: key_features from formulation
     if (strengths.length < 3) {
       const keyFeatures = analysisData?.analysis_1_category_scores?.product_development?.formulation?.key_features;
@@ -1806,28 +1814,30 @@ export function EnhancedBenchmarkComparison({
     return strengths.length > 0 ? strengths : ['Pending analysis'];
   };
 
-  // NEW: Get Our Concept Weaknesses/Risks from multiple sources
+  // Get Our Concept Weaknesses/Risks from multiple sources — formula_briefs
+  // (current pipeline data) is the primary source; analysisData.top_weaknesses
+  // is only populated from the legacy category_analyses table as a fallback.
   const getOurWeaknesses = (): string[] => {
     const weaknesses: string[] = [];
-    
-    // Source 1: top_weaknesses from category_analyses
-    const topWeaknesses = analysisData?.top_weaknesses;
-    if (topWeaknesses && Array.isArray(topWeaknesses)) {
-      topWeaknesses.slice(0, 3).forEach(w => {
-        if (w.weakness) weaknesses.push(w.weakness);
+
+    // Source 1: risk_factors from formula_brief (current pipeline)
+    const riskFactors = analysisData?.formula_brief?.risk_factors;
+    if (riskFactors && Array.isArray(riskFactors)) {
+      riskFactors.slice(0, 3).forEach(r => {
+        if (!weaknesses.includes(r)) weaknesses.push(r);
       });
     }
-    
-    // Source 2: risk_factors from formula_brief
+
+    // Source 2: top_weaknesses — legacy category_analyses fallback only
     if (weaknesses.length < 3) {
-      const riskFactors = analysisData?.formula_brief?.risk_factors;
-      if (riskFactors && Array.isArray(riskFactors)) {
-        riskFactors.slice(0, 3 - weaknesses.length).forEach(r => {
-          if (!weaknesses.includes(r)) weaknesses.push(r);
+      const topWeaknesses = analysisData?.top_weaknesses;
+      if (topWeaknesses && Array.isArray(topWeaknesses)) {
+        topWeaknesses.slice(0, 3 - weaknesses.length).forEach(w => {
+          if (w.weakness && !weaknesses.includes(w.weakness)) weaknesses.push(w.weakness);
         });
       }
     }
-    
+
     // Source 3: unmet_needs (things we need to address)
     if (weaknesses.length < 3) {
       const unmetNeeds = analysisData?.analysis_1_category_scores?.customer_insights?.unmet_needs;
@@ -3190,6 +3200,35 @@ export function EnhancedBenchmarkComparison({
                     ))}
                   </div>
                 </div>
+
+                {/* Off-Amazon Sources — live-web grounding behind this strategy
+                    (dovive_p5_sources: Perplexity findings + brand-page citations),
+                    deduped by URL across the whole category. */}
+                {p5Sources && p5Sources.length > 0 && (
+                  <div className="rounded-lg p-2 border border-border/60 bg-card">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide mb-1 flex items-center gap-1.5 text-muted-foreground">
+                      <FileText className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                      Off-Amazon Sources
+                      <span className="ml-auto text-[11px] text-muted-foreground tabular-nums">{p5Sources.length}</span>
+                    </p>
+                    <div className="space-y-1">
+                      {p5Sources.slice(0, 15).map((src) => (
+                        <a
+                          key={src.id}
+                          href={src.source_url || undefined}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 text-[11px] text-foreground hover:text-primary hover:underline truncate"
+                        >
+                          {src.source_type && (
+                            <span className="shrink-0 px-1 py-0 rounded border border-border/60 text-[10px] text-muted-foreground">{src.source_type}</span>
+                          )}
+                          <span className="truncate">{src.source_url}</span>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
               </SidePanelShell>
             )}

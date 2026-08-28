@@ -47,8 +47,23 @@ export interface DovivePhase5ResearchRow {
 }
 
 export interface DoviveP5SourceRow {
+  id: number | string;
   asin: string;
   keyword: string;
+  source_url: string | null;
+  source_type: string | null;
+  raw_html_excerpt: string | null;
+  extracted: {
+    signals?: {
+      retail_price?: string | null;
+      certifications?: string[] | null;
+      excerpt_preview?: string | null;
+      dosage_mg_mentioned?: string | null;
+    } | null;
+    citations?: string[] | null;
+    perplexity_findings?: string | null;
+  } | null;
+  scraped_at: string | null;
 }
 
 /** Minimal shape of formula_briefs.ingredients (jsonb) sub-keys used by the completeness audit. */

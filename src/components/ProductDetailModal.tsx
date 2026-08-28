@@ -17,6 +17,9 @@ import { useSupplementFactsAnalysis } from "@/hooks/useSupplementFactsAnalysis";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis } from "recharts";
 import HistoricalBSRSalesChart from "@/components/product/HistoricalBSRSalesChart";
 import type { Product } from "@/hooks/useProducts";
+import { useP5SourcesForProduct } from "@/hooks/useP5Sources";
+import { useCategoryContext } from "@/contexts/CategoryContext";
+import { Globe } from "lucide-react";
 
 interface ProductDetailModalProps {
   product: Product | null;
@@ -150,7 +153,10 @@ const SENTIMENT_COLORS = {
 
 export default function ProductDetailModal({ product, open, onOpenChange }: ProductDetailModalProps) {
   const [selectedImage, setSelectedImage] = useState(0);
+  const [showFullFindings, setShowFullFindings] = useState(false);
   const { analyzeProduct, isAnalyzing } = useSupplementFactsAnalysis();
+  const { categoryName } = useCategoryContext();
+  const { data: p5Sources } = useP5SourcesForProduct(product?.asin, categoryName || undefined);
 
   if (!product) return null;
 
@@ -1883,6 +1889,98 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                   </>
                 );
               })()}
+
+              {/* Off-Amazon Intelligence — P5 dovive_p5_sources: Perplexity findings,
+                  brand-page excerpts, and citation URLs collected off-Amazon. Previously
+                  collected but never rendered anywhere in the UI. */}
+              <Panel>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium flex items-center gap-2">
+                    <Globe className="w-4 h-4 text-primary" />
+                    Off-Amazon Intelligence
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {!p5Sources || p5Sources.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-2">No off-Amazon sources found for this product yet.</p>
+                  ) : (
+                    <>
+                      {/* Source links row — favicon-style chip per citation */}
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-1.5">Sources</p>
+                        <div className="flex flex-col gap-1.5">
+                          {p5Sources.map((src) => (
+                            <div key={src.id} className="flex items-center gap-2 flex-wrap">
+                              {src.source_type && (
+                                <Badge variant="secondary" className="text-[10px] shrink-0">{src.source_type}</Badge>
+                              )}
+                              {src.source_url && (
+                                <a
+                                  href={src.source_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-1 text-xs text-primary hover:underline truncate max-w-full"
+                                >
+                                  <img
+                                    src={`https://www.google.com/s2/favicons?domain=${(() => { try { return new URL(src.source_url!).hostname; } catch { return src.source_url; } })()}`}
+                                    alt=""
+                                    className="w-3.5 h-3.5 shrink-0"
+                                  />
+                                  <span className="truncate">{src.source_url}</span>
+                                  <ExternalLink className="w-3 h-3 shrink-0" />
+                                </a>
+                              )}
+                            </div>
+                          ))}
+                          {/* Additional citation URLs found within the research (dedup vs source_url) */}
+                          {Array.from(new Set(p5Sources.flatMap(s => s.extracted?.citations || [])))
+                            .filter(url => !p5Sources.some(s => s.source_url === url))
+                            .slice(0, 10)
+                            .map((url) => (
+                              <a
+                                key={url}
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary hover:underline truncate max-w-full"
+                              >
+                                <img
+                                  src={`https://www.google.com/s2/favicons?domain=${(() => { try { return new URL(url).hostname; } catch { return url; } })()}`}
+                                  alt=""
+                                  className="w-3.5 h-3.5 shrink-0"
+                                />
+                                <span className="truncate">{url}</span>
+                                <ExternalLink className="w-3 h-3 shrink-0" />
+                              </a>
+                            ))}
+                        </div>
+                      </div>
+
+                      {/* Perplexity findings — structured text, collapsed behind show more */}
+                      {(() => {
+                        const findings = p5Sources.find(s => s.extracted?.perplexity_findings)?.extracted?.perplexity_findings;
+                        if (!findings) return null;
+                        const isLong = findings.length > 500;
+                        const displayText = showFullFindings || !isLong ? findings : `${findings.slice(0, 500)}...`;
+                        return (
+                          <div className="pt-2 border-t border-border/40">
+                            <p className="text-xs font-medium text-muted-foreground mb-1.5">Research Findings</p>
+                            <p className="text-sm text-foreground/90 whitespace-pre-wrap leading-relaxed">{displayText}</p>
+                            {isLong && (
+                              <button
+                                onClick={() => setShowFullFindings(!showFullFindings)}
+                                className="mt-1.5 text-xs text-primary hover:underline"
+                              >
+                                {showFullFindings ? "Show less" : "Show more"}
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </>
+                  )}
+                </CardContent>
+              </Panel>
             </div>
           </TabsContent>
         </Tabs>

@@ -140,7 +140,7 @@ export function DocumentContainer({ content, isLoading, title }: DocumentContain
   }
 
   return (
-    <div className="bg-white dark:bg-card max-w-[800px] mx-auto shadow-lg rounded-lg p-8 md:p-12">
+    <div className="bg-card max-w-[800px] mx-auto shadow-lg rounded-lg p-8 md:p-12">
       <article className="document-content prose prose-slate dark:prose-invert max-w-none">
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}

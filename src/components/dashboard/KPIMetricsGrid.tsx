@@ -73,42 +73,35 @@ export function KPIMetricsGrid({
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
       {kpis.map((kpi, idx) => (
-        <Card
+        <div
           key={idx}
-          className="border-border/50 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-default opacity-0 animate-fade-in"
+          className="rounded-md border border-border bg-card px-3 py-2.5 opacity-0 animate-fade-in"
           style={{ animationDelay: `${idx * 100}ms`, animationFillMode: 'forwards' }}
         >
-          <CardContent className="p-4 sm:p-6">
-            {isLoading ? (
-              <div className="space-y-3">
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-8 w-20" />
-                <Skeleton className="h-3 w-16" />
-              </div>
-            ) : (
-              <div className="animate-enter flex items-start justify-between">
-                <div>
-                  <p className="text-xs sm:text-sm font-medium text-muted-foreground mb-1">
-                    {kpi.label}
-                  </p>
-                  <p className="text-xl sm:text-2xl font-bold text-foreground">
-                    {kpi.value !== null ? kpi.value : <LoadingPulse />}
-                  </p>
-                  {kpi.subtext && (
-                    <p className={`text-[10px] sm:text-xs mt-1 ${(kpi as any).subtextColor || "text-muted-foreground"}`}>
-                      {kpi.subtext}
-                    </p>
-                  )}
-                </div>
-                <div className={`p-2 sm:p-3 rounded-full ${kpi.iconBg}`}>
-                  <kpi.icon className={`w-4 h-4 sm:w-5 sm:h-5 ${kpi.iconColor}`} />
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          {isLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-3 w-20" />
+              <Skeleton className="h-5 w-16" />
+              <Skeleton className="h-2.5 w-14" />
+            </div>
+          ) : (
+            <div className="animate-enter">
+              <p className="text-[9.5px] uppercase tracking-wide text-muted-foreground/70 mb-1">
+                {kpi.label}
+              </p>
+              <p className="text-[17px] font-extrabold text-foreground leading-none">
+                {kpi.value !== null ? kpi.value : <LoadingPulse />}
+              </p>
+              {kpi.subtext && (
+                <p className={`text-[10px] mt-1 ${(kpi as any).subtextColor || "text-muted-foreground"}`}>
+                  {kpi.subtext}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
       ))}
     </div>
   );

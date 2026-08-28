@@ -7,11 +7,13 @@
  * audit script — so a phase can never read "complete" over thin/empty data.
  */
 
-import { CheckCircle2, AlertTriangle, Loader2 } from "lucide-react";
+import { useState } from "react";
+import { CheckCircle2, AlertTriangle, Loader2, Search } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { useDataCompleteness } from "@/hooks/useDataCompleteness";
+import { useDataCompleteness, type PhaseCompleteness } from "@/hooks/useDataCompleteness";
+import { SidePanelShell } from "@/components/ui/side-panel-shell";
 
 interface DataCompletenessChecklistProps {
   keyword: string;
@@ -19,6 +21,7 @@ interface DataCompletenessChecklistProps {
 
 export function DataCompletenessChecklist({ keyword }: DataCompletenessChecklistProps) {
   const { data, isLoading, error } = useDataCompleteness(keyword);
+  const [activePhase, setActivePhase] = useState<PhaseCompleteness | null>(null);
 
   if (isLoading) {
     return (
@@ -80,40 +83,61 @@ export function DataCompletenessChecklist({ keyword }: DataCompletenessChecklist
         {data.phases.map((phase) => {
           const ok = phase.status === "complete";
           return (
-            <div
+            <button
+              type="button"
               key={phase.phase}
-              className={cn(
-                "flex items-start gap-3 rounded-lg border px-3 py-2.5 transition-colors",
-                ok ? "border-chart-4/20 bg-chart-4/5" : "border-border bg-muted/20"
-              )}
+              onClick={() => setActivePhase(phase)}
+              className={cn("check-item w-full text-left cursor-pointer", ok ? "done" : "warn")}
             >
-              {ok ? (
-                <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0 text-chart-4" />
-              ) : (
-                <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
-              )}
+              <div className="dot" />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-bold text-muted-foreground tracking-wide">P{phase.phase}</span>
-                  <span className="text-sm font-semibold text-foreground">{phase.label}</span>
-                  <Badge
-                    variant="outline"
-                    className={cn(
-                      "text-[10px] font-bold uppercase tracking-wide px-1.5 py-0",
-                      ok
-                        ? "bg-chart-4/10 text-chart-4 border-chart-4/30"
-                        : "bg-muted text-muted-foreground border-border"
-                    )}
-                  >
-                    {ok ? "Complete" : "Incomplete"}
-                  </Badge>
+                  <span className="ci-title text-xs font-bold text-muted-foreground tracking-wide">P{phase.phase}</span>
+                  <span className="ci-title text-sm font-semibold text-foreground">{phase.label}</span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">{phase.detail}</p>
               </div>
-            </div>
+              <span className="ci-pct shrink-0 text-[10px] font-bold uppercase tracking-wide">
+                {ok ? "Complete" : "Incomplete"}
+              </span>
+            </button>
           );
         })}
       </CardContent>
+
+      {activePhase && (
+        <SidePanelShell
+          title={`P${activePhase.phase} — ${activePhase.label}`}
+          icon={<Search className="h-[18px] w-[18px]" />}
+          onClose={() => setActivePhase(null)}
+        >
+          <div className="p-5 space-y-4">
+            <Badge
+              variant="outline"
+              className={cn(
+                "text-[10px] font-bold uppercase tracking-wide px-1.5 py-0",
+                activePhase.status === "complete"
+                  ? "bg-chart-4/10 text-chart-4 border-chart-4/30"
+                  : "bg-muted text-muted-foreground border-border"
+              )}
+            >
+              {activePhase.status === "complete" ? "Complete" : "Incomplete"}
+            </Badge>
+            <div>
+              <h3 className="text-xs font-bold text-muted-foreground tracking-wide uppercase mb-1">
+                Audit detail
+              </h3>
+              <p className="text-sm text-foreground leading-relaxed">{activePhase.detail}</p>
+            </div>
+            <div>
+              <h3 className="text-xs font-bold text-muted-foreground tracking-wide uppercase mb-1">
+                Keyword
+              </h3>
+              <p className="text-sm text-foreground">{keyword}</p>
+            </div>
+          </div>
+        </SidePanelShell>
+      )}
     </Card>
   );
 }

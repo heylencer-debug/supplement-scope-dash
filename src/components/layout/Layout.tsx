@@ -201,9 +201,9 @@ export function Layout({ children }: LayoutProps) {
   };
 
   return (
-    <div className="min-h-screen flex w-full">
+    <div className="h-screen flex w-full overflow-hidden">
       <AppSidebar />
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <main className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
         {/* HEADER (.dark, h-14, flat) — carries the category-tab context; the
             6 analysis tabs (Products/Market/QA/Compliance/Manufacturer/Data
             Audit) render as their own pipeline-tab strip directly under this,

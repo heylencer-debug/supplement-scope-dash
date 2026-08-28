@@ -52,7 +52,7 @@ export function AppSidebar() {
   };
 
   return (
-    <aside className="dark brand-iris-surface brand-iris-rail w-[300px] shrink-0 text-foreground hidden md:flex flex-col p-3.5 gap-3">
+    <aside className="dark brand-iris-surface brand-iris-rail w-[300px] shrink-0 h-full text-foreground hidden md:flex flex-col p-3.5 gap-3">
       {/* BRAND PLATE — opaque ink tile on a bg-black/45 scrim, same
           construction as the shell's railBody brand row. */}
       <div className="shrink-0 flex items-center gap-3 rounded-xl bg-black/45 px-3 py-2.5">
@@ -70,7 +70,7 @@ export function AppSidebar() {
       </div>
 
       {/* THE GLASS PANEL — full height, nav rows live here. */}
-      <div className="flex-1 min-h-0 flex flex-col rounded-xl border border-white/10 bg-black/60 backdrop-blur-xl overflow-hidden p-2.5 gap-1">
+      <div className="flex-1 min-h-0 flex flex-col rounded-xl border border-white/10 bg-black/60 backdrop-blur-xl overflow-y-auto p-2.5 gap-1">
         <p className="px-1 pb-1 text-[11px] font-semibold uppercase tracking-wider text-brand-smoke/50">
           Navigate
         </p>

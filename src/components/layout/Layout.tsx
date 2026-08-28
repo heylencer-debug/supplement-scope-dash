@@ -1,4 +1,3 @@
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
 import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { Plus, X, Loader2 } from "lucide-react";
@@ -198,21 +197,23 @@ export function Layout({ children }: LayoutProps) {
   };
 
   return (
-    <SidebarProvider>
-      <div className="min-h-screen flex w-full">
-        <AppSidebar />
-        <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          <header className="h-14 border-b border-border bg-card shadow-soft flex items-center px-2 sm:px-4 gap-2 sm:gap-3">
-            <SidebarTrigger className="flex-shrink-0" />
-            
+    <div className="min-h-screen flex w-full">
+      <AppSidebar />
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* HEADER (.dark, h-14, flat) — carries the category-tab context; the
+            6 analysis tabs (Products/Market/QA/Compliance/Manufacturer/Data
+            Audit) render as their own pipeline-tab strip directly under this,
+            inside Dashboard.tsx, since they're per-category-analysis state
+            that only exists on that route (see takeout-design-spec.md §1). */}
+        <header className="dark h-14 bg-background text-foreground border-b border-border/60 shadow-none flex items-center px-2 sm:px-4 gap-2 sm:gap-3 shrink-0">
             {/* New Analysis Button */}
-            <button 
+            <button
               onClick={() => navigate("/")}
               className={cn(
-                "flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 whitespace-nowrap flex-shrink-0",
-                isNewAnalysisActive 
-                  ? "bg-primary text-primary-foreground shadow-sm" 
-                  : "text-muted-foreground hover:bg-secondary hover:text-foreground hover:shadow-sm"
+                "pearl-quiet pearl-radius-tight flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-lg text-sm font-medium transition-colors duration-200 whitespace-nowrap flex-shrink-0",
+                isNewAnalysisActive
+                  ? "bg-brand-smoke/15 border border-brand-smoke/30 text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
               )}
             >
               <Plus className="w-4 h-4" />
@@ -222,7 +223,7 @@ export function Layout({ children }: LayoutProps) {
             {allTabs.length > 0 && (
               <>
                 {/* Divider */}
-                <div className="h-5 w-px bg-border flex-shrink-0" />
+                <div className="h-5 w-px bg-border/60 flex-shrink-0" />
                 
                 {/* Analysis Tabs - scrollable area with scroll indicators */}
                 <div className="flex-1 relative min-w-0 overflow-hidden">
@@ -252,10 +253,10 @@ export function Layout({ children }: LayoutProps) {
                                           <div
                                             key={tab.id}
                                             className={cn(
-                                              "flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm transition-all duration-200 group flex-shrink-0",
-                                              isActive 
-                                                ? "bg-secondary text-foreground font-medium shadow-sm" 
-                                                : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground hover:shadow-sm"
+                                              "flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm transition-colors duration-200 group flex-shrink-0 border",
+                                              isActive
+                                                ? "bg-brand-smoke/15 border-brand-smoke/30 text-foreground font-medium"
+                                                : "border-transparent text-muted-foreground hover:text-foreground"
                                             )}
                                           >
                                             <button
@@ -297,16 +298,20 @@ export function Layout({ children }: LayoutProps) {
                 </div>
               </>
             )}
-          </header>
-          <div className="flex-1 bg-background overflow-y-auto overflow-x-hidden flex flex-col items-center">
-            <div className="w-full max-w-full md:max-w-[90vw] lg:max-w-[85vw] xl:max-w-[80vw] px-3 sm:px-4 md:px-6 lg:px-0">
-              <div className="py-4 sm:py-6 md:py-8">
-                {children}
-              </div>
+        </header>
+        {/* CONTENT PANE — `.light takeout-canvas`, verbatim from the spec:
+            gray reading surface with lifted muted-foreground contrast, so
+            every existing white `bg-card` component (KPIs, benchmark cards,
+            Data Audit, etc.) reads as a card ON the canvas instead of
+            white-on-white. */}
+        <div className="light takeout-canvas flex-1 overflow-y-auto overflow-x-hidden flex flex-col items-center text-foreground">
+          <div className="w-full max-w-full md:max-w-[90vw] lg:max-w-[85vw] xl:max-w-[80vw] px-3 sm:px-4 md:px-6 lg:px-0">
+            <div className="py-4 sm:py-6 md:py-8">
+              {children}
             </div>
           </div>
-        </main>
-      </div>
-    </SidebarProvider>
+        </div>
+      </main>
+    </div>
   );
 }

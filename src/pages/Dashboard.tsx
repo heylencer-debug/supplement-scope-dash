@@ -479,14 +479,20 @@ export default function Dashboard() {
       )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="pearl-tab-lift grid w-full grid-cols-6 h-auto bg-transparent">
-          <TabsTrigger className="pearl-tab" value="products">📦 Products</TabsTrigger>
-          <TabsTrigger className="pearl-tab" value="market">📈 Market</TabsTrigger>
-          <TabsTrigger className="pearl-tab" value="qa">🔬 QA Review</TabsTrigger>
-          <TabsTrigger className="pearl-tab" value="validation">⚖️ Compliance</TabsTrigger>
-          <TabsTrigger className="pearl-tab" value="manufacturer">🏭 Manufacturer</TabsTrigger>
-          <TabsTrigger className="pearl-tab" value="data-audit">🔍 Data Audit</TabsTrigger>
-        </TabsList>
+        {/* Pipeline tab strip — dark chrome extension of the app header,
+            gliding smoke pill on the active tab (never yellow/accent), per
+            takeout-design-spec.md §1 "The header". -mx cancels Layout's page
+            gutter so this bar reads flush with the header above it. */}
+        <div className="dark -mx-3 sm:-mx-4 md:-mx-6 lg:-mx-0 px-3 sm:px-4 md:px-6 lg:px-0 bg-background border-b border-border/60">
+          <TabsList className="flex w-full items-center gap-1 h-auto py-2 bg-transparent overflow-x-auto scrollbar-hide">
+            <TabsTrigger className="takeout-pipeline-tab" value="products">📦 Products</TabsTrigger>
+            <TabsTrigger className="takeout-pipeline-tab" value="market">📈 Market</TabsTrigger>
+            <TabsTrigger className="takeout-pipeline-tab" value="qa">🔬 QA Review</TabsTrigger>
+            <TabsTrigger className="takeout-pipeline-tab" value="validation">⚖️ Compliance</TabsTrigger>
+            <TabsTrigger className="takeout-pipeline-tab" value="manufacturer">🏭 Manufacturer</TabsTrigger>
+            <TabsTrigger className="takeout-pipeline-tab" value="data-audit">🔍 Data Audit</TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="products" className="space-y-6 md:space-y-10 mt-4">
       {/* SECTION 2: KPI Metrics Grid (Scoreboards) */}

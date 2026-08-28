@@ -122,6 +122,74 @@
     --chart-4: 142 70% 45%;
     --chart-5: 262 80% 60%;
   }
+
+  /* ── DARK TOKEN SCOPE ──────────────────────────────────────────────────
+     Getnoodle's `.dark`/`.light` are CLASS SCOPES applied to specific
+     surfaces (BrandModal, the Takeout sidebar/header), not a global
+     html-level toggle — the app's default `:root` above stays the Option B
+     light palette. Any element wrapped in `.dark` (and its descendants,
+     since shadcn components all read the same var names) repaints in this
+     ink/smoke palette instead. This is also the fix for BrandModal's
+     dark-on-dark content bug: BrandModal's shell already carries a `dark`
+     class (brand-modal.tsx), but until now nothing DEFINED `.dark`, so its
+     `text-foreground`/`bg-card`/etc. content silently fell through to the
+     light tokens above (near-black text on a near-black iris surface). */
+  .dark {
+    /* Tailwind wraps these tokens in hsl(var(--x)) (see tailwind.config.ts) —
+       values here must stay raw "H S% L%" triplets, same convention as the
+       :root block above, NOT pre-wrapped hsl() strings. */
+    --background: var(--brand-ink);
+    --foreground: var(--brand-smoke);
+
+    --card: 0 0% 13%;               /* #212126-ish panel on ink */
+    --card-foreground: var(--brand-smoke);
+
+    --popover: 0 0% 13%;
+    --popover-foreground: var(--brand-smoke);
+
+    --primary: var(--brand-electric);
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 0 0% 18%;
+    --secondary-foreground: var(--brand-smoke);
+
+    --muted: 0 0% 18%;
+    --muted-foreground: 0 0% 64%;
+
+    --accent: var(--brand-electric);
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 65%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 100% / 0.1;
+    --input: 0 0% 100% / 0.14;
+    --ring: var(--brand-electric);
+
+    --sidebar-background: 0 0% 8%;
+    --sidebar-foreground: var(--brand-smoke);
+    --sidebar-primary: var(--brand-electric);
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 18%;
+    --sidebar-accent-foreground: var(--brand-smoke);
+    --sidebar-border: 0 0% 100% / 0.1;
+    --sidebar-ring: var(--brand-electric);
+  }
+
+  /* ── TAKEOUT CONTENT CANVAS ── copied verbatim from the getnoodle spec
+     (index.css:7758) — light-gray reading surface w/ lifted muted-foreground
+     contrast for dense report text, whisper gridlines, and re-grounded
+     categorical data hues. Applied to the `.light` content pane so all
+     existing dashboard cards (white bg-card) sit on this gray, not pure
+     white-on-white. */
+  .takeout-canvas {
+    background-color: color-mix(in oklab, hsl(var(--background)) 60%, hsl(var(--secondary)));
+    --muted-foreground: 0 0% 32%; /* lifted contrast for dense 11-12px report text */
+    --takeout-grid: 0 0% 90%;
+    font-feature-settings: 'tnum' 1, 'cv01' 1;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
 }
 
 @layer base {
@@ -687,5 +755,108 @@
   [data-pearl-scope='sidepanel'] .pearl-button,
   [data-pearl-scope='sidepanel'] .pearl-quiet {
     min-height: var(--pearl-h);
+  }
+}
+
+/* =====================================================================
+   TAKEOUT SHELL — dark iris sidebar + flat dark header framing the light
+   `.takeout-canvas` content pane. Per takeout-design-spec.md section 1.
+   ===================================================================== */
+@layer components {
+  /* Sidebar glass panel (the opaque body sitting on brand-iris-surface) */
+  .takeout-sidebar-glass {
+    background-color: rgba(0, 0, 0, 0.6);
+    -webkit-backdrop-filter: blur(18px);
+    backdrop-filter: blur(18px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--radius-lg);
+  }
+
+  /* Sidebar nav row — active = smoke tint + smoke hairline, never yellow */
+  .takeout-nav-item {
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    color: hsl(var(--brand-smoke) / 0.9);
+    transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+  }
+  .takeout-nav-item:hover {
+    background-color: hsl(var(--brand-smoke) / 0.06);
+  }
+  .takeout-nav-item.active {
+    background-color: hsl(var(--brand-smoke) / 0.1);
+    border-color: hsl(var(--brand-smoke) / 0.45);
+    color: hsl(var(--brand-smoke));
+  }
+
+  /* Header pipeline tab strip — gliding smoke pill, electric-blue never used
+     here (that accent is reserved for the light canvas per the spec). */
+  /* !important on the load-bearing declarations only: the shared
+     TabsTrigger default (src/components/ui/tabs.tsx) ships
+     `data-[state=active]:text-primary data-[state=active]:border-primary`
+     Tailwind utilities at the SAME specificity as an attribute-selector
+     class rule ([data-state=active] contributes like a class), and
+     Tailwind's utilities layer is emitted after @layer components — a tie
+     the utility wins by layer order. Same bug already hit `.pearl-tab`
+     (see Dashboard.tsx / prior session notes); belt-and-suspenders here
+     instead of re-touching the shared default a second time. */
+  .takeout-pipeline-tab {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    height: 2.25rem;
+    padding: 0 0.875rem;
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    font-weight: 500;
+    color: hsl(var(--brand-smoke) / 0.55) !important;
+    background: transparent;
+    border: 1px solid transparent !important;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+  }
+  .takeout-pipeline-tab:hover {
+    color: hsl(var(--brand-smoke) / 0.85) !important;
+  }
+  .takeout-pipeline-tab[data-state='active'] {
+    color: hsl(var(--brand-smoke)) !important;
+    background-color: hsl(var(--brand-smoke) / 0.15);
+    border-color: hsl(var(--brand-smoke) / 0.3) !important;
+  }
+  .takeout-pipeline-tab .takeout-tab-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 18px;
+    min-width: 18px;
+    padding: 0 4px;
+    border-radius: 9999px;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1;
+    background: hsl(var(--brand-smoke) / 0.14);
+    color: hsl(var(--brand-smoke) / 0.75);
+  }
+  .takeout-pipeline-tab[data-state='active'] .takeout-tab-count {
+    background: hsl(var(--brand-smoke));
+    color: hsl(var(--brand-ink));
+  }
+
+  /* YieldChip-style metric chip, for the light canvas */
+  .takeout-metric-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    height: 1.5rem;
+    padding: 0 0.5rem;
+    border-radius: var(--radius-md);
+    background: hsl(var(--muted) / 0.6);
+    border: 1px solid hsl(var(--border));
+    font-size: 11px;
+    font-weight: 500;
+    color: hsl(var(--muted-foreground));
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
 }

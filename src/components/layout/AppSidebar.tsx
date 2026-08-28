@@ -1,18 +1,23 @@
 import { Search, LayoutDashboard, Table, Building2, Package, LucideIcon } from "lucide-react";
 import { NavLink as RouterNavLink, useLocation } from "react-router-dom";
 import { useCategoryContext } from "@/contexts/CategoryContext";
-import { cn } from "@/lib/utils";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-} from "@/components/ui/sidebar";
+import { LibraryRow } from "@/components/library/LibraryModalShell";
 
+/**
+ * Noodle Takeout page rail (see takeout-design-spec.md section 1 +
+ * ~/getnoodle's LibraryModalShell.tsx, the canonical distillation of
+ * TakeoutModal's anatomy — src/components/library/LibraryModalShell.tsx in
+ * this repo is a verbatim port of that file, kept byte-faithful for a future
+ * Noodle-subapp merge).
+ *
+ * This component reuses the SAME class recipe and the SAME `LibraryRow` row
+ * primitive as the ported shell, but as plain page markup instead of inside
+ * a Radix Dialog — Dovive is a routed multi-page SPA, not a dialog launched
+ * from a host app, so wrapping every route in a focus-trapped modal isn't
+ * viable. `.dark brand-iris-surface` rail: brand plate on a `bg-black/45`
+ * scrim + a full-height `bg-black/60 backdrop-blur-xl` glass panel, exactly
+ * as the shell's `railBody`.
+ */
 
 interface MenuItem {
   title: string;
@@ -29,71 +34,6 @@ const menuItems: MenuItem[] = [
   { title: "Manufacturer Portal", url: "/manufacturer-portal", icon: Building2, preserveCategory: false },
 ];
 
-interface NavItemProps {
-  item: MenuItem;
-  isActive: boolean;
-  href: string;
-  trailing?: React.ReactNode;
-}
-
-function NavItem({ item, isActive, href, trailing }: NavItemProps) {
-  const Icon = item.icon;
-  
-  return (
-    <SidebarMenuItem>
-      <SidebarMenuButton asChild>
-        <RouterNavLink
-          to={href}
-          end={item.url === "/"}
-          className={cn(
-            "group relative flex items-center gap-3 px-4 py-3.5 rounded-[15px] text-sidebar-foreground/80 transition-all duration-300 overflow-hidden",
-            "hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
-            isActive && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground shadow-[0_4px_14px_rgba(255,255,255,0.25)]"
-          )}
-        >
-          {/* Hover background effect */}
-          <span className={cn(
-            "absolute inset-0 bg-sidebar-accent/30 rounded-[15px] scale-x-0 origin-left transition-transform duration-300",
-            "group-hover:scale-x-100",
-            isActive && "hidden"
-          )} />
-          
-          
-          {/* Icon with bounce animation */}
-          <span className={cn(
-            "relative z-10 transition-transform duration-300",
-            "group-hover:animate-icon-bounce",
-            isActive && "group-hover:animate-none"
-          )}>
-            <Icon className="w-5 h-5" />
-          </span>
-          
-          {/* Text */}
-          <span className={cn(
-            "relative z-10 font-semibold transition-transform duration-200",
-            "group-hover:translate-x-0.5",
-            isActive && "group-hover:translate-x-0"
-          )}>
-            {item.title}
-          </span>
-          
-          {/* Trailing indicator */}
-          {trailing && (
-            <span className="relative z-10">
-              {trailing}
-            </span>
-          )}
-          
-          {/* Hover glow effect for active items */}
-          {isActive && (
-            <span className="absolute inset-0 bg-white/5 rounded-[15px] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-          )}
-        </RouterNavLink>
-      </SidebarMenuButton>
-    </SidebarMenuItem>
-  );
-}
-
 export function AppSidebar() {
   const { categoryName } = useCategoryContext();
   const location = useLocation();
@@ -107,45 +47,46 @@ export function AppSidebar() {
 
   const isActive = (item: MenuItem) => {
     const pathname = location.pathname;
-    if (item.url === "/") {
-      return pathname === "/";
-    }
+    if (item.url === "/") return pathname === "/";
     return pathname.startsWith(item.url);
   };
 
   return (
-    <Sidebar className="rounded-r-[30px] overflow-hidden">
-      <SidebarHeader className="p-6 border-b border-sidebar-border/30">
-        <div className="flex items-center gap-3 group cursor-pointer">
-          <div className={cn(
-            "w-12 h-12 rounded-2xl bg-sidebar-primary flex items-center justify-center shadow-[0_4px_14px_rgba(255,255,255,0.25)]",
-            "transition-all duration-300 group-hover:scale-105 group-hover:shadow-[0_6px_20px_rgba(255,255,255,0.35)]"
-          )}>
-            <Search className="w-6 h-6 text-sidebar-primary-foreground transition-transform duration-300 group-hover:rotate-12" />
-          </div>
-          <div className="transition-transform duration-200 group-hover:translate-x-0.5">
-            <h1 className="text-lg font-bold text-sidebar-foreground">Noodle Search</h1>
-            <p className="text-xs text-sidebar-foreground/70">Market Intelligence</p>
-          </div>
+    <aside className="dark brand-iris-surface w-[300px] shrink-0 text-foreground hidden md:flex flex-col p-3.5 gap-3">
+      {/* BRAND PLATE — opaque ink tile on a bg-black/45 scrim, same
+          construction as the shell's railBody brand row. */}
+      <div className="shrink-0 flex items-center gap-3 rounded-xl bg-black/45 px-3 py-2.5">
+        <span className="inline-flex items-center justify-center h-11 w-11 rounded-lg bg-brand-ink border border-brand-smoke/20 text-brand-smoke shrink-0">
+          <Search className="w-5 h-5" />
+        </span>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold tracking-tight leading-tight text-brand-smoke truncate">
+            Dovive Scout
+          </p>
+          <p className="text-xs text-brand-smoke/75 leading-snug truncate">
+            Supplement Intelligence
+          </p>
         </div>
-      </SidebarHeader>
-      <SidebarContent className="p-5">
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu className="space-y-2">
-              {menuItems.map((item) => (
-                <NavItem
-                  key={item.title}
-                  item={item}
-                  isActive={isActive(item)}
-                  href={getUrl(item)}
-                  trailing={undefined}
-                />
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-    </Sidebar>
+      </div>
+
+      {/* THE GLASS PANEL — full height, nav rows live here. */}
+      <div className="flex-1 min-h-0 flex flex-col rounded-xl border border-white/10 bg-black/60 backdrop-blur-xl overflow-hidden p-2.5 gap-1">
+        <p className="px-1 pb-1 text-[11px] font-semibold uppercase tracking-wider text-brand-smoke/50">
+          Navigate
+        </p>
+        {menuItems.map((item) => {
+          const Icon = item.icon;
+          const active = isActive(item);
+          return (
+            <LibraryRow key={item.title} selected={active} title={item.title}>
+              <RouterNavLink to={getUrl(item)} end={item.url === "/"} className="flex items-center gap-2.5">
+                <Icon className="w-4 h-4 shrink-0 text-brand-smoke/85" aria-hidden />
+                <span className="text-[13px] font-medium truncate text-brand-smoke/95">{item.title}</span>
+              </RouterNavLink>
+            </LibraryRow>
+          );
+        })}
+      </div>
+    </aside>
   );
 }

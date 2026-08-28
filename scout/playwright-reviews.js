@@ -59,11 +59,13 @@ async function isBlocked(page) {
 
 // ── Fetch ASINs from Supabase ─────────────────────────────────────────────────
 async function getAsins() {
-  // Order by BSR rank (nulls last) instead of scraped_at — with MAX_ASINS
-  // capping the batch, this guarantees the top-ranked products (the ones
-  // P4/P11's "top 20 BSR" gates care about) get reviews first regardless of
-  // how many total products the category has.
-  let url = `${SUPABASE_URL}/rest/v1/dovive_research?select=asin,keyword,title,bsr,rank_position&order=rank_position.asc.nullslast,bsr.asc.nullslast`;
+  // The verifier's P3 gate checks the top-20 products by DASH bsr_current
+  // (Keepa-enriched, fresher than the scrape-time dovive_research.bsr).
+  // The old ordering here was rank_position (search rank) first — a
+  // different set entirely, so the capped MAX_ASINS batch kept scraping
+  // products the gate never looks at while the true top-BSR sellers stayed
+  // uncovered. Rank candidates by the SAME bsr_current the gate uses.
+  let url = `${SUPABASE_URL}/rest/v1/dovive_research?select=asin,keyword,title,bsr,rank_position`;
   if (KEYWORD_FILTER) url += `&keyword=eq.${encodeURIComponent(KEYWORD_FILTER)}`;
 
   const res = await fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } });
@@ -71,11 +73,36 @@ async function getAsins() {
   const data = await res.json();
 
   const seen = new Set();
-  return data.filter(r => {
+  const rows = data.filter(r => {
     if (seen.has(r.asin)) return false;
     seen.add(r.asin);
     return true;
   });
+
+  // Pull bsr_current for these ASINs from the DASH products table and sort
+  // by it (nulls last, falling back to scrape-time bsr, then rank_position).
+  try {
+    const DASH_URL_ = process.env.DASH_URL || SUPABASE_URL;
+    const DASH_KEY_ = process.env.DASH_KEY || SUPABASE_KEY;
+    const asinList = rows.map(r => r.asin).join(',');
+    const dashRes = await fetch(`${DASH_URL_}/rest/v1/products?select=asin,bsr_current&asin=in.(${asinList})`, {
+      headers: { apikey: DASH_KEY_, Authorization: `Bearer ${DASH_KEY_}` }
+    });
+    if (dashRes.ok) {
+      const bsrByAsin = {};
+      for (const p of await dashRes.json()) {
+        if (p.bsr_current != null && (bsrByAsin[p.asin] == null || p.bsr_current < bsrByAsin[p.asin])) bsrByAsin[p.asin] = p.bsr_current;
+      }
+      const key = r => bsrByAsin[r.asin] ?? r.bsr ?? (r.rank_position != null ? 10000000 + r.rank_position : Infinity);
+      rows.sort((a, b) => key(a) - key(b));
+      console.log(`   ASIN order: DASH bsr_current (${Object.keys(bsrByAsin).length}/${rows.length} matched)`);
+      return rows;
+    }
+  } catch (e) {
+    console.warn(`   ⚠️ DASH bsr_current lookup failed (${e.message}) — falling back to scrape-time ordering`);
+  }
+  rows.sort((a, b) => (a.bsr ?? Infinity) - (b.bsr ?? Infinity) || (a.rank_position ?? Infinity) - (b.rank_position ?? Infinity));
+  return rows;
 }
 
 async function getScrapedAsins() {

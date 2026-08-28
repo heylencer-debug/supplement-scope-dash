@@ -51,7 +51,7 @@ function getOpenRouterKey()   { return process.env.OPENROUTER_API_KEY || null; }
 const ANALYSIS_MODEL = process.env.ANALYSIS_MODEL || 'anthropic/claude-sonnet-5';
 const VALIDATION_MODEL = process.env.VALIDATION_MODEL || 'anthropic/claude-opus-5';
 
-async function callClaudeSonnet(prompt, maxTokens = 12000) {
+async function callClaudeSonnet(prompt, maxTokens = 32000) {
   const key = getOpenRouterKey();
   if (!key) throw new Error('OPENROUTER_API_KEY not set');
   const start = Date.now();
@@ -70,6 +70,17 @@ async function callClaudeSonnet(prompt, maxTokens = 12000) {
         model: ANALYSIS_MODEL,
         max_tokens: maxTokens,
         stream: true,
+        // 2026-08-28 FIX: root cause of the previously-empty draft
+        // (`27510→16000 finish_reason:length, 0k chars`, TWICE, on a 40-
+        // competitor exhaustive ingredient table) — the completion budget
+        // was fully consumed with zero visible `delta.content` text, which
+        // only happens when a model spends its whole budget on hidden
+        // reasoning/thinking tokens before ever emitting the answer.
+        // Explicitly disable extended thinking for this deterministic,
+        // data-driven tabular task (no benefit from chain-of-thought here,
+        // every fact must come from the provided OCR data verbatim) so the
+        // full token budget goes to visible output.
+        reasoning: { enabled: false },
         messages: [{ role: 'user', content: prompt }],
       }),
     });
@@ -78,6 +89,7 @@ async function callClaudeSonnet(prompt, maxTokens = 12000) {
       throw new Error(`Claude Sonnet error ${res.status}: ${errText.slice(0, 200)}`);
     }
     let output = '';
+    let reasoning = '';
     let promptTokens = 0, completionTokens = 0, finishReason = null;
     const text = await res.text();
     for (const line of text.split('\n')) {
@@ -89,6 +101,12 @@ async function callClaudeSonnet(prompt, maxTokens = 12000) {
         if (j.error) throw new Error(`Claude Sonnet error: ${j.error.message || JSON.stringify(j.error)}`);
         const delta = j.choices?.[0]?.delta?.content;
         if (delta) output += delta;
+        // Diagnostic only — reasoning/thinking deltas (if the provider still
+        // emits them despite reasoning:{enabled:false}) are NOT counted as
+        // real output but are logged so a future empty-output case is
+        // immediately diagnosable instead of a silent mystery.
+        const reasoningDelta = j.choices?.[0]?.delta?.reasoning || j.choices?.[0]?.delta?.reasoning_content;
+        if (reasoningDelta) reasoning += reasoningDelta;
         if (j.choices?.[0]?.finish_reason) finishReason = j.choices[0].finish_reason;
         if (j.usage) { promptTokens = j.usage.prompt_tokens || 0; completionTokens = j.usage.completion_tokens || 0; }
       } catch (e) {
@@ -98,7 +116,7 @@ async function callClaudeSonnet(prompt, maxTokens = 12000) {
     if (promptTokens || completionTokens) console.log(`  Tokens: ${promptTokens}→${completionTokens}${finishReason ? ` (finish_reason: ${finishReason})` : ''}`);
     console.log(`  ✅ Claude Sonnet done (${Math.round((Date.now()-start)/1000)}s, ${Math.round(output.length/1000)}k chars)`);
     if (!output) {
-      console.warn(`  ⚠ Claude Sonnet returned EMPTY output (finish_reason: ${finishReason || 'unknown'}, completion_tokens: ${completionTokens}) — likely max_tokens too low or all budget consumed before content. NOT coercing to null silently.`);
+      console.warn(`  ⚠ Claude Sonnet returned EMPTY output (finish_reason: ${finishReason || 'unknown'}, completion_tokens: ${completionTokens}, reasoning_chars: ${reasoning.length}) — likely max_tokens too low or all budget consumed before content. NOT coercing to null silently.`);
     }
     // Never silently coerce empty-but-real responses to null — an empty string is diagnosable,
     // null looks identical to "never called". Caller decides how to handle empties.
@@ -127,6 +145,9 @@ async function callClaudeOpus(prompt, maxTokens = 16000) {
         model: VALIDATION_MODEL,
         max_tokens: maxTokens,
         stream: true,
+        // 2026-08-28: same fix applied here for consistency/safety — see
+        // callClaudeSonnet's comment above for the observed root cause.
+        reasoning: { enabled: false },
         messages: [{ role: 'user', content: prompt }],
       }),
     });
@@ -135,6 +156,7 @@ async function callClaudeOpus(prompt, maxTokens = 16000) {
       throw new Error(`Claude Opus error ${res.status}: ${errText.slice(0, 200)}`);
     }
     let output = '';
+    let reasoning = '';
     let promptTokens = 0, completionTokens = 0, finishReason = null;
     const text = await res.text();
     for (const line of text.split('\n')) {
@@ -146,6 +168,8 @@ async function callClaudeOpus(prompt, maxTokens = 16000) {
         if (j.error) throw new Error(`Claude Opus error: ${j.error.message || JSON.stringify(j.error)}`);
         const delta = j.choices?.[0]?.delta?.content;
         if (delta) output += delta;
+        const reasoningDelta = j.choices?.[0]?.delta?.reasoning || j.choices?.[0]?.delta?.reasoning_content;
+        if (reasoningDelta) reasoning += reasoningDelta;
         if (j.choices?.[0]?.finish_reason) finishReason = j.choices[0].finish_reason;
         if (j.usage) { promptTokens = j.usage.prompt_tokens || 0; completionTokens = j.usage.completion_tokens || 0; }
       } catch (e) {
@@ -155,7 +179,7 @@ async function callClaudeOpus(prompt, maxTokens = 16000) {
     if (promptTokens || completionTokens) console.log(`  Tokens: ${promptTokens}→${completionTokens}${finishReason ? ` (finish_reason: ${finishReason})` : ''}`);
     console.log(`  ✅ Claude Opus done (${Math.round((Date.now()-start)/1000)}s, ${Math.round(output.length/1000)}k chars)`);
     if (!output) {
-      console.warn(`  ⚠ Claude Opus returned EMPTY output (finish_reason: ${finishReason || 'unknown'}, completion_tokens: ${completionTokens})`);
+      console.warn(`  ⚠ Claude Opus returned EMPTY output (finish_reason: ${finishReason || 'unknown'}, completion_tokens: ${completionTokens}, reasoning_chars: ${reasoning.length})`);
     }
     return output;
   } finally {
@@ -451,10 +475,15 @@ async function run() {
   console.log(`\nCall 1: Claude (via OpenRouter) drafting ingredient comparison (${withFormula.length} competitors with OCR data)...`);
   const sonnetPrompt = buildSonnetDraftPrompt(adjustedFormula, withFormula, KEYWORD);
   console.log(`  Prompt: ${Math.round(sonnetPrompt.length / 1000)}k chars`);
-  let sonnetDraft = await callClaudeSonnet(sonnetPrompt, 16000);
+  // 2026-08-28 FIX: 16000/20000 both failed with the FULL budget consumed
+  // and ZERO visible output chars (see callClaudeSonnet's reasoning:false
+  // fix above) — raised to 32000/48000, well inside Sonnet 5's confirmed
+  // 128000 max_completion_tokens, as a belt-and-suspenders safety net on
+  // top of disabling reasoning tokens.
+  let sonnetDraft = await callClaudeSonnet(sonnetPrompt, 32000);
   if (!sonnetDraft) {
-    console.warn(`  ⚠ Sonnet draft came back empty — retrying once with a larger token budget (20000)...`);
-    sonnetDraft = await callClaudeSonnet(sonnetPrompt, 20000);
+    console.warn(`  ⚠ Sonnet draft came back empty — retrying once with a larger token budget (48000)...`);
+    sonnetDraft = await callClaudeSonnet(sonnetPrompt, 48000);
   }
   if (!sonnetDraft) {
     console.error(`  ❌ Sonnet draft still empty after retry — persisting explicit error marker instead of null so this is diagnosable, not silently lost.`);

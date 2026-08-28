@@ -262,6 +262,35 @@ async function fetchP5DeepResearch(keyword) {
   }
 }
 
+// ─── Category-level Packaging Summary Fetch (2026-08-28 FIX) ────────────────
+// ROOT CAUSE of empty key_differentiators/weak opportunity_insights:
+// extractPackagingIntelligence() below reads each product's ROW-LEVEL
+// marketing_analysis.packaging_intelligence, which is P7's per-product
+// analyzePackaging() output — {primary_benefit_claim, benefit_claims,
+// badge_claims, inferred_color_palette, claim_density, messaging_score,
+// headline_hook, ...}. It has NO whitespace_gaps/market_gaps/gaps,
+// differentiation_opportunities/visual_differentiation, or
+// competitor_weaknesses/weaknesses keys — those never existed on the
+// per-product shape, so every branch below silently matched nothing on
+// every run. The REAL category-level summary (market_gaps.benefit_gaps/
+// badge_gaps, saturated_claims, dovive_packaging_strategy with
+// claims_to_own/badges_to_feature/key_insight/color_rationale) is computed
+// once per category by P7's buildPackagingSummary() and saved to the
+// separate `dovive_packaging_intelligence` table (upsert keyed by exact
+// `keyword`), which P8 never queried. Fetch it here.
+async function fetchCategoryPackagingSummary(keyword) {
+  try {
+    const { data } = await DOVIVE.from('dovive_packaging_intelligence')
+      .select('intelligence, generated_at, products_analyzed')
+      .eq('keyword', keyword)
+      .maybeSingle();
+    return data?.intelligence || null;
+  } catch (e) {
+    console.warn('  ⚠️ Category packaging summary fetch failed (non-fatal):', e.message);
+    return null;
+  }
+}
+
 // ─── Full Packaging Intelligence Fetch ───────────────────────────────────────
 function extractPackagingIntelligence(allProducts) {
   const colorSignals = {};
@@ -328,6 +357,48 @@ function extractPackagingIntelligence(allProducts) {
     differentiationOpps: uniqueOpps,
     competitorWeaknesses: uniqueWeaknesses,
     labelHierarchyPatterns: labelHierarchyPatterns.slice(0, 5),
+  };
+}
+
+// 2026-08-28 FIX: merges the REAL category-level P7 packaging summary
+// (fetched via fetchCategoryPackagingSummary(), see comment above) into the
+// per-product-derived object above. Real, non-empty content only — anything
+// missing is left as an empty array, never invented.
+function mergeCategoryPackagingSummary(perProductIntel, categorySummary) {
+  if (!categorySummary) return perProductIntel;
+
+  const strategy = categorySummary.dovive_packaging_strategy || {};
+  const gaps = categorySummary.market_gaps || {};
+  const saturated = categorySummary.saturated_claims || [];
+
+  // Real differentiation opportunities: underused benefit claims + badges
+  // Dovive should own, plus the strategy's own key insight (already a
+  // grounded, human-readable sentence computed from real frequency data).
+  const realDiffOpps = [
+    ...(strategy.claims_to_own || []).map(label => `Own the "${label}" claim — underused by competitors in this category.`),
+    ...(strategy.badges_to_feature || []).map(label => `Feature "${label}" badge — low competitor adoption, high trust signal.`),
+    strategy.key_insight || null,
+    strategy.color_rationale || null,
+  ].filter(Boolean);
+
+  // Real whitespace gaps: benefit/badge claims used by <15%/<10% of the
+  // category (P7's benefitGaps/badgeGaps), formatted as readable strings.
+  const realWhiteSpace = [
+    ...(gaps.benefit_gaps || []).map(g => `"${g.label}" claim — only ${g.pct}% of competitors use it`),
+    ...(gaps.badge_gaps || []).map(g => `"${g.label}" badge — only ${g.pct}% of competitors use it`),
+  ];
+
+  // Real "competitor weaknesses" proxy: saturated claims are what most
+  // competitors lean on (an over-reliance / lack-of-differentiation risk
+  // for the category, not a true per-competitor weakness — P7 has no
+  // direct weakness signal, so this is the closest real, non-invented data).
+  const realSaturation = saturated.map(c => `${c.pct}% of competitors rely on the "${c.label}" claim — saturated, low differentiation if copied.`);
+
+  return {
+    ...perProductIntel,
+    differentiationOpps: [...new Set([...realDiffOpps, ...(perProductIntel.differentiationOpps || [])])].slice(0, 10),
+    whiteSpaceGaps: [...new Set([...realWhiteSpace, ...(perProductIntel.whiteSpaceGaps || [])])].slice(0, 15),
+    competitorWeaknesses: [...new Set([...realSaturation, ...(perProductIntel.competitorWeaknesses || [])])].slice(0, 10),
   };
 }
 
@@ -565,8 +636,15 @@ async function compileMarketData(categoryId) {
 
   // ── Full Packaging Intelligence from P8 ──────────────────────────────────
   console.log('  Extracting full P8 packaging intelligence...');
-  const packagingIntel = extractPackagingIntelligence(allProducts);
-  console.log(`  P8 packaging: ${packagingIntel.whiteSpaceGaps.length} gaps, ${packagingIntel.differentiationOpps.length} opps`);
+  const perProductPackagingIntel = extractPackagingIntelligence(allProducts);
+  // 2026-08-28 FIX: merge in the REAL category-level P7 summary
+  // (dovive_packaging_intelligence table) — see fetchCategoryPackagingSummary/
+  // mergeCategoryPackagingSummary above; the per-product loop alone never
+  // populated differentiationOpps/whiteSpaceGaps/competitorWeaknesses since
+  // those keys don't exist on the per-product row shape.
+  const categoryPackagingSummary = await fetchCategoryPackagingSummary(KEYWORD);
+  const packagingIntel = mergeCategoryPackagingSummary(perProductPackagingIntel, categoryPackagingSummary);
+  console.log(`  P8 packaging: ${packagingIntel.whiteSpaceGaps.length} gaps, ${packagingIntel.differentiationOpps.length} opps (category summary found: ${!!categoryPackagingSummary})`);
 
   // ── Pull actual raw review text from dovive_reviews ───────────────────────
   let rawReviewText = { positive: [], negative: [] };
@@ -1335,19 +1413,33 @@ async function saveToDB(categoryId, grokBrief, claudeBrief, marketData, position
     // (real packaging-gap analysis + P5's real off-Amazon/grounded competitor
     // angles), so every run gets non-empty values without relying on the
     // dead seed script or fabricated demo content.
+    // 2026-08-28 FIX: differentiationOpps/whiteSpaceGaps now come from the
+    // REAL category-level P7 packaging summary (see
+    // fetchCategoryPackagingSummary/mergeCategoryPackagingSummary) instead
+    // of the always-empty per-product-shape lookup — non-empty on any run
+    // where P7 has completed for this keyword.
     key_differentiators: [
       ...(marketData.packaging_intelligence?.differentiationOpps || []).slice(0, 5),
       ...(marketData.p5_deep_research || []).map(r => r.competitor_angle).filter(Boolean).slice(0, 5),
     ].filter(Boolean).slice(0, 8),
+    // 2026-08-28 FIX: was a single stat line ("N competitors analyzed at avg
+    // price $X") — not an insight. Now leads with the real, computed
+    // whitespace-gap opportunities (underused claims/badges with real %
+    // figures) and unmet pain points; the stat line is demoted to trailing
+    // context only, never the sole content. Left empty (not stat-line
+    // filler) if genuinely no real insight data exists.
     opportunity_insights: [
-      marketData.category_summary.total_products
-        ? `${marketData.category_summary.total_products} competitors analyzed at avg price ${marketData.category_summary.avg_price}.`
-        : null,
       (marketData.packaging_intelligence?.whiteSpaceGaps || []).length
-        ? `Packaging whitespace gaps: ${marketData.packaging_intelligence.whiteSpaceGaps.slice(0, 5).join('; ')}.`
+        ? `Packaging whitespace: ${marketData.packaging_intelligence.whiteSpaceGaps.slice(0, 5).join('; ')}.`
         : null,
       marketData.category_summary.top_pain_points?.length
         ? `Top unmet consumer pain points: ${marketData.category_summary.top_pain_points.slice(0, 5).map(p => p.keyword).join(', ')}.`
+        : null,
+      (marketData.p5_deep_research || []).map(r => r.key_weaknesses).filter(Boolean).length
+        ? `Competitor gaps from off-Amazon research: ${[...new Set((marketData.p5_deep_research || []).map(r => r.key_weaknesses).filter(Boolean))].slice(0, 3).join('; ')}.`
+        : null,
+      marketData.category_summary.total_products
+        ? `(${marketData.category_summary.total_products} competitors analyzed at avg price ${marketData.category_summary.avg_price}.)`
         : null,
     ].filter(Boolean).join(' ') || null,
     risk_factors: [

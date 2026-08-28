@@ -10,6 +10,7 @@ import { CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from 
 import { BrandCard } from "@/components/ui/brand-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PearlButton } from "@/components/ui/pearl-button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertCircle, FlaskConical, Target, ShieldCheck, Package,
@@ -242,10 +243,10 @@ function FormulaCard({ card, categoryName, generatedAt, onManufacturerPDF }: {
         <CardContent className="pt-4 pb-4">
           <div className="flex justify-end mb-3 gap-2 flex-wrap">
             {onManufacturerPDF && (
-              <Button variant="default" size="sm" onClick={onManufacturerPDF} className="flex items-center gap-2 text-xs">
+              <PearlButton variant="primary" withSparkle={false} onClick={onManufacturerPDF} className="flex items-center gap-2 text-xs h-8">
                 <FileText className="h-3.5 w-3.5" />
                 Manufacturer PDF
-              </Button>
+              </PearlButton>
             )}
             <Button variant="outline" size="sm" onClick={download} className="flex items-center gap-2 text-xs">
               <Download className="h-3.5 w-3.5" />

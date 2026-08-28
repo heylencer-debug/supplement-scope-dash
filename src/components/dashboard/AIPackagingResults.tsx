@@ -37,12 +37,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { BrandModal } from "@/components/ui/brand-modal";
 
 interface AIPackagingResultsProps {
   analysis: PackagingDesignAnalysis;
@@ -488,33 +483,30 @@ export function AIPackagingResults({ analysis, mockupImageUrl, onSaveMockup, onR
         ) : null}
 
         {/* Full Image Modal */}
-        <Dialog open={isImageModalOpen} onOpenChange={setIsImageModalOpen}>
-          <DialogContent className="max-w-4xl w-full p-0 overflow-hidden">
-            <DialogHeader className="p-4 pb-2">
-              <DialogTitle className="flex items-center gap-2">
-                <ImageIcon className="w-5 h-5 text-primary" />
-                AI Product Mockup
-              </DialogTitle>
-            </DialogHeader>
-            <div className="p-4 pt-0">
-              {generatedMockup && (
-                <div className="relative">
-                  <img 
-                    src={generatedMockup} 
-                    alt="AI Generated Product Mockup - Full Size"
-                    className="w-full h-auto rounded-lg shadow-lg"
-                  />
-                  <div className="absolute bottom-4 right-4 flex gap-2">
-                    <Button size="sm" variant="secondary" onClick={downloadMockup} className="gap-1.5 shadow-lg">
-                      <Download className="w-4 h-4" />
-                      Download
-                    </Button>
-                  </div>
-                </div>
-              )}
+        <BrandModal
+          open={isImageModalOpen}
+          onOpenChange={setIsImageModalOpen}
+          size="lg"
+          icon={<ImageIcon className="w-5 h-5" />}
+          title="AI Product Mockup"
+          bodyClassName="px-0 pb-0 sm:px-0 sm:pb-0"
+        >
+          {generatedMockup && (
+            <div className="relative px-5 pb-5 sm:px-6 sm:pb-6">
+              <img
+                src={generatedMockup}
+                alt="AI Generated Product Mockup - Full Size"
+                className="w-full h-auto rounded-lg shadow-lg"
+              />
+              <div className="absolute bottom-9 right-9 flex gap-2">
+                <Button size="sm" variant="secondary" onClick={downloadMockup} className="gap-1.5 shadow-lg">
+                  <Download className="w-4 h-4" />
+                  Download
+                </Button>
+              </div>
             </div>
-          </DialogContent>
-        </Dialog>
+          )}
+        </BrandModal>
       </div>
     );
   }
@@ -698,33 +690,30 @@ export function AIPackagingResults({ analysis, mockupImageUrl, onSaveMockup, onR
           </CardContent>
 
           {/* Full Image Modal */}
-          <Dialog open={isImageModalOpen} onOpenChange={setIsImageModalOpen}>
-            <DialogContent className="max-w-4xl w-full p-0 overflow-hidden">
-              <DialogHeader className="p-4 pb-2">
-                <DialogTitle className="flex items-center gap-2">
-                  <ImageIcon className="w-5 h-5 text-primary" />
-                  AI Product Mockup
-                </DialogTitle>
-              </DialogHeader>
-              <div className="p-4 pt-0">
-                {generatedMockup && (
-                  <div className="relative">
-                    <img 
-                      src={generatedMockup} 
-                      alt="AI Generated Product Mockup - Full Size"
-                      className="w-full h-auto rounded-lg shadow-lg"
-                    />
-                    <div className="absolute bottom-4 right-4 flex gap-2">
-                      <Button size="sm" variant="secondary" onClick={downloadMockup} className="gap-1.5 shadow-lg">
-                        <Download className="w-4 h-4" />
-                        Download
-                      </Button>
-                    </div>
-                  </div>
-                )}
+          <BrandModal
+            open={isImageModalOpen}
+            onOpenChange={setIsImageModalOpen}
+            size="lg"
+            icon={<ImageIcon className="w-5 h-5" />}
+            title="AI Product Mockup"
+            bodyClassName="px-0 pb-0 sm:px-0 sm:pb-0"
+          >
+            {generatedMockup && (
+              <div className="relative px-5 pb-5 sm:px-6 sm:pb-6">
+                <img
+                  src={generatedMockup}
+                  alt="AI Generated Product Mockup - Full Size"
+                  className="w-full h-auto rounded-lg shadow-lg"
+                />
+                <div className="absolute bottom-9 right-9 flex gap-2">
+                  <Button size="sm" variant="secondary" onClick={downloadMockup} className="gap-1.5 shadow-lg">
+                    <Download className="w-4 h-4" />
+                    Download
+                  </Button>
+                </div>
               </div>
-            </DialogContent>
-          </Dialog>
+            )}
+          </BrandModal>
         </BrandCard>
       )}
 

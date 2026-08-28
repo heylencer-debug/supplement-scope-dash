@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { CardContent } from "@/components/ui/card";
 import { BrandCard } from "@/components/ui/brand-card";
 import { Button } from "@/components/ui/button";
+import { PearlButton } from "@/components/ui/pearl-button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertCircle, CheckCircle2, AlertTriangle,
@@ -308,15 +309,15 @@ export function FormulaValidationTab({ categoryId, categoryName, activeVersionIn
         <BrandCard className="border-blue-500/30 bg-blue-500/5">
           <CardContent className="py-4 px-5 flex flex-col justify-center gap-2">
             <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Manufacturer Brief</p>
-            <Button
-              variant="default"
-              size="sm"
-              className="flex items-center gap-2 w-full"
+            <PearlButton
+              variant="primary"
+              withSparkle={false}
+              className="flex items-center gap-2 w-full h-8"
               onClick={handleManufacturerPDF}
             >
               <FileText className="h-3.5 w-3.5" />
               Download Manufacturer PDF
-            </Button>
+            </PearlButton>
             <p className="text-[10px] text-muted-foreground text-center">Full brief · P11 · P12 · Print-ready</p>
           </CardContent>
         </BrandCard>

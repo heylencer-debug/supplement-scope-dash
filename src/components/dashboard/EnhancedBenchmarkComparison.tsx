@@ -5,6 +5,7 @@ import { BrandCard } from "@/components/ui/brand-card";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { PearlButton } from "@/components/ui/pearl-button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -1138,10 +1139,10 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                 // Hide buttons for Top Performers only if New Winners is available but not run yet
                 !(activeTab === 'top_performers' && analysisAvailability.newWinners.available && !newWinnersAnalysis.hasAnalysis && !newWinnersAnalysis.isNotAvailable) && (
                   <div className="flex items-center gap-2">
-                    <Button 
-                      variant="default"
-                      size="sm" 
-                      className="h-8 px-3 text-xs transition-all duration-300 hover:shadow-[0_0_20px_hsl(var(--primary)/0.4)] hover:scale-105"
+                    <PearlButton
+                      variant="primary"
+                      withSparkle={false}
+                      className="h-8 px-3 text-xs"
                       onClick={(e) => { e.stopPropagation(); activeAnalysisData.runAnalysis(); }}
                       disabled={activeAnalysisData.isLoading || !categoryId}
                     >
@@ -1151,7 +1152,7 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                         <Brain className="w-3.5 h-3.5 mr-1.5" />
                       )}
                       Analyze {activeTab === 'new_winners' ? 'New Winners' : 'Top Performers'}
-                    </Button>
+                    </PearlButton>
                     
                     {/* Manual ASIN Selection Popover */}
                     <Popover open={showAsinInput} onOpenChange={setShowAsinInput}>
@@ -1300,13 +1301,15 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                           Run <strong>New Winners</strong> analysis first. This establishes the ingredient count that Top Performers will match for consistent comparison.
                         </p>
                       </div>
-                      <Button 
+                      <PearlButton
+                        variant="primary"
+                        withSparkle={false}
                         onClick={() => setActiveTab('new_winners')}
                         className="gap-2"
                       >
                         <Zap className="w-4 h-4" />
                         Go to New Winners
-                      </Button>
+                      </PearlButton>
                     </>
                   ) : (
                     <>
@@ -1322,12 +1325,12 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                           Using {newWinnersAnalysis.analysis?.ingredient_comparison_table?.summary?.total_our_ingredients || 'N/A'} ingredients from New Winners analysis
                         </Badge>
                       )}
-                      <Button 
+                      <PearlButton
+                        variant="primary"
+                        withSparkle={false}
                         onClick={() => activeAnalysisData.runAnalysis()}
                         disabled={activeAnalysisData.isLoading || !categoryId || (activeTab === 'top_performers' && !newWinnersAnalysis.hasAnalysis)}
-                        className={cn(
-                          "gap-2 transition-all duration-300 hover:shadow-[0_0_20px_hsl(var(--primary)/0.4)] hover:scale-105"
-                        )}
+                        className="gap-2"
                       >
                         {activeAnalysisData.isLoading ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -1335,7 +1338,7 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                           <Brain className="w-4 h-4" />
                         )}
                         {activeAnalysisData.isLoading ? 'Analyzing...' : `Analyze ${activeTab === 'new_winners' ? 'New Winners' : 'Top Performers'}`}
-                      </Button>
+                      </PearlButton>
                     </>
                   )}
                 </div>
@@ -2371,31 +2374,51 @@ export function EnhancedBenchmarkComparison({
             {/* Action Buttons */}
             <div className="flex items-center gap-2 flex-wrap">
               {/* Analyze Competitors Button */}
-              <Button 
-                variant={competitiveAnalysis ? "outline" : "default"}
-                size="sm" 
-                onClick={runCompetitiveAnalysis}
-                disabled={competitiveLoading || competitivePolling}
-                className={cn(
-                  "h-8 gap-1.5 transition-all duration-300 hover:shadow-[0_0_20px_hsl(var(--primary)/0.4)] hover:scale-105"
-                )}
-              >
-                {(competitiveLoading || competitivePolling) ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span className="hidden sm:inline">
-                      {competitivePolling ? `Analyzing (${pollingAttempt})...` : "Starting..."}
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <Brain className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">
-                      {competitiveAnalysis ? "Re-Analyze" : "Analyze Competitors"}
-                    </span>
-                  </>
-                )}
-              </Button>
+              {competitiveAnalysis ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={runCompetitiveAnalysis}
+                  disabled={competitiveLoading || competitivePolling}
+                  className="h-8 gap-1.5"
+                >
+                  {(competitiveLoading || competitivePolling) ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span className="hidden sm:inline">
+                        {competitivePolling ? `Analyzing (${pollingAttempt})...` : "Starting..."}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Brain className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Re-Analyze</span>
+                    </>
+                  )}
+                </Button>
+              ) : (
+                <PearlButton
+                  variant="primary"
+                  withSparkle={false}
+                  onClick={runCompetitiveAnalysis}
+                  disabled={competitiveLoading || competitivePolling}
+                  className="h-8 gap-1.5"
+                >
+                  {(competitiveLoading || competitivePolling) ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span className="hidden sm:inline">
+                        {competitivePolling ? `Analyzing (${pollingAttempt})...` : "Starting..."}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Brain className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Analyze Competitors</span>
+                    </>
+                  )}
+                </PearlButton>
+              )}
               
               {competitiveAnalysis && (
                 <Button variant="ghost" size="sm" onClick={clearCompetitiveAnalysis} className="h-8 px-2 text-xs">

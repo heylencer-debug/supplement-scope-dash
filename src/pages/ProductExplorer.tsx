@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Search, Filter, Download, Star, TrendingUp, Loader2, Eye, ChevronDown, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Beaker, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { PearlButton } from "@/components/ui/pearl-button";
 import { Input } from "@/components/ui/input";
 import { CardContent, CardHeader } from "@/components/ui/card";
 import { BrandCard } from "@/components/ui/brand-card";
@@ -391,14 +392,15 @@ export default function ProductExplorer() {
               )}
             </Button>
           )}
-          <Button 
-            variant="default" 
+          <PearlButton
+            variant="primary"
+            withSparkle={false}
             className="gap-2"
             onClick={() => navigate(`/products/add?category=${encodeURIComponent(categoryName || "")}`)}
           >
             <Plus className="w-4 h-4" />
             Add Product
-          </Button>
+          </PearlButton>
           <Button variant="outline" className="gap-2">
             <Download className="w-4 h-4" />
             Export

@@ -12,7 +12,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { pdf } from "@react-pdf/renderer";
 import { StrategyBriefPDF } from "@/components/document/StrategyBriefPDF";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { BrandModal } from "@/components/ui/brand-modal";
 import { extractFlavorsFromFormulaBrief } from "@/lib/extractFlavor";
 
 interface ManufacturerFeedbackProps {
@@ -713,33 +713,31 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
       </div>
 
       {/* Version Viewing Dialog */}
-      <Dialog open={viewingVersionId !== null} onOpenChange={(open) => !open && setViewingVersionId(null)}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <FileText className="w-5 h-5 text-primary" />
-              {viewingVersionId === "original" ? "Original Formula Brief" : viewingVersion ? `Formula Brief v${viewingVersion.version_number}` : "Formula Brief"}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="prose prose-sm max-w-none dark:prose-invert
-            prose-headings:font-semibold prose-headings:text-foreground
-            prose-p:text-muted-foreground prose-p:leading-relaxed
-            prose-strong:text-foreground
-            prose-table:text-xs
-            prose-th:px-3 prose-th:py-2 prose-th:bg-muted/30 prose-th:text-left prose-th:font-semibold prose-th:border-b prose-th:border-border
-            prose-td:px-3 prose-td:py-2 prose-td:border-t prose-td:border-border/50 prose-td:text-muted-foreground
-          ">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {(() => {
-                const pipelineBrief = pipelineBriefs?.find(pb => pb.id === viewingVersionId);
-                if (pipelineBrief) return pipelineBrief.content;
-                if (viewingVersion) return viewingVersion.formula_brief_content;
-                return "No content available";
-              })()}
-            </ReactMarkdown>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <BrandModal
+        open={viewingVersionId !== null}
+        onOpenChange={(open) => !open && setViewingVersionId(null)}
+        size="lg"
+        icon={<FileText className="w-5 h-5" />}
+        title={viewingVersionId === "original" ? "Original Formula Brief" : viewingVersion ? `Formula Brief v${viewingVersion.version_number}` : "Formula Brief"}
+      >
+        <div className="prose prose-sm max-w-none dark:prose-invert
+          prose-headings:font-semibold prose-headings:text-foreground
+          prose-p:text-muted-foreground prose-p:leading-relaxed
+          prose-strong:text-foreground
+          prose-table:text-xs
+          prose-th:px-3 prose-th:py-2 prose-th:bg-muted/30 prose-th:text-left prose-th:font-semibold prose-th:border-b prose-th:border-border
+          prose-td:px-3 prose-td:py-2 prose-td:border-t prose-td:border-border/50 prose-td:text-muted-foreground
+        ">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {(() => {
+              const pipelineBrief = pipelineBriefs?.find(pb => pb.id === viewingVersionId);
+              if (pipelineBrief) return pipelineBrief.content;
+              if (viewingVersion) return viewingVersion.formula_brief_content;
+              return "No content available";
+            })()}
+          </ReactMarkdown>
+        </div>
+      </BrandModal>
 
     <div className="border border-border rounded-[var(--radius)] bg-card mt-0">
       {/* Header */}

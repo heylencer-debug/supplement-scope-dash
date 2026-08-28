@@ -6,7 +6,6 @@ import { Progress } from "@/components/ui/progress";
 import { ScrollAnimate } from "@/components/ui/scroll-animate";
 import { Building2, ChevronsUpDown, Link2 } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { PearlButton } from "@/components/ui/pearl-button";
 
 // Dashboard components
 import { HeroHeader } from "@/components/dashboard/HeroHeader";
@@ -964,15 +963,15 @@ export default function Dashboard() {
         {/* TAB 7: Manufacturer Feedback — living formula brief */}
         <TabsContent value="manufacturer" className="space-y-4 mt-3">
           <div className="flex justify-end">
-            <PearlButton
-              tone="neon"
-              className="pearl-pill"
+            <button
+              type="button"
+              className="pearl-pill pearl-neon"
               onClick={handleGenerateLink}
               disabled={generatingLink}
             >
               <Link2 className="w-3.5 h-3.5" />
               {generatingLink ? "Generating…" : "Generate Manufacturer Link ↗"}
-            </PearlButton>
+            </button>
           </div>
           {category?.id && categoryName ? (
             <ManufacturerFeedback

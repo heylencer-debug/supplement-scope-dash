@@ -12,7 +12,7 @@ const TabsList = React.forwardRef<
   <TabsPrimitive.List
     ref={ref}
     className={cn(
-      "inline-flex h-12 items-center justify-center rounded-2xl bg-muted/60 p-1.5 text-muted-foreground backdrop-blur-sm border border-border/50",
+      "inline-flex h-12 items-center justify-center rounded-xl bg-muted/60 p-1.5 text-muted-foreground backdrop-blur-sm border border-border/50",
       className,
     )}
     {...props}
@@ -31,7 +31,7 @@ const TabsTrigger = React.forwardRef<
          blue fill — components that want the ink-pearl-pill look (the main
          Dashboard tab bar) add `.pearl-tab`, whose CSS then wins cleanly
          since this default no longer competes for `background`. */
-      "inline-flex items-center justify-center whitespace-nowrap rounded-xl px-4 py-2 text-sm font-bold tracking-wide ring-offset-background transition-all duration-300 ease-out border-b-2 border-transparent",
+      "inline-flex items-center justify-center whitespace-nowrap rounded-lg px-4 py-2 text-sm font-bold tracking-wide ring-offset-background transition-all duration-300 ease-out border-b-2 border-transparent",
       "hover:text-primary",
       "data-[state=active]:text-primary data-[state=active]:border-primary",
       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",

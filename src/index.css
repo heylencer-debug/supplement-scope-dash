@@ -69,11 +69,26 @@
     --input: var(--brand-border);
     --ring: var(--brand-electric);
 
-    /* Compact/clinical radius + shadow scale (mockup) */
+    /* ── RADIUS SCALE — ONE scale, shared by Tailwind and hand-written CSS.
+       tailwind.config.ts derives its steps from `--radius` (sm = r-8, md =
+       r-4, lg = r, xl = r+4, 2xl = r+8), so with --radius: 12px the ladder is:
+
+         chips / menu rows   rounded-md   8px   (--radius-md)
+         controls, buttons   rounded-lg  12px   (--radius-lg)
+         cards / panels      rounded-xl  16px   (--radius-xl-card)
+         modals / dialogs    rounded-2xl 20px   (--radius-xl)
+         pills / badges      rounded-full
+
+       The `--radius-md/lg/xl` custom props below previously carried a SECOND,
+       conflicting ladder (10 / 14 / 20) used by the `.pearl-*`, `.takeout-*`
+       and `.brand-*` rules — so a hand-written control landed on 10px right
+       next to a Tailwind-classed one on 12px, and nothing in the UI shared an
+       edge. They are now pinned to the Tailwind steps they name. */
     --radius: 12px;
-    --radius-xl: 20px;
-    --radius-lg: 14px;
-    --radius-md: 10px;
+    --radius-md: 8px;   /* == rounded-md  */
+    --radius-lg: 12px;  /* == rounded-lg  */
+    --radius-xl-card: 16px; /* == rounded-xl  */
+    --radius-xl: 20px;  /* == rounded-2xl */
     --pearl-hi: rgba(255, 255, 255, 0.55);
     --pearl-lo: rgba(0, 0, 0, 0.12);
     --pearl-shadow-sm: 0 1px 3px 0px rgba(0, 0, 0, 0.06), 0 1px 2px -1px rgba(0, 0, 0, 0.06);
@@ -346,7 +361,9 @@
     font-size: 12px;
     line-height: 1;
     padding: 8px 16px;
-    border-radius: 10px;
+    /* Control step of the shared ladder — same edge as a `rounded-lg`
+       Tailwind control and as ui/button.tsx, which now wears these classes. */
+    border-radius: var(--radius-lg);
     transition: transform 150ms ease, box-shadow 150ms ease, opacity 150ms ease, background-color 150ms ease;
   }
 
@@ -627,7 +644,7 @@
     background-size: 160px 160px, 130% 130%, 100% 100%, 100% 100%;
     background-position: 0 0, var(--iris-orb-x) var(--iris-orb-y), 50% 50%, 50% 50%;
     background-repeat: repeat, no-repeat, no-repeat, no-repeat;
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-xl-card);
   }
 
   /* THE EDGE — magenta on the left, smoke on the right. mask-composite, not
@@ -769,7 +786,7 @@
     -webkit-backdrop-filter: blur(18px);
     backdrop-filter: blur(18px);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-xl-card);
   }
 
   /* Sidebar nav row — active = smoke tint + smoke hairline, never yellow */

@@ -32,7 +32,7 @@ function SkeletonCard({ className, ...props }: React.HTMLAttributes<HTMLDivEleme
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-[20px] border-0 bg-card p-6 shadow-soft",
+        "relative overflow-hidden rounded-xl border-0 bg-card p-6 shadow-soft",
         "before:absolute before:inset-0 before:-translate-x-full",
         "before:animate-[shimmer_1.5s_ease-in-out_infinite]",
         "before:bg-gradient-to-r before:from-transparent before:via-primary/5 before:to-transparent",
@@ -100,7 +100,7 @@ function SkeletonButton({ size = "md", className }: SkeletonButtonProps) {
   };
 
   return (
-    <Skeleton className={cn("rounded-[20px]", sizeClasses[size], className)} />
+    <Skeleton className={cn("rounded-xl", sizeClasses[size], className)} />
   );
 }
 

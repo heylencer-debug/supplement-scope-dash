@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronRight, ClipboardCopy, FileText, Loader2, Package, Trash2, Send, AlertCircle, CheckCircle2, XCircle, Clock } from "lucide-react";
-import { PearlButton } from "@/components/ui/pearl-button";
+import { Button } from "@/components/ui/button";
 import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Panel } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
@@ -15,16 +15,7 @@ import { useSubmitScoutJob, useScoutJobs } from "@/hooks/useScoutJobs";
 import { SCOUT_PHASE_NAMES, type ScoutJobRow } from "@/types/scoutJobs";
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { BrandModal } from "@/components/ui/brand-modal";
 
 const PENDING_ANALYSES_KEY = "pending_analyses";
 
@@ -180,14 +171,14 @@ export default function NewAnalysis() {
               disabled={submitScoutJob.isPending}
               className="bg-background"
             />
-            <PearlButton type="submit" disabled={!keywordInput.trim() || submitScoutJob.isPending} className="inline-flex items-center">
+            <Button type="submit" disabled={!keywordInput.trim() || submitScoutJob.isPending} className="shrink-0">
               {submitScoutJob.isPending ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               ) : (
                 <Send className="w-4 h-4 mr-2" />
               )}
               Queue Analysis
-            </PearlButton>
+            </Button>
           </form>
 
           {/* Recent/active queue status */}
@@ -414,40 +405,46 @@ export default function NewAnalysis() {
       </Panel>
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!categoryToDelete} onOpenChange={(open) => !open && setCategoryToDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Category</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete <span className="font-semibold">"{categoryToDelete?.name}"</span>?
-              <br /><br />
-              This will permanently remove:
-              <ul className="list-disc list-inside mt-2 space-y-1">
-                <li>All products ({categoryToDelete?.total_products || 0})</li>
-                <li>All reviews and analysis data</li>
-                <li>Formula briefs and recommendations</li>
-              </ul>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteCategory.isPending}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
+      <BrandModal
+        open={!!categoryToDelete}
+        onOpenChange={(open) => !open && setCategoryToDelete(null)}
+        size="sm"
+        icon={<Trash2 className="h-5 w-5" />}
+        title="Delete Category"
+        description={`Are you sure you want to delete "${categoryToDelete?.name ?? ""}"?`}
+        footer={
+          <>
+            <button
+              className="pearl-secondary"
+              onClick={() => setCategoryToDelete(null)}
+              disabled={deleteCategory.isPending}
+            >
+              Cancel
+            </button>
+            <button
+              className="pearl-secondary text-destructive"
               onClick={confirmDelete}
               disabled={deleteCategory.isPending}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deleteCategory.isPending ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Deleting...
                 </>
               ) : (
                 "Delete"
               )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </button>
+          </>
+        }
+      >
+        <p className="text-sm text-muted-foreground">This will permanently remove:</p>
+        <ul className="list-disc list-inside mt-2 space-y-1 text-sm text-muted-foreground">
+          <li>All products ({categoryToDelete?.total_products || 0})</li>
+          <li>All reviews and analysis data</li>
+          <li>Formula briefs and recommendations</li>
+        </ul>
+      </BrandModal>
     </div>
   );
 }

@@ -23,10 +23,17 @@ const badgeVariants = cva(
   },
 );
 
-export interface BadgeProps extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof badgeVariants> {}
+export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement>, VariantProps<typeof badgeVariants> {}
 
+/**
+ * Renders a <span>, not a <div>: badges are routinely dropped inside running
+ * copy (`<p>`), and a <div> there is invalid HTML — React was logging a
+ * validateDOMNesting warning from EnhancedBenchmarkComparison for exactly
+ * this. `inline-flex` already gives the block-ish box, so nothing changes
+ * visually.
+ */
 function Badge({ className, variant, ...props }: BadgeProps) {
-  return <div className={cn(badgeVariants({ variant }), className)} {...props} />;
+  return <span className={cn(badgeVariants({ variant }), className)} {...props} />;
 }
 
 export { Badge, badgeVariants };

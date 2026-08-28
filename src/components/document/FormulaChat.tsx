@@ -32,14 +32,7 @@ import { supabase } from "@/integrations/supabase/client";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { BrandModal } from "@/components/ui/brand-modal";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -1813,18 +1806,43 @@ export function FormulaChat({
       </div>
 
       {/* Confirmation Dialog with Preview */}
-      <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
-        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle>Save New Formula Version?</DialogTitle>
-            <DialogDescription>
-              The AI has generated an updated formula with the following changes:
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4 flex-1 min-h-0">
+      <BrandModal
+        open={showConfirmDialog}
+        onOpenChange={setShowConfirmDialog}
+        size="lg"
+        icon={<Sparkles className="h-5 w-5" />}
+        title="Save New Formula Version?"
+        description="The AI has generated an updated formula with the following changes:"
+        footer={
+          <>
+            <button
+              className="pearl-secondary"
+              onClick={() => {
+                setGeneratedFormula(null);
+                setShowConfirmDialog(false);
+              }}
+            >
+              Cancel
+            </button>
+            <button className="pearl-secondary" onClick={handleConfirmSave} disabled={isCreatingVersion}>
+              {isCreatingVersion ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Save Version
+                </>
+              )}
+            </button>
+          </>
+        }
+      >
+          <div className="space-y-4">
             {/* Change Summary */}
-            <div className="bg-primary/10 border border-primary/20 rounded-lg p-3">
+            <div className="bg-primary/10 border border-primary/20 rounded-xl p-3">
               <p className="text-sm font-medium text-foreground">
                 {generatedFormula?.change_summary}
               </p>
@@ -1854,7 +1872,7 @@ export function FormulaChat({
             </div>
 
             {showPreview && generatedFormula?.new_formula_content && (
-              <ScrollArea className="h-[400px] border rounded-lg bg-card">
+              <ScrollArea className="h-[400px] border border-border/60 rounded-xl bg-card">
                 <div className="p-6 prose prose-sm max-w-none dark:prose-invert">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
                     {generatedFormula.new_formula_content}
@@ -1863,57 +1881,27 @@ export function FormulaChat({
               </ScrollArea>
             )}
           </div>
-
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                setGeneratedFormula(null);
-                setShowConfirmDialog(false);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleConfirmSave}
-              disabled={isCreatingVersion}
-            >
-              {isCreatingVersion ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4 mr-2" />
-                  Save Version
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      </BrandModal>
 
       {/* Version Switch Confirmation Dialog */}
-      <Dialog open={showVersionSwitchDialog} onOpenChange={setShowVersionSwitchDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Switch Version?</DialogTitle>
-            <DialogDescription>
-              You have unsent content in your message. Switching versions will clear your current input.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button 
-              variant="outline" 
+      <BrandModal
+        open={showVersionSwitchDialog}
+        onOpenChange={setShowVersionSwitchDialog}
+        size="sm"
+        title="Switch Version?"
+        footer={
+          <>
+            <button
+              className="pearl-secondary"
               onClick={() => {
                 setPendingVersionId(null);
                 setShowVersionSwitchDialog(false);
               }}
             >
               Cancel
-            </Button>
-            <Button 
+            </button>
+            <button
+              className="pearl-secondary"
               onClick={() => {
                 if (pendingVersionId) {
                   setInput("");
@@ -1928,32 +1916,35 @@ export function FormulaChat({
               }}
             >
               Switch Version
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </button>
+          </>
+        }
+      >
+        <p className="text-sm text-muted-foreground">
+          You have unsent content in your message. Switching versions will clear your current input.
+        </p>
+      </BrandModal>
 
       {/* Delete Version Confirmation Dialog */}
-      <Dialog open={showDeleteVersionDialog} onOpenChange={setShowDeleteVersionDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Delete Version {versionToDelete?.number}?</DialogTitle>
-            <DialogDescription>
-              This action cannot be undone. The version will be permanently deleted.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button 
-              variant="outline" 
+      <BrandModal
+        open={showDeleteVersionDialog}
+        onOpenChange={setShowDeleteVersionDialog}
+        size="sm"
+        icon={<Trash2 className="h-5 w-5" />}
+        title={`Delete Version ${versionToDelete?.number ?? ""}?`}
+        footer={
+          <>
+            <button
+              className="pearl-secondary"
               onClick={() => {
                 setVersionToDelete(null);
                 setShowDeleteVersionDialog(false);
               }}
             >
               Cancel
-            </Button>
-            <Button 
-              variant="destructive"
+            </button>
+            <button
+              className="pearl-secondary text-destructive"
               onClick={handleDeleteVersion}
               disabled={isDeletingVersion}
             >
@@ -1968,10 +1959,14 @@ export function FormulaChat({
                   Delete
                 </>
               )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </button>
+          </>
+        }
+      >
+        <p className="text-sm text-muted-foreground">
+          This action cannot be undone. The version will be permanently deleted.
+        </p>
+      </BrandModal>
     </>
   );
 }

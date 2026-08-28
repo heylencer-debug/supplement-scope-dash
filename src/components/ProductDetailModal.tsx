@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { BrandModal } from "@/components/ui/brand-modal";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -277,12 +277,15 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
   const maxContentHeight = "max-h-[calc(70vh-140px)]";
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col">
-        <DialogHeader className="pb-2 shrink-0">
-          <DialogTitle className="text-xl font-bold pr-8 line-clamp-2">
-            {product.title ?? "Product Details"}
-          </DialogTitle>
+    <BrandModal
+      open={open}
+      onOpenChange={onOpenChange}
+      size="lg"
+      className="sm:max-w-5xl"
+      icon={<Package className="w-5 h-5" />}
+      title={<span className="line-clamp-2">{product.title ?? "Product Details"}</span>}
+    >
+        <div className="pb-3">
           <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
             <span className="font-medium text-foreground">{product.brand}</span>
             <span>•</span>
@@ -309,9 +312,9 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
               </>
             )}
           </div>
-        </DialogHeader>
+        </div>
 
-        <Tabs defaultValue="scout-overview" className="flex-1 min-h-0 flex flex-col">
+        <Tabs defaultValue="scout-overview" className="flex flex-col">
           <TabsList className="grid w-full grid-cols-5 shrink-0 h-auto">
             <TabsTrigger value="scout-overview" className="gap-1 text-xs py-1.5">📊 Overview</TabsTrigger>
             <TabsTrigger value="scout-formula" className="gap-1 text-xs py-1.5">🧪 Formula</TabsTrigger>
@@ -1984,7 +1987,6 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
             </div>
           </TabsContent>
         </Tabs>
-      </DialogContent>
-    </Dialog>
+    </BrandModal>
   );
 }

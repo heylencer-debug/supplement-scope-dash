@@ -40,12 +40,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { BrandModal } from "@/components/ui/brand-modal";
 import {
   Collapsible,
   CollapsibleContent,
@@ -1957,46 +1952,40 @@ function MockupCard({
       )}
 
       {/* Full Image Modal */}
-      <Dialog open={isImageModalOpen} onOpenChange={setIsImageModalOpen}>
-        <DialogContent className="max-w-4xl w-full p-0 overflow-hidden">
-          <DialogHeader className="p-4 pb-2">
-            <DialogTitle className="flex items-center gap-2">
-              <Icon className={cn("w-5 h-5", isLeaders ? "text-blue-600" : "text-orange-600")} />
-              {title} Product Mockup
-            </DialogTitle>
-          </DialogHeader>
-          <div className="p-4 pt-0">
-            {generatedMockup && (
-              <div className="relative">
-                <img 
-                  src={generatedMockup} 
-                  alt={`${title} Product Mockup - Full Size`}
-                  className="w-full h-auto rounded-lg shadow-lg"
-                />
-                <div className="absolute bottom-4 right-4 flex gap-2">
-                  <Button size="sm" variant="secondary" onClick={downloadMockup} className="gap-1.5 shadow-lg">
-                    <Download className="w-4 h-4" />
-                    Download
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <BrandModal
+        open={isImageModalOpen}
+        onOpenChange={setIsImageModalOpen}
+        size="lg"
+        icon={<Icon className="w-5 h-5" />}
+        title={`${title} Product Mockup`}
+        footer={
+          generatedMockup && (
+            <button className="pearl-secondary" onClick={downloadMockup}>
+              <Download className="w-4 h-4 mr-2" />
+              Download
+            </button>
+          )
+        }
+      >
+        {generatedMockup && (
+          <img
+            src={generatedMockup}
+            alt={`${title} Product Mockup - Full Size`}
+            className="w-full h-auto rounded-xl"
+          />
+        )}
+      </BrandModal>
 
       {/* Flat Layout Modal with Tabs */}
-      <Dialog open={isFlatModalOpen} onOpenChange={setIsFlatModalOpen}>
-        <DialogContent className="max-w-5xl w-full p-0 overflow-hidden max-h-[90vh]">
-          <DialogHeader className="p-4 pb-2">
-            <DialogTitle className="flex items-center gap-2">
-              <LayoutGrid className={cn("w-5 h-5", isLeaders ? "text-blue-600" : "text-orange-600")} />
-              {title} Flat Layout
-            </DialogTitle>
-          </DialogHeader>
-          
+      <BrandModal
+        open={isFlatModalOpen}
+        onOpenChange={setIsFlatModalOpen}
+        size="lg"
+        icon={<LayoutGrid className="w-5 h-5" />}
+        title={`${title} Flat Layout`}
+      >
           <Tabs defaultValue="preview" className="w-full">
-            <div className="px-4">
+            <div>
               <TabsList className="grid w-full grid-cols-2 h-9">
                 <TabsTrigger value="preview" className="text-xs">Preview</TabsTrigger>
                 <TabsTrigger value="history" className="text-xs">
@@ -2005,7 +1994,7 @@ function MockupCard({
               </TabsList>
             </div>
             
-            <TabsContent value="preview" className="p-4 pt-3 mt-0 space-y-4">
+            <TabsContent value="preview" className="pt-3 mt-0 space-y-4">
               {flatLayoutUrl ? (
                 <>
                   <div className="relative">
@@ -2069,7 +2058,7 @@ function MockupCard({
               </p>
             </TabsContent>
             
-            <TabsContent value="history" className="p-4 pt-3 mt-0">
+            <TabsContent value="history" className="pt-3 mt-0">
               {flatHistory.length > 0 ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-[60vh] overflow-y-auto">
                   {flatHistory.map((item) => (
@@ -2116,8 +2105,7 @@ function MockupCard({
               )}
             </TabsContent>
           </Tabs>
-        </DialogContent>
-      </Dialog>
+      </BrandModal>
     </div>
   );
 }

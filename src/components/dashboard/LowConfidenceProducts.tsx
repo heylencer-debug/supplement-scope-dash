@@ -2,7 +2,6 @@ import { useState, useMemo } from "react";
 import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Panel } from "@/components/ui/panel";
 import { Button } from "@/components/ui/button";
-import { PearlButton } from "@/components/ui/pearl-button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -75,11 +74,11 @@ export function LowConfidenceProducts({ products, categoryId, isLoading }: LowCo
               {lowConfidenceProducts.length} products need re-analysis for accurate supplement facts
             </CardDescription>
           </div>
-          <PearlButton
-                        withSparkle={false}
+          <Button
+            size="sm"
             onClick={handleBulkReanalysis}
             disabled={isAnalyzing || !categoryId}
-            className="gap-2 h-8 text-xs"
+            className="gap-2"
           >
             {isAnalyzing ? (
               <>
@@ -92,7 +91,7 @@ export function LowConfidenceProducts({ products, categoryId, isLoading }: LowCo
                 Bulk Reanalysis
               </>
             )}
-          </PearlButton>
+          </Button>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">

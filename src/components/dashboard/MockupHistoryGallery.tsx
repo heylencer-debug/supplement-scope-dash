@@ -9,12 +9,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { BrandModal } from '@/components/ui/brand-modal';
 import {
   Tooltip,
   TooltipContent,
@@ -210,54 +205,50 @@ export function MockupHistoryGallery({
       </Collapsible>
 
       {/* Full Preview Dialog */}
-      <Dialog open={!!previewItem} onOpenChange={(open) => !open && setPreviewItem(null)}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center justify-between">
-              <span>
-                Mockup from {previewItem && format(new Date(previewItem.created_at), 'MMMM d, yyyy')}
-              </span>
-              {previewItem?.packaging_format && (
-                <Badge variant="secondary">{previewItem.packaging_format}</Badge>
-              )}
-            </DialogTitle>
-          </DialogHeader>
-          
-          {previewItem && (
-            <div className="space-y-4">
-              <div className="rounded-lg overflow-hidden border">
-                <img
-                  src={previewItem.image_url}
-                  alt="Mockup preview"
-                  className="w-full h-auto"
-                />
-              </div>
-              
-              <div className="flex justify-end gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    onDelete(previewItem.id);
-                    setPreviewItem(null);
-                  }}
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
-                </Button>
-                <Button
-                  onClick={() => {
-                    onRestore(previewItem.image_url);
-                    setPreviewItem(null);
-                  }}
-                >
-                  <RotateCcw className="h-4 w-4 mr-2" />
-                  Use This Mockup
-                </Button>
-              </div>
+      <BrandModal
+        open={!!previewItem}
+        onOpenChange={(open) => !open && setPreviewItem(null)}
+        size="lg"
+        icon={<History className="h-5 w-5" />}
+        title={`Mockup from ${previewItem ? format(new Date(previewItem.created_at), 'MMMM d, yyyy') : ''}`}
+        footer={
+          previewItem && (
+            <>
+              <button
+                className="pearl-secondary"
+                onClick={() => {
+                  onDelete(previewItem.id);
+                  setPreviewItem(null);
+                }}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete
+              </button>
+              <button
+                className="pearl-secondary"
+                onClick={() => {
+                  onRestore(previewItem.image_url);
+                  setPreviewItem(null);
+                }}
+              >
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Use This Mockup
+              </button>
+            </>
+          )
+        }
+      >
+        {previewItem && (
+          <div className="space-y-4">
+            {previewItem.packaging_format && (
+              <Badge variant="secondary">{previewItem.packaging_format}</Badge>
+            )}
+            <div className="rounded-xl overflow-hidden border border-border/60">
+              <img src={previewItem.image_url} alt="Mockup preview" className="w-full h-auto" />
             </div>
-          )}
-        </DialogContent>
-      </Dialog>
+          </div>
+        )}
+      </BrandModal>
     </>
   );
 }

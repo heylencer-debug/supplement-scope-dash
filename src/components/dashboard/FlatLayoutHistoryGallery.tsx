@@ -9,12 +9,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { BrandModal } from '@/components/ui/brand-modal';
 import {
   Tooltip,
   TooltipContent,
@@ -210,59 +205,55 @@ export function FlatLayoutHistoryGallery({
       </Collapsible>
 
       {/* Full Preview Dialog */}
-      <Dialog open={!!previewItem} onOpenChange={(open) => !open && setPreviewItem(null)}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center justify-between">
-              <span>
-                Flat Layout from {previewItem && format(new Date(previewItem.created_at), 'MMMM d, yyyy')}
-              </span>
-              <div className="flex gap-2">
-                {previewItem?.design_settings?.layout_mode === 'front_only' && (
-                  <Badge variant="secondary">Front Panel Only</Badge>
-                )}
-                {previewItem?.packaging_format && (
-                  <Badge variant="outline">{previewItem.packaging_format}</Badge>
-                )}
-              </div>
-            </DialogTitle>
-          </DialogHeader>
-          
-          {previewItem && (
-            <div className="space-y-4">
-              <div className="rounded-lg overflow-hidden border bg-muted">
-                <img
-                  src={previewItem.image_url}
-                  alt="Flat layout preview"
-                  className="w-full h-auto"
-                />
-              </div>
-              
-              <div className="flex justify-end gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    onDelete(previewItem.id);
-                    setPreviewItem(null);
-                  }}
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
-                </Button>
-                <Button
-                  onClick={() => {
-                    onRestore(previewItem.image_url);
-                    setPreviewItem(null);
-                  }}
-                >
-                  <RotateCcw className="h-4 w-4 mr-2" />
-                  Use This Layout
-                </Button>
-              </div>
+      <BrandModal
+        open={!!previewItem}
+        onOpenChange={(open) => !open && setPreviewItem(null)}
+        size="lg"
+        icon={<LayoutGrid className="h-5 w-5" />}
+        title={`Flat Layout from ${previewItem ? format(new Date(previewItem.created_at), 'MMMM d, yyyy') : ''}`}
+        footer={
+          previewItem && (
+            <>
+              <button
+                className="pearl-secondary"
+                onClick={() => {
+                  onDelete(previewItem.id);
+                  setPreviewItem(null);
+                }}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete
+              </button>
+              <button
+                className="pearl-secondary"
+                onClick={() => {
+                  onRestore(previewItem.image_url);
+                  setPreviewItem(null);
+                }}
+              >
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Use This Layout
+              </button>
+            </>
+          )
+        }
+      >
+        {previewItem && (
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              {previewItem.design_settings?.layout_mode === 'front_only' && (
+                <Badge variant="secondary">Front Panel Only</Badge>
+              )}
+              {previewItem.packaging_format && (
+                <Badge variant="outline">{previewItem.packaging_format}</Badge>
+              )}
             </div>
-          )}
-        </DialogContent>
-      </Dialog>
+            <div className="rounded-xl overflow-hidden border border-border/60 bg-muted">
+              <img src={previewItem.image_url} alt="Flat layout preview" className="w-full h-auto" />
+            </div>
+          </div>
+        )}
+      </BrandModal>
     </>
   );
 }

@@ -223,14 +223,27 @@ async function run() {
       updated_at: new Date().toISOString(),
     };
 
-    // 2026-08-28: write via upsert directly (was insert-then-catch-fallback-
-    // to-upsert) — same net effect on a re-run within THIS category since
-    // there's a unique constraint on (asin, category_id) elsewhere in the
-    // pipeline (see human-bsr.js's on_conflict=asin,category_id), but this
-    // is the explicit, intended path rather than relying on an insert error
-    // as a side channel. Re-running this script for the SAME category now
-    // always UPDATEs the existing row in place — never leaves an orphan.
-    const { error } = await DASH.from('products').upsert(row, { onConflict: 'asin,category_id' });
+    // 2026-08-29: PROGRAMMATIC upsert — the previous `.upsert(row,
+    // {onConflict:'asin,category_id'})` failed on EVERY row ("no unique or
+    // exclusion constraint matching the ON CONFLICT specification") because
+    // the live products table has NO unique constraint on that pair (it
+    // can't be added until the stale-duplicate cleanup runs). Select the
+    // existing row id for (asin, category_id) and UPDATE it in place, else
+    // INSERT — no DB constraint required, same no-orphans guarantee.
+    const { data: existRows, error: existErr } = await DASH.from('products')
+      .select('id').eq('asin', p.asin).eq('category_id', categoryId).limit(2);
+    let error = existErr || null;
+    if (!error) {
+      if (existRows && existRows.length > 0) {
+        // Update the first; if a same-category dupe somehow exists, remove it.
+        ({ error } = await DASH.from('products').update(row).eq('id', existRows[0].id));
+        if (!error && existRows.length > 1) {
+          await DASH.from('products').delete().eq('asin', p.asin).eq('category_id', categoryId).neq('id', existRows[0].id);
+        }
+      } else {
+        ({ error } = await DASH.from('products').insert(row));
+      }
+    }
     if (error) {
       console.error(`  ERROR ${p.asin}: ${error.message}`);
       errors++;

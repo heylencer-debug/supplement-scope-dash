@@ -278,8 +278,13 @@ function formatP5OffAmazonBlock(p5Entry) {
   if (p5Entry.research) {
     const r = p5Entry.research;
     if (r.competitor_angle) parts.push(`P5 competitive angle: ${r.competitor_angle.slice(0, 400)}`);
-    if (r.key_strengths?.length) parts.push(`P5 key strengths: ${r.key_strengths.slice(0, 3).join('; ')}`);
-    if (r.key_weaknesses?.length) parts.push(`P5 key weaknesses: ${r.key_weaknesses.slice(0, 3).join('; ')}`);
+    // P5 stores key_strengths/key_weaknesses as regex-extracted STRINGS
+    // (phase5-deep-research.js), not arrays — coerce either shape.
+    const asList = (v) => Array.isArray(v) ? v : (typeof v === 'string' && v.trim() ? [v.trim()] : []);
+    const ks = asList(r.key_strengths);
+    const kw = asList(r.key_weaknesses);
+    if (ks.length) parts.push(`P5 key strengths: ${ks.slice(0, 3).join('; ')}`);
+    if (kw.length) parts.push(`P5 key weaknesses: ${kw.slice(0, 3).join('; ')}`);
   }
   return parts.length ? parts.join('\n') : null;
 }

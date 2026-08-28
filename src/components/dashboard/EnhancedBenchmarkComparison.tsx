@@ -25,6 +25,7 @@ import { useIngredientAnalysis, IngredientAnalysis } from "@/hooks/useIngredient
 import AIAnalysisResults from "@/components/dashboard/AIAnalysisResults";
 import { useCompetitiveAnalysis } from "@/hooks/useCompetitiveAnalysis";
 import { BrandCard } from "@/components/ui/brand-card";
+import { SidePanelShell } from "@/components/ui/side-panel-shell";
 import { CompetitiveAnalysisResults } from "@/components/dashboard/CompetitiveAnalysisResults";
 interface VersionInfo {
   versionNumber: number;
@@ -1356,6 +1357,7 @@ export function EnhancedBenchmarkComparison({
   const [showOnlyNewWinners, setShowOnlyNewWinners] = useState(false);
   const [sortBy, setSortBy] = useState<'sales' | 'revenue' | 'age' | 'growth'>('sales');
   const [competitorAnalysisOpen, setCompetitorAnalysisOpen] = useState(false);
+  const [conceptPanelOpen, setConceptPanelOpen] = useState(false);
   const [selectedCompetitorBrand, setSelectedCompetitorBrand] = useState<string | null>(null);
   const { toast } = useToast();
   
@@ -2570,20 +2572,89 @@ export function EnhancedBenchmarkComparison({
         <CardContent className="px-3 sm:px-4 md:px-6 overflow-hidden">
           {/* Mobile: Vertical stack, Desktop: Horizontal scroll */}
           <div className="flex flex-col lg:flex-row lg:items-stretch gap-3 lg:gap-2 md:gap-3 overflow-x-hidden">
-            {/* Our Concept Column - the single branded highlight on the page. Flat white everywhere else; this is the one BrandCard iris surface. */}
-            <BrandCard
-              even
-              className="w-full lg:w-[280px] xl:w-[320px] lg:shrink-0 lg:max-h-[750px] border-l-2 border-l-primary flex flex-col"
-            >
-              <div className="px-3 py-2.5 shrink-0 border-b border-white/10">
-                <div className="flex items-center gap-2 min-w-0">
-                  <Target className="w-3.5 h-3.5 text-primary shrink-0" />
-                  <p className="text-[13px] font-semibold tracking-tight text-foreground truncate">Our Concept</p>
-                  <span className="ml-auto text-[11px] text-muted-foreground shrink-0">Strategy</span>
-                </div>
-              </div>
+            {/* Our Concept Column - compact, product-card-sized iris tile. Full strategy lives in the SidePanelShell (click-through). */}
+            {(() => {
+              const pricing = getOurPricing();
+              const oppScore = getOurOpportunityScore();
+              const differentiators = getOurDifferentiators();
+              const risksCount = getOurWeaknesses().length;
+              const audience = getOurBuyerProfile();
+              return (
+                <BrandCard
+                  even
+                  onClick={() => setConceptPanelOpen(true)}
+                  className="w-full lg:w-[280px] xl:w-[300px] lg:shrink-0 border-l-2 border-l-primary flex flex-col cursor-pointer transition-transform hover:-translate-y-0.5"
+                >
+                  {/* Header: icon chip + label + tier/score chip */}
+                  <div className="px-3 py-2 shrink-0 border-b border-white/10 flex items-center gap-2 min-w-0">
+                    <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                      <Sparkles className="w-3.5 h-3.5 text-primary" />
+                    </div>
+                    <p className="text-[13px] font-semibold tracking-tight text-foreground truncate">Our Concept</p>
+                    <Badge variant="secondary" className="ml-auto text-[10px] h-5 px-1.5 shrink-0 tabular-nums">
+                      {oppScore.overall ? `${oppScore.overall}/10` : '—'}
+                    </Badge>
+                  </div>
 
-              <div className="p-3 space-y-3 flex-1 overflow-y-auto">
+                  {/* Compact icon-row body */}
+                  <div className="p-3 space-y-1.5 flex-1">
+                    <div className="flex items-center gap-2 text-[11px] leading-tight">
+                      <Target className="w-3 h-3 text-muted-foreground shrink-0" />
+                      <span className="text-muted-foreground shrink-0">Target Price</span>
+                      <span className="ml-auto font-medium tabular-nums text-foreground shrink-0">
+                        {pricing.price != null ? `$${Number(pricing.price).toFixed(2)}` : '—'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-[11px] leading-tight">
+                      <TrendingUp className="w-3 h-3 text-muted-foreground shrink-0" />
+                      <span className="text-muted-foreground shrink-0">Opportunity</span>
+                      <span className="ml-auto font-medium tabular-nums text-foreground shrink-0">
+                        {oppScore.overall ? `${oppScore.overall}/10` : '—'}
+                      </span>
+                    </div>
+                    <div className="flex items-start gap-2 text-[11px] leading-tight">
+                      <Trophy className="w-3 h-3 text-muted-foreground shrink-0 mt-0.5" />
+                      <span className="text-muted-foreground shrink-0">Top diff.</span>
+                      <span className="ml-auto font-medium text-foreground truncate text-right">
+                        {differentiators[0] || '—'}
+                      </span>
+                    </div>
+                    <div className="flex items-start gap-2 text-[11px] leading-tight">
+                      <Users className="w-3 h-3 text-muted-foreground shrink-0 mt-0.5" />
+                      <span className="text-muted-foreground shrink-0">Audience</span>
+                      <span className="ml-auto font-medium text-foreground truncate text-right">
+                        {audience ? audience.split(' ').slice(0, 4).join(' ') : '—'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-[11px] leading-tight">
+                      <AlertTriangle className="w-3 h-3 text-muted-foreground shrink-0" />
+                      <span className="text-muted-foreground shrink-0">Risks</span>
+                      <span className="ml-auto font-medium tabular-nums text-foreground shrink-0">{risksCount}</span>
+                    </div>
+                  </div>
+
+                  {/* Footer affordance */}
+                  <div className="px-3 py-2 border-t border-white/10 shrink-0">
+                    <button
+                      className="pearl-quiet w-full h-7 text-[11px] justify-center"
+                      onClick={(e) => { e.stopPropagation(); setConceptPanelOpen(true); }}
+                    >
+                      View full strategy
+                      <ArrowRight className="w-3 h-3 ml-1" />
+                    </button>
+                  </div>
+                </BrandCard>
+              );
+            })()}
+
+            {conceptPanelOpen && (
+              <SidePanelShell
+                title="Our Concept — Full Strategy"
+                icon={<Sparkles className="w-4 h-4" />}
+                width={480}
+                onClose={() => setConceptPanelOpen(false)}
+              >
+              <div className="p-3 space-y-3">
                 {/* COMPETITIVE ADVANTAGE SUMMARY BADGE */}
                 {(() => {
                   const advantages = getCompetitiveAdvantages();
@@ -3029,7 +3100,8 @@ export function EnhancedBenchmarkComparison({
                   </div>
                 </div>
               </div>
-            </BrandCard>
+              </SidePanelShell>
+            )}
 
             {/* Competitor Columns - Stack on mobile, Scrollable on desktop */}
             <ScrollArea className="w-full lg:flex-1 overflow-x-hidden h-full">

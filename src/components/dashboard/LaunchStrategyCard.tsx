@@ -1,5 +1,5 @@
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BrandCard } from "@/components/ui/brand-card";
+import { Panel } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Rocket, Quote, Megaphone, CheckCircle2, Target, Zap } from "lucide-react";
@@ -30,7 +30,7 @@ export function LaunchStrategyCard({
 }: LaunchStrategyCardProps) {
   if (isLoading) {
     return (
-      <BrandCard>
+      <Panel>
         <CardHeader>
           <Skeleton className="h-6 w-48" />
         </CardHeader>
@@ -39,13 +39,13 @@ export function LaunchStrategyCard({
           <Skeleton className="h-32 w-full" />
           <Skeleton className="h-24 w-full" />
         </CardContent>
-      </BrandCard>
+      </Panel>
     );
   }
 
   if (!goToMarket) {
     return (
-      <BrandCard>
+      <Panel>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
             <Rocket className="h-5 w-5 text-primary" />
@@ -57,7 +57,7 @@ export function LaunchStrategyCard({
             No launch strategy data available yet.
           </p>
         </CardContent>
-      </BrandCard>
+      </Panel>
     );
   }
 
@@ -80,7 +80,7 @@ export function LaunchStrategyCard({
   ].filter(t => t.value);
 
   return (
-    <BrandCard>
+    <Panel>
       <CardHeader className="pb-4">
         <CardTitle className="flex items-center gap-2 text-lg">
           <Rocket className="h-5 w-5 text-primary" />
@@ -116,7 +116,7 @@ export function LaunchStrategyCard({
                 </div>
               </div>
             ) : (
-              <div className="relative p-4 rounded-lg bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20">
+              <div className="relative p-4 rounded-lg bg-card border border-border/60">
                 <Quote className="absolute top-2 left-2 h-6 w-6 text-primary/20" />
                 <p className="text-sm italic text-foreground leading-relaxed pl-4">
                   "{goToMarket.positioning}"
@@ -194,6 +194,6 @@ export function LaunchStrategyCard({
           </div>
         )}
       </CardContent>
-    </BrandCard>
+    </Panel>
   );
 }

@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BrandCard } from "@/components/ui/brand-card";
+import { Panel } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { 
@@ -87,7 +87,7 @@ function StrategyCard({
   };
 
   return (
-    <BrandCard className={cn(
+    <Panel className={cn(
       "relative overflow-hidden transition-all duration-300",
       isRecommended && "ring-2 ring-primary shadow-lg"
     )}>
@@ -263,7 +263,7 @@ function StrategyCard({
           </Button>
         )}
       </CardContent>
-    </BrandCard>
+    </Panel>
   );
 }
 
@@ -278,9 +278,9 @@ export function DualPackagingStrategies({ analysis, onSelectStrategy }: DualPack
     <div className="space-y-6">
       {/* Recommendation Banner */}
       {analysis.recommendation && (
-        <div className="p-4 bg-primary/5 border border-primary/20 rounded-xl">
+        <div className="p-4 bg-card border border-primary/20 rounded-xl">
           <div className="flex items-start gap-3">
-            <div className="p-2 bg-primary/10 rounded-lg">
+            <div className="p-2 bg-card rounded-lg">
               <ThumbsUp className="w-5 h-5 text-primary" />
             </div>
             <div>

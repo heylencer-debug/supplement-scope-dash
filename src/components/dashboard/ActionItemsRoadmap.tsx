@@ -1,5 +1,5 @@
 import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BrandCard } from "@/components/ui/brand-card";
+import { Panel } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { ClipboardList, CheckCircle2, Circle, ArrowRight, Calendar } from "lucide-react";
@@ -61,7 +61,7 @@ export function ActionItemsRoadmap({ actionItems }: ActionItemsRoadmapProps) {
   const completionPercent = Math.round((completed / total) * 100);
 
   return (
-    <BrandCard className="border-primary/20">
+    <Panel className="border-primary/20">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <ClipboardList className="w-5 h-5 text-primary" />
@@ -109,7 +109,7 @@ export function ActionItemsRoadmap({ actionItems }: ActionItemsRoadmapProps) {
           </div>
         )}
       </CardContent>
-    </BrandCard>
+    </Panel>
   );
 }
 

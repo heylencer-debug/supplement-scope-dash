@@ -8,7 +8,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Brain, AlertCircle, Clock, TrendingUp, FlaskConical, DollarSign, Users, Target, ShieldAlert, Lightbulb, BarChart3, Star, CheckCircle2, AlertTriangle, Zap } from "lucide-react";
 import { CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { BrandCard } from "@/components/ui/brand-card";
+import { Panel } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
@@ -82,12 +82,12 @@ function SectionCard({ icon, title, children, accent }: {
   icon: React.ReactNode; title: string; children: React.ReactNode; accent?: string;
 }) {
   return (
-    <BrandCard className={accent ? `border-l-4 ${accent}` : ""}>
+    <Panel className={accent ? `border-l-4 ${accent}` : ""}>
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">{icon}{title}</CardTitle>
       </CardHeader>
       <CardContent>{children}</CardContent>
-    </BrandCard>
+    </Panel>
   );
 }
 
@@ -135,14 +135,14 @@ export function MarketIntelligenceReport({ categoryId, categoryName }: MarketInt
 
   if (error || !mi?.ai_market_analysis || typeof mi.ai_market_analysis !== 'string') {
     return (
-      <BrandCard>
+      <Panel>
         <CardContent className="py-8">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <AlertCircle className="w-4 h-4" />
             <span>No market intelligence data yet. Run <code className="text-xs bg-muted px-1 rounded">node phase6-market-analysis.js --keyword "{categoryName}"</code> to generate.</span>
           </div>
         </CardContent>
-      </BrandCard>
+      </Panel>
     );
   }
 
@@ -190,11 +190,11 @@ export function MarketIntelligenceReport({ categoryId, categoryName }: MarketInt
       {/* KPI Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {kpis.map((kpi, i) => (
-          <BrandCard key={i} className="p-4">
+          <Panel key={i} className="p-4">
             <div className="flex items-center gap-2 mb-1">{kpi.icon}<span className="text-xs text-muted-foreground">{kpi.label}</span></div>
             <p className={`text-2xl font-bold ${kpi.color}`}>{kpi.value}</p>
             <p className="text-xs text-muted-foreground mt-0.5">{kpi.sub}</p>
-          </BrandCard>
+          </Panel>
         ))}
       </div>
 
@@ -259,7 +259,7 @@ export function MarketIntelligenceReport({ categoryId, categoryName }: MarketInt
 
       {/* DOVIVE Strategic Recommendation */}
       {recItems.length > 0 && (
-        <BrandCard className="border-2 border-chart-2/40 bg-chart-2/5">
+        <Panel className="border-2 border-chart-2/40 bg-chart-2/5">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base text-chart-2">
               <Star className="w-4 h-4" />
@@ -281,7 +281,7 @@ export function MarketIntelligenceReport({ categoryId, categoryName }: MarketInt
               ))}
             </div>
           </CardContent>
-        </BrandCard>
+        </Panel>
       )}
 
     </div>

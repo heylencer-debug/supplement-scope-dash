@@ -1,5 +1,5 @@
 import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BrandCard } from "@/components/ui/brand-card";
+import { Panel } from "@/components/ui/panel";
 import { Globe, TrendingUp, DollarSign, BarChart3, Zap } from "lucide-react";
 import { AnimatedNumber } from "@/components/ui/animated-number";
 import { StatCard } from "@/components/ui/stat-card";
@@ -79,7 +79,7 @@ export function MarketOverviewSection({ data }: MarketOverviewSectionProps) {
 
       {/* Market Size Comparison */}
       <ScrollAnimate variant="fade-up" delay={100}>
-        <BrandCard>
+        <Panel>
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
               <BarChart3 className="h-5 w-5 text-primary" />
@@ -98,12 +98,12 @@ export function MarketOverviewSection({ data }: MarketOverviewSectionProps) {
               <span>{data.globalMarketSize}</span>
             </div>
           </CardContent>
-        </BrandCard>
+        </Panel>
       </ScrollAnimate>
 
       {/* Growth Drivers with Visual Icons */}
       <ScrollAnimate variant="fade-up" delay={200}>
-        <BrandCard>
+        <Panel>
           <CardHeader>
             <div className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-chart-4" />
@@ -129,13 +129,12 @@ export function MarketOverviewSection({ data }: MarketOverviewSectionProps) {
               })}
             </div>
           </CardContent>
-        </BrandCard>
+        </Panel>
       </ScrollAnimate>
 
       {/* Amazon Context - Enhanced Visual */}
       <ScrollAnimate variant="fade-up" delay={300}>
-        <BrandCard className="overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-chart-1/5 via-transparent to-chart-2/5 pointer-events-none" />
+        <Panel className="overflow-hidden">
           <CardHeader className="relative">
             <div className="flex items-center gap-2">
               <div className="p-2 rounded-lg bg-chart-1/10">
@@ -152,7 +151,7 @@ export function MarketOverviewSection({ data }: MarketOverviewSectionProps) {
               <p className="text-foreground leading-relaxed">{data.amazonContext}</p>
             </div>
           </CardContent>
-        </BrandCard>
+        </Panel>
       </ScrollAnimate>
     </div>
   );

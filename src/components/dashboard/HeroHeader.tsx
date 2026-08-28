@@ -29,18 +29,6 @@ export function HeroHeader({
 }: HeroHeaderProps) {
   // Clean category name - remove leading "=" characters
   const cleanCategoryName = categoryName.replace(/^=+/, '').trim();
-  const getVerdictColor = (rec: string | null) => {
-    const r = (rec || "").toUpperCase();
-    if (r.includes("PROCEED") || r.includes("HIGH")) return "bg-chart-4/10 text-chart-4 border-chart-4/30";
-    if (r.includes("CONSIDER") || r.includes("CAUTION")) return "bg-chart-2/10 text-chart-2 border-chart-2/30";
-    if (r.includes("SKIP") || r.includes("AVOID")) return "bg-destructive/10 text-destructive border-destructive/30";
-    return "bg-secondary text-secondary-foreground";
-  };
-  const getScoreColor = (score: number) => {
-    if (score >= 70) return "bg-chart-4";
-    if (score >= 50) return "bg-chart-2";
-    return "bg-destructive";
-  };
   const getTierDisplay = () => {
     if (opportunityTierLabel) return opportunityTierLabel;
     if (opportunityTier) {
@@ -62,47 +50,37 @@ export function HeroHeader({
   const score10 = opportunityIndex > 10 ? opportunityIndex / 10 : opportunityIndex;
   const normalizedScore = Math.min(100, Math.max(0, score10 * 10));
   const displayScore = score10.toFixed(1);
-  return <div className="relative overflow-hidden rounded-xl bg-card border border-border p-4 sm:p-6 md:p-8 text-foreground">
-      {/* Thin electric accent line — the only "billboard" left */}
-      <div className="absolute top-0 left-0 right-0 h-[3px] bg-primary" />
-
-      <div className="relative space-y-5">
+  return <div className="relative overflow-hidden rounded-xl bg-card border border-border/60 border-l-2 border-l-primary p-4 text-foreground">
+      <div className="relative space-y-3">
         {/* Top Row: Title, Score, and Product Images */}
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
           {/* Left Section: Title, Badge, Score */}
-          <div className="flex-1 space-y-3">
+          <div className="flex-1 space-y-2">
             {isLoading ? <>
                 <Skeleton className="h-8 w-64" />
                 <Skeleton className="h-6 w-32" />
               </> : <>
-                <div className="space-y-2 animate-enter">
-                  <h1 className="text-xl md:text-2xl lg:text-3xl font-bold tracking-tight text-foreground">
+                <div className="flex flex-wrap items-center gap-2 animate-enter">
+                  <h1 className="text-lg md:text-xl font-semibold tracking-tight text-foreground">
                     {cleanCategoryName}
                   </h1>
-                  {recommendation && <Badge className={`text-xs px-3 py-1 font-medium border ${getVerdictColor(recommendation)}`}>
+                  {recommendation && <Badge variant="outline" className="text-[11px] px-2 py-0 h-5 font-medium border-border/60 bg-transparent text-muted-foreground">
                       {recommendation}
                     </Badge>}
                 </div>
 
                 {/* Compact Score Display */}
-                <div className="flex flex-wrap items-center gap-3 md:gap-4 animate-enter" style={{ animationDelay: '0.1s' }}>
-                  <div className="flex items-center gap-2 md:gap-3">
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-2xl md:text-3xl font-bold text-foreground">{displayScore}</span>
-                      <span className="text-xs md:text-sm text-muted-foreground">/10</span>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <span className="text-[10px] md:text-xs text-muted-foreground">Opportunity Score</span>
-                      <div className="w-20 md:w-32 h-1.5 md:h-2 bg-muted rounded-full overflow-hidden">
-                        <div className={`h-full rounded-full transition-all duration-500 ${getScoreColor(normalizedScore)}`} style={{
-                      width: `${normalizedScore}%`
-                    }} />
-                      </div>
+                <div className="flex flex-wrap items-center gap-3 animate-enter" style={{ animationDelay: '0.1s' }}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Opportunity</span>
+                    <span className="text-[15px] font-semibold tabular-nums text-foreground">{displayScore}<span className="text-[11px] font-normal text-muted-foreground">/10</span></span>
+                    <div className="w-24 h-1 bg-muted rounded-full overflow-hidden">
+                      <div className="h-full rounded-full bg-foreground/40 transition-all duration-500" style={{ width: `${normalizedScore}%` }} />
                     </div>
                   </div>
-                  <Badge variant="outline" className="text-[10px] md:text-xs text-muted-foreground border-border bg-secondary">
+                  <span className="inline-flex items-center h-5 px-2 rounded-full border border-border/60 text-[11px] text-muted-foreground">
                     {getTierDisplay()}
-                  </Badge>
+                  </span>
                 </div>
               </>}
           </div>
@@ -110,9 +88,9 @@ export function HeroHeader({
           {/* Right Section: Top Products - Bigger Images */}
           <div className="flex flex-col items-start lg:items-end gap-2">
             {isLoading ? <div className="flex -space-x-4">
-                {[...Array(5)].map((_, i) => <Skeleton key={i} className="w-14 h-14 md:w-16 md:h-16 rounded-lg ring-2 ring-border" />)}
+                {[...Array(5)].map((_, i) => <Skeleton key={i} className="w-12 h-12 md:w-14 md:h-14 rounded-lg ring-1 ring-border" />)}
               </div> : topProducts.length > 0 ? <>
-                <span className="text-[10px] md:text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
                   Top Brands
                 </span>
                 <TooltipProvider>
@@ -120,8 +98,8 @@ export function HeroHeader({
                     {topProducts.slice(0, 5).map((product, index) => <Tooltip key={index}>
                         <TooltipTrigger asChild>
                           <div className="relative transition-transform hover:scale-110 hover:z-10">
-                            <div className="w-14 h-14 md:w-16 md:h-16 lg:w-20 lg:h-20 rounded-lg ring-2 ring-border bg-white shadow-sm overflow-hidden">
-                              {product.main_image_url ? <img src={product.main_image_url} alt={product.brand || 'Product'} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-slate-600 text-xs md:text-sm font-medium">
+                            <div className="w-12 h-12 md:w-14 md:h-14 rounded-lg ring-1 ring-border bg-white overflow-hidden">
+                              {product.main_image_url ? <img src={product.main_image_url} alt={product.brand || 'Product'} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-muted flex items-center justify-center text-slate-600 text-xs md:text-sm font-medium">
                                   {(product.brand || 'P').slice(0, 2).toUpperCase()}
                                 </div>}
                             </div>
@@ -139,12 +117,12 @@ export function HeroHeader({
         </div>
 
         {/* Executive Summary */}
-        {!isLoading && executiveSummary && <div className="pt-3 border-t border-border animate-enter" style={{ animationDelay: '0.2s' }}>
-            <p className="text-xs md:text-sm text-muted-foreground leading-relaxed line-clamp-3 md:line-clamp-none">
+        {!isLoading && executiveSummary && <div className="pt-2.5 border-t border-border/60 animate-enter" style={{ animationDelay: '0.2s' }}>
+            <p className="text-[13px] text-muted-foreground leading-relaxed line-clamp-3">
               {executiveSummary}
             </p>
           </div>}
-        {isLoading && <div className="pt-3 border-t border-border">
+        {isLoading && <div className="pt-2.5 border-t border-border/60">
             <Skeleton className="h-12 w-full" />
           </div>}
       </div>

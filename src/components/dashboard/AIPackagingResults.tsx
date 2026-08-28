@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 import { handleApiError } from "@/lib/handleApiError";
 import { PackagingDesignAnalysis } from "@/hooks/usePackagingAnalysis";
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BrandCard } from "@/components/ui/brand-card";
+import { Panel } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { 
@@ -515,7 +515,7 @@ export function AIPackagingResults({ analysis, mockupImageUrl, onSaveMockup, onR
     <div className="space-y-6">
       {/* Regenerate Copy Section */}
       {onRegenerateCopy && (
-        <div className="flex items-center justify-between p-4 bg-gradient-to-r from-primary/5 to-chart-2/5 rounded-xl border border-primary/20">
+        <div className="flex items-center justify-between p-4 rounded-xl border border-border/60 bg-card">
           <div>
             <h3 className="text-sm font-semibold flex items-center gap-2">
               <RefreshCw className="w-4 h-4 text-primary" />
@@ -565,7 +565,7 @@ export function AIPackagingResults({ analysis, mockupImageUrl, onSaveMockup, onR
 
       {/* Section 0: Visual Mockup Preview - Hidden when hideMockupSection is true */}
       {!hideMockupSection && (
-        <BrandCard className="border-chart-2/20 bg-gradient-to-br from-muted/30 to-muted/10">
+        <Panel className="">
           <CardHeader className="pb-4">
             <div className="flex flex-col gap-4">
               <div className="flex items-center justify-between">
@@ -714,11 +714,11 @@ export function AIPackagingResults({ analysis, mockupImageUrl, onSaveMockup, onR
               </div>
             )}
           </BrandModal>
-        </BrandCard>
+        </Panel>
       )}
 
       {/* Section 1: Design Brief Card */}
-      <BrandCard className="border-primary/20">
+      <Panel className="border-primary/20">
         <CardHeader className="pb-4">
           <CardTitle className="text-lg flex items-center gap-2">
             <Palette className="w-5 h-5 text-primary" />
@@ -764,7 +764,7 @@ export function AIPackagingResults({ analysis, mockupImageUrl, onSaveMockup, onR
           </div>
 
           {/* Primary Claim */}
-          <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
+          <div className="p-4 bg-card rounded-lg border border-primary/20">
             <p className="text-xs font-medium text-primary mb-2">Primary Claim</p>
             <p className="text-xl font-bold text-foreground">{primaryClaim}</p>
           </div>
@@ -823,10 +823,10 @@ export function AIPackagingResults({ analysis, mockupImageUrl, onSaveMockup, onR
             </Collapsible>
           )}
         </CardContent>
-      </BrandCard>
+      </Panel>
 
       {/* Section 2: Elements Checklist */}
-      <BrandCard>
+      <Panel>
         <CardHeader className="pb-4">
           <CardTitle className="text-lg flex items-center gap-2">
             <CheckCircle2 className="w-5 h-5 text-chart-4" />
@@ -879,7 +879,7 @@ export function AIPackagingResults({ analysis, mockupImageUrl, onSaveMockup, onR
 
           {/* Call to Action */}
           {callToAction && (
-            <div className="p-3 bg-chart-4/10 rounded-lg border border-chart-4/20">
+            <div className="p-3 bg-card rounded-lg border border-chart-4/20">
               <p className="text-xs font-medium text-chart-4 mb-1">Call to Action</p>
               <p className="text-base font-semibold text-foreground">{callToAction}</p>
             </div>
@@ -899,10 +899,10 @@ export function AIPackagingResults({ analysis, mockupImageUrl, onSaveMockup, onR
             </div>
           )}
         </CardContent>
-      </BrandCard>
+      </Panel>
 
       {/* Section 3: Mock Content */}
-      <BrandCard>
+      <Panel>
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg flex items-center gap-2">
@@ -980,7 +980,7 @@ export function AIPackagingResults({ analysis, mockupImageUrl, onSaveMockup, onR
             </div>
           )}
         </CardContent>
-      </BrandCard>
+      </Panel>
     </div>
   );
 }

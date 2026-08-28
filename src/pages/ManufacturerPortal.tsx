@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BrandCard } from "@/components/ui/brand-card";
+import { Panel } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -518,24 +518,24 @@ export default function ManufacturerPortal() {
                     ))}
                   </div>
                 ) : publishedLabel === null ? (
-                  <BrandCard className="border border-gray-200">
+                  <Panel className="border border-gray-200">
                     <CardContent className="py-8 text-center text-gray-400 text-sm">
                       No formula version has been shared yet. Check back soon.
                     </CardContent>
-                  </BrandCard>
+                  </Panel>
                 ) : !publishedVersion ? (
-                  <BrandCard className="border border-gray-200">
+                  <Panel className="border border-gray-200">
                     <CardContent className="py-8 text-center text-gray-400 text-sm">
                       Loading shared formula…
                     </CardContent>
-                  </BrandCard>
+                  </Panel>
                 ) : (() => {
                   const v = publishedVersion;
                   const isExpanded = expandedVersionId === v.id;
                   const isCommentActive = activeCommentVersion === v.label;
                   return (
                     <div className="space-y-3">
-                      <BrandCard
+                      <Panel
                         className={[
                           "border transition-shadow",
                           isCommentActive ? "border-blue-200 shadow-sm" : "border-gray-200",
@@ -618,7 +618,7 @@ export default function ManufacturerPortal() {
                             </div>
                           )}
                         </CardContent>
-                      </BrandCard>
+                      </Panel>
                     </div>
                   );
                 })()}

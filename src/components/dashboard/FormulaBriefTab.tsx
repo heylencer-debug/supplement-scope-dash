@@ -7,7 +7,7 @@
 import React, { useRef, useCallback, useState } from "react";
 import { useFormulaBrief, type IngredientRow } from "@/hooks/useFormulaBrief";
 import { CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { BrandCard } from "@/components/ui/brand-card";
+import { Panel } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PearlButton } from "@/components/ui/pearl-button";
@@ -191,7 +191,7 @@ function SectionCard({ icon: Icon, title, description, children, accent }: {
   icon: any; title: string; description?: string; children: React.ReactNode; accent?: string;
 }) {
   return (
-    <BrandCard className={accent}>
+    <Panel className={accent}>
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-sm">
           <Icon className="h-4 w-4 text-primary" />{title}
@@ -199,7 +199,7 @@ function SectionCard({ icon: Icon, title, description, children, accent }: {
         {description && <CardDescription className="text-xs">{description}</CardDescription>}
       </CardHeader>
       <CardContent>{children}</CardContent>
-    </BrandCard>
+    </Panel>
   );
 }
 
@@ -219,7 +219,7 @@ function FormulaCard({ card, categoryName, generatedAt, onManufacturerPDF }: {
   const download = usePDFDownload(downloadRef, `${categoryName || 'dovive'}-${card.id}-formula`);
 
   return (
-    <BrandCard className={`border ${card.borderColor} transition-all duration-200`}>
+    <Panel className={`border ${card.borderColor} transition-all duration-200`}>
       {/* Card header — always visible, click to toggle */}
       <button
         className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-t-lg ${card.bgColor} hover:brightness-105 transition-all`}
@@ -267,7 +267,7 @@ function FormulaCard({ card, categoryName, generatedAt, onManufacturerPDF }: {
           {!card.downloadContent && <div ref={downloadRef} style={{ display: 'none' }}>{renderMarkdown(card.content)}</div>}
         </CardContent>
       )}
-    </BrandCard>
+    </Panel>
   );
 }
 
@@ -483,12 +483,12 @@ export function FormulaBriefTab({ categoryId, categoryName }: Props) {
       </SectionCard>
 
       {/* Placeholder for legacy structured sections */}
-      <BrandCard className="border-chart-2/20">
+      <Panel className="border-chart-2/20">
         <CardContent className="py-8 text-center space-y-2">
           <FlaskConical className="h-8 w-8 text-muted-foreground/40 mx-auto" />
           <p className="text-sm text-muted-foreground">This brief uses the old format. Re-run <code className="text-foreground text-xs bg-muted px-1.5 py-0.5 rounded">phase8-formula-brief.js --force</code> to generate the full AI brief.</p>
         </CardContent>
-      </BrandCard>
+      </Panel>
     </div>
   );
 }

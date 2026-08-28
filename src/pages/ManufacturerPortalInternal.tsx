@@ -532,7 +532,7 @@ export default function ManufacturerPortalInternal() {
                     </div>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
                       {item.is_active && (
-                        <span className="text-[9px] px-2 py-0.5 bg-primary/10 text-primary rounded-full font-bold uppercase tracking-wide">active</span>
+                        <span className="text-[9px] px-2 py-0.5 bg-card text-primary rounded-full font-bold uppercase tracking-wide">active</span>
                       )}
                       {isPublished && (
                         <span className="text-[9px] px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full font-bold uppercase tracking-wide">shared</span>
@@ -623,7 +623,7 @@ export default function ManufacturerPortalInternal() {
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
                 {activeItem.is_active && (
-                  <span className="text-[10px] px-2.5 py-1 bg-primary/10 text-primary rounded-full font-bold uppercase tracking-wide">
+                  <span className="text-[10px] px-2.5 py-1 bg-card text-primary rounded-full font-bold uppercase tracking-wide">
                     Active
                   </span>
                 )}
@@ -650,7 +650,7 @@ export default function ManufacturerPortalInternal() {
                   <Icon className="w-3.5 h-3.5" />
                   {label}
                   {key === "comments" && comments.length > 0 && (
-                    <span className="ml-0.5 bg-primary/10 text-primary text-[10px] w-5 h-5 rounded-full inline-flex items-center justify-center font-bold">
+                    <span className="ml-0.5 bg-card text-primary text-[10px] w-5 h-5 rounded-full inline-flex items-center justify-center font-bold">
                       {comments.length}
                     </span>
                   )}
@@ -863,7 +863,7 @@ export default function ManufacturerPortalInternal() {
                                             href={c.attachment_url}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-2 text-xs text-primary hover:text-primary/80 bg-primary/5 hover:bg-primary/10 border border-primary/10 rounded-xl px-3 py-2 transition-colors"
+                                            className="inline-flex items-center gap-2 text-xs text-primary hover:text-primary/80 bg-card hover:bg-card border border-primary/10 rounded-xl px-3 py-2 transition-colors"
                                           >
                                             <FileText className="w-3.5 h-3.5 shrink-0" />
                                             <span className="truncate max-w-[200px]">{c.attachment_name ?? "Attachment"}</span>

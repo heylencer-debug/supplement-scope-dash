@@ -2,7 +2,7 @@ import { X, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { CardContent } from "@/components/ui/card";
-import { BrandCard } from "@/components/ui/brand-card";
+import { Panel } from "@/components/ui/panel";
 import { BulkAnalysisProgress as ProgressType } from "@/hooks/useBulkSupplementAnalysis";
 
 interface BulkAnalysisProgressProps {
@@ -21,7 +21,7 @@ export function BulkAnalysisProgress({ progress, onDismiss }: BulkAnalysisProgre
   const isError = progress.status === "error";
 
   return (
-    <BrandCard className="border-primary/20 bg-primary/5">
+    <Panel className="border-primary/20 bg-primary/5">
       <CardContent className="py-3 px-4">
         <div className="flex items-center gap-4">
           {/* Status Icon */}
@@ -80,6 +80,6 @@ export function BulkAnalysisProgress({ progress, onDismiss }: BulkAnalysisProgre
           )}
         </div>
       </CardContent>
-    </BrandCard>
+    </Panel>
   );
 }

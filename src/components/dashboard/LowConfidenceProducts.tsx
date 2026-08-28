@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BrandCard } from "@/components/ui/brand-card";
+import { Panel } from "@/components/ui/panel";
 import { Button } from "@/components/ui/button";
 import { PearlButton } from "@/components/ui/pearl-button";
 import { Badge } from "@/components/ui/badge";
@@ -40,7 +40,7 @@ export function LowConfidenceProducts({ products, categoryId, isLoading }: LowCo
 
   if (isLoading) {
     return (
-      <BrandCard>
+      <Panel>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
             <AlertTriangle className="w-5 h-5 text-warning" />
@@ -50,7 +50,7 @@ export function LowConfidenceProducts({ products, categoryId, isLoading }: LowCo
         <CardContent>
           <Skeleton className="h-[200px] w-full" />
         </CardContent>
-      </BrandCard>
+      </Panel>
     );
   }
 
@@ -63,7 +63,7 @@ export function LowConfidenceProducts({ products, categoryId, isLoading }: LowCo
     : 0;
 
   return (
-    <BrandCard className="border-warning/30">
+    <Panel className="border-warning/30">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
@@ -98,7 +98,7 @@ export function LowConfidenceProducts({ products, categoryId, isLoading }: LowCo
       <CardContent className="space-y-4">
         {/* Progress Section */}
         {progress.status === "running" && (
-          <div className="p-4 bg-primary/5 rounded-lg border border-primary/20 space-y-3">
+          <div className="p-4 bg-card rounded-lg border border-primary/20 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <RefreshCw className="h-4 w-4 text-primary animate-spin" />
@@ -131,7 +131,7 @@ export function LowConfidenceProducts({ products, categoryId, isLoading }: LowCo
 
         {/* Completion Message */}
         {progress.status === "complete" && (
-          <div className="p-4 bg-chart-4/10 rounded-lg border border-chart-4/30 flex items-center gap-3">
+          <div className="p-4 bg-card rounded-lg border border-chart-4/30 flex items-center gap-3">
             <CheckCircle2 className="h-5 w-5 text-chart-4" />
             <div>
               <p className="text-sm font-medium text-foreground">
@@ -206,6 +206,6 @@ export function LowConfidenceProducts({ products, categoryId, isLoading }: LowCo
           </p>
         )}
       </CardContent>
-    </BrandCard>
+    </Panel>
   );
 }

@@ -2340,7 +2340,7 @@ export function DualMockupGenerator({ analysis, mockupImages, onSaveMockup, cate
 
       {/* Completion indicator */}
       {mockupImages.match_leaders && mockupImages.match_disruptors && (
-        <div className="flex items-center justify-center gap-2 p-3 bg-chart-4/10 rounded-lg border border-chart-4/20">
+        <div className="flex items-center justify-center gap-2 p-3 bg-card rounded-lg border border-chart-4/20">
           <Badge variant="secondary" className="bg-chart-4/20 text-chart-4 border-chart-4/30">
             ✓ Both mockups generated
           </Badge>

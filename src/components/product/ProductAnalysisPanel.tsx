@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BrandCard } from "@/components/ui/brand-card";
+import { Panel } from "@/components/ui/panel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { AlertTriangle, CheckCircle2, Lightbulb, Zap, Image as ImageIcon, Users, MessageSquare, Target, TrendingUp, XCircle, Star, ThumbsUp, ThumbsDown, Sparkles, FileText, ChevronDown, ChevronUp, Quote, Crown, UserCircle, Gift, List, Palette, Sun, Layout, Heart } from "lucide-react";
@@ -109,7 +109,7 @@ function SmartImageCard({
       {/* Analysis shown below the image when expanded */}
       {isExpanded && (image.description || image.analysis) && <div className="p-3 bg-muted/50 rounded-md border border-border text-xs space-y-2 animate-in fade-in slide-in-from-top-2">
           {image.description && <p className="font-medium">{image.description}</p>}
-          {image.analysis && <div className="p-2 bg-primary/5 rounded border-l-2 border-primary">
+          {image.analysis && <div className="p-2 bg-card rounded border-l-2 border-primary">
               <p className="text-muted-foreground mb-1 font-semibold">Strategy:</p>
               <p className="leading-relaxed">{image.analysis}</p>
             </div>}
@@ -160,7 +160,7 @@ function TitleAnalysisCard({
   const clarityScore = titleAnalysis.clarity_score;
   const issues = titleAnalysis.issues || [];
   if (clarityScore === undefined && issues.length === 0) return null;
-  return <BrandCard>
+  return <Panel>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm flex items-center gap-2">
@@ -176,7 +176,7 @@ function TitleAnalysisCard({
         {issues.length > 0 ? <div className="space-y-2">
             <p className="text-xs text-muted-foreground font-medium mb-3">Issues Found:</p>
             <div className="space-y-2">
-              {issues.map((issue: string, i: number) => <div key={i} className="flex items-start gap-2 p-3 bg-chart-2/5 rounded-md border border-chart-2/20">
+              {issues.map((issue: string, i: number) => <div key={i} className="flex items-start gap-2 p-3 bg-card rounded-md border border-chart-2/20">
                   <AlertTriangle className="w-4 h-4 text-chart-2 shrink-0 mt-0.5" />
                   <span className="text-sm">{issue}</span>
                 </div>)}
@@ -185,7 +185,7 @@ function TitleAnalysisCard({
             No title issues identified
           </p>}
       </CardContent>
-    </BrandCard>;
+    </Panel>;
 }
 
 // NEW: Bullet Analysis Card Component
@@ -199,7 +199,7 @@ function BulletAnalysisCard({
   const strengths = bulletAnalysis.strengths || [];
   const weaknesses = bulletAnalysis.weaknesses || [];
   if (strengths.length === 0 && weaknesses.length === 0 && benefitFocused === undefined) return null;
-  return <BrandCard>
+  return <Panel>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm flex items-center gap-2">
@@ -217,7 +217,7 @@ function BulletAnalysisCard({
               <CheckCircle2 className="w-3 h-3 text-chart-4" /> Strengths ({strengths.length})
             </p>
             <div className="space-y-2">
-              {strengths.map((strength: string, i: number) => <div key={i} className="flex items-start gap-2 p-3 bg-chart-4/5 rounded-md border border-chart-4/20">
+              {strengths.map((strength: string, i: number) => <div key={i} className="flex items-start gap-2 p-3 bg-card rounded-md border border-chart-4/20">
                   <CheckCircle2 className="w-4 h-4 text-chart-4 shrink-0 mt-0.5" />
                   <span className="text-sm">{strength}</span>
                 </div>)}
@@ -230,14 +230,14 @@ function BulletAnalysisCard({
               <XCircle className="w-3 h-3 text-chart-2" /> Weaknesses ({weaknesses.length})
             </p>
             <div className="space-y-2">
-              {weaknesses.map((weakness: string, i: number) => <div key={i} className="flex items-start gap-2 p-3 bg-chart-2/5 rounded-md border border-chart-2/20">
+              {weaknesses.map((weakness: string, i: number) => <div key={i} className="flex items-start gap-2 p-3 bg-card rounded-md border border-chart-2/20">
                   <XCircle className="w-4 h-4 text-chart-2 shrink-0 mt-0.5" />
                   <span className="text-sm">{weakness}</span>
                 </div>)}
             </div>
           </div>}
       </CardContent>
-    </BrandCard>;
+    </Panel>;
 }
 
 // NEW: Visual Style Guide Card Component
@@ -252,7 +252,7 @@ function VisualStyleGuideCard({
   const lightingStyle = visualStyleGuide.lighting_style || '';
   const compositionStyle = visualStyleGuide.composition_style || '';
   if (!colorPalette && moodKeywords.length === 0 && !lightingStyle && !compositionStyle) return null;
-  return <BrandCard>
+  return <Panel>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm flex items-center gap-2">
           <Palette className="w-4 h-4 text-chart-5" /> Visual Style Guide
@@ -260,7 +260,7 @@ function VisualStyleGuideCard({
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Color Palette */}
-        {colorPalette && <div className="p-3 bg-chart-5/5 rounded-lg border border-chart-5/20">
+        {colorPalette && <div className="p-3 bg-card rounded-lg border border-chart-5/20">
             <div className="flex items-center gap-2 mb-2">
               <Palette className="w-4 h-4 text-chart-5" />
               <span className="text-xs font-semibold text-muted-foreground">Color Palette</span>
@@ -269,7 +269,7 @@ function VisualStyleGuideCard({
           </div>}
         
         {/* Mood Keywords */}
-        {moodKeywords.length > 0 && <div className="p-3 bg-primary/5 rounded-lg border border-primary/20">
+        {moodKeywords.length > 0 && <div className="p-3 bg-card rounded-lg border border-primary/20">
             <div className="flex items-center gap-2 mb-2">
               <Heart className="w-4 h-4 text-primary" />
               <span className="text-xs font-semibold text-muted-foreground">Mood Keywords</span>
@@ -282,7 +282,7 @@ function VisualStyleGuideCard({
           </div>}
         
         {/* Lighting Style */}
-        {lightingStyle && <div className="p-3 bg-chart-2/5 rounded-lg border border-chart-2/20">
+        {lightingStyle && <div className="p-3 bg-card rounded-lg border border-chart-2/20">
             <div className="flex items-center gap-2 mb-2">
               <Sun className="w-4 h-4 text-chart-2" />
               <span className="text-xs font-semibold text-muted-foreground">Lighting Style</span>
@@ -291,7 +291,7 @@ function VisualStyleGuideCard({
           </div>}
         
         {/* Composition Style */}
-        {compositionStyle && <div className="p-3 bg-chart-3/5 rounded-lg border border-chart-3/20">
+        {compositionStyle && <div className="p-3 bg-card rounded-lg border border-chart-3/20">
             <div className="flex items-center gap-2 mb-2">
               <Layout className="w-4 h-4 text-chart-3" />
               <span className="text-xs font-semibold text-muted-foreground">Composition Style</span>
@@ -299,7 +299,7 @@ function VisualStyleGuideCard({
             <p className="text-sm">{compositionStyle}</p>
           </div>}
       </CardContent>
-    </BrandCard>;
+    </Panel>;
 }
 
 // Creative Strategy Card Component - Enhanced
@@ -315,7 +315,7 @@ function CreativeStrategyCard({
   const uniqueSellingProps = creativeBrief.unique_selling_props || [];
   const hasData = brandIdentity.archetype || targetPersona.demographic || winningOffers.analysis || uniqueSellingProps.length > 0;
   if (!hasData) return null;
-  return <BrandCard>
+  return <Panel>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm flex items-center gap-2">
@@ -331,7 +331,7 @@ function CreativeStrategyCard({
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Brand Archetype */}
-          {(brandIdentity.archetype || brandIdentity.tone) && <div className="p-3 bg-primary/5 rounded-lg border border-primary/20">
+          {(brandIdentity.archetype || brandIdentity.tone) && <div className="p-3 bg-card rounded-lg border border-primary/20">
               <div className="flex items-center gap-2 mb-2">
                 <Crown className="w-4 h-4 text-primary" />
                 <span className="text-xs font-semibold text-muted-foreground">Brand Archetype</span>
@@ -343,29 +343,29 @@ function CreativeStrategyCard({
             </div>}
           
           {/* Target Persona - Enhanced with primary_motivation */}
-          {(targetPersona.demographic || targetPersona.psychographic || targetPersona.primary_motivation) && <div className="p-3 bg-chart-3/5 rounded-lg border border-chart-3/20">
+          {(targetPersona.demographic || targetPersona.psychographic || targetPersona.primary_motivation) && <div className="p-3 bg-card rounded-lg border border-chart-3/20">
               <div className="flex items-center gap-2 mb-2">
                 <UserCircle className="w-4 h-4 text-chart-3" />
                 <span className="text-xs font-semibold text-muted-foreground">Target Persona</span>
               </div>
               {targetPersona.demographic && <p className="text-sm font-medium mb-1">{targetPersona.demographic}</p>}
               {targetPersona.psychographic && <p className="text-xs text-muted-foreground mb-2">{targetPersona.psychographic}</p>}
-              {targetPersona.primary_motivation && <div className="mt-2 p-2 bg-chart-3/10 rounded-md border-l-2 border-chart-3">
+              {targetPersona.primary_motivation && <div className="mt-2 p-2 bg-card rounded-md border-l-2 border-chart-3">
                   <p className="text-xs font-semibold text-muted-foreground mb-1">Primary Motivation:</p>
                   <p className="text-sm">{targetPersona.primary_motivation}</p>
                 </div>}
             </div>}
           
           {/* Winning Offer - Enhanced with effectiveness */}
-          {(winningOffers.analysis || winningOffers.effectiveness) && <div className="p-3 bg-chart-2/5 rounded-lg border border-chart-2/20 md:col-span-2">
+          {(winningOffers.analysis || winningOffers.effectiveness) && <div className="p-3 bg-card rounded-lg border border-chart-2/20 md:col-span-2">
               <div className="flex items-center gap-2 mb-2">
                 <Gift className="w-4 h-4 text-chart-2" />
                 <span className="text-xs font-semibold text-muted-foreground">Winning Offer Analysis</span>
               </div>
-              {winningOffers.analysis && <div className="p-3 bg-chart-2/10 rounded-md mb-3">
+              {winningOffers.analysis && <div className="p-3 bg-card rounded-md mb-3">
                   <ExpandableText text={winningOffers.analysis} maxLength={300} />
                 </div>}
-              {winningOffers.effectiveness && <div className="p-3 bg-chart-4/5 rounded-md border border-chart-4/20">
+              {winningOffers.effectiveness && <div className="p-3 bg-card rounded-md border border-chart-4/20">
                   <p className="text-xs font-semibold text-muted-foreground mb-1 flex items-center gap-1">
                     <TrendingUp className="w-3 h-3 text-chart-4" /> Effectiveness Assessment
                   </p>
@@ -374,7 +374,7 @@ function CreativeStrategyCard({
             </div>}
           
           {/* USP List */}
-          {uniqueSellingProps.length > 0 && <div className="p-3 bg-chart-4/5 rounded-lg border border-chart-4/20 md:col-span-2">
+          {uniqueSellingProps.length > 0 && <div className="p-3 bg-card rounded-lg border border-chart-4/20 md:col-span-2">
               <div className="flex items-center gap-2 mb-2">
                 <List className="w-4 h-4 text-chart-4" />
                 <span className="text-xs font-semibold text-muted-foreground">Unique Selling Props</span>
@@ -389,7 +389,7 @@ function CreativeStrategyCard({
             </div>}
         </div>
       </CardContent>
-    </BrandCard>;
+    </Panel>;
 }
 
 // Copy Assets / Swipe File Component
@@ -401,7 +401,7 @@ function CopyAssetsCard({
   const bestHooks = copyAssets?.best_hooks || [];
   const clarityScore = copyAssets?.clarity_score;
   const benefitsFocus = copyAssets?.benefits_focus;
-  return <BrandCard>
+  return <Panel>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm flex items-center gap-2">
@@ -421,7 +421,7 @@ function CopyAssetsCard({
         {bestHooks.length > 0 ? <div className="space-y-2">
             <p className="text-xs text-muted-foreground font-medium mb-3">Killer Hooks (ALL-CAPS phrases from listing):</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              {bestHooks.map((hook: string, i: number) => <div key={i} className="p-3 bg-primary/5 rounded-md border border-primary/20 hover:bg-primary/10 transition-colors">
+              {bestHooks.map((hook: string, i: number) => <div key={i} className="p-3 bg-card rounded-md border border-primary/20 hover:bg-primary/10 transition-colors">
                   <div className="flex items-start gap-2">
                     <Quote className="w-4 h-4 text-primary shrink-0 mt-0.5" />
                     <span className="text-sm font-semibold">{hook}</span>
@@ -434,7 +434,7 @@ function CopyAssetsCard({
             <p className="text-xs mt-1">This section shows ALL-CAPS phrases from the listing.</p>
           </div>}
       </CardContent>
-    </BrandCard>;
+    </Panel>;
 }
 export default function ProductAnalysisPanel({
   marketingAnalysis,
@@ -579,7 +579,7 @@ export default function ProductAnalysisPanel({
           <VisualStyleGuideCard visualStyleGuide={visualStyleGuide} />
           
           {/* Score Card Summary */}
-          {(overallGrade || metrics.length > 0) && <BrandCard>
+          {(overallGrade || metrics.length > 0) && <Panel>
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm flex items-center gap-2">
@@ -609,10 +609,10 @@ export default function ProductAnalysisPanel({
               })}
                   </div>}
               </CardContent>
-            </BrandCard>}
+            </Panel>}
           
           {/* Key Insights from Reviews */}
-          {keyInsights.length > 0 && <BrandCard>
+          {keyInsights.length > 0 && <Panel>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
                   <Lightbulb className="w-4 h-4 text-primary" /> Key Insights
@@ -620,20 +620,20 @@ export default function ProductAnalysisPanel({
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {keyInsights.slice(0, 5).map((insight: string, i: number) => <div key={i} className="flex items-start gap-2 p-2 bg-primary/5 rounded-md">
+                  {keyInsights.slice(0, 5).map((insight: string, i: number) => <div key={i} className="flex items-start gap-2 p-2 bg-card rounded-md">
                       <Lightbulb className="w-3 h-3 text-primary shrink-0 mt-1" />
                       <span className="text-sm">{insight}</span>
                     </div>)}
                 </div>
               </CardContent>
-            </BrandCard>}
+            </Panel>}
           
-          {!Object.keys(creativeBrief).length && !overallGrade && !metrics.length && !keyInsights.length && <BrandCard>
+          {!Object.keys(creativeBrief).length && !overallGrade && !metrics.length && !keyInsights.length && <Panel>
               <CardContent className="py-8 text-center text-muted-foreground">
                 <Sparkles className="w-8 h-8 mx-auto mb-2 opacity-50" />
                 <p>No creative strategy data available yet.</p>
               </CardContent>
-            </BrandCard>}
+            </Panel>}
         </TabsContent>
 
         {/* TAB 2: COPY ANALYSIS & SWIPE FILE */}
@@ -648,7 +648,7 @@ export default function ProductAnalysisPanel({
           <CopyAssetsCard copyAssets={copyAssets} />
           
           {/* Clarity Score (legacy) */}
-          {copyClarity !== undefined && !copyAssets.clarity_score && !titleAnalysis.clarity_score && <BrandCard>
+          {copyClarity !== undefined && !copyAssets.clarity_score && !titleAnalysis.clarity_score && <Panel>
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm flex items-center gap-2">
@@ -657,10 +657,10 @@ export default function ProductAnalysisPanel({
                   <ScoreBadge score={copyClarity} />
                 </div>
               </CardHeader>
-            </BrandCard>}
+            </Panel>}
 
           {/* Copy Hooks (legacy) */}
-          {copyHooks.length > 0 && <BrandCard>
+          {copyHooks.length > 0 && <Panel>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
                   <Lightbulb className="w-4 h-4" /> What the Copy Does Well
@@ -669,26 +669,26 @@ export default function ProductAnalysisPanel({
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {copyHooks.map((hook: string, i: number) => <div key={i} className="flex items-start gap-2 p-3 bg-chart-4/5 rounded-md border border-chart-4/20">
+                  {copyHooks.map((hook: string, i: number) => <div key={i} className="flex items-start gap-2 p-3 bg-card rounded-md border border-chart-4/20">
                       <CheckCircle2 className="w-4 h-4 text-chart-4 shrink-0 mt-0.5" />
                       <span className="text-sm">{hook}</span>
                     </div>)}
                 </div>
               </CardContent>
-            </BrandCard>}
+            </Panel>}
           
-          {!copyAssets.best_hooks?.length && copyHooks.length === 0 && copyClarity === undefined && !titleAnalysis.issues?.length && !bulletAnalysis.strengths?.length && !bulletAnalysis.weaknesses?.length && <BrandCard>
+          {!copyAssets.best_hooks?.length && copyHooks.length === 0 && copyClarity === undefined && !titleAnalysis.issues?.length && !bulletAnalysis.strengths?.length && !bulletAnalysis.weaknesses?.length && <Panel>
               <CardContent className="py-8 text-center text-muted-foreground">
                 <FileText className="w-8 h-8 mx-auto mb-2 opacity-50" />
                 <p>No copy analysis data available yet.</p>
               </CardContent>
-            </BrandCard>}
+            </Panel>}
         </TabsContent>
 
         {/* TAB 3: GAP ANALYSIS & SENTIMENT */}
         <TabsContent value="sentiment" className="mt-0 space-y-4">
           {/* Gap Analysis - Full Text Warning Box */}
-          {gapAnalysis && <BrandCard className="border-chart-2/30">
+          {gapAnalysis && <Panel className="border-chart-2/30">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 text-chart-2" /> Gap Analysis
@@ -696,7 +696,7 @@ export default function ProductAnalysisPanel({
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="p-4 bg-chart-2/5 rounded-lg border border-chart-2/20">
+                <div className="p-4 bg-card rounded-lg border border-chart-2/20">
                   <div className="flex items-start gap-3">
                     <Quote className="w-5 h-5 text-chart-2 shrink-0 mt-0.5" />
                     <div className="text-sm leading-relaxed">
@@ -705,12 +705,12 @@ export default function ProductAnalysisPanel({
                   </div>
                 </div>
               </CardContent>
-            </BrandCard>}
+            </Panel>}
           
           {/* Praises & Complaints */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Primary Praises */}
-            <BrandCard>
+            <Panel>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
                   <ThumbsUp className="w-4 h-4 text-chart-4" /> What Customers Love
@@ -721,7 +721,7 @@ export default function ProductAnalysisPanel({
               </CardHeader>
               <CardContent>
                 {primaryPraises.length > 0 ? <div className="space-y-2">
-                    {primaryPraises.map((praise: string, i: number) => <div key={i} className="flex items-start gap-2 p-2 bg-chart-4/5 rounded-md">
+                    {primaryPraises.map((praise: string, i: number) => <div key={i} className="flex items-start gap-2 p-2 bg-card rounded-md">
                         <CheckCircle2 className="w-4 h-4 text-chart-4 shrink-0 mt-0.5" />
                         <span className="text-sm">{praise}</span>
                       </div>)}
@@ -729,10 +729,10 @@ export default function ProductAnalysisPanel({
                     No praises identified
                   </p>}
               </CardContent>
-            </BrandCard>
+            </Panel>
 
             {/* Primary Complaints */}
-            <BrandCard>
+            <Panel>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
                   <ThumbsDown className="w-4 h-4 text-chart-2" /> Customer Complaints
@@ -743,7 +743,7 @@ export default function ProductAnalysisPanel({
               </CardHeader>
               <CardContent>
                 {primaryComplaints.length > 0 ? <div className="space-y-2">
-                    {primaryComplaints.map((complaint: string, i: number) => <div key={i} className="flex items-start gap-2 p-2 bg-chart-2/5 rounded-md">
+                    {primaryComplaints.map((complaint: string, i: number) => <div key={i} className="flex items-start gap-2 p-2 bg-card rounded-md">
                         <XCircle className="w-4 h-4 text-chart-2 shrink-0 mt-0.5" />
                         <span className="text-sm">{complaint}</span>
                       </div>)}
@@ -751,12 +751,12 @@ export default function ProductAnalysisPanel({
                     No complaints identified
                   </p>}
               </CardContent>
-            </BrandCard>
+            </Panel>
           </div>
           
           {/* Pain Points & Positive Themes from Reviews */}
           {(painPoints.length > 0 || positiveThemes.length > 0) && <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {painPoints.length > 0 && <BrandCard>
+              {painPoints.length > 0 && <Panel>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm flex items-center gap-2">
                       <AlertTriangle className="w-4 h-4 text-destructive" /> Review Pain Points
@@ -773,9 +773,9 @@ export default function ProductAnalysisPanel({
                         </div>)}
                     </div>
                   </CardContent>
-                </BrandCard>}
+                </Panel>}
 
-              {positiveThemes.length > 0 && <BrandCard>
+              {positiveThemes.length > 0 && <Panel>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm flex items-center gap-2">
                       <Star className="w-4 h-4 text-chart-4" /> Positive Themes
@@ -784,7 +784,7 @@ export default function ProductAnalysisPanel({
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2">
-                      {positiveThemes.slice(0, 5).map((theme: any, i: number) => <div key={i} className="p-2 bg-chart-4/5 rounded-md border border-chart-4/20">
+                      {positiveThemes.slice(0, 5).map((theme: any, i: number) => <div key={i} className="p-2 bg-card rounded-md border border-chart-4/20">
                           <p className="text-sm font-medium">{theme.theme || theme}</p>
                           {theme.frequency && <p className="text-xs text-muted-foreground mt-1">
                               {theme.frequency}% mention rate
@@ -792,14 +792,14 @@ export default function ProductAnalysisPanel({
                         </div>)}
                     </div>
                   </CardContent>
-                </BrandCard>}
+                </Panel>}
             </div>}
         </TabsContent>
 
         {/* TAB 4: SMART VISUAL GALLERY */}
         <TabsContent value="visuals" className="mt-0 space-y-4">
           {/* Target Audience / Vibe */}
-          {(vibe || demographics.primary_audience) && <BrandCard>
+          {(vibe || demographics.primary_audience) && <Panel>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
                   <Users className="w-4 h-4" /> Visual Strategy & Demographics
@@ -819,10 +819,10 @@ export default function ProductAnalysisPanel({
                     <ScoreBadge score={demographics.relatability_score} />
                   </div>}
               </CardContent>
-            </BrandCard>}
+            </Panel>}
 
           {/* Smart Image Gallery with Hover Analysis */}
-          <BrandCard>
+          <Panel>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2">
                 <ImageIcon className="w-4 h-4" /> Smart Gallery
@@ -839,12 +839,12 @@ export default function ProductAnalysisPanel({
                   No image analysis available
                 </p>}
             </CardContent>
-          </BrandCard>
+          </Panel>
         </TabsContent>
 
         {/* TAB 5: ACTION PLAN */}
         <TabsContent value="actions" className="mt-0 space-y-4">
-          <BrandCard>
+          <Panel>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2">
                 <Zap className="w-4 h-4 text-chart-2" /> Action Plan
@@ -860,10 +860,10 @@ export default function ProductAnalysisPanel({
                   No action items available
                 </p>}
             </CardContent>
-          </BrandCard>
+          </Panel>
           
           {/* Actionable Recommendations from Reviews */}
-          {actionableRecommendations.length > 0 && <BrandCard>
+          {actionableRecommendations.length > 0 && <Panel>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
                   <Target className="w-4 h-4 text-primary" /> Review-Based Recommendations
@@ -883,7 +883,7 @@ export default function ProductAnalysisPanel({
                     </div>)}
                 </div>
               </CardContent>
-            </BrandCard>}
+            </Panel>}
         </TabsContent>
       </Tabs>
     </div>;

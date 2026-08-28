@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { BrandCard } from "@/components/ui/brand-card";
+import { Panel } from "@/components/ui/panel";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -110,7 +110,7 @@ export function FormulaFitSection({ categoryId }: FormulaFitSectionProps) {
     };
     
     return (
-      <BrandCard className="overflow-hidden">
+      <Panel className="overflow-hidden">
         <CardContent className="flex flex-col items-center justify-center py-12 text-center">
           <div className="relative mb-6">
             <div className="absolute inset-0 rounded-full bg-primary/20 animate-ping" style={{ animationDuration: '2s' }} />
@@ -128,15 +128,9 @@ export function FormulaFitSection({ categoryId }: FormulaFitSectionProps) {
           <div className="w-full max-w-md mb-4">
             <div className="h-2 bg-muted rounded-full overflow-hidden">
               <div 
-                className="h-full bg-gradient-to-r from-primary via-primary to-primary/70 rounded-full transition-all duration-500 ease-out relative"
+                className="h-full bg-primary rounded-full transition-all duration-500 ease-out relative"
                 style={{ width: `${progressPercent}%` }}
               >
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-[shimmer_2s_infinite]" 
-                  style={{ 
-                    backgroundSize: '200% 100%',
-                    animation: 'shimmer 2s infinite linear'
-                  }} 
-                />
               </div>
             </div>
           </div>
@@ -164,14 +158,14 @@ export function FormulaFitSection({ categoryId }: FormulaFitSectionProps) {
             )}
           </div>
         </CardContent>
-      </BrandCard>
+      </Panel>
     );
   }
 
   // Error state
   if (error) {
     return (
-      <BrandCard className="border-destructive/50">
+      <Panel className="border-destructive/50">
         <CardContent className="flex flex-col items-center justify-center py-16 text-center">
           <div className="h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
             <AlertTriangle className="h-6 w-6 text-destructive" />
@@ -183,14 +177,14 @@ export function FormulaFitSection({ categoryId }: FormulaFitSectionProps) {
             Retry Analysis
           </Button>
         </CardContent>
-      </BrandCard>
+      </Panel>
     );
   }
 
   // No analysis yet
   if (!hasAnalysis) {
     return (
-      <BrandCard className="border-dashed">
+      <Panel className="border-dashed">
         <CardContent className="flex flex-col items-center justify-center py-16 text-center">
           <Target className="h-12 w-12 text-muted-foreground mb-4" />
           <h3 className="text-xl font-semibold mb-2">Formula Fit Analysis</h3>
@@ -204,7 +198,7 @@ export function FormulaFitSection({ categoryId }: FormulaFitSectionProps) {
             Run Analysis
           </Button>
         </CardContent>
-      </BrandCard>
+      </Panel>
     );
   }
 
@@ -286,7 +280,7 @@ function BrandsAnalyzedCard({
   };
 
   return (
-    <BrandCard className="border-primary/20 bg-primary/5">
+    <Panel className="border-primary/20 bg-primary/5">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div>
@@ -416,7 +410,7 @@ function BrandsAnalyzedCard({
           </Collapsible>
         ))}
       </CardContent>
-    </BrandCard>
+    </Panel>
   );
 }
 
@@ -546,7 +540,7 @@ function FormulaFitScoreCard({
   };
 
   return (
-    <BrandCard>
+    <Panel>
       <CardHeader className="flex flex-row items-start justify-between">
         <div>
           <CardTitle className="text-xl">Market Fit Score</CardTitle>
@@ -583,7 +577,7 @@ function FormulaFitScoreCard({
           </div>
         </div>
       </CardContent>
-    </BrandCard>
+    </Panel>
   );
 }
 
@@ -593,7 +587,7 @@ function StrengthsCard({
   strengths: FormulaFitAnalysis["strengths"];
 }) {
   return (
-    <BrandCard className="h-full">
+    <Panel className="h-full">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-green-600">
           <CheckCircle2 className="h-5 w-5" />
@@ -616,7 +610,7 @@ function StrengthsCard({
           </div>
         ))}
       </CardContent>
-    </BrandCard>
+    </Panel>
   );
 }
 
@@ -637,7 +631,7 @@ function WeaknessesCard({
   };
 
   return (
-    <BrandCard className="h-full">
+    <Panel className="h-full">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-red-600">
           <XCircle className="h-5 w-5" />
@@ -660,7 +654,7 @@ function WeaknessesCard({
           </div>
         ))}
       </CardContent>
-    </BrandCard>
+    </Panel>
   );
 }
 
@@ -683,7 +677,7 @@ function TrendAlignmentChart({
   };
 
   return (
-    <BrandCard>
+    <Panel>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <TrendingUp className="h-5 w-5 text-primary" />
@@ -718,7 +712,7 @@ function TrendAlignmentChart({
           </BarChart>
         </ResponsiveContainer>
       </CardContent>
-    </BrandCard>
+    </Panel>
   );
 }
 
@@ -732,7 +726,7 @@ function PainPointCoverage({
   const percentage = Math.round((addressed / total) * 100);
 
   return (
-    <BrandCard>
+    <Panel>
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
@@ -779,7 +773,7 @@ function PainPointCoverage({
           ))}
         </div>
       </CardContent>
-    </BrandCard>
+    </Panel>
   );
 }
 
@@ -789,7 +783,7 @@ function CompetitivePositionCard({
   position: FormulaFitAnalysis["competitive_position"];
 }) {
   return (
-    <BrandCard className="h-full">
+    <Panel className="h-full">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Target className="h-5 w-5 text-primary" />
@@ -809,13 +803,13 @@ function CompetitivePositionCard({
         </div>
         <p className="text-muted-foreground">{position.summary}</p>
       </CardContent>
-    </BrandCard>
+    </Panel>
   );
 }
 
 function GapsCard({ gaps }: { gaps: FormulaFitAnalysis["gaps"] }) {
   return (
-    <BrandCard className="h-full">
+    <Panel className="h-full">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-amber-600">
           <AlertTriangle className="h-5 w-5" />
@@ -835,7 +829,7 @@ function GapsCard({ gaps }: { gaps: FormulaFitAnalysis["gaps"] }) {
           </div>
         ))}
       </CardContent>
-    </BrandCard>
+    </Panel>
   );
 }
 
@@ -860,7 +854,7 @@ function RecommendationsCard({
   };
 
   return (
-    <BrandCard>
+    <Panel>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Lightbulb className="h-5 w-5 text-primary" />
@@ -892,6 +886,6 @@ function RecommendationsCard({
           ))}
         </div>
       </CardContent>
-    </BrandCard>
+    </Panel>
   );
 }

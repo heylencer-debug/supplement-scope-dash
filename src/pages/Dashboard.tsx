@@ -452,7 +452,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-4 md:space-y-6 pb-12 md:pb-16 overflow-x-hidden bg-background text-foreground text-[13px]">
+    <div className="space-y-3 md:space-y-4 pb-10 overflow-x-hidden bg-background text-foreground text-[13px]">
       {/* SECTION 1: Hero Header with Executive Summary */}
       <div className="animate-fade-in">
         <HeroHeader
@@ -494,7 +494,7 @@ export default function Dashboard() {
           </TabsList>
         </div>
 
-        <TabsContent value="products" className="space-y-6 md:space-y-10 mt-4">
+        <TabsContent value="products" className="space-y-4 mt-3">
       {/* SECTION 2: KPI Metrics Grid (Scoreboards) */}
       <ScrollAnimate delay={100} variant="fade-up" duration={500}>
         <KPIMetricsGrid
@@ -637,7 +637,7 @@ export default function Dashboard() {
 
         </TabsContent>
 
-        <TabsContent value="market" className="space-y-6 mt-4">
+        <TabsContent value="market" className="space-y-4 mt-3">
 
           {/* P6 Grok Market Intelligence — always at top */}
           {category?.id && (
@@ -659,19 +659,19 @@ export default function Dashboard() {
                 <CardContent>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                     <div className="text-center p-3 bg-secondary/50 rounded-lg">
-                      <p className="text-2xl font-bold">{marketAnalysisData.total}</p>
+                      <p className="text-[20px] font-semibold tabular-nums text-foreground">{marketAnalysisData.total}</p>
                       <p className="text-xs text-muted-foreground">Total Products</p>
                     </div>
                     <div className="text-center p-3 bg-secondary/50 rounded-lg">
-                      <p className="text-2xl font-bold">${marketAnalysisData.avgPrice.toFixed(2)}</p>
+                      <p className="text-[20px] font-semibold tabular-nums text-foreground">${marketAnalysisData.avgPrice.toFixed(2)}</p>
                       <p className="text-xs text-muted-foreground">Avg Price</p>
                     </div>
                     <div className="text-center p-3 bg-secondary/50 rounded-lg">
-                      <p className="text-2xl font-bold">{marketAnalysisData.avgRating.toFixed(1)}★</p>
+                      <p className="text-[20px] font-semibold tabular-nums text-foreground">{marketAnalysisData.avgRating.toFixed(1)}★</p>
                       <p className="text-xs text-muted-foreground">Avg Rating</p>
                     </div>
                     <div className="text-center p-3 bg-secondary/50 rounded-lg">
-                      <p className="text-2xl font-bold">{Math.round(marketAnalysisData.avgReviews).toLocaleString()}</p>
+                      <p className="text-[20px] font-semibold tabular-nums text-foreground">{Math.round(marketAnalysisData.avgReviews).toLocaleString()}</p>
                       <p className="text-xs text-muted-foreground">Avg Reviews</p>
                     </div>
                   </div>
@@ -841,7 +841,7 @@ export default function Dashboard() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-3xl font-bold">{marketAnalysisData.launchScore}</span>
+                    <span className="text-[24px] font-semibold tabular-nums text-foreground">{marketAnalysisData.launchScore}</span>
                     <Badge variant={marketAnalysisData.launchScore >= 70 ? "default" : marketAnalysisData.launchScore >= 40 ? "secondary" : "destructive"}>
                       {marketAnalysisData.launchScore >= 70 ? "Ready" : marketAnalysisData.launchScore >= 40 ? "Moderate" : "Challenging"}
                     </Badge>
@@ -870,7 +870,7 @@ export default function Dashboard() {
         {/* Formula Brief tab removed — versions now shown in Manufacturer tab */}
 
         {/* TAB 5: QA Review (P9 Scout) */}
-        <TabsContent value="qa" className="space-y-6 mt-4">
+        <TabsContent value="qa" className="space-y-4 mt-3">
           {category?.id ? (
             <FormulaQATab categoryId={category.id} categoryName={categoryName} activeVersionInfo={activeVersion ? { versionNumber: activeVersion.version_number, changeSummary: activeVersion.change_summary } : null} />
           ) : (
@@ -879,7 +879,7 @@ export default function Dashboard() {
         </TabsContent>
 
         {/* TAB 6: Compliance — P11 Competitive Benchmarking + P12 FDA */}
-        <TabsContent value="validation" className="space-y-6 mt-4">
+        <TabsContent value="validation" className="space-y-4 mt-3">
           {category?.id ? (
             <FormulaValidationTab categoryId={category.id} categoryName={categoryName} activeVersionInfo={activeVersion ? { versionNumber: activeVersion.version_number, changeSummary: activeVersion.change_summary } : null} />
           ) : (
@@ -888,7 +888,7 @@ export default function Dashboard() {
         </TabsContent>
 
         {/* TAB 7: Manufacturer Feedback — living formula brief */}
-        <TabsContent value="manufacturer" className="space-y-6 mt-4">
+        <TabsContent value="manufacturer" className="space-y-4 mt-3">
           <div className="flex justify-end">
             <PearlButton
               tone="neon"
@@ -912,7 +912,7 @@ export default function Dashboard() {
         </TabsContent>
 
         {/* TAB 8: Data Completeness Audit — real per-phase data checks, not job status */}
-        <TabsContent value="data-audit" className="space-y-6 mt-4">
+        <TabsContent value="data-audit" className="space-y-4 mt-3">
           {categoryName ? (
             <DataCompletenessChecklist keyword={categoryName} />
           ) : (

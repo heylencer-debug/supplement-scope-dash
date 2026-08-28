@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { BrandCard } from "@/components/ui/brand-card";
+import { Panel } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -362,7 +362,7 @@ export default function AddProduct() {
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Basic Info */}
-        <BrandCard>
+        <Panel>
           <CardHeader>
             <CardTitle>Basic Information</CardTitle>
             <CardDescription>Product details from Amazon listing</CardDescription>
@@ -482,10 +482,10 @@ export default function AddProduct() {
               />
             </div>
           </CardContent>
-        </BrandCard>
+        </Panel>
 
         {/* Supplement Facts */}
-        <BrandCard>
+        <Panel>
           <CardHeader>
             <CardTitle>Supplement Facts</CardTitle>
             <CardDescription>Upload an image or manually enter ingredients from the product label</CardDescription>
@@ -685,10 +685,10 @@ export default function AddProduct() {
               />
             </div>
           </CardContent>
-        </BrandCard>
+        </Panel>
 
         {/* Claims & Additional Info */}
-        <BrandCard>
+        <Panel>
           <CardHeader>
             <CardTitle>Claims & Additional Info</CardTitle>
             <CardDescription>Label claims, directions, and warnings</CardDescription>
@@ -751,7 +751,7 @@ export default function AddProduct() {
               />
             </div>
           </CardContent>
-        </BrandCard>
+        </Panel>
 
         {/* Submit */}
         <div className="flex justify-end gap-3">

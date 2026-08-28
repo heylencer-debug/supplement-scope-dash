@@ -1,5 +1,5 @@
 import { CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { BrandCard } from "@/components/ui/brand-card";
+import { Panel } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { 
@@ -46,7 +46,7 @@ export function LaunchPlanSection({
 }: LaunchPlanSectionProps) {
   if (isLoading) {
     return (
-      <BrandCard>
+      <Panel>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
             <Rocket className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
@@ -107,7 +107,7 @@ export function LaunchPlanSection({
             </div>
           </div>
         </CardContent>
-      </BrandCard>
+      </Panel>
     );
   }
 
@@ -167,7 +167,7 @@ export function LaunchPlanSection({
   }
 
   return (
-    <BrandCard className="animate-enter [animation-duration:400ms]">
+    <Panel className="animate-enter [animation-duration:400ms]">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
           <Rocket className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
@@ -188,7 +188,7 @@ export function LaunchPlanSection({
                   <Quote className="h-4 w-4 text-primary" />
                   <h4 className="text-xs sm:text-sm font-semibold text-foreground">Winning Hook</h4>
                 </div>
-                <div className="relative p-3 sm:p-4 rounded-lg bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20">
+                <div className="relative p-3 sm:p-4 rounded-lg bg-card border border-border/60">
                   <Quote className="absolute top-2 left-2 h-5 w-5 sm:h-6 sm:w-6 text-primary/20" />
                   <p className="text-xs sm:text-sm italic text-foreground leading-relaxed pl-4">
                     "{goToMarket.positioning}"
@@ -292,16 +292,16 @@ export function LaunchPlanSection({
                 return (
                   <div key={timeline} className="min-w-0">
                     {/* Phase Header */}
-                    <div className={`bg-gradient-to-r ${gradientColor} rounded-t-md px-2 py-1.5`}>
+                    <div className="rounded-t-md border border-border/60 border-b-0 bg-card px-2 py-1.5">
                       <div className="flex items-center gap-1.5">
-                        <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-white text-[10px] font-bold shrink-0">
+                        <span className="text-[11px] font-semibold tabular-nums text-muted-foreground shrink-0">
                           {timelineIdx + 1}
-                        </div>
-                        <span className="text-white text-xs font-medium truncate flex-1">
+                        </span>
+                        <span className="text-[13px] font-medium text-foreground truncate flex-1">
                           {timeline}
                         </span>
                         {hasCritical && (
-                          <AlertCircle className="w-3 h-3 text-white/80 shrink-0" />
+                          <AlertCircle className="w-3 h-3 text-muted-foreground shrink-0" />
                         )}
                       </div>
                       <div className="flex items-center gap-1.5 mt-1">
@@ -313,7 +313,7 @@ export function LaunchPlanSection({
                             }}
                           />
                         </div>
-                        <span className="text-white/80 text-[10px]">
+                        <span className="text-muted-foreground text-[10px]">
                           {completedCount}/{items.length}
                         </span>
                       </div>
@@ -374,6 +374,6 @@ export function LaunchPlanSection({
           </div>
         )}
       </CardContent>
-    </BrandCard>
+    </Panel>
   );
 }

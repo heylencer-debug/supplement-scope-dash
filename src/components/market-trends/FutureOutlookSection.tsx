@@ -1,5 +1,5 @@
 import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BrandCard } from "@/components/ui/brand-card";
+import { Panel } from "@/components/ui/panel";
 import { Rocket, Globe, Lightbulb, Target, AlertCircle, TrendingUp, ArrowUpRight, MapPin } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, AreaChart, Area, XAxis, YAxis } from "recharts";
 import { AnimatedNumber } from "@/components/ui/animated-number";
@@ -80,7 +80,7 @@ export function FutureOutlookSection({ data }: FutureOutlookSectionProps) {
 
       {/* Growth Trajectory Chart */}
       <ScrollAnimate variant="scale-up" delay={100}>
-        <BrandCard>
+        <Panel>
           <CardHeader>
             <div className="flex items-center gap-2">
               <ArrowUpRight className="h-5 w-5 text-chart-4" />
@@ -125,13 +125,13 @@ export function FutureOutlookSection({ data }: FutureOutlookSectionProps) {
               </ResponsiveContainer>
             </div>
           </CardContent>
-        </BrandCard>
+        </Panel>
       </ScrollAnimate>
 
       {/* Regional Growth */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ScrollAnimate variant="scale-up" delay={200}>
-          <BrandCard>
+          <Panel>
             <CardHeader>
               <div className="flex items-center gap-2">
                 <Globe className="h-5 w-5 text-chart-2" />
@@ -172,11 +172,11 @@ export function FutureOutlookSection({ data }: FutureOutlookSectionProps) {
                 </ResponsiveContainer>
               </div>
             </CardContent>
-          </BrandCard>
+          </Panel>
         </ScrollAnimate>
 
         <ScrollAnimate variant="scale-up" delay={300}>
-          <BrandCard>
+          <Panel>
             <CardHeader>
               <div className="flex items-center gap-2">
                 <MapPin className="h-5 w-5 text-chart-1" />
@@ -209,14 +209,13 @@ export function FutureOutlookSection({ data }: FutureOutlookSectionProps) {
                 ))}
               </div>
             </CardContent>
-          </BrandCard>
+          </Panel>
         </ScrollAnimate>
       </div>
 
       {/* Innovations */}
       <ScrollAnimate variant="fade-up" delay={400}>
-        <BrandCard className="overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-chart-4/5 via-transparent to-chart-2/5 pointer-events-none" />
+        <Panel className="overflow-hidden">
           <CardHeader className="relative">
             <div className="flex items-center gap-2">
               <div className="p-2 rounded-lg bg-chart-4/10">
@@ -233,13 +232,12 @@ export function FutureOutlookSection({ data }: FutureOutlookSectionProps) {
               <p className="text-foreground leading-relaxed">{data.innovations}</p>
             </div>
           </CardContent>
-        </BrandCard>
+        </Panel>
       </ScrollAnimate>
 
       {/* Opportunities */}
       <ScrollAnimate variant="fade-up" delay={500}>
-        <BrandCard className="overflow-hidden border-chart-4/30">
-          <div className="absolute inset-0 bg-gradient-to-br from-chart-4/10 to-chart-4/5 pointer-events-none" />
+        <Panel className="overflow-hidden border-chart-4/30">
           <CardHeader className="relative">
             <div className="flex items-center gap-2">
               <div className="p-2 rounded-lg bg-chart-4/20">
@@ -256,12 +254,12 @@ export function FutureOutlookSection({ data }: FutureOutlookSectionProps) {
               <p className="text-foreground leading-relaxed font-medium">{data.opportunities}</p>
             </div>
           </CardContent>
-        </BrandCard>
+        </Panel>
       </ScrollAnimate>
 
       {/* External Factors */}
       <ScrollAnimate variant="fade-up" delay={600}>
-        <BrandCard>
+        <Panel>
           <CardHeader>
             <div className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-chart-2" />
@@ -274,7 +272,7 @@ export function FutureOutlookSection({ data }: FutureOutlookSectionProps) {
               <p className="text-foreground leading-relaxed">{data.externalFactors}</p>
             </div>
           </CardContent>
-        </BrandCard>
+        </Panel>
       </ScrollAnimate>
     </div>
   );

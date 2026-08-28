@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { BrandCard } from "@/components/ui/brand-card";
+import { Panel } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from "recharts";
 import { TrendingUp, Target, FlaskConical, Leaf, Zap, Hash, MessageSquare } from "lucide-react";
@@ -159,7 +159,7 @@ export function ClaimPatternChart({ analyses }: ClaimPatternChartProps) {
   }));
 
   return (
-    <BrandCard className="bg-gradient-to-br from-primary/5 to-transparent border-primary/20">
+    <Panel className="">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-sm font-medium">
           <TrendingUp className="w-4 h-4 text-primary" />
@@ -171,7 +171,7 @@ export function ClaimPatternChart({ analyses }: ClaimPatternChartProps) {
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Dominant Style Banner */}
-        <div className="flex items-center gap-3 p-3 bg-primary/10 rounded-lg border border-primary/20">
+        <div className="flex items-center gap-3 p-3 bg-card rounded-lg border border-primary/20">
           <div className="p-2 rounded-full bg-primary/20 text-primary">
             {claimPatterns.dominant.icon}
           </div>
@@ -266,6 +266,6 @@ export function ClaimPatternChart({ analyses }: ClaimPatternChartProps) {
           )}
         </div>
       </CardContent>
-    </BrandCard>
+    </Panel>
   );
 }

@@ -1,5 +1,5 @@
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BrandCard } from "@/components/ui/brand-card";
+import { Panel } from "@/components/ui/panel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
@@ -54,7 +54,7 @@ export default function HistoricalBSRSalesChart({ historicalData }: Props) {
   });
 
   return (
-    <BrandCard>
+    <Panel>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium flex items-center gap-2">
           <TrendingUp className="w-4 h-4" />
@@ -199,6 +199,6 @@ export default function HistoricalBSRSalesChart({ historicalData }: Props) {
           </TabsContent>
         </Tabs>
       </CardContent>
-    </BrandCard>
+    </Panel>
   );
 }

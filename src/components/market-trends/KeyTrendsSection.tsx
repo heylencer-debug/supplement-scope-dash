@@ -1,5 +1,5 @@
 import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BrandCard } from "@/components/ui/brand-card";
+import { Panel } from "@/components/ui/panel";
 import { TrendingUp, Sparkles, BarChart, Flame, Zap, Star } from "lucide-react";
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer, BarChart as RechartsBarChart, Bar, XAxis, YAxis, Tooltip, Cell } from "recharts";
 import { TrendHeatIndicator } from "./TrendHeatIndicator";
@@ -51,7 +51,7 @@ export function KeyTrendsSection({ data }: KeyTrendsSectionProps) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Radar Chart */}
         <ScrollAnimate variant="scale-up">
-          <BrandCard>
+          <Panel>
             <CardHeader>
               <div className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-chart-4" />
@@ -80,12 +80,12 @@ export function KeyTrendsSection({ data }: KeyTrendsSectionProps) {
                 </ResponsiveContainer>
               </div>
             </CardContent>
-          </BrandCard>
+          </Panel>
         </ScrollAnimate>
 
         {/* Bar Chart */}
         <ScrollAnimate variant="scale-up" delay={100}>
-          <BrandCard>
+          <Panel>
             <CardHeader>
               <div className="flex items-center gap-2">
                 <BarChart className="h-5 w-5 text-primary" />
@@ -120,13 +120,13 @@ export function KeyTrendsSection({ data }: KeyTrendsSectionProps) {
                 </ResponsiveContainer>
               </div>
             </CardContent>
-          </BrandCard>
+          </Panel>
         </ScrollAnimate>
       </div>
 
       {/* Trend Cards with Visual Enhancements */}
       <ScrollAnimate variant="fade-up" delay={200}>
-        <BrandCard>
+        <Panel>
           <CardHeader>
             <div className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-chart-2" />
@@ -143,7 +143,7 @@ export function KeyTrendsSection({ data }: KeyTrendsSectionProps) {
                 return (
                   <div
                     key={index}
-                    className="group relative p-4 rounded-xl bg-gradient-to-r from-secondary/30 to-secondary/10 border border-border/50 hover:border-primary/30 hover:shadow-md transition-all duration-300"
+                    className="group relative p-4 rounded-xl bg-card border border-border/60 hover:border-border hover:shadow-md transition-all duration-300"
                     style={{
                       borderLeftWidth: '4px',
                       borderLeftColor: COLORS[index % COLORS.length],
@@ -179,7 +179,7 @@ export function KeyTrendsSection({ data }: KeyTrendsSectionProps) {
               })}
             </div>
           </CardContent>
-        </BrandCard>
+        </Panel>
       </ScrollAnimate>
     </div>
   );

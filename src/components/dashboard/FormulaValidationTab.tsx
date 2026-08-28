@@ -9,7 +9,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { CardContent } from "@/components/ui/card";
-import { BrandCard } from "@/components/ui/brand-card";
+import { Panel } from "@/components/ui/panel";
 import { Button } from "@/components/ui/button";
 import { PearlButton } from "@/components/ui/pearl-button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -149,7 +149,7 @@ function ExpandableCard({
 }) {
   const [open, setOpen] = useState(false);
   return (
-    <BrandCard className={`border ${borderColor} transition-all duration-200`}>
+    <Panel className={`border ${borderColor} transition-all duration-200`}>
       <button
         className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-t-lg ${bgColor} hover:brightness-105 transition-all`}
         onClick={() => setOpen((o) => !o)}
@@ -167,7 +167,7 @@ function ExpandableCard({
         </div>
       </button>
       {open && <CardContent className="pt-4 pb-4">{children}</CardContent>}
-    </BrandCard>
+    </Panel>
   );
 }
 
@@ -266,7 +266,7 @@ export function FormulaValidationTab({ categoryId, categoryName, activeVersionIn
     <div className="space-y-5">
       {/* Active version indicator */}
       {activeVersionInfo && (
-        <div className="flex items-center gap-2 text-xs bg-primary/10 border border-primary/20 rounded-lg px-3 py-2 text-primary">
+        <div className="flex items-center gap-2 text-xs bg-card border border-primary/20 rounded-lg px-3 py-2 text-primary">
           <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
           <span>Analyzing against <strong>Active Version {activeVersionInfo.versionNumber}</strong></span>
           {activeVersionInfo.changeSummary && <span className="text-muted-foreground">— {activeVersionInfo.changeSummary}</span>}
@@ -276,7 +276,7 @@ export function FormulaValidationTab({ categoryId, categoryName, activeVersionIn
       {/* Score banner */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {hasP11 && (
-          <BrandCard className="border-blue-500/30 bg-blue-500/5">
+          <Panel className="border-blue-500/30 bg-blue-500/5">
             <CardContent className="py-4 px-5 flex items-center gap-4">
               <Scale className="h-6 w-6 text-blue-400 shrink-0" />
               <div className="flex-1 min-w-0">
@@ -287,11 +287,11 @@ export function FormulaValidationTab({ categoryId, categoryName, activeVersionIn
                 {p11Result && <p className="text-xs text-muted-foreground truncate">{p11Result} · {p11Date}</p>}
               </div>
             </CardContent>
-          </BrandCard>
+          </Panel>
         )}
 
         {hasP12 && (
-          <BrandCard className="border-green-500/30 bg-green-500/5">
+          <Panel className="border-green-500/30 bg-green-500/5">
             <CardContent className="py-4 px-5 flex items-center gap-4">
               <ShieldCheck className="h-6 w-6 text-green-400 shrink-0" />
               <div className="flex-1 min-w-0">
@@ -302,11 +302,11 @@ export function FormulaValidationTab({ categoryId, categoryName, activeVersionIn
                 {p12Status && <p className="text-xs text-muted-foreground truncate">{p12Status} · {p12Date}</p>}
               </div>
             </CardContent>
-          </BrandCard>
+          </Panel>
         )}
 
         {/* Download card */}
-        <BrandCard className="border-blue-500/30 bg-blue-500/5">
+        <Panel className="border-blue-500/30 bg-blue-500/5">
           <CardContent className="py-4 px-5 flex flex-col justify-center gap-2">
             <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Manufacturer Brief</p>
             <PearlButton
@@ -319,7 +319,7 @@ export function FormulaValidationTab({ categoryId, categoryName, activeVersionIn
             </PearlButton>
             <p className="text-[10px] text-muted-foreground text-center">Full brief · P11 · P12 · Print-ready</p>
           </CardContent>
-        </BrandCard>
+        </Panel>
       </div>
 
       {/* P12 compliance status pill */}

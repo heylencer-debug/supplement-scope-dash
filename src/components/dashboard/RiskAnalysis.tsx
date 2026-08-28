@@ -1,5 +1,5 @@
 import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BrandCard } from "@/components/ui/brand-card";
+import { Panel } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, XCircle, FileWarning, Truck, AlertCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -13,7 +13,7 @@ export function RiskAnalysis({ risks, isLoading }: RiskAnalysisProps) {
   // Show loading skeleton
   if (isLoading) {
     return (
-      <BrandCard className="border-destructive/20">
+      <Panel className="border-destructive/20">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <AlertTriangle className="w-5 h-5 text-destructive" />
@@ -35,7 +35,7 @@ export function RiskAnalysis({ risks, isLoading }: RiskAnalysisProps) {
             </div>
           </div>
         </CardContent>
-      </BrandCard>
+      </Panel>
     );
   }
 
@@ -51,7 +51,7 @@ export function RiskAnalysis({ risks, isLoading }: RiskAnalysisProps) {
   if (!hasData) return null;
 
   return (
-    <BrandCard className="border-destructive/20 animate-enter [animation-duration:400ms]">
+    <Panel className="border-destructive/20 animate-enter [animation-duration:400ms]">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
           <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-destructive" />
@@ -70,7 +70,7 @@ export function RiskAnalysis({ risks, isLoading }: RiskAnalysisProps) {
               </h4>
               <div className="space-y-2">
                 {category_challenges.map((challenge, idx) => (
-                  <div key={idx} className="p-2 sm:p-3 bg-chart-2/5 border border-chart-2/20 rounded-lg">
+                  <div key={idx} className="p-2 sm:p-3 bg-card border border-chart-2/20 rounded-lg">
                     <p className="text-xs sm:text-sm text-foreground">{challenge}</p>
                   </div>
                 ))}
@@ -107,7 +107,7 @@ export function RiskAnalysis({ risks, isLoading }: RiskAnalysisProps) {
               </h4>
               <div className="space-y-2">
                 {regulatory.map((req, idx) => (
-                  <div key={idx} className="p-2 sm:p-3 bg-chart-2/5 border border-chart-2/20 rounded-lg flex items-start gap-2">
+                  <div key={idx} className="p-2 sm:p-3 bg-card border border-chart-2/20 rounded-lg flex items-start gap-2">
                     <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-chart-2/20 flex items-center justify-center shrink-0">
                       <span className="text-[10px] sm:text-xs text-chart-2">{idx + 1}</span>
                     </div>
@@ -127,7 +127,7 @@ export function RiskAnalysis({ risks, isLoading }: RiskAnalysisProps) {
               </h4>
               <div className="space-y-2">
                 {supply_chain.map((risk, idx) => (
-                  <div key={idx} className="p-2 sm:p-3 bg-chart-5/5 border border-chart-5/20 rounded-lg">
+                  <div key={idx} className="p-2 sm:p-3 bg-card border border-chart-5/20 rounded-lg">
                     <p className="text-xs sm:text-sm text-foreground">{risk}</p>
                   </div>
                 ))}
@@ -136,6 +136,6 @@ export function RiskAnalysis({ risks, isLoading }: RiskAnalysisProps) {
           )}
         </div>
       </CardContent>
-    </BrandCard>
+    </Panel>
   );
 }

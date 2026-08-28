@@ -1,5 +1,5 @@
 import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BrandCard } from "@/components/ui/brand-card";
+import { Panel } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
 import { Users, MessageCircle, Heart, Lightbulb, Tag, ThumbsUp, ThumbsDown, Sparkles } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
@@ -32,7 +32,7 @@ export function ConsumerInsightsSection({ data }: ConsumerInsightsSectionProps) 
     <div className="space-y-6">
       {/* Use Cases with Visual Cards */}
       <ScrollAnimate variant="fade-up">
-        <BrandCard>
+        <Panel>
           <CardHeader>
             <div className="flex items-center gap-2">
               <Users className="h-5 w-5 text-primary" />
@@ -47,7 +47,7 @@ export function ConsumerInsightsSection({ data }: ConsumerInsightsSectionProps) 
                 return (
                   <div
                     key={index}
-                    className="group relative p-4 rounded-xl bg-gradient-to-br from-secondary/40 to-secondary/20 border border-border/50 hover:border-primary/30 hover:shadow-md transition-all duration-300"
+                    className="group relative p-4 rounded-xl bg-card border border-border/60 hover:border-border hover:shadow-md transition-all duration-300"
                     style={{
                       borderLeftWidth: '4px',
                       borderLeftColor: COLORS[index % COLORS.length],
@@ -75,13 +75,13 @@ export function ConsumerInsightsSection({ data }: ConsumerInsightsSectionProps) 
               })}
             </div>
           </CardContent>
-        </BrandCard>
+        </Panel>
       </ScrollAnimate>
 
       {/* Preferred Attributes with Bubble Visualization */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ScrollAnimate variant="scale-up" delay={100}>
-          <BrandCard>
+          <Panel>
             <CardHeader>
               <div className="flex items-center gap-2">
                 <Tag className="h-5 w-5 text-chart-4" />
@@ -122,11 +122,11 @@ export function ConsumerInsightsSection({ data }: ConsumerInsightsSectionProps) 
                 </ResponsiveContainer>
               </div>
             </CardContent>
-          </BrandCard>
+          </Panel>
         </ScrollAnimate>
 
         <ScrollAnimate variant="scale-up" delay={200}>
-          <BrandCard>
+          <Panel>
             <CardHeader>
               <div className="flex items-center gap-2">
                 <Heart className="h-5 w-5 text-chart-4 fill-chart-4" />
@@ -153,13 +153,13 @@ export function ConsumerInsightsSection({ data }: ConsumerInsightsSectionProps) 
                 ))}
               </div>
             </CardContent>
-          </BrandCard>
+          </Panel>
         </ScrollAnimate>
       </div>
 
       {/* Praises & Complaints with Sentiment Visual */}
       <ScrollAnimate variant="fade-up" delay={300}>
-        <BrandCard className="overflow-hidden">
+        <Panel className="overflow-hidden">
           <CardHeader>
             <div className="flex items-center gap-2">
               <MessageCircle className="h-5 w-5 text-chart-2" />
@@ -182,13 +182,12 @@ export function ConsumerInsightsSection({ data }: ConsumerInsightsSectionProps) 
               <p className="text-foreground leading-relaxed">{data.praisesComplaints}</p>
             </div>
           </CardContent>
-        </BrandCard>
+        </Panel>
       </ScrollAnimate>
 
       {/* Emerging Behaviors */}
       <ScrollAnimate variant="fade-up" delay={400}>
-        <BrandCard className="overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-chart-1/5 to-chart-4/5 pointer-events-none" />
+        <Panel className="overflow-hidden">
           <CardHeader className="relative">
             <div className="flex items-center gap-2">
               <div className="p-2 rounded-lg bg-chart-1/10 animate-pulse">
@@ -205,7 +204,7 @@ export function ConsumerInsightsSection({ data }: ConsumerInsightsSectionProps) 
               <p className="text-foreground leading-relaxed">{data.emergingBehaviors}</p>
             </div>
           </CardContent>
-        </BrandCard>
+        </Panel>
       </ScrollAnimate>
     </div>
   );

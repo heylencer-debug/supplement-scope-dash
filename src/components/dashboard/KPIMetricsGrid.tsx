@@ -73,11 +73,11 @@ export function KPIMetricsGrid({
   ];
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+    <div className="grid grid-cols-2 lg:grid-cols-4 rounded-xl border border-border/60 bg-card overflow-hidden">
       {kpis.map((kpi, idx) => (
         <div
           key={idx}
-          className="rounded-md border border-border bg-card px-3 py-2.5 opacity-0 animate-fade-in"
+          className="px-4 py-3 border-b border-r border-border/60 last:border-r-0 lg:border-b-0 [&:nth-child(2)]:border-r-0 lg:[&:nth-child(2)]:border-r opacity-0 animate-fade-in"
           style={{ animationDelay: `${idx * 100}ms`, animationFillMode: 'forwards' }}
         >
           {isLoading ? (
@@ -88,14 +88,14 @@ export function KPIMetricsGrid({
             </div>
           ) : (
             <div className="animate-enter">
-              <p className="text-[9.5px] uppercase tracking-wide text-muted-foreground/70 mb-1">
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
                 {kpi.label}
               </p>
-              <p className="text-[17px] font-extrabold text-foreground leading-none">
+              <p className="mt-1 text-[20px] font-semibold tabular-nums text-foreground leading-none">
                 {kpi.value !== null ? kpi.value : <LoadingPulse />}
               </p>
               {kpi.subtext && (
-                <p className={`text-[10px] mt-1 ${(kpi as any).subtextColor || "text-muted-foreground"}`}>
+                <p className="text-[11px] tabular-nums mt-1 text-muted-foreground">
                   {kpi.subtext}
                 </p>
               )}

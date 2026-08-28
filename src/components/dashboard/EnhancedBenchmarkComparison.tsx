@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect, Fragment } from "react";
 import { cn } from "@/lib/utils";
 import { CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { BrandCard } from "@/components/ui/brand-card";
+import { Panel } from "@/components/ui/panel";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -327,8 +327,8 @@ function PackagingComparisonSection({ ourPackaging, competitors, getCompetitorPa
   };
 
   const getScoreBgColor = (score: number): string => {
-    if (score >= 70) return 'bg-chart-4/10 border-chart-4/30';
-    if (score >= 40) return 'bg-chart-2/10 border-chart-2/30';
+    if (score >= 70) return 'bg-card border-border/60';
+    if (score >= 40) return 'bg-card border-border/60';
     return 'bg-muted/50 border-muted';
   };
 
@@ -378,13 +378,13 @@ function PackagingComparisonSection({ ourPackaging, competitors, getCompetitorPa
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <BrandCard className="mt-4">
+      <Panel className="mt-4">
         <CardHeader className="pb-2 p-3 sm:p-4 md:p-6">
           <div className="flex items-center justify-between">
             <CollapsibleTrigger asChild>
               <div className="cursor-pointer hover:opacity-80 transition-opacity">
                 <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
-                  <Package className="w-3 h-3 sm:w-4 sm:h-4 text-primary" />
+                  <Package className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground" />
                   Packaging Strategy Comparison
                 </CardTitle>
                 <CardDescription className="text-[10px] sm:text-xs">
@@ -405,7 +405,7 @@ function PackagingComparisonSection({ ourPackaging, competitors, getCompetitorPa
             <div className="space-y-4">
               {/* Our Concept Packaging */}
               {ourPackaging && (ourPackaging.type || ourPackaging.design_elements?.length) && (
-                <div className="p-2 sm:p-3 bg-primary/5 rounded-lg border border-primary/20">
+                <div className="p-2 sm:p-3 bg-card rounded-lg border border-primary/20">
                   <div className="flex items-center gap-2 mb-2">
                     <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-primary flex items-center justify-center">
                       <Sparkles className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-primary-foreground" />
@@ -416,7 +416,7 @@ function PackagingComparisonSection({ ourPackaging, competitors, getCompetitorPa
                     {ourPackaging.type && (
                       <div className="bg-background/60 rounded p-1.5 sm:p-2">
                         <p className="text-[9px] sm:text-[10px] text-muted-foreground mb-0.5">Recommended Format</p>
-                        <p className="text-xs sm:text-sm font-medium text-primary">{ourPackaging.type}</p>
+                        <p className="text-[13px] font-medium text-foreground">{ourPackaging.type}</p>
                         {ourPackaging.quantity && (
                           <p className="text-[9px] sm:text-[10px] text-muted-foreground">({ourPackaging.quantity} count)</p>
                         )}
@@ -509,7 +509,7 @@ function PackagingComparisonSection({ ourPackaging, competitors, getCompetitorPa
               {/* Average Score Banner */}
               <div className="flex items-center justify-between p-2 sm:p-3 bg-muted/30 rounded-lg border">
                 <div className="flex items-center gap-2">
-                  <Award className="w-3 h-3 sm:w-4 sm:h-4 text-primary" />
+                  <Award className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground" />
                   <span className="text-[10px] sm:text-xs font-medium text-foreground">Category Average Packaging Score</span>
                 </div>
                 <div className={`flex items-center gap-1 sm:gap-2 ${getScoreColor(aggregatedData.avgScore)}`}>
@@ -522,7 +522,7 @@ function PackagingComparisonSection({ ourPackaging, competitors, getCompetitorPa
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Top Claims */}
                 {aggregatedData.topClaims.length > 0 && (
-                  <div className="bg-chart-4/5 rounded-lg p-2 sm:p-3 border border-chart-4/20">
+                  <div className="rounded-lg p-3 border border-border/60 bg-card">
                     <p className="text-[9px] sm:text-[10px] font-semibold mb-2 flex items-center gap-1 text-chart-4">
                       <Tag className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                       Most Common Claims
@@ -540,8 +540,8 @@ function PackagingComparisonSection({ ourPackaging, competitors, getCompetitorPa
 
                 {/* Top Trust Signals */}
                 {aggregatedData.topTrustSignals.length > 0 && (
-                  <div className="bg-primary/5 rounded-lg p-2 sm:p-3 border border-primary/20">
-                    <p className="text-[9px] sm:text-[10px] font-semibold mb-2 flex items-center gap-1 text-primary">
+                  <div className="bg-card rounded-lg p-2 sm:p-3 border border-primary/20">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide mb-2 flex items-center gap-1.5 text-muted-foreground">
                       <Shield className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                       Common Trust Signals
                     </p>
@@ -559,7 +559,7 @@ function PackagingComparisonSection({ ourPackaging, competitors, getCompetitorPa
             </div>
           </CardContent>
         </CollapsibleContent>
-      </BrandCard>
+      </Panel>
     </Collapsible>
   );
 }
@@ -982,13 +982,13 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <BrandCard className="mt-4">
+      <Panel className="mt-4">
         <CardHeader className="pb-2 p-3 sm:p-4 md:p-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <CollapsibleTrigger asChild>
               <div className="cursor-pointer hover:opacity-80 transition-opacity">
                 <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
-                  <FlaskConical className="w-3 h-3 sm:w-4 sm:h-4 text-primary" />
+                  <FlaskConical className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground" />
                   Ingredient & Dosage Comparison
                   <Badge variant="secondary" className="ml-2 text-[9px] sm:text-[10px]">
                     {stats.total} total
@@ -1224,7 +1224,7 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                   </p>
                 ) : (
                   <p className="text-xs text-muted-foreground">
-                    <Trophy className="w-3 h-3 inline mr-1 text-primary" />
+                    <Trophy className="w-3 h-3 inline mr-1 text-muted-foreground" />
                     <strong>Top Performers:</strong> Compare against established best-sellers with proven track records and market-leading formulations.
                   </p>
                 )}
@@ -1284,7 +1284,7 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                     {activeTab === 'new_winners' ? (
                       <Zap className="w-8 h-8 text-amber-500" />
                     ) : (
-                      <Trophy className="w-8 h-8 text-primary" />
+                      <Trophy className="w-8 h-8 text-muted-foreground" />
                     )}
                   </div>
                   <h3 className="text-lg font-semibold text-foreground mb-2">
@@ -1343,7 +1343,7 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
             </div>
           </CardContent>
         </CollapsibleContent>
-      </BrandCard>
+      </Panel>
     </Collapsible>
   );
 }
@@ -2331,7 +2331,7 @@ export function EnhancedBenchmarkComparison({
   // Loading check - placed AFTER all hooks to avoid hooks rules violation
   if (loading) {
     return (
-      <BrandCard>
+      <Panel>
         <CardHeader className="pb-2">
           <Skeleton className="h-5 w-48" />
           <Skeleton className="h-4 w-64" />
@@ -2343,18 +2343,18 @@ export function EnhancedBenchmarkComparison({
             ))}
           </div>
         </CardContent>
-      </BrandCard>
+      </Panel>
     );
   }
 
   return (
     <>
-      <BrandCard>
+      <Panel>
         <CardHeader className="pb-2 p-3 sm:p-4 md:p-6">
           <div className="flex items-start justify-between gap-4">
             <div>
               <CardTitle className="flex items-center gap-2 text-sm sm:text-base md:text-lg">
-                <Package className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5 text-primary" />
+                <Package className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5 text-muted-foreground" />
                 Benchmark Comparison
                 {versionInfo && (
                   <Badge variant={versionInfo.isActive ? "default" : "secondary"} className="ml-1 text-[9px] sm:text-[10px] font-medium">
@@ -2441,7 +2441,7 @@ export function EnhancedBenchmarkComparison({
                         onClick={() => setShowOnlyNewWinners(!showOnlyNewWinners)}
                         className={cn(
                           "h-8 gap-1.5",
-                          showOnlyNewWinners && "bg-chart-4 hover:bg-chart-4/90"
+                          showOnlyNewWinners && "border-primary text-primary"
                         )}
                       >
                         <Zap className="w-3.5 h-3.5" />
@@ -2450,7 +2450,7 @@ export function EnhancedBenchmarkComparison({
                           variant="secondary" 
                           className={cn(
                             "ml-1 h-5 px-1.5 text-[10px]",
-                            showOnlyNewWinners && "bg-white/20 text-white"
+                            showOnlyNewWinners && "bg-muted text-foreground"
                           )}
                         >
                           {formulaReferencesCount}
@@ -2583,40 +2583,32 @@ export function EnhancedBenchmarkComparison({
           {/* Mobile: Vertical stack, Desktop: Horizontal scroll */}
           <div className="flex flex-col lg:flex-row lg:items-stretch gap-3 lg:gap-2 md:gap-3 overflow-x-hidden">
             {/* Our Concept Column - Full width on mobile, fixed on desktop */}
-            <div className="w-full lg:w-[280px] xl:w-[320px] lg:shrink-0 lg:max-h-[750px] rounded-lg border-2 border-chart-2/50 bg-gradient-to-b from-chart-2/10 to-background dark:from-chart-2/20 overflow-hidden flex flex-col">
-              <div className="bg-gradient-to-r from-chart-2 to-chart-2/80 px-2 sm:px-3 py-1.5 sm:py-2 shrink-0">
-                <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 rounded-full bg-white/20 flex items-center justify-center">
-                    <Target className="w-2.5 h-2.5 sm:w-3 sm:h-3 md:w-4 md:h-4 text-white" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-white font-semibold text-[10px] sm:text-xs md:text-sm truncate">OUR CONCEPT</p>
-                    <p className="text-white/80 text-[9px] sm:text-[10px] md:text-xs truncate">Strategy</p>
-                  </div>
+            <div className="w-full lg:w-[280px] xl:w-[320px] lg:shrink-0 lg:max-h-[750px] rounded-xl border border-border/60 border-l-2 border-l-primary bg-card overflow-hidden flex flex-col">
+              <div className="px-3 py-2.5 shrink-0 border-b border-border/60">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Target className="w-3.5 h-3.5 text-primary shrink-0" />
+                  <p className="text-[13px] font-semibold tracking-tight text-foreground truncate">Our Concept</p>
+                  <span className="ml-auto text-[11px] text-muted-foreground shrink-0">Strategy</span>
                 </div>
               </div>
-              
-              <div className="p-2 md:p-3 space-y-2 sm:space-y-3 flex-1 overflow-y-auto">
+
+              <div className="p-3 space-y-3 flex-1 overflow-y-auto">
                 {/* COMPETITIVE ADVANTAGE SUMMARY BADGE */}
                 {(() => {
                   const advantages = getCompetitiveAdvantages();
                   if (advantages.length === 0) return null;
                   return (
-                    <div className="bg-gradient-to-r from-chart-4 to-chart-4/80 rounded-lg p-2 sm:p-2.5 text-white">
+                    <div>
                       <div className="flex items-center gap-1.5 mb-1.5">
-                        <Trophy className="w-3 h-3 sm:w-4 sm:h-4" />
-                        <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wide">Why Proceed</p>
-                        <Badge className="ml-auto text-[7px] sm:text-[8px] h-4 bg-white/20 text-white border-0">
-                          Top {advantages.length}
-                        </Badge>
+                        <Trophy className="w-3 h-3 text-muted-foreground" />
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Why Proceed</p>
+                        <span className="ml-auto text-[11px] text-muted-foreground tabular-nums">Top {advantages.length}</span>
                       </div>
-                      <div className="space-y-1">
+                      <div>
                         {advantages.map((adv, i) => (
-                          <div key={i} className="flex items-start gap-1.5 text-[8px] sm:text-[9px]">
-                            <div className="w-4 h-4 rounded-full bg-white/20 flex items-center justify-center shrink-0 mt-0.5">
-                              <span className="text-[7px] font-bold">{i + 1}</span>
-                            </div>
-                            <span className="text-white/95 leading-tight">{adv}</span>
+                          <div key={i} className="flex items-start gap-2 py-1.5 text-[11px] leading-snug text-foreground border-b border-border/40 last:border-b-0">
+                            <span className="text-[11px] tabular-nums text-muted-foreground shrink-0 w-3">{i + 1}</span>
+                            <span>{adv}</span>
                           </div>
                         ))}
                       </div>
@@ -2629,35 +2621,25 @@ export function EnhancedBenchmarkComparison({
                   const pricing = getOurPricing();
                   const oppScore = getOurOpportunityScore();
                   return (
-                    <div className="grid grid-cols-2 gap-2">
-                      {/* Pricing Card */}
-                      <div className="bg-chart-4/10 dark:bg-chart-4/20 rounded-lg p-2 border border-chart-4/20">
-                        <p className="text-[8px] sm:text-[9px] text-muted-foreground flex items-center gap-1">
-                          <DollarSign className="w-2.5 h-2.5" />
-                          Target Price
-                        </p>
-                        <p className="text-base sm:text-lg font-bold text-chart-4">
+                    <div className="grid grid-cols-2 border-y border-border/40">
+                      {/* Target price */}
+                      <div className="py-2 pr-3 border-r border-border/40">
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Target Price</p>
+                        <p className="mt-0.5 text-[17px] font-semibold tabular-nums leading-none text-foreground">
                           {pricing.price != null ? `$${Number(pricing.price).toFixed(2)}` : '—'}
                         </p>
                         {pricing.tier && (
-                          <Badge variant="secondary" className="text-[7px] sm:text-[8px] h-4 mt-1">
-                            {pricing.tier}
-                          </Badge>
+                          <p className="mt-1 text-[11px] text-muted-foreground truncate">{pricing.tier}</p>
                         )}
                       </div>
-                      {/* Opportunity Score Card */}
-                      <div className="bg-primary/10 dark:bg-primary/20 rounded-lg p-2 border border-primary/20">
-                        <p className="text-[8px] sm:text-[9px] text-muted-foreground flex items-center gap-1">
-                          <TrendingUp className="w-2.5 h-2.5" />
-                          Opportunity
-                        </p>
-                        <p className="text-base sm:text-lg font-bold text-primary">
+                      {/* Opportunity score */}
+                      <div className="py-2 pl-3">
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Opportunity</p>
+                        <p className="mt-0.5 text-[17px] font-semibold tabular-nums leading-none text-foreground">
                           {oppScore.overall ? `${oppScore.overall}/10` : '—'}
                         </p>
                         {oppScore.overall && oppScore.overall >= 7 && (
-                          <Badge className="text-[7px] sm:text-[8px] h-4 mt-1 bg-chart-4 text-white">
-                            High Potential
-                          </Badge>
+                          <p className="mt-1 text-[11px] text-muted-foreground">High potential</p>
                         )}
                       </div>
                     </div>
@@ -2669,13 +2651,13 @@ export function EnhancedBenchmarkComparison({
                   const oppScore = getOurOpportunityScore();
                   if (oppScore.details.length === 0) return null;
                   return (
-                    <div className="bg-muted/30 rounded-lg p-2 border">
-                      <p className="text-[8px] sm:text-[9px] font-medium text-muted-foreground mb-1.5">Score Breakdown</p>
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Score Breakdown</p>
                       <div className="grid grid-cols-2 gap-1">
                         {oppScore.details.map((d, i) => (
-                          <div key={i} className="flex items-center justify-between text-[8px] sm:text-[9px]">
+                          <div key={i} className="flex items-center justify-between text-[11px] py-1 border-b border-border/40">
                             <span className="text-muted-foreground">{d.label}</span>
-                            <span className={`font-medium ${d.value >= 7 ? 'text-chart-4' : d.value >= 5 ? 'text-chart-2' : 'text-destructive'}`}>
+                            <span className="font-medium tabular-nums text-foreground">
                               {d.value}/10
                             </span>
                           </div>
@@ -2687,11 +2669,11 @@ export function EnhancedBenchmarkComparison({
 
                 {/* Positioning */}
                 <div>
-                  <p className="text-[9px] sm:text-[10px] font-semibold mb-1 flex items-center gap-1">
-                    <MessageSquare className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-primary" />
+                  <p className="text-[11px] font-semibold uppercase tracking-wide mb-1 flex items-center gap-1.5 text-muted-foreground">
+                    <MessageSquare className="w-3 h-3" />
                     Positioning
                   </p>
-                  <p className="text-[9px] sm:text-[10px] text-muted-foreground">
+                  <p className="text-[11px] leading-snug text-foreground">
                     {getOurPositioning()}
                   </p>
                 </div>
@@ -2701,15 +2683,15 @@ export function EnhancedBenchmarkComparison({
                   const differentiators = getOurDifferentiators();
                   if (differentiators.length === 0) return null;
                   return (
-                    <div className="bg-chart-3/10 dark:bg-chart-3/20 rounded-lg p-2 border border-chart-3/20">
-                      <p className="text-[9px] sm:text-[10px] font-semibold mb-1 flex items-center gap-1 text-chart-3">
-                        <Sparkles className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide mb-1 flex items-center gap-1.5 text-muted-foreground">
+                        <Sparkles className="w-3 h-3" />
                         Key Differentiators
                       </p>
                       <div className="space-y-0.5">
                         {differentiators.slice(0, 4).map((d, i) => (
-                          <div key={i} className="flex items-start gap-1 text-[9px] sm:text-[10px] text-foreground">
-                            <CheckCircle className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-chart-3 mt-0.5 shrink-0" />
+                          <div key={i} className="flex items-start gap-1.5 text-[11px] leading-snug text-foreground py-1 border-b border-border/40 last:border-b-0">
+                            <CheckCircle className="w-3 h-3 text-muted-foreground mt-0.5 shrink-0" />
                             <span>{d}</span>
                           </div>
                         ))}
@@ -2720,14 +2702,14 @@ export function EnhancedBenchmarkComparison({
 
                 {/* Go-to-Market Messaging */}
                 <div>
-                  <p className="text-[9px] sm:text-[10px] font-semibold mb-1 flex items-center gap-1">
-                    <Megaphone className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-chart-3" />
+                  <p className="text-[11px] font-semibold uppercase tracking-wide mb-1 flex items-center gap-1.5 text-muted-foreground">
+                    <Megaphone className="w-3 h-3" />
                     Go-to-Market Messaging
                   </p>
                   <div className="space-y-0.5">
                     {getOurMessaging().slice(0, 4).map((msg, i) => (
-                      <div key={i} className="flex items-start gap-1 text-[9px] sm:text-[10px] text-muted-foreground">
-                        <span className="w-1 h-1 rounded-full bg-chart-3 mt-1.5 shrink-0" />
+                      <div key={i} className="flex items-start gap-1.5 text-[11px] leading-snug text-foreground py-1 border-b border-border/40 last:border-b-0">
+                        <span className="w-1 h-1 rounded-full bg-muted-foreground/50 mt-1.5 shrink-0" />
                         <span>{msg}</span>
                       </div>
                     ))}
@@ -2739,18 +2721,18 @@ export function EnhancedBenchmarkComparison({
                   const intel = getCompetitiveIntel();
                   if (intel.weaknesses.length === 0 && intel.gaps.length === 0) return null;
                   return (
-                    <div className="bg-chart-5/10 dark:bg-chart-5/20 rounded-lg p-2 border border-chart-5/20">
-                      <p className="text-[9px] sm:text-[10px] font-semibold mb-1.5 flex items-center gap-1 text-chart-5">
-                        <Eye className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide mb-1.5 flex items-center gap-1.5 text-muted-foreground">
+                        <Eye className="w-3 h-3" />
                         Competitive Intelligence
                       </p>
                       {intel.weaknesses.length > 0 && (
                         <div className="mb-2">
-                          <p className="text-[8px] sm:text-[9px] font-medium text-muted-foreground mb-0.5">Exploitable Weaknesses</p>
+                          <p className="text-[11px] font-medium text-muted-foreground mb-0.5">Exploitable Weaknesses</p>
                           <div className="space-y-0.5">
                             {intel.weaknesses.slice(0, 3).map((w, i) => (
-                              <div key={i} className="flex items-start gap-1 text-[8px] sm:text-[9px] text-foreground">
-                                <XCircle className="w-2.5 h-2.5 text-destructive mt-0.5 shrink-0" />
+                              <div key={i} className="flex items-start gap-1.5 text-[11px] leading-snug text-foreground py-1 border-b border-border/40 last:border-b-0">
+                                <XCircle className="w-3 h-3 text-muted-foreground mt-0.5 shrink-0" />
                                 <span>{w}</span>
                               </div>
                             ))}
@@ -2759,11 +2741,11 @@ export function EnhancedBenchmarkComparison({
                       )}
                       {intel.gaps.length > 0 && (
                         <div>
-                          <p className="text-[8px] sm:text-[9px] font-medium text-muted-foreground mb-0.5">Market Gaps</p>
+                          <p className="text-[11px] font-medium text-muted-foreground mb-0.5">Market Gaps</p>
                           <div className="space-y-0.5">
                             {intel.gaps.slice(0, 3).map((g, i) => (
-                              <div key={i} className="flex items-start gap-1 text-[8px] sm:text-[9px] text-foreground">
-                                <Target className="w-2.5 h-2.5 text-chart-4 mt-0.5 shrink-0" />
+                              <div key={i} className="flex items-start gap-1.5 text-[11px] leading-snug text-foreground py-1 border-b border-border/40 last:border-b-0">
+                                <Target className="w-3 h-3 text-muted-foreground mt-0.5 shrink-0" />
                                 <span>{g}</span>
                               </div>
                             ))}
@@ -2779,15 +2761,15 @@ export function EnhancedBenchmarkComparison({
                   const avoid = getThingsToAvoid();
                   if (avoid.length === 0) return null;
                   return (
-                    <div className="bg-destructive/10 dark:bg-destructive/20 rounded-lg p-2 border border-destructive/20">
-                      <p className="text-[9px] sm:text-[10px] font-semibold mb-1 flex items-center gap-1 text-destructive">
-                        <XCircle className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide mb-1 flex items-center gap-1.5 text-muted-foreground">
+                        <XCircle className="w-3 h-3" />
                         Things to Avoid
                       </p>
                       <div className="space-y-0.5">
                         {avoid.map((item, i) => (
-                          <div key={i} className="flex items-start gap-1 text-[8px] sm:text-[9px] text-foreground">
-                            <AlertTriangle className="w-2.5 h-2.5 text-destructive mt-0.5 shrink-0" />
+                          <div key={i} className="flex items-start gap-1.5 text-[11px] leading-snug text-foreground py-1 border-b border-border/40 last:border-b-0">
+                            <AlertTriangle className="w-3 h-3 text-muted-foreground mt-0.5 shrink-0" />
                             <span>{item}</span>
                           </div>
                         ))}
@@ -2801,28 +2783,28 @@ export function EnhancedBenchmarkComparison({
                   const fin = getFinancialHighlights();
                   if (!fin.investment && !fin.margin && !fin.breakeven) return null;
                   return (
-                    <div className="bg-muted/50 rounded-lg p-2 border">
-                      <p className="text-[9px] sm:text-[10px] font-semibold mb-1.5 flex items-center gap-1">
-                        <DollarSign className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-chart-4" />
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide mb-1.5 flex items-center gap-1.5 text-muted-foreground">
+                        <DollarSign className="w-3 h-3" />
                         Financial Highlights
                       </p>
-                      <div className="grid grid-cols-3 gap-1">
+                      <div className="grid grid-cols-3 border-y border-border/40 divide-x divide-border/40">
                         {fin.investment && (
-                          <div className="bg-background/60 rounded p-1.5 text-center">
-                            <p className="text-[7px] sm:text-[8px] text-muted-foreground">Investment</p>
-                            <p className="text-[9px] sm:text-[10px] font-medium">{fin.investment}</p>
+                          <div className="py-1.5 px-2 text-center">
+                            <p className="text-[11px] text-muted-foreground">Investment</p>
+                            <p className="text-[13px] font-medium tabular-nums text-foreground">{fin.investment}</p>
                           </div>
                         )}
                         {fin.margin && (
-                          <div className="bg-background/60 rounded p-1.5 text-center">
-                            <p className="text-[7px] sm:text-[8px] text-muted-foreground">Margin</p>
-                            <p className="text-[9px] sm:text-[10px] font-medium text-chart-4">{fin.margin}</p>
+                          <div className="py-1.5 px-2 text-center">
+                            <p className="text-[11px] text-muted-foreground">Margin</p>
+                            <p className="text-[13px] font-medium tabular-nums text-foreground">{fin.margin}</p>
                           </div>
                         )}
                         {fin.breakeven && (
-                          <div className="bg-background/60 rounded p-1.5 text-center">
-                            <p className="text-[7px] sm:text-[8px] text-muted-foreground">Breakeven</p>
-                            <p className="text-[9px] sm:text-[10px] font-medium">{fin.breakeven}</p>
+                          <div className="py-1.5 px-2 text-center">
+                            <p className="text-[11px] text-muted-foreground">Breakeven</p>
+                            <p className="text-[13px] font-medium tabular-nums text-foreground">{fin.breakeven}</p>
                           </div>
                         )}
                       </div>
@@ -2835,8 +2817,8 @@ export function EnhancedBenchmarkComparison({
                   const painPoints = getPainPointsWithEvidence();
                   if (painPoints.length === 0) return null;
                   return (
-                    <div className="bg-chart-2/10 dark:bg-chart-2/20 rounded-lg p-2 border border-chart-2/20">
-                      <p className="text-[9px] sm:text-[10px] font-semibold mb-1.5 flex items-center gap-1 text-chart-2">
+                    <div className="rounded-lg p-2 border border-border/60 bg-card">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide mb-1.5 flex items-center gap-1.5 text-muted-foreground">
                         <AlertTriangle className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                         Customer Pain Points
                       </p>
@@ -2868,7 +2850,7 @@ export function EnhancedBenchmarkComparison({
                   return (
                     <div>
                       <p className="text-[9px] sm:text-[10px] font-semibold mb-1 flex items-center gap-1">
-                        <Layers className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-primary" />
+                        <Layers className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-muted-foreground" />
                         Unmet Needs (Opportunities)
                       </p>
                       <div className="space-y-0.5">
@@ -2888,15 +2870,15 @@ export function EnhancedBenchmarkComparison({
                   const love = getWhatCustomersLove();
                   if (love.length === 0) return null;
                   return (
-                    <div className="bg-chart-4/10 dark:bg-chart-4/20 rounded-lg p-2 border border-chart-4/20">
-                      <p className="text-[9px] sm:text-[10px] font-semibold mb-1 flex items-center gap-1 text-chart-4">
+                    <div className="rounded-lg p-2 border border-border/60 bg-card">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide mb-1 flex items-center gap-1.5 text-muted-foreground">
                         <ThumbsUp className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                         What Customers Love
                       </p>
                       <div className="space-y-0.5">
                         {love.slice(0, 4).map((item, i) => (
-                          <div key={i} className="flex items-start gap-1 text-[8px] sm:text-[9px] text-foreground">
-                            <span className="w-1 h-1 rounded-full bg-chart-4 mt-1.5 shrink-0" />
+                          <div key={i} className="flex items-start gap-1 text-[11px] leading-snug text-foreground">
+                            <span className="w-1 h-1 rounded-full bg-muted-foreground/50 mt-1.5 shrink-0" />
                             <span>{item}</span>
                           </div>
                         ))}
@@ -2912,7 +2894,7 @@ export function EnhancedBenchmarkComparison({
                   return (
                     <div>
                       <p className="text-[9px] sm:text-[10px] font-semibold mb-1 flex items-center gap-1">
-                        <Users className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-primary" />
+                        <Users className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-muted-foreground" />
                         Purchase Decision Drivers
                       </p>
                       <div className="flex flex-wrap gap-1">
@@ -2929,7 +2911,7 @@ export function EnhancedBenchmarkComparison({
                 {/* Target Audience */}
                 <div>
                   <p className="text-[9px] sm:text-[10px] font-semibold mb-1 flex items-center gap-1">
-                    <Users className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-primary" />
+                    <Users className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-muted-foreground" />
                     Target Audience
                   </p>
                   <div className="space-y-1.5">
@@ -2937,8 +2919,8 @@ export function EnhancedBenchmarkComparison({
                       {getOurBuyerProfile()}
                     </p>
                     {getOurMotivation() && (
-                      <div className="bg-primary/10 dark:bg-primary/20 rounded p-1.5 border border-primary/20 dark:border-primary/30">
-                        <p className="text-[8px] sm:text-[9px] font-medium text-primary mb-0.5">Primary Motivation</p>
+                      <div className="rounded p-1.5 border border-border/60 bg-card">
+                        <p className="text-[11px] font-medium text-muted-foreground mb-0.5">Primary Motivation</p>
                         <p className="text-[8px] sm:text-[9px] text-muted-foreground">
                           {getOurMotivation()}
                         </p>
@@ -2964,7 +2946,7 @@ export function EnhancedBenchmarkComparison({
                           {hasMatch ? (
                             <Check className="w-2.5 h-2.5 text-chart-4 mt-0.5 shrink-0" />
                           ) : (
-                            <span className="w-1 h-1 rounded-full bg-chart-4 mt-1.5 shrink-0 ml-1" />
+                            <span className="w-1 h-1 rounded-full bg-muted-foreground/50 mt-1.5 shrink-0 ml-1" />
                           )}
                           <span>{ing}</span>
                         </div>
@@ -2974,8 +2956,8 @@ export function EnhancedBenchmarkComparison({
                 </div>
 
                 {/* FORMULATION DETAILS SECTION */}
-                <div className="bg-primary/5 dark:bg-primary/10 rounded-lg p-1.5 sm:p-2 border border-primary/20 space-y-1.5 sm:space-y-2">
-                  <p className="text-[8px] sm:text-[9px] font-semibold flex items-center gap-1 text-primary">
+                <div className="rounded-lg p-2 border border-border/60 bg-card space-y-1.5 sm:space-y-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide flex items-center gap-1.5 text-muted-foreground">
                     <FlaskConical className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                     Formulation Details
                   </p>
@@ -2986,17 +2968,17 @@ export function EnhancedBenchmarkComparison({
                       const specs = getOurFormulationSpecs();
                       return (
                         <>
-                          <div className="bg-background/60 rounded p-1 sm:p-1.5">
-                            <p className="text-[7px] sm:text-[8px] text-muted-foreground">Servings</p>
-                            <p className="text-[8px] sm:text-[9px] font-medium">{specs.servingsPerContainer || '—'}</p>
+                          <div className="bg-muted/30 rounded p-1.5">
+                            <p className="text-[11px] text-muted-foreground">Servings</p>
+                            <p className="text-[11px] font-medium tabular-nums text-foreground">{specs.servingsPerContainer || '—'}</p>
                           </div>
-                          <div className="bg-background/60 rounded p-1 sm:p-1.5">
-                            <p className="text-[7px] sm:text-[8px] text-muted-foreground">Serving Size</p>
-                            <p className="text-[8px] sm:text-[9px] font-medium">{specs.servingSize || '—'}</p>
+                          <div className="bg-muted/30 rounded p-1.5">
+                            <p className="text-[11px] text-muted-foreground">Serving Size</p>
+                            <p className="text-[11px] font-medium tabular-nums text-foreground">{specs.servingSize || '—'}</p>
                           </div>
                           <div className="bg-background/60 rounded p-1 sm:p-1.5 col-span-2">
-                            <p className="text-[7px] sm:text-[8px] text-muted-foreground">Form</p>
-                            <p className="text-[8px] sm:text-[9px] font-medium">{specs.packagingType || getOurFormFactor()}</p>
+                            <p className="text-[11px] text-muted-foreground">Form</p>
+                            <p className="text-[11px] font-medium tabular-nums text-foreground">{specs.packagingType || getOurFormFactor()}</p>
                           </div>
                         </>
                       );
@@ -3025,15 +3007,15 @@ export function EnhancedBenchmarkComparison({
                 </div>
 
                 {/* Our Strengths */}
-                <div className="bg-chart-4/10 dark:bg-chart-4/20 rounded-lg p-2 border border-chart-4/20 dark:border-chart-4/30">
-                  <p className="text-[9px] sm:text-[10px] font-semibold mb-1 flex items-center gap-1 text-chart-4">
+                <div className="rounded-lg p-2 border border-border/60 bg-card">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide mb-1 flex items-center gap-1.5 text-muted-foreground">
                     <ThumbsUp className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                     Our Strengths
                   </p>
                   <div className="space-y-0.5">
                     {getOurStrengths().map((strength, i) => (
-                      <div key={i} className="flex items-start gap-1 text-[8px] sm:text-[9px] text-foreground">
-                        <span className="w-1 h-1 rounded-full bg-chart-4 mt-1.5 shrink-0" />
+                      <div key={i} className="flex items-start gap-1 text-[11px] leading-snug text-foreground">
+                        <span className="w-1 h-1 rounded-full bg-muted-foreground/50 mt-1.5 shrink-0" />
                         <span>{strength}</span>
                       </div>
                     ))}
@@ -3041,15 +3023,15 @@ export function EnhancedBenchmarkComparison({
                 </div>
 
                 {/* Our Risks/Challenges */}
-                <div className="bg-chart-2/10 dark:bg-chart-2/20 rounded-lg p-2 border border-chart-2/20 dark:border-chart-2/30">
-                  <p className="text-[9px] sm:text-[10px] font-semibold mb-1 flex items-center gap-1 text-chart-2">
+                <div className="rounded-lg p-2 border border-border/60 bg-card">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide mb-1 flex items-center gap-1.5 text-muted-foreground">
                     <AlertTriangle className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                     Risks & Challenges
                   </p>
                   <div className="space-y-0.5">
                     {getOurWeaknesses().map((weakness, i) => (
-                      <div key={i} className="flex items-start gap-1 text-[8px] sm:text-[9px] text-foreground">
-                        <span className="w-1 h-1 rounded-full bg-chart-2 mt-1.5 shrink-0" />
+                      <div key={i} className="flex items-start gap-1 text-[11px] leading-snug text-foreground">
+                        <span className="w-1 h-1 rounded-full bg-muted-foreground/50 mt-1.5 shrink-0" />
                         <span>{weakness}</span>
                       </div>
                     ))}
@@ -3073,51 +3055,44 @@ export function EnhancedBenchmarkComparison({
                   return (
                   <div 
                     key={product.id} 
-                    className="group relative w-full lg:w-[280px] xl:w-[300px] lg:shrink-0 lg:max-h-[750px] rounded-lg border border-border bg-card overflow-hidden cursor-pointer transition-all hover:border-primary hover:shadow-md flex flex-col"
+                    className="group relative w-full lg:w-[280px] xl:w-[300px] lg:shrink-0 lg:max-h-[750px] rounded-xl border border-border/60 bg-card overflow-hidden cursor-pointer transition-all hover:border-border hover:shadow-md flex flex-col"
                     onClick={() => handleProductClick(product)}
                   >
                     {/* AI Analysis Available Badge */}
                     {hasCompetitorAnalysis && (
                       <div className="absolute top-2 right-2 z-10">
-                        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-primary text-primary-foreground text-[9px] font-medium shadow-sm">
-                          <Brain className="w-2.5 h-2.5" />
+                        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md border border-border/60 bg-card text-[11px] font-medium text-muted-foreground">
+                          <Brain className="w-3 h-3" />
                           <span>AI</span>
                         </div>
                       </div>
                     )}
                     
                     <div className={cn(
-                      "bg-gradient-to-r px-3 py-2",
-                      isFormulaReference(product.asin) 
-                        ? "from-chart-4/20 to-chart-4/10 border-b-2 border-chart-4" 
-                        : "from-muted to-muted/80"
+                      "px-3 py-2 border-b border-border/60",
+                      isFormulaReference(product.asin) && "border-l-2 border-l-primary"
                     )}>
                       <div className="flex items-center gap-2">
-                        <div className={cn(
-                          "w-6 h-6 md:w-7 md:h-7 rounded-full flex items-center justify-center font-bold text-xs",
-                          isFormulaReference(product.asin)
-                            ? "bg-chart-4 text-white"
-                            : "bg-primary/10 text-primary"
-                        )}>
+                        <span className="text-[11px] font-semibold tabular-nums text-muted-foreground shrink-0">
                           #{idx + 1}
-                        </div>
+                        </span>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5">
-                            <p className="font-semibold text-xs md:text-sm truncate">{product.brand || 'Unknown'}</p>
+                            <p className="text-[13px] font-medium truncate text-foreground">{product.brand || 'Unknown'}</p>
                             {isFormulaReference(product.asin) && (
-                              <Badge variant="default" className="text-[8px] h-4 bg-chart-4 text-white gap-0.5 shrink-0">
-                                <Zap className="w-2.5 h-2.5" />
-                                New Winner
-                              </Badge>
+                              <span className="text-[11px] font-semibold text-primary shrink-0 inline-flex items-center gap-0.5">
+                                <Zap className="w-3 h-3" />
+                                New
+                              </span>
                             )}
                           </div>
-                          <p className="text-[10px] text-muted-foreground truncate">{product.title?.substring(0, 25)}...</p>
+                          <p className="text-[11px] text-muted-foreground truncate">{product.title?.substring(0, 25)}...</p>
                         </div>
                       </div>
                     </div>
 
-                    <div className="p-2 md:p-3 space-y-3 flex-1 overflow-y-auto">
-                      <div className="w-full aspect-square rounded-lg bg-white border overflow-hidden">
+                    <div className="p-3 space-y-2.5 flex-1 overflow-y-auto">
+                      <div className="w-full aspect-square rounded-lg bg-muted/30 border border-border/60 overflow-hidden">
                         {product.main_image_url ? (
                           <img 
                             src={product.main_image_url} 
@@ -3131,69 +3106,51 @@ export function EnhancedBenchmarkComparison({
                         )}
                       </div>
 
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="p-1.5 bg-secondary rounded text-center flex-1">
-                          <p className="text-[10px] text-muted-foreground">Price</p>
-                          <p className="text-sm md:text-base font-bold">{product.price != null ? `$${Number(product.price).toFixed(2)}` : <span className="inline-flex"><span className="w-1 h-1 rounded-full bg-muted-foreground/60 mx-0.5" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60 mx-0.5" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60 mx-0.5" /></span>}</p>
+                      <div className="flex items-center justify-between border-y border-border/40">
+                        <div className="py-2 text-center flex-1 border-r border-border/40">
+                          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Price</p>
+                          <p className="text-[17px] font-semibold tabular-nums text-foreground">{product.price != null ? `$${Number(product.price).toFixed(2)}` : <span className="inline-flex"><span className="w-1 h-1 rounded-full bg-muted-foreground/60 mx-0.5" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60 mx-0.5" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60 mx-0.5" /></span>}</p>
                         </div>
-                        <div className="p-1.5 bg-secondary rounded text-center flex-1">
-                          <p className="text-[10px] text-muted-foreground">Rating</p>
+                        <div className="py-2 text-center flex-1">
+                          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Rating</p>
                         <div className="flex items-center justify-center gap-0.5">
-                            <Star className="w-3 h-3 fill-chart-2 text-chart-2" />
-                            <span className="text-sm md:text-base font-bold">{product.rating ? product.rating.toFixed(1) : <span className="inline-flex"><span className="w-1 h-1 rounded-full bg-muted-foreground/60 mx-0.5" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60 mx-0.5" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60 mx-0.5" /></span>}</span>
+                            <Star className="w-3 h-3 text-muted-foreground" />
+                            <span className="text-[17px] font-semibold tabular-nums text-foreground">{product.rating ? product.rating.toFixed(1) : <span className="inline-flex"><span className="w-1 h-1 rounded-full bg-muted-foreground/60 mx-0.5" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60 mx-0.5" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60 mx-0.5" /></span>}</span>
                           </div>
                         </div>
                       </div>
 
-                      <div className="bg-secondary/50 rounded p-1.5">
-                        <div className="flex items-center gap-1 mb-1">
-                          <TrendingUp className="w-3 h-3 text-primary" />
-                          <p className="text-[10px] font-semibold">Sales</p>
+                      <div>
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <TrendingUp className="w-3 h-3 text-muted-foreground" />
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Sales</p>
                         </div>
-                        <div className="grid grid-cols-2 gap-1 text-[10px]">
+                        <div className="grid grid-cols-2 gap-1 text-[11px] tabular-nums">
                           <div>
                             <p className="text-muted-foreground">Monthly</p>
-                            <p className="font-semibold text-chart-4">{(product.monthly_sales || 0).toLocaleString()}</p>
+                            <p className="font-medium text-foreground">{(product.monthly_sales || 0).toLocaleString()}</p>
                           </div>
                           <div>
                             <p className="text-muted-foreground">Reviews</p>
-                            <p className="font-semibold">{(product.reviews || 0).toLocaleString()}</p>
+                            <p className="font-medium text-foreground">{(product.reviews || 0).toLocaleString()}</p>
                           </div>
                         </div>
                       </div>
 
                       {/* Product Stats Grid - Highlight for Formula References */}
-                      <div className="grid grid-cols-2 gap-1.5">
-                        <div className={cn(
-                          "rounded p-1.5",
-                          isFormulaReference(product.asin) ? "bg-chart-4/10 border border-chart-4/30" : "bg-secondary/50"
-                        )}>
-                          <p className="text-[9px] text-muted-foreground">Listing Age</p>
-                          <p className={cn(
-                            "text-[10px] font-semibold",
-                            isFormulaReference(product.asin) && "text-chart-4"
-                          )}>
-                            {product.age_months ? `${product.age_months} mo` : '—'}
-                          </p>
+                      <div className="border-t border-border/40">
+                        <div className="flex items-center justify-between py-1 text-[11px] border-b border-border/40">
+                          <span className="text-muted-foreground">Listing Age</span>
+                          <span className="font-medium tabular-nums text-foreground">{product.age_months ? `${product.age_months} mo` : '—'}</span>
                         </div>
-                        <div className={cn(
-                          "rounded p-1.5",
-                          isFormulaReference(product.asin) ? "bg-chart-4/10 border border-chart-4/30" : "bg-secondary/50"
-                        )}>
-                          <p className="text-[9px] text-muted-foreground">Revenue/mo</p>
-                          <p className={cn(
-                            "text-[10px] font-semibold",
-                            isFormulaReference(product.asin) && "text-chart-4"
-                          )}>
-                            {product.monthly_revenue ? `$${product.monthly_revenue.toLocaleString()}` : '—'}
-                          </p>
+                        <div className="flex items-center justify-between py-1 text-[11px] border-b border-border/40">
+                          <span className="text-muted-foreground">Revenue/mo</span>
+                          <span className="font-medium tabular-nums text-foreground">{product.monthly_revenue ? `$${product.monthly_revenue.toLocaleString()}` : '—'}</span>
                         </div>
-                      </div>
-                      
-                      {/* BSR Rank - separate row */}
-                      <div className="bg-secondary/50 rounded p-1.5">
-                        <p className="text-[9px] text-muted-foreground">BSR Rank</p>
-                        <p className="text-[10px] font-semibold">{product.bsr_current ? `#${product.bsr_current.toLocaleString()}` : (product.rank ? `#${product.rank.toLocaleString()}` : '—')}</p>
+                        <div className="flex items-center justify-between py-1 text-[11px]">
+                          <span className="text-muted-foreground">BSR Rank</span>
+                          <span className="font-medium tabular-nums text-foreground">{product.bsr_current ? `#${product.bsr_current.toLocaleString()}` : (product.rank ? `#${product.rank.toLocaleString()}` : '—')}</span>
+                        </div>
                       </div>
 
                       {/* Mini Performance Trend Chart (2yr) */}
@@ -3243,7 +3200,7 @@ export function EnhancedBenchmarkComparison({
                           <div className="bg-secondary/50 rounded p-1.5">
                             <div className="flex items-center justify-between mb-1">
                               <p className="text-[9px] font-semibold flex items-center gap-1">
-                                <BarChart3 className="w-3 h-3 text-primary" />
+                                <BarChart3 className="w-3 h-3 text-muted-foreground" />
                                 Performance (2yr)
                               </p>
                               <div className="flex gap-1">
@@ -3369,7 +3326,7 @@ export function EnhancedBenchmarkComparison({
                             return (
                               <>
                                 <p className="text-[10px] font-semibold mb-1 flex items-center gap-1">
-                                  <Award className="w-3 h-3 text-primary" />
+                                  <Award className="w-3 h-3 text-muted-foreground" />
                                   USPs
                                   <Badge variant="secondary" className="text-[9px] h-4 ml-auto">
                                     0
@@ -3383,7 +3340,7 @@ export function EnhancedBenchmarkComparison({
                           return (
                             <>
                               <p className="text-[10px] font-semibold mb-1 flex items-center gap-1">
-                                <Award className="w-3 h-3 text-primary" />
+                                <Award className="w-3 h-3 text-muted-foreground" />
                                 USPs
                                 <Badge variant="secondary" className="text-[9px] h-4 ml-auto">
                                   {uspCount}
@@ -3392,7 +3349,7 @@ export function EnhancedBenchmarkComparison({
                               <div className="space-y-0.5 max-h-24 overflow-y-auto pr-1">
                                 {usps.map((usp, i) => (
                                   <div key={i} className="flex items-start gap-1 text-[10px] text-muted-foreground">
-                                    <span className="w-1 h-1 rounded-full bg-primary mt-1.5 shrink-0" />
+                                    <span className="w-1 h-1 rounded-full bg-muted-foreground/50 mt-1.5 shrink-0" />
                                     <span>{usp}</span>
                                   </div>
                                 ))}
@@ -3423,11 +3380,11 @@ export function EnhancedBenchmarkComparison({
                             return items.map((ing, i) => {
                               const hasMatch = isMatchingIngredient(ing, ourIngredients);
                               return (
-                                <div key={i} className={`flex items-start gap-1 text-[10px] ${hasMatch ? 'text-chart-4 font-medium' : fallback ? 'text-primary' : 'text-muted-foreground'}`}>
+                                <div key={i} className={`flex items-start gap-1 text-[10px] ${hasMatch ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
                                   {hasMatch ? (
                                     <Check className="w-3 h-3 text-chart-4 mt-0.5 shrink-0" />
                                   ) : (
-                                    <span className="w-1 h-1 rounded-full bg-chart-4 mt-1.5 shrink-0 ml-1" />
+                                    <span className="w-1 h-1 rounded-full bg-muted-foreground/50 mt-1.5 shrink-0 ml-1" />
                                   )}
                                   <span>{ing}</span>
                                 </div>
@@ -3438,8 +3395,8 @@ export function EnhancedBenchmarkComparison({
                       </div>
 
                       {/* FORMULATION DETAILS SECTION */}
-                      <div className="bg-primary/5 dark:bg-primary/10 rounded-lg p-2 border border-primary/20 space-y-2">
-                        <p className="text-[10px] font-semibold flex items-center gap-1 text-primary">
+                      <div className="rounded-lg p-2 border border-border/60 bg-card space-y-2">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide flex items-center gap-1.5 text-muted-foreground">
                           <FlaskConical className="w-3 h-3" />
                           Formulation Details
                         </p>
@@ -3579,7 +3536,7 @@ export function EnhancedBenchmarkComparison({
                               }
                               return marketing.map((item, i) => (
                                 <div key={i} className="flex items-start gap-1 text-[10px] text-muted-foreground">
-                                  <span className="w-1 h-1 rounded-full bg-chart-3 mt-1.5 shrink-0" />
+                                  <span className="w-1 h-1 rounded-full bg-muted-foreground/50 mt-1.5 shrink-0" />
                                   <span>{item}</span>
                                 </div>
                               ));
@@ -3593,7 +3550,7 @@ export function EnhancedBenchmarkComparison({
                       {/* Target Audience */}
                       <div>
                         <p className="text-[10px] font-semibold mb-1 flex items-center gap-1">
-                          <Users className="w-3 h-3 text-primary" />
+                          <Users className="w-3 h-3 text-muted-foreground" />
                           Target Audience
                         </p>
                         {hasMarketingAnalysis(product) ? (
@@ -3606,7 +3563,7 @@ export function EnhancedBenchmarkComparison({
                       </div>
 
                       {/* Where Competitors Win - NEW */}
-                      <div className="bg-chart-4/10 dark:bg-chart-4/20 rounded-lg p-2 border border-chart-4/20 dark:border-chart-4/30">
+                      <div className="rounded-lg p-2 border border-border/60 bg-card">
                         <p className="text-[10px] font-semibold mb-1 flex items-center gap-1 text-chart-4">
                           <Trophy className="w-3 h-3" />
                           Where They Win
@@ -3648,7 +3605,7 @@ export function EnhancedBenchmarkComparison({
                               }
                               return strengths.map((s, i) => (
                                 <div key={i} className="flex items-start gap-1 text-[10px] text-muted-foreground">
-                                  <span className="w-1 h-1 rounded-full bg-chart-4 mt-1.5 shrink-0" />
+                                  <span className="w-1 h-1 rounded-full bg-muted-foreground/50 mt-1.5 shrink-0" />
                                   <span>{s.theme}</span>
                                   {s.percentage && (
                                     <span className="text-chart-4 font-medium ml-auto">{s.percentage}%</span>
@@ -3720,7 +3677,7 @@ export function EnhancedBenchmarkComparison({
             </ScrollArea>
           </div>
         </CardContent>
-      </BrandCard>
+      </Panel>
 
       {/* UNIFIED INGREDIENT & DOSAGE COMPARISON */}
       <IngredientComparisonSection 
@@ -3762,16 +3719,16 @@ export function EnhancedBenchmarkComparison({
             
             const getImpactColor = (impact: string) => {
               switch (impact) {
-                case "high": return "bg-chart-4/10 text-chart-4 border-chart-4/20";
-                case "medium": return "bg-chart-2/10 text-chart-2 border-chart-2/20";
+                case "high": return "bg-emerald-500/10 text-emerald-700 border-emerald-500/20";
+                case "medium": return "bg-amber-500/10 text-amber-700 border-amber-500/20";
                 default: return "bg-muted text-muted-foreground border-muted";
               }
             };
             
             const getDifficultyColor = (difficulty: string) => {
               switch (difficulty) {
-                case "easy": return "bg-chart-4/10 text-chart-4 border-chart-4/20";
-                case "moderate": return "bg-chart-2/10 text-chart-2 border-chart-2/20";
+                case "easy": return "bg-emerald-500/10 text-emerald-700 border-emerald-500/20";
+                case "moderate": return "bg-amber-500/10 text-amber-700 border-amber-500/20";
                 default: return "bg-destructive/10 text-destructive border-destructive/20";
               }
             };
@@ -3806,7 +3763,7 @@ export function EnhancedBenchmarkComparison({
                     </div>
                     <div className="space-y-2">
                       {compAnalysis.where_we_win.map((win, i) => (
-                        <div key={i} className="p-3 rounded-lg bg-chart-4/5 border border-chart-4/10">
+                        <div key={i} className="p-3 rounded-lg border border-border/60 bg-card">
                           <div className="flex items-center gap-2 mb-1">
                             <span className="font-medium text-sm">{win.area}</span>
                             <Badge variant="outline" className={getImpactColor(win.impact)}>
@@ -3827,7 +3784,7 @@ export function EnhancedBenchmarkComparison({
                     </div>
                     <div className="space-y-2">
                       {compAnalysis.where_they_win.map((loss, i) => (
-                        <div key={i} className="p-3 rounded-lg bg-chart-2/5 border border-chart-2/10">
+                        <div key={i} className="p-3 rounded-lg border border-border/60 bg-card">
                           <div className="flex items-center gap-2 mb-1">
                             <span className="font-medium text-sm">{loss.area}</span>
                             <Badge variant="outline" className={getDifficultyColor(loss.difficulty)}>
@@ -3836,8 +3793,8 @@ export function EnhancedBenchmarkComparison({
                           </div>
                           <p className="text-sm text-muted-foreground mb-2">{loss.their_advantage}</p>
                           <p className="text-sm flex items-center gap-1.5">
-                            <ArrowRight className="w-3.5 h-3.5 text-primary" />
-                            <span className="text-primary">{loss.how_to_match}</span>
+                            <ArrowRight className="w-3.5 h-3.5 text-muted-foreground" />
+                            <span className="text-foreground">{loss.how_to_match}</span>
                           </p>
                         </div>
                       ))}

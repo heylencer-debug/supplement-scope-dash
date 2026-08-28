@@ -7,7 +7,7 @@
 import { useScoutPackagingData } from "@/hooks/useScoutPackagingData";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { BrandCard } from "@/components/ui/brand-card";
+import { Panel } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, Target, TrendingUp, Palette, ShieldCheck, Lightbulb, Star } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
@@ -78,7 +78,7 @@ export function ScoutPackagingIntelligence({ categoryId }: Props) {
     <div className="space-y-6">
 
       {/* Dovive Strategy Card */}
-      <BrandCard className="border-primary/20 bg-primary/5">
+      <Panel className="border-primary/20 bg-primary/5">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base text-primary">
             <Target className="h-4 w-4" />
@@ -149,10 +149,10 @@ export function ScoutPackagingIntelligence({ categoryId }: Props) {
             </div>
           </div>
         </CardContent>
-      </BrandCard>
+      </Panel>
 
       {/* Benefit Claim Frequency */}
-      <BrandCard>
+      <Panel>
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-sm">
             <TrendingUp className="h-4 w-4 text-primary" />
@@ -196,11 +196,11 @@ export function ScoutPackagingIntelligence({ categoryId }: Props) {
             </BarChart>
           </ResponsiveContainer>
         </CardContent>
-      </BrandCard>
+      </Panel>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Badge Frequency */}
-        <BrandCard>
+        <Panel>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm">
               <ShieldCheck className="h-4 w-4 text-primary" />
@@ -225,11 +225,11 @@ export function ScoutPackagingIntelligence({ categoryId }: Props) {
               ))}
             </div>
           </CardContent>
-        </BrandCard>
+        </Panel>
 
         {/* Color Palette + Opportunity Gaps */}
         <div className="space-y-4">
-          <BrandCard>
+          <Panel>
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-sm">
                 <Palette className="h-4 w-4 text-primary" />
@@ -247,9 +247,9 @@ export function ScoutPackagingIntelligence({ categoryId }: Props) {
                 ))}
               </div>
             </CardContent>
-          </BrandCard>
+          </Panel>
 
-          <BrandCard className="border-chart-4/20 bg-chart-4/5">
+          <Panel className="border-chart-4/20 bg-chart-4/5">
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-sm text-chart-4">
                 <Lightbulb className="h-4 w-4" />
@@ -274,12 +274,12 @@ export function ScoutPackagingIntelligence({ categoryId }: Props) {
                 ))}
               </div>
             </CardContent>
-          </BrandCard>
+          </Panel>
         </div>
       </div>
 
       {/* Top Packagers */}
-      <BrandCard>
+      <Panel>
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-sm">
             <Star className="h-4 w-4 text-chart-2" />
@@ -324,7 +324,7 @@ export function ScoutPackagingIntelligence({ categoryId }: Props) {
             ))}
           </div>
         </CardContent>
-      </BrandCard>
+      </Panel>
     </div>
   );
 }

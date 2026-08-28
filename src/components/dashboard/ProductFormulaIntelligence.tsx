@@ -8,7 +8,7 @@
 
 import { useProductIntelligence } from "@/hooks/useProductIntelligence";
 import { CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { BrandCard } from "@/components/ui/brand-card";
+import { Panel } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle, FlaskConical, ShieldCheck, Zap, TrendingUp, Star, Award } from "lucide-react";
@@ -103,7 +103,7 @@ export function ProductFormulaIntelligence({ categoryId, categoryName }: Props) 
 
   if (error || !data || data.summary.total === 0) {
     return (
-      <div className="flex items-center gap-2 text-sm text-chart-2 p-4 bg-chart-2/10 rounded-xl border border-chart-2/20">
+      <div className="flex items-center gap-2 text-sm text-chart-2 p-4 bg-card rounded-xl border border-chart-2/20">
         <AlertCircle className="h-4 w-4 shrink-0" />
         {error ? "Failed to load formula intelligence" : "No P6 data yet — run phase6-product-intelligence.js first"}
       </div>
@@ -132,7 +132,7 @@ export function ProductFormulaIntelligence({ categoryId, categoryName }: Props) 
     <div className="space-y-6">
 
       {/* Formula Stats KPIs */}
-      <BrandCard>
+      <Panel>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-sm">
             <FlaskConical className="h-4 w-4 text-primary" />
@@ -180,11 +180,11 @@ export function ProductFormulaIntelligence({ categoryId, categoryName }: Props) 
             ))}
           </div>
         </CardContent>
-      </BrandCard>
+      </Panel>
 
       {/* Primary Active Form + Dosage Distribution (category-dynamic) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <BrandCard>
+        <Panel>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm">
               <FlaskConical className="h-4 w-4 text-primary" />
@@ -227,9 +227,9 @@ export function ProductFormulaIntelligence({ categoryId, categoryName }: Props) 
               </div>
             )}
           </CardContent>
-        </BrandCard>
+        </Panel>
 
-        <BrandCard>
+        <Panel>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm">
               <TrendingUp className="h-4 w-4 text-primary" />
@@ -269,12 +269,12 @@ export function ProductFormulaIntelligence({ categoryId, categoryName }: Props) 
               </div>
             )}
           </CardContent>
-        </BrandCard>
+        </Panel>
       </div>
 
       {/* Certifications + Bonus Ingredients */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <BrandCard>
+        <Panel>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm">
               <ShieldCheck className="h-4 w-4 text-chart-4" />
@@ -299,9 +299,9 @@ export function ProductFormulaIntelligence({ categoryId, categoryName }: Props) 
               <p className="text-sm text-muted-foreground">No certification data available</p>
             )}
           </CardContent>
-        </BrandCard>
+        </Panel>
 
-        <BrandCard>
+        <Panel>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm">
               <Zap className="h-4 w-4 text-chart-2" />
@@ -328,12 +328,12 @@ export function ProductFormulaIntelligence({ categoryId, categoryName }: Props) 
               <p className="text-sm text-muted-foreground">No bonus ingredient data available</p>
             )}
           </CardContent>
-        </BrandCard>
+        </Panel>
       </div>
 
       {/* Formula Quality + Threat Distribution */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <BrandCard>
+        <Panel>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm">
               <Award className="h-4 w-4 text-chart-5" />
@@ -363,9 +363,9 @@ export function ProductFormulaIntelligence({ categoryId, categoryName }: Props) 
               Avg: <span className="text-foreground font-medium">{s.avg_quality_score}/10</span> — most products score below 6, leaving room for Dovive to lead on formula quality
             </p>
           </CardContent>
-        </BrandCard>
+        </Panel>
 
-        <BrandCard>
+        <Panel>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm">
               <TrendingUp className="h-4 w-4 text-destructive" />
@@ -391,11 +391,11 @@ export function ProductFormulaIntelligence({ categoryId, categoryName }: Props) 
               Most competitors are Medium/Low threat — Dovive can compete with a premium formula
             </p>
           </CardContent>
-        </BrandCard>
+        </Panel>
       </div>
 
       {/* Top 10 by Formula Score */}
-      <BrandCard>
+      <Panel>
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-sm">
             <Star className="h-4 w-4 text-chart-2" />
@@ -459,11 +459,11 @@ export function ProductFormulaIntelligence({ categoryId, categoryName }: Props) 
             </table>
           </div>
         </CardContent>
-      </BrandCard>
+      </Panel>
 
       {/* Premium / Top Extract Products — dynamic, not KSM-66 specific */}
       {premiumProducts.length > 0 && (
-        <BrandCard className="border-primary/20 bg-primary/5">
+        <Panel className="border-primary/20 bg-primary/5">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm text-primary">
               <FlaskConical className="h-4 w-4" />
@@ -508,7 +508,7 @@ export function ProductFormulaIntelligence({ categoryId, categoryName }: Props) 
               })}
             </div>
           </CardContent>
-        </BrandCard>
+        </Panel>
       )}
     </div>
   );

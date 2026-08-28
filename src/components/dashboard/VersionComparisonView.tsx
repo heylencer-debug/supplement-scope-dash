@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BrandCard } from "@/components/ui/brand-card";
+import { Panel } from "@/components/ui/panel";
 import { 
   Select, 
   SelectContent, 
@@ -173,7 +173,7 @@ export function VersionComparisonView({
   };
 
   return (
-    <BrandCard className="border-primary/20">
+    <Panel className="border-primary/20">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-base">
@@ -312,7 +312,7 @@ export function VersionComparisonView({
           </TabsContent>
         </Tabs>
       </CardContent>
-    </BrandCard>
+    </Panel>
   );
 }
 
@@ -539,7 +539,7 @@ function IngredientComparison({ left, right }: { left: any; right: any }) {
       {/* SWOT Summary */}
       {data.swot && (
         <div className="grid grid-cols-2 gap-2 text-[10px]">
-          <div className="p-2 bg-chart-4/10 rounded">
+          <div className="p-2 bg-card rounded">
             <div className="font-medium text-chart-4 mb-1">Strengths ({data.swot.strengths?.length || 0})</div>
             {data.swot.strengths?.slice(0, 2).map((s: string, i: number) => (
               <div key={i} className="text-muted-foreground truncate">• {s}</div>
@@ -569,7 +569,7 @@ function PackagingComparison({ left, right }: { left: any; right: any }) {
         <div className="space-y-2">
           <div className="text-xs font-medium">Design Brief</div>
           {data.design_brief.primary_claim && (
-            <div className="p-2 bg-primary/5 rounded-lg border border-primary/20">
+            <div className="p-2 bg-card rounded-lg border border-primary/20">
               <div className="text-[10px] text-muted-foreground mb-1">Primary Claim</div>
               <div className="text-xs font-medium">{data.design_brief.primary_claim}</div>
             </div>

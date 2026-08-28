@@ -1,6 +1,6 @@
 import { X, Trophy, DollarSign, FlaskConical, Megaphone, HeartCrack, Sparkles, Check, AlertTriangle } from "lucide-react";
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BrandCard } from "@/components/ui/brand-card";
+import { Panel } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
@@ -130,7 +130,7 @@ export default function BenchmarkComparison({
   };
 
   return (
-    <BrandCard className="mt-6">
+    <Panel className="mt-6">
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -147,9 +147,9 @@ export default function BenchmarkComparison({
         <ScrollArea className="w-full">
           <div className="flex min-w-max">
             {/* Our Concept Column - Fixed with Gold/Orange styling */}
-            <div className="w-64 flex-shrink-0 border-r-2 border-chart-2 bg-gradient-to-b from-chart-2/10 to-chart-2/5 dark:from-chart-2/20 dark:to-chart-2/10">
+            <div className="w-64 flex-shrink-0 border-r border-border/60 bg-card">
               {/* Header */}
-              <div className="bg-gradient-to-r from-chart-2 via-chart-2/90 to-chart-2/80 text-white p-4 rounded-tl-lg shadow-lg border-l-4 border-chart-2">
+              <div className="p-4 border-b border-border/60">
                 <div className="flex items-center gap-2">
                   <Trophy className="w-5 h-5 drop-shadow" />
                   <span className="font-bold tracking-wide">OUR CONCEPT</span>
@@ -226,7 +226,7 @@ export default function BenchmarkComparison({
               </div>
 
               {/* Key Features Row */}
-              <div className="p-4 bg-chart-2/5 dark:bg-chart-2/10 rounded-bl-lg">
+              <div className="p-4 bg-card rounded-bl-lg">
                 <div className="flex items-center gap-2 text-sm font-medium text-foreground mb-2">
                   <Sparkles className="w-4 h-4" />
                   KEY FEATURES
@@ -341,6 +341,6 @@ export default function BenchmarkComparison({
           <ScrollBar orientation="horizontal" />
         </ScrollArea>
       </CardContent>
-    </BrandCard>
+    </Panel>
   );
 }

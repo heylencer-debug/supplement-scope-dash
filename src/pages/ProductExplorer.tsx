@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { PearlButton } from "@/components/ui/pearl-button";
 import { Input } from "@/components/ui/input";
 import { CardContent, CardHeader } from "@/components/ui/card";
-import { BrandCard } from "@/components/ui/brand-card";
+import { Panel } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -333,11 +333,11 @@ export default function ProductExplorer() {
 
   const ScoreBadge = ({ score, label }: { score: number | null; label: string }) => {
     if (score === null) return null;
-    const color = score >= 7 ? "text-chart-4 bg-chart-4/10" 
-      : score >= 5 ? "text-chart-2 bg-chart-2/10" 
-      : "text-destructive bg-destructive/10";
+    const color = score >= 7 ? "text-emerald-700 bg-emerald-500/10 border-emerald-500/20"
+      : score >= 5 ? "text-amber-700 bg-amber-500/10 border-amber-500/20"
+      : "text-destructive bg-destructive/10 border-destructive/20";
     return (
-      <span className={`${color} text-xs px-1.5 py-0.5 rounded font-medium`}>
+      <span className={`${color} text-[11px] tabular-nums px-1.5 py-0.5 rounded border font-medium`}>
         {label[0]}:{score}
       </span>
     );
@@ -352,7 +352,7 @@ export default function ProductExplorer() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       {/* Bulk Analysis Progress Banner */}
       {bulkProgress.status !== "idle" && (
         <BulkAnalysisProgress 
@@ -361,10 +361,10 @@ export default function ProductExplorer() {
         />
       )}
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Product Explorer</h1>
-          <p className="text-muted-foreground">
+      <div className="flex items-center justify-between pb-3 border-b border-border/60">
+        <div className="space-y-1">
+          <h1 className="text-lg font-semibold tracking-tight text-foreground">Product Explorer</h1>
+          <p className="text-[13px] text-muted-foreground">
             {categoryName
               ? `Browsing products in: ${categoryName}`
               : "Browse and analyze products in detail"}
@@ -407,7 +407,7 @@ export default function ProductExplorer() {
         </div>
       </div>
 
-      <BrandCard>
+      <Panel>
         <CardHeader>
           <div className="flex flex-col gap-4">
             <div className="flex flex-col sm:flex-row gap-4">
@@ -776,7 +776,7 @@ export default function ProductExplorer() {
             </div>
           </div>
         </CardContent>
-      </BrandCard>
+      </Panel>
 
       <BenchmarkComparison
         selectedProducts={selectedProducts}

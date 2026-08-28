@@ -1,5 +1,5 @@
 import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BrandCard } from "@/components/ui/brand-card";
+import { Panel } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
 import { Target, TrendingUp, TrendingDown, Building2, PieChart as PieChartIcon } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from "recharts";
@@ -44,26 +44,26 @@ export function CompetitiveLandscapeSection({ data }: CompetitiveLandscapeSectio
       {/* Summary Stats Row */}
       <ScrollAnimate variant="fade-up">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <BrandCard className="p-4">
+          <Panel className="p-4">
             <p className="text-xs text-muted-foreground mb-1">Total Brands</p>
             <p className="text-2xl font-bold text-foreground">{data.brandRankings.length}</p>
-          </BrandCard>
-          <BrandCard className="p-4">
+          </Panel>
+          <Panel className="p-4">
             <p className="text-xs text-muted-foreground mb-1">Combined Revenue</p>
             <p className="text-2xl font-bold text-foreground">
               <AnimatedNumber value={totalRevenue} decimals={0} prefix="$" suffix="M" />
             </p>
-          </BrandCard>
-          <BrandCard className="p-4">
+          </Panel>
+          <Panel className="p-4">
             <p className="text-xs text-muted-foreground mb-1">Avg Growth</p>
             <p className="text-2xl font-bold text-chart-4">
               +{(data.brandRankings.reduce((sum, b) => sum + b.yoyChange, 0) / data.brandRankings.length).toFixed(1)}%
             </p>
-          </BrandCard>
-          <BrandCard className="p-4">
+          </Panel>
+          <Panel className="p-4">
             <p className="text-xs text-muted-foreground mb-1">Market Leader</p>
             <p className="text-lg font-bold text-foreground truncate">{data.brandRankings[0]?.brandName}</p>
-          </BrandCard>
+          </Panel>
         </div>
       </ScrollAnimate>
 
@@ -71,7 +71,7 @@ export function CompetitiveLandscapeSection({ data }: CompetitiveLandscapeSectio
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Market Share Donut */}
         <ScrollAnimate variant="scale-up" delay={100}>
-          <BrandCard>
+          <Panel>
             <CardHeader>
               <div className="flex items-center gap-2">
                 <PieChartIcon className="h-5 w-5 text-chart-4" />
@@ -124,12 +124,12 @@ export function CompetitiveLandscapeSection({ data }: CompetitiveLandscapeSectio
                 </ResponsiveContainer>
               </div>
             </CardContent>
-          </BrandCard>
+          </Panel>
         </ScrollAnimate>
 
         {/* Revenue Bar Chart */}
         <ScrollAnimate variant="scale-up" delay={200}>
-          <BrandCard>
+          <Panel>
             <CardHeader>
               <div className="flex items-center gap-2">
                 <Target className="h-5 w-5 text-primary" />
@@ -174,13 +174,13 @@ export function CompetitiveLandscapeSection({ data }: CompetitiveLandscapeSectio
                 </ResponsiveContainer>
               </div>
             </CardContent>
-          </BrandCard>
+          </Panel>
         </ScrollAnimate>
       </div>
 
       {/* Brand Rankings List with Visual Enhancements */}
       <ScrollAnimate variant="fade-up" delay={300}>
-        <BrandCard>
+        <Panel>
           <CardHeader>
             <div className="flex items-center gap-2">
               <Building2 className="h-5 w-5 text-chart-2" />
@@ -193,7 +193,7 @@ export function CompetitiveLandscapeSection({ data }: CompetitiveLandscapeSectio
               {data.brandRankings.map((brand, index) => (
                 <div
                   key={index}
-                  className="group relative p-4 rounded-xl bg-gradient-to-r from-secondary/30 to-secondary/10 border border-border/50 hover:border-primary/30 hover:shadow-md transition-all duration-300"
+                  className="group relative p-4 rounded-xl bg-card border border-border/60 hover:border-border hover:shadow-md transition-all duration-300"
                   style={{
                     borderLeftWidth: '4px',
                     borderLeftColor: COLORS[index % COLORS.length],
@@ -238,13 +238,12 @@ export function CompetitiveLandscapeSection({ data }: CompetitiveLandscapeSectio
               ))}
             </div>
           </CardContent>
-        </BrandCard>
+        </Panel>
       </ScrollAnimate>
 
       {/* Market Share Insights */}
       <ScrollAnimate variant="fade-up" delay={400}>
-        <BrandCard className="overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-chart-2/5 via-transparent to-chart-1/5 pointer-events-none" />
+        <Panel className="overflow-hidden">
           <CardHeader className="relative">
             <CardTitle className="text-lg">Market Share Analysis</CardTitle>
             <CardDescription>Strategic insights and competitive dynamics</CardDescription>
@@ -254,7 +253,7 @@ export function CompetitiveLandscapeSection({ data }: CompetitiveLandscapeSectio
               <p className="text-foreground leading-relaxed">{data.marketShareInsights}</p>
             </div>
           </CardContent>
-        </BrandCard>
+        </Panel>
       </ScrollAnimate>
     </div>
   );

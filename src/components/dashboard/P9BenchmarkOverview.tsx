@@ -6,7 +6,7 @@
 
 import { Trophy, CheckCircle2, FlaskConical, AlertCircle, Loader2 } from "lucide-react";
 import { CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { BrandCard } from "@/components/ui/brand-card";
+import { Panel } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { useFormulaBrief } from "@/hooks/useFormulaBrief";
@@ -119,7 +119,7 @@ function ComparisonTable({ markdown }: { markdown: string }) {
             <td className="px-3 py-2 text-muted-foreground whitespace-normal">{children}</td>
           ),
           blockquote: ({ children }) => (
-            <blockquote className="border-l-3 border-primary pl-3 py-1 my-2 bg-primary/5 rounded-r-lg text-xs">{children}</blockquote>
+            <blockquote className="border-l-3 border-primary pl-3 py-1 my-2 bg-card rounded-r-lg text-xs">{children}</blockquote>
           ),
           code: ({ children }) => (
             <code className="bg-muted px-1 py-0.5 rounded text-[10px] font-mono text-foreground">{children}</code>
@@ -150,7 +150,7 @@ export function P9BenchmarkOverview({ categoryId, activeVersionContent, activeVe
     return (
       <div className="space-y-4">
         {/* Active Version Indicator */}
-        <BrandCard className="border-primary/30 bg-primary/5">
+        <Panel className="border-primary/30 bg-primary/5">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm text-primary">
               <CheckCircle2 className="h-4 w-4" />
@@ -193,7 +193,7 @@ export function P9BenchmarkOverview({ categoryId, activeVersionContent, activeVe
               </div>
             )}
           </CardContent>
-        </BrandCard>
+        </Panel>
       </div>
     );
   }
@@ -201,7 +201,7 @@ export function P9BenchmarkOverview({ categoryId, activeVersionContent, activeVe
   // Fallback: show pipeline data when no active version is set
   if (error || !brief?.ingredients) {
     return (
-      <div className="flex items-center gap-2 text-sm text-chart-2 p-4 bg-chart-2/10 rounded-xl border border-chart-2/20">
+      <div className="flex items-center gap-2 text-sm text-chart-2 p-4 bg-card rounded-xl border border-chart-2/20">
         <AlertCircle className="h-4 w-4 shrink-0" />
         No formula brief yet — run P9 + P10 for this category first
       </div>
@@ -220,7 +220,7 @@ export function P9BenchmarkOverview({ categoryId, activeVersionContent, activeVe
 
       {/* QA Verdict Banner */}
       {qaVerdict && (
-        <BrandCard className="border-chart-4/30 bg-chart-4/5">
+        <Panel className="border-chart-4/30 bg-chart-4/5">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm text-chart-4">
               <Trophy className="h-4 w-4" />
@@ -233,12 +233,12 @@ export function P9BenchmarkOverview({ categoryId, activeVersionContent, activeVe
               <Badge className="mt-2" variant="outline">Score: {qaVerdict.score}/10</Badge>
             )}
           </CardContent>
-        </BrandCard>
+        </Panel>
       )}
 
       {/* Competitor Comparison Table */}
       {comparison && (
-        <BrandCard>
+        <Panel>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm">
               <FlaskConical className="h-4 w-4 text-primary" />
@@ -253,12 +253,12 @@ export function P9BenchmarkOverview({ categoryId, activeVersionContent, activeVe
               <ComparisonTable markdown={comparison} />
             </div>
           </CardContent>
-        </BrandCard>
+        </Panel>
       )}
 
       {/* Adjusted Formula */}
       {adjustedFormula && (
-        <BrandCard className="border-primary/20 bg-primary/5">
+        <Panel className="border-primary/20 bg-primary/5">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm text-primary">
               <CheckCircle2 className="h-4 w-4" />
@@ -293,12 +293,12 @@ export function P9BenchmarkOverview({ categoryId, activeVersionContent, activeVe
               )}
             </div>
           </CardContent>
-        </BrandCard>
+        </Panel>
       )}
 
       {/* Full AI Brief (collapsed) */}
       {finalBrief && !adjustedFormula && (
-        <BrandCard>
+        <Panel>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm">
               <FlaskConical className="h-4 w-4 text-primary" />
@@ -310,7 +310,7 @@ export function P9BenchmarkOverview({ categoryId, activeVersionContent, activeVe
               <ComparisonTable markdown={typeof finalBrief === 'string' ? finalBrief.slice(0, 5000) : ''} />
             </div>
           </CardContent>
-        </BrandCard>
+        </Panel>
       )}
     </div>
   );

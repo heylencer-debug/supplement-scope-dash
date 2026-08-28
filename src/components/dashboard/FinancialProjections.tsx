@@ -1,5 +1,5 @@
 import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BrandCard } from "@/components/ui/brand-card";
+import { Panel } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { DollarSign, TrendingUp, PiggyBank, Target, Calendar } from "lucide-react";
@@ -24,7 +24,7 @@ export function FinancialProjections({ financials, isLoading }: FinancialProject
   // Show loading skeleton
   if (isLoading) {
     return (
-      <BrandCard className="border-chart-4/20">
+      <Panel className="border-chart-4/20">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <DollarSign className="w-5 h-5 text-chart-4" />
@@ -50,7 +50,7 @@ export function FinancialProjections({ financials, isLoading }: FinancialProject
             <Skeleton className="h-20 rounded-lg" />
           </div>
         </CardContent>
-      </BrandCard>
+      </Panel>
     );
   }
 
@@ -87,7 +87,7 @@ export function FinancialProjections({ financials, isLoading }: FinancialProject
   if (!hasData) return null;
 
   return (
-    <BrandCard className="border-chart-4/20 animate-enter [animation-duration:400ms]">
+    <Panel className="border-chart-4/20 animate-enter [animation-duration:400ms]">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <DollarSign className="w-5 h-5 text-chart-4" />
@@ -205,7 +205,7 @@ export function FinancialProjections({ financials, isLoading }: FinancialProject
           {breakeven && (
             <>
               {breakeven.months_to_breakeven !== undefined && (
-                <div className="p-3 sm:p-4 bg-chart-4/10 border border-chart-4/20 rounded-lg text-center">
+                <div className="p-3 sm:p-4 bg-card border border-chart-4/20 rounded-lg text-center">
                   <p className="text-lg sm:text-2xl font-bold text-chart-4">{breakeven.months_to_breakeven}</p>
                   <p className="text-[10px] sm:text-xs text-muted-foreground flex items-center justify-center gap-1">
                     <Calendar className="w-3 h-3" />
@@ -253,6 +253,6 @@ export function FinancialProjections({ financials, isLoading }: FinancialProject
           </div>
         )}
       </CardContent>
-    </BrandCard>
+    </Panel>
   );
 }

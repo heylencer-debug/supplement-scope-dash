@@ -1,7 +1,7 @@
 import { RefreshCw, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CardContent } from "@/components/ui/card";
-import { BrandCard } from "@/components/ui/brand-card";
+import { Panel } from "@/components/ui/panel";
 import Lottie from "lottie-react";
 
 // Inline minimal scanner animation data
@@ -95,7 +95,7 @@ interface ProcessingScreenProps {
 export default function ProcessingScreen({ categoryName, onRefresh, isRefetching }: ProcessingScreenProps) {
   return (
     <div className="flex items-center justify-center min-h-[60vh]">
-      <BrandCard className="max-w-md w-full border-2 border-accent/20">
+      <Panel className="max-w-md w-full border-2 border-accent/20">
         <CardContent className="pt-8 pb-8 text-center space-y-6">
           <div className="w-40 h-40 mx-auto">
             <Lottie
@@ -137,7 +137,7 @@ export default function ProcessingScreen({ categoryName, onRefresh, isRefetching
             Refresh Status
           </Button>
         </CardContent>
-      </BrandCard>
+      </Panel>
     </div>
   );
 }

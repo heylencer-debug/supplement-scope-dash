@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight, ClipboardCopy, FileText, Loader2, Package, T
 import { Button } from "@/components/ui/button";
 import { PearlButton } from "@/components/ui/pearl-button";
 import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BrandCard } from "@/components/ui/brand-card";
+import { Panel } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
@@ -151,24 +151,22 @@ export default function NewAnalysis() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-10">
-      <div className="text-center space-y-3">
-        <h1 className="text-3xl font-bold text-foreground">Market Analysis</h1>
-        <p className="text-muted-foreground">
+    <div className="max-w-4xl mx-auto space-y-4">
+      <div className="space-y-1 pb-3 border-b border-border/60">
+        <h1 className="text-lg font-semibold tracking-tight text-foreground">Market Analysis</h1>
+        <p className="text-[13px] text-muted-foreground">
           View and navigate your analyzed supplement categories
         </p>
       </div>
 
       {/* New Keyword Submission -> Scout cloud queue */}
-      <BrandCard className="border-primary/20 bg-primary/5">
-        <CardContent className="p-6 space-y-4">
-          <div className="flex items-start gap-4">
-            <div className="p-2 rounded-full bg-primary/10 shrink-0">
-              <FileText className="w-5 h-5 text-primary" />
-            </div>
+      <Panel className="border-l-2 border-l-primary">
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-start gap-2.5">
+            <FileText className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
             <div>
-              <p className="font-semibold text-foreground mb-1">New Keyword Research via Scout</p>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-[13px] font-semibold text-foreground mb-0.5">New Keyword Research via Scout</p>
+              <p className="text-[13px] text-muted-foreground">
                 Submit a keyword to queue a full Scout pipeline run (Amazon scrape → Keepa → reviews → OCR →
                 deep research → formula brief → QA → benchmarking → FDA compliance).
               </p>
@@ -245,22 +243,22 @@ export default function NewAnalysis() {
             </div>
           )}
         </CardContent>
-      </BrandCard>
+      </Panel>
 
       {/* Recently Analyzed Categories */}
-      <BrandCard>
+      <Panel>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <FileText className="w-4 h-4 text-primary" />
+          <CardTitle className="flex items-center gap-2 text-[13px] font-semibold">
+            <FileText className="w-3.5 h-3.5 text-muted-foreground" />
             Recently Analyzed Categories
           </CardTitle>
           <CardDescription>
             Click to view the full analysis dashboard
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-4">
           {categoriesLoading && !recentCategories ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {[1, 2, 3].map((i) => (
                 <Skeleton key={i} className="h-48 w-full rounded-xl" />
               ))}
@@ -271,7 +269,7 @@ export default function NewAnalysis() {
             </p>
           ) : (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                 {paginatedCategories.map((cat) => (
                   <div
                     key={cat.id}
@@ -373,7 +371,7 @@ export default function NewAnalysis() {
                     </div>
 
                     {/* Hover overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                    <div className="absolute inset-0 bg-foreground/[0.03] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
                   </div>
                 ))}
               </div>
@@ -422,7 +420,7 @@ export default function NewAnalysis() {
             </>
           )}
         </CardContent>
-      </BrandCard>
+      </Panel>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!categoryToDelete} onOpenChange={(open) => !open && setCategoryToDelete(null)}>

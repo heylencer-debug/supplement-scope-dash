@@ -29,7 +29,7 @@ export function AIAnalysisResults({ analysis, onRefresh, isLoading, versionInfo 
   // Check for "not available" status
   if (analysis?.status === 'not_available') {
     return (
-      <div className="bg-gradient-to-br from-primary/5 via-chart-5/5 to-chart-4/5 rounded-xl border border-primary/20 p-6 text-center">
+      <div className="rounded-xl border border-border/60 bg-card p-6 text-center">
         <Info className="h-8 w-8 mx-auto mb-3 text-muted-foreground" />
         <h3 className="font-semibold text-foreground mb-1">Analysis Not Available</h3>
         <p className="text-sm text-muted-foreground max-w-md mx-auto">{(analysis as any).reason || 'No matching products found for this analysis type.'}</p>
@@ -44,7 +44,7 @@ export function AIAnalysisResults({ analysis, onRefresh, isLoading, versionInfo 
   // Guard against incomplete/error analysis data
   if (!analysis?.summary || !analysis?.charts || !analysis?.ingredients) {
     return (
-      <div className="bg-gradient-to-br from-primary/5 via-chart-5/5 to-chart-4/5 rounded-xl border border-primary/20 p-6 text-center">
+      <div className="rounded-xl border border-border/60 bg-card p-6 text-center">
         <Brain className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-50" />
         <p className="text-sm text-muted-foreground">Analysis data is incomplete or still processing</p>
         <Button variant="ghost" size="sm" onClick={onRefresh} disabled={isLoading} className="mt-3">
@@ -130,7 +130,7 @@ export function AIAnalysisResults({ analysis, onRefresh, isLoading, versionInfo 
   ] : [];
 
   return (
-    <div className="bg-gradient-to-br from-primary/5 via-chart-5/5 to-chart-4/5 rounded-xl border border-primary/20 p-4 space-y-4">
+    <div className="rounded-xl border border-border/60 bg-card p-4 space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -218,15 +218,15 @@ export function AIAnalysisResults({ analysis, onRefresh, isLoading, versionInfo 
               <div className="text-xl font-bold text-muted-foreground">{analysis.ingredient_comparison_table.summary.total_competitor_avg || 0}</div>
               <div className="text-[9px] text-muted-foreground">Comp. Avg</div>
             </div>
-            <div className="bg-chart-4/10 rounded-lg p-3 border border-chart-4/30 text-center">
+            <div className="bg-card rounded-lg p-3 border border-chart-4/30 text-center">
               <div className="text-xl font-bold text-chart-4">{analysis.ingredient_comparison_table.summary.overlap_count || 0}</div>
               <div className="text-[9px] text-chart-4">In All</div>
             </div>
-            <div className="bg-primary/10 rounded-lg p-3 border border-primary/30 text-center">
+            <div className="bg-card rounded-lg p-3 border border-primary/30 text-center">
               <div className="text-xl font-bold text-primary">{analysis.ingredient_comparison_table.summary.unique_to_us_count || 0}</div>
               <div className="text-[9px] text-primary">Unique to Us</div>
             </div>
-            <div className="bg-chart-5/10 rounded-lg p-3 border border-chart-5/30 text-center">
+            <div className="bg-card rounded-lg p-3 border border-chart-5/30 text-center">
               <div className="text-xl font-bold text-chart-5">{analysis.ingredient_comparison_table.summary.alternatives_detected_count || 0}</div>
               <div className="text-[9px] text-chart-5">🔄 Alternatives</div>
             </div>
@@ -400,7 +400,7 @@ export function AIAnalysisResults({ analysis, onRefresh, isLoading, versionInfo 
             <>
               {/* Metadata Header - What was sent to AI */}
               {analysis.data_sent_to_ai && (
-                <div className="bg-primary/5 rounded-lg p-3 border border-primary/20">
+                <div className="bg-card rounded-lg p-3 border border-primary/20">
                   <p className="text-xs font-medium text-primary mb-2 flex items-center gap-1">
                     <Info className="w-3 h-3" />
                     Data Sent to AI
@@ -485,7 +485,7 @@ export function AIAnalysisResults({ analysis, onRefresh, isLoading, versionInfo 
                             {comp.supplement_facts_complete.active_ingredients && 
                              Array.isArray(comp.supplement_facts_complete.active_ingredients) && 
                              comp.supplement_facts_complete.active_ingredients.length > 0 && (
-                              <div className="bg-chart-4/5 rounded-lg p-2 border border-chart-4/20">
+                              <div className="bg-card rounded-lg p-2 border border-chart-4/20">
                                 <p className="text-[10px] font-medium text-chart-4 mb-1">Active Ingredients</p>
                                 <div className="flex flex-wrap gap-1">
                                   {comp.supplement_facts_complete.active_ingredients.slice(0, 10).map((ing: any, i: number) => (
@@ -505,7 +505,7 @@ export function AIAnalysisResults({ analysis, onRefresh, isLoading, versionInfo 
                             
                             {/* Proprietary Blends */}
                             {comp.supplement_facts_complete.proprietary_blends && (
-                              <div className="bg-chart-2/5 rounded-lg p-2 border border-chart-2/20">
+                              <div className="bg-card rounded-lg p-2 border border-chart-2/20">
                                 <p className="text-[10px] font-medium text-chart-2 mb-1">Proprietary Blends</p>
                                 <p className="text-[9px] text-foreground">
                                   {typeof comp.supplement_facts_complete.proprietary_blends === 'string' 
@@ -519,7 +519,7 @@ export function AIAnalysisResults({ analysis, onRefresh, isLoading, versionInfo 
                             {comp.supplement_facts_complete.claims_on_label && 
                              Array.isArray(comp.supplement_facts_complete.claims_on_label) &&
                              comp.supplement_facts_complete.claims_on_label.length > 0 && (
-                              <div className="bg-primary/5 rounded-lg p-2 border border-primary/20">
+                              <div className="bg-card rounded-lg p-2 border border-primary/20">
                                 <p className="text-[10px] font-medium text-primary mb-1">Label Claims</p>
                                 <div className="flex flex-wrap gap-1">
                                   {comp.supplement_facts_complete.claims_on_label.map((claim: string, i: number) => (
@@ -597,7 +597,7 @@ export function AIAnalysisResults({ analysis, onRefresh, isLoading, versionInfo 
                               <AlertCircle className="w-3 h-3 text-chart-2" />
                               Important Information (Raw)
                             </p>
-                            <pre className="text-[9px] text-muted-foreground bg-chart-2/5 rounded p-2 border border-chart-2/10 overflow-x-auto max-h-[100px] overflow-y-auto whitespace-pre-wrap">
+                            <pre className="text-[9px] text-muted-foreground bg-card rounded p-2 border border-chart-2/10 overflow-x-auto max-h-[100px] overflow-y-auto whitespace-pre-wrap">
                               {typeof comp.important_information === 'string' 
                                 ? comp.important_information 
                                 : JSON.stringify(comp.important_information, null, 2)}
@@ -612,7 +612,7 @@ export function AIAnalysisResults({ analysis, onRefresh, isLoading, versionInfo 
                               <FlaskConical className="w-3 h-3 text-chart-4" />
                               Nutrients (Raw)
                             </p>
-                            <pre className="text-[9px] text-muted-foreground bg-chart-4/5 rounded p-2 border border-chart-4/10 overflow-x-auto max-h-[100px] overflow-y-auto whitespace-pre-wrap">
+                            <pre className="text-[9px] text-muted-foreground bg-card rounded p-2 border border-chart-4/10 overflow-x-auto max-h-[100px] overflow-y-auto whitespace-pre-wrap">
                               {typeof comp.nutrients === 'string' 
                                 ? comp.nutrients 
                                 : JSON.stringify(comp.nutrients, null, 2)}
@@ -642,7 +642,7 @@ export function AIAnalysisResults({ analysis, onRefresh, isLoading, versionInfo 
                               <AlertTriangle className="w-3 h-3 text-chart-2" />
                               Pain Points (Raw)
                             </p>
-                            <pre className="text-[9px] text-muted-foreground bg-chart-2/5 rounded p-2 border border-chart-2/10 overflow-x-auto max-h-[100px] overflow-y-auto whitespace-pre-wrap">
+                            <pre className="text-[9px] text-muted-foreground bg-card rounded p-2 border border-chart-2/10 overflow-x-auto max-h-[100px] overflow-y-auto whitespace-pre-wrap">
                               {JSON.stringify(comp.pain_points, null, 2)}
                             </pre>
                           </div>
@@ -683,7 +683,7 @@ export function AIAnalysisResults({ analysis, onRefresh, isLoading, versionInfo 
           {/* SWOT Summary */}
           {analysis.swot && analysis.swot.strengths && analysis.swot.weaknesses && analysis.swot.opportunities && analysis.swot.threats && (
             <div className="grid grid-cols-2 gap-3">
-              <div className="bg-chart-4/5 rounded-lg p-3 border border-chart-4/20">
+              <div className="bg-card rounded-lg p-3 border border-chart-4/20">
                 <p className="text-xs font-medium text-chart-4 mb-2 flex items-center gap-1">
                   <CheckCircle className="w-3 h-3" /> Strengths ({analysis.swot.strengths.length})
                 </p>
@@ -709,7 +709,7 @@ export function AIAnalysisResults({ analysis, onRefresh, isLoading, versionInfo 
                   ))}
                 </ul>
               </div>
-              <div className="bg-chart-3/5 rounded-lg p-3 border border-chart-3/20">
+              <div className="bg-card rounded-lg p-3 border border-chart-3/20">
                 <p className="text-xs font-medium text-chart-3 mb-2 flex items-center gap-1">
                   <Lightbulb className="w-3 h-3" /> Opportunities ({analysis.swot.opportunities.length})
                 </p>
@@ -722,7 +722,7 @@ export function AIAnalysisResults({ analysis, onRefresh, isLoading, versionInfo 
                   ))}
                 </ul>
               </div>
-              <div className="bg-chart-2/5 rounded-lg p-3 border border-chart-2/20">
+              <div className="bg-card rounded-lg p-3 border border-chart-2/20">
                 <p className="text-xs font-medium text-chart-2 mb-2 flex items-center gap-1">
                   <AlertCircle className="w-3 h-3" /> Threats ({analysis.swot.threats.length})
                 </p>

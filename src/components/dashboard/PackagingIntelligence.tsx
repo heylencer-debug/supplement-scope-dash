@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 import { useMemo, useState, useEffect } from "react";
 import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BrandCard } from "@/components/ui/brand-card";
+import { Panel } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -104,7 +104,7 @@ function AnalysisProgressIndicator({
   };
 
   return (
-    <div className="p-5 bg-primary/5 rounded-xl border border-primary/20">
+    <div className="p-5 bg-card rounded-xl border border-primary/20">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Sparkles className="w-5 h-5 text-primary" />
@@ -386,7 +386,7 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
 
   if (isLoading) {
     return (
-      <BrandCard>
+      <Panel>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
             <Package className="w-5 h-5 text-primary" />
@@ -397,7 +397,7 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
           <Skeleton className="h-20 w-full" />
           <Skeleton className="h-32 w-full" />
         </CardContent>
-      </BrandCard>
+      </Panel>
     );
   }
 
@@ -406,7 +406,7 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
   // even if no analysis data exists yet
 
   return (
-    <BrandCard>
+    <Panel>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
           <Package className="w-5 h-5 text-primary" />
@@ -535,7 +535,7 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
 
         {/* Restored Progress Banner */}
         {hasRestoredProgress && latestUpdatedAt && (
-          <div className="flex items-center gap-3 p-3 bg-chart-4/5 rounded-lg border border-chart-4/20 animate-enter">
+          <div className="flex items-center gap-3 p-3 bg-card rounded-lg border border-chart-4/20 animate-enter">
             <History className="w-4 h-4 text-chart-4" />
             <div className="flex-1">
               <span className="text-sm font-medium text-chart-4">Progress restored from previous session</span>
@@ -1021,6 +1021,6 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
         )}
 
       </CardContent>
-    </BrandCard>
+    </Panel>
   );
 }

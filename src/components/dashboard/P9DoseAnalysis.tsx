@@ -6,7 +6,7 @@
 
 import { Pill, CheckCircle2, XCircle, AlertCircle, Loader2, FlaskConical } from "lucide-react";
 import { CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { BrandCard } from "@/components/ui/brand-card";
+import { Panel } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
 import { useFormulaBrief } from "@/hooks/useFormulaBrief";
 
@@ -28,7 +28,7 @@ export function P9DoseAnalysis({ categoryId }: P9DoseAnalysisProps) {
 
   if (error || !brief?.ingredients) {
     return (
-      <div className="flex items-center gap-2 text-sm text-chart-2 p-4 bg-chart-2/10 rounded-xl border border-chart-2/20">
+      <div className="flex items-center gap-2 text-sm text-chart-2 p-4 bg-card rounded-xl border border-chart-2/20">
         <AlertCircle className="h-4 w-4 shrink-0" />
         No formula brief yet — run P9 + P10 for this category first
       </div>
@@ -49,7 +49,7 @@ export function P9DoseAnalysis({ categoryId }: P9DoseAnalysisProps) {
 
       {/* Formula Validation Status */}
       {validation && (
-        <BrandCard className={`border-${validation.valid && !hasErrors ? "chart-4" : "destructive"}/30 bg-${validation.valid && !hasErrors ? "chart-4" : "destructive"}/5`}>
+        <Panel className={`border-${validation.valid && !hasErrors ? "chart-4" : "destructive"}/30 bg-${validation.valid && !hasErrors ? "chart-4" : "destructive"}/5`}>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm">
               {validation.valid && !hasErrors
@@ -93,7 +93,7 @@ export function P9DoseAnalysis({ categoryId }: P9DoseAnalysisProps) {
               <div className="space-y-1">
                 <p className="text-xs font-semibold text-chart-2 uppercase tracking-wide">⚠️ Warnings</p>
                 {validation.warnings.map((w, i) => (
-                  <p key={i} className="text-xs text-chart-2 bg-chart-2/10 p-2 rounded">{w}</p>
+                  <p key={i} className="text-xs text-chart-2 bg-card p-2 rounded">{w}</p>
                 ))}
               </div>
             )}
@@ -102,12 +102,12 @@ export function P9DoseAnalysis({ categoryId }: P9DoseAnalysisProps) {
               <p className="text-xs text-chart-4 font-medium">✅ Formula validated — no critical errors</p>
             )}
           </CardContent>
-        </BrandCard>
+        </Panel>
       )}
 
       {/* Adjusted Formula Table */}
       {adjustedFormula && (
-        <BrandCard>
+        <Panel>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm">
               <FlaskConical className="h-4 w-4 text-primary" />
@@ -124,12 +124,12 @@ export function P9DoseAnalysis({ categoryId }: P9DoseAnalysisProps) {
               </pre>
             </div>
           </CardContent>
-        </BrandCard>
+        </Panel>
       )}
 
       {/* Flavor QA */}
       {flavorQa && (
-        <BrandCard>
+        <Panel>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm">
               <Pill className="h-4 w-4 text-chart-2" />
@@ -142,12 +142,12 @@ export function P9DoseAnalysis({ categoryId }: P9DoseAnalysisProps) {
               {flavorQa}
             </pre>
           </CardContent>
-        </BrandCard>
+        </Panel>
       )}
 
       {/* Positioning */}
       {brief.positioning && (
-        <BrandCard className="border-primary/20 bg-primary/5">
+        <Panel className="border-primary/20 bg-primary/5">
           <CardContent className="pt-4">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Recommended Positioning</p>
             <p className="text-sm text-foreground">{brief.positioning}</p>
@@ -158,7 +158,7 @@ export function P9DoseAnalysis({ categoryId }: P9DoseAnalysisProps) {
               <p className="text-xs text-muted-foreground mt-1">Flavors: {brief.flavor_profile}</p>
             )}
           </CardContent>
-        </BrandCard>
+        </Panel>
       )}
     </div>
   );

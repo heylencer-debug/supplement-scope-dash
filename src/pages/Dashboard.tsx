@@ -24,6 +24,7 @@ import { OcrCoveragePanel } from "@/components/dashboard/OcrCoveragePanel";
 import { P9BenchmarkOverview } from "@/components/dashboard/P9BenchmarkOverview";
 import { MarketIntelligenceReport } from "@/components/dashboard/MarketIntelligenceReport";
 import { ManufacturerFeedback } from "@/components/document/ManufacturerFeedback";
+import { DataCompletenessChecklist } from "@/components/dashboard/DataCompletenessChecklist";
 
 import {
   ResponsiveContainer,
@@ -483,6 +484,7 @@ export default function Dashboard() {
           <TabsTrigger value="qa">🔬 QA Review</TabsTrigger>
           <TabsTrigger value="validation">⚖️ Compliance</TabsTrigger>
           <TabsTrigger value="manufacturer">🏭 Manufacturer</TabsTrigger>
+          <TabsTrigger value="data-audit">🔍 Data Audit</TabsTrigger>
         </TabsList>
 
         <TabsContent value="products" className="space-y-6 md:space-y-10 mt-4">
@@ -900,6 +902,15 @@ export default function Dashboard() {
             />
           ) : (
             <div className="text-center py-12 text-muted-foreground">Select a category to view manufacturer feedback.</div>
+          )}
+        </TabsContent>
+
+        {/* TAB 8: Data Completeness Audit — real per-phase data checks, not job status */}
+        <TabsContent value="data-audit" className="space-y-6 mt-4">
+          {categoryName ? (
+            <DataCompletenessChecklist keyword={categoryName} />
+          ) : (
+            <div className="text-center py-12 text-muted-foreground">Select a category to run the data audit.</div>
           )}
         </TabsContent>
       </Tabs>

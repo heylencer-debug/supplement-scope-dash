@@ -6,8 +6,8 @@
  *
  * Anti-hallucination architecture:
  *   1. All competitor data from DB (P4 OCR — real scraped formulas, not AI memory)
- *   2. Claude Sonnet 4.6 drafts the benchmarking analysis grounded in provided data
- *   3. Claude Opus 4.6 validates/critiques — finds unsupported claims, wrong doses
+ *   2. Claude (via OpenRouter) drafts the benchmarking analysis grounded in provided data
+ *   3. Claude (via OpenRouter) validates/critiques — finds unsupported claims, wrong doses
  *   4. Every comparison backed by actual OCR text from DB; unverifiable = flagged
  *   5. Structured output with mandatory evidence fields
  *
@@ -41,7 +41,14 @@ const FORCE = process.argv.includes('--force');
 function getOpenRouterKey()   { return process.env.OPENROUTER_API_KEY || null; }
 
 // Analysis model — configurable without a rebuild. Default: Claude Sonnet 5 via OpenRouter.
-// Opus (validation tier) is intentionally left untouched — not part of this migration.
+// 2026-08-28: Opus validation tier (callClaudeOpus) now ALSO points at ANALYSIS_MODEL
+// (Sonnet 5), per explicit instruction. NOTE: draft (Call 1) and validation (Call 2)
+// are now the SAME model — the validation step no longer provides independent-model
+// cross-checking the way a different model (Opus) validating a Sonnet draft did.
+// It still re-reads the competitor OCR data fresh and can catch the draft's own
+// hallucinations/arithmetic errors, but same-model validation is weaker than a
+// genuinely different model's second opinion. Flagged per explicit instruction to
+// proceed with the swap anyway.
 const ANALYSIS_MODEL = process.env.ANALYSIS_MODEL || 'anthropic/claude-sonnet-5';
 
 async function callClaudeSonnet(prompt, maxTokens = 12000) {
@@ -117,7 +124,7 @@ async function callClaudeOpus(prompt, maxTokens = 12000) {
         'X-Title': 'DOVIVE Scout P11 Benchmarking',
       },
       body: JSON.stringify({
-        model: 'anthropic/claude-opus-4.6',
+        model: ANALYSIS_MODEL,
         max_tokens: maxTokens,
         stream: true,
         messages: [{ role: 'user', content: prompt }],
@@ -172,10 +179,10 @@ Rating: ${c.rating_value}⭐ (${(c.rating_count||0).toLocaleString()} reviews)
 Serving: ${c.serving_size || 'N/A'} | Servings/container: ${c.servings_per_container || 'N/A'}
 
 Supplement Facts (OCR extracted):
-${sf.slice(0, 800) || 'Not available'}
+${sf.slice(0, 2500) || 'Not available'}
 
 Structured nutrients:
-${nutrients ? nutrients.slice(0, 600) : 'Not available'}
+${nutrients ? nutrients.slice(0, 2000) : 'Not available'}
 `;
   }).join('\n---\n');
 
@@ -202,7 +209,7 @@ Produce this exact structure:
 
 # P11 COMPETITIVE FORMULA BENCHMARKING — ${keyword.toUpperCase()}
 *Data source: P4 OCR extraction + P10 adjusted formula*
-*Benchmarking model: Claude (${ANALYSIS_MODEL}) (draft) — to be validated by Claude Opus 4.6*
+*Benchmarking model: Claude (${ANALYSIS_MODEL}) (draft) — to be validated by Claude (${ANALYSIS_MODEL})*
 
 ## EXECUTIVE SUMMARY
 | Metric | Value |
@@ -263,7 +270,7 @@ List every instance where you wrote NEEDS_VERIFICATION and why:
 - [ingredient/claim]: [what's unverifiable and why]
 
 ---
-Be surgical and data-driven. If you can't verify a claim from the data provided, flag it. This report will be reviewed by Claude Opus 4.6 which will check every number against the source data.`;
+Be surgical and data-driven. If you can't verify a claim from the data provided, flag it. This report will be reviewed by Claude (via OpenRouter) which will check every number against the source data.`;
 }
 
 // ─── Build Claude Opus Validation Prompt ──────────────────────────────────────
@@ -271,7 +278,7 @@ Be surgical and data-driven. If you can't verify a claim from the data provided,
 function buildOpusValidationPrompt(adjustedFormula, competitors, grokDraft, keyword) {
   // Build a compact competitor reference for verification
   const compRef = competitors.slice(0, 50).map(c => {
-    const sf = (c.supplement_facts_raw || '').slice(0, 400);
+    const sf = (c.supplement_facts_raw || '').slice(0, 1200);
     return `[${c.asin}] ${c.brand}: ${sf || 'No OCR data'}`;
   }).join('\n');
 
@@ -291,8 +298,8 @@ ${adjustedFormula || 'Not available'}
 ${compRef}
 
 ## GROK BENCHMARKING DRAFT (to validate)
-${grokDraft?.slice(0, 8000) || 'No draft available'}
-${grokDraft && grokDraft.length > 8000 ? '\n[Draft continues — key sections shown]\n' : ''}
+${grokDraft?.slice(0, 40000) || 'No draft available'}
+${grokDraft && grokDraft.length > 40000 ? '\n[Draft continues — key sections shown]\n' : ''}
 
 ---
 
@@ -300,8 +307,8 @@ ${grokDraft && grokDraft.length > 8000 ? '\n[Draft continues — key sections sh
 
 Produce a validation report in this exact format:
 
-# P11 VALIDATION REPORT — Claude Opus 4.6
-*Reviewing Claude Sonnet 4.6 benchmarking draft for ${keyword}*
+# P11 VALIDATION REPORT — Claude (via OpenRouter)
+*Reviewing Claude (via OpenRouter) benchmarking draft for ${keyword}*
 
 ## VALIDATION SUMMARY
 | | Count |
@@ -441,7 +448,7 @@ async function run() {
   // as the P9 Call2 truncation fix (6000→16000 tokens, commit 59cf9a3). Fix: raise the
   // budget to 16000 (matching P9's proven ceiling) and retry once on empty output
   // before giving up — never let the raw draft silently end up null.
-  console.log(`\nCall 1: Claude Sonnet 4.6 drafting ingredient comparison (${withFormula.length} competitors with OCR data)...`);
+  console.log(`\nCall 1: Claude (via OpenRouter) drafting ingredient comparison (${withFormula.length} competitors with OCR data)...`);
   const sonnetPrompt = buildSonnetDraftPrompt(adjustedFormula, withFormula, KEYWORD);
   console.log(`  Prompt: ${Math.round(sonnetPrompt.length / 1000)}k chars`);
   let sonnetDraft = await callClaudeSonnet(sonnetPrompt, 16000);
@@ -455,7 +462,7 @@ async function run() {
   }
 
   // ── Call 2: Claude Opus validates ─────────────────────────────────────────
-  console.log(`\nCall 2: Claude Opus 4.6 validating Sonnet's analysis...`);
+  console.log(`\nCall 2: Claude (via OpenRouter) validating Sonnet's analysis...`);
   const opusPrompt = buildOpusValidationPrompt(adjustedFormula, withFormula, sonnetDraft, KEYWORD);
   console.log(`  Prompt: ${Math.round(opusPrompt.length / 1000)}k chars`);
   let opusValidation = await callClaudeOpus(opusPrompt, 12000);
@@ -484,7 +491,7 @@ async function run() {
     competitors_with_formula: withFormula.length,
     competitors_without_formula: withoutFormula.length,
     generated_at: new Date().toISOString(),
-    models_used: { draft: ANALYSIS_MODEL, validation: 'anthropic/claude-opus-4.6' },
+    models_used: { draft: ANALYSIS_MODEL, validation: ANALYSIS_MODEL },
   };
 
   const updatedIngredients = {
@@ -514,7 +521,7 @@ async function run() {
       `Generated: ${new Date().toISOString()}`,
       `Formula score: ${formulaScore}/10 | Validation: ${validationResult}`,
       `Competitors with formula data: ${withFormula.length} | Without: ${withoutFormula.length}`,
-      `Models: Claude Sonnet 4.6 (draft) + Claude Opus 4.6 (validation)`,
+      `Models: ${ANALYSIS_MODEL} (draft) + ${ANALYSIS_MODEL} (validation)`,
       ``,
       `---`,
       ``,

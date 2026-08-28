@@ -32,6 +32,7 @@ const KEYWORD         = process.argv[2] || 'ashwagandha gummies';
 const TEST_MODE       = process.argv.includes('--test');
 const OPENROUTER_KEY  = process.env.OPENROUTER_API_KEY;
 const supabase        = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const ANALYSIS_MODEL  = process.env.ANALYSIS_MODEL || 'anthropic/claude-sonnet-5';
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
@@ -76,36 +77,53 @@ Extract ALL text visible in this image and return a JSON object with these field
 If no supplement facts panel is visible, still extract any product claims, ingredients, or certifications visible.
 Return ONLY valid JSON, no markdown.`;
 
-  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${OPENROUTER_KEY}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://dovive.com',
-      'X-Title': 'DOVIVE Scout P4 OCR'
-    },
-    body: JSON.stringify({
-      model: 'anthropic/claude-haiku-4.5',
-      max_tokens: 1000,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'text', text: prompt },
-          { type: 'image_url', image_url: { url: imageUrl, detail: 'high' } }
-        ]
-      }]
-    })
-  });
+  const doCall = async (maxTokens) => {
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENROUTER_KEY}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://dovive.com',
+        'X-Title': 'DOVIVE Scout P4 OCR'
+      },
+      body: JSON.stringify({
+        model: ANALYSIS_MODEL,
+        max_tokens: maxTokens,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            { type: 'image_url', image_url: { url: imageUrl, detail: 'high' } }
+          ]
+        }]
+      })
+    });
 
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`OpenRouter error ${res.status}: ${err.slice(0, 200)}`);
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`OpenRouter error ${res.status}: ${err.slice(0, 200)}`);
+    }
+
+    const data = await res.json();
+    if (data.error) throw new Error(`Claude OCR error: ${data.error.message || JSON.stringify(data.error)}`);
+    const choice = data.choices?.[0];
+    const content = choice?.message?.content || '';
+    const finishReason = choice?.finish_reason || 'unknown';
+    return { content, finishReason, usage: data.usage };
+  };
+
+  let { content, finishReason, usage } = await doCall(2000);
+  console.log(`\n  finish_reason: ${finishReason}`);
+  if (finishReason === 'length' || !content) {
+    console.log(`  ⚠️  Truncated/empty — retrying once at 4000 tokens...`);
+    const retry = await doCall(4000);
+    console.log(`  finish_reason (retry): ${retry.finishReason}`);
+    content = retry.content;
+    usage = retry.usage;
+    if (!content) {
+      throw new Error('[ERROR: truncated/empty] — retry still produced no content');
+    }
   }
-
-  const data = await res.json();
-  if (data.error) throw new Error(`Claude Haiku OCR error: ${data.error.message || JSON.stringify(data.error)}`);
-  const content = data.choices?.[0]?.message?.content || '';
-  const usage = data.usage;
 
   try {
     return { result: JSON.parse(content), usage };
@@ -215,7 +233,7 @@ async function main() {
           health_claims:         result.health_claims?.length ? result.health_claims : null,
           certifications:        result.certifications?.length ? result.certifications : null,
           raw_text:              result.raw_text || null,
-          gpt_model:             'anthropic/claude-haiku-4.5',
+          gpt_model:             ANALYSIS_MODEL,
           processed_at:          new Date().toISOString()
         });
 

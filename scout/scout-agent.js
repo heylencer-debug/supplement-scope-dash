@@ -1563,7 +1563,8 @@ Write a market research summary covering:
 
 Be specific. Use the actual data. Plain English — no jargon.`;
 
-  try {
+  const SCOUT_AGENT_MODEL = process.env.ANALYSIS_MODEL || 'anthropic/claude-sonnet-5';
+  const doCall = async (maxTokens) => {
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -1572,26 +1573,38 @@ Be specific. Use the actual data. Plain English — no jargon.`;
         'HTTP-Referer': 'https://heylencer-debug.github.io/Dovive'
       },
       body: JSON.stringify({
-        model: 'anthropic/claude-3.5-sonnet',
+        model: SCOUT_AGENT_MODEL,
         messages: [{ role: 'user', content: prompt }],
-        max_tokens: 1500
+        max_tokens: maxTokens
       })
     });
-
     if (!res.ok) {
       const text = await res.text();
-      log(`OpenRouter error: ${text}`, 'error');
-      return { summary: 'AI summary generation failed', recommendation: 'MONITOR' };
+      throw new Error(`OpenRouter error: ${text}`);
+    }
+    const data = await res.json();
+    const choice = data.choices?.[0];
+    return { content: choice?.message?.content || '', finishReason: choice?.finish_reason || 'unknown' };
+  };
+
+  try {
+    let { content, finishReason } = await doCall(2000);
+    log(`AI summary finish_reason: ${finishReason}`, 'info');
+    if (!content || finishReason === 'length') {
+      log('AI summary truncated/empty — retrying once at 3000 tokens...', 'warn');
+      const retry = await doCall(3000);
+      if (retry.content) content = retry.content;
+    }
+    if (!content) {
+      log('AI summary still empty after retry — persisting explicit error marker.', 'error');
+      return { summary: '[ERROR: truncated/empty]', recommendation: 'MONITOR' };
     }
 
-    const data = await res.json();
-    const summary = data.choices?.[0]?.message?.content || 'No summary generated';
-
     // Extract recommendation
-    const recMatch = summary.match(/ENTRY RECOMMENDATION[:\s]*(ENTER|MONITOR|AVOID)/i);
+    const recMatch = content.match(/ENTRY RECOMMENDATION[:\s]*(ENTER|MONITOR|AVOID)/i);
     const recommendation = recMatch ? recMatch[1].toUpperCase() : 'MONITOR';
 
-    return { summary, recommendation };
+    return { summary: content, recommendation };
   } catch (err) {
     log(`AI summary error: ${err.message}`, 'error');
     return { summary: 'AI summary generation failed: ' + err.message, recommendation: 'MONITOR' };

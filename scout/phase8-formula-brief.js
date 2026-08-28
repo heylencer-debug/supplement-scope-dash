@@ -41,32 +41,56 @@ function getOpenRouterKey() {
 const ANALYSIS_MODEL = process.env.ANALYSIS_MODEL || 'anthropic/claude-sonnet-5';
 
 // ─── DUAL AI Formulation ───────────────────────────────────────────────────────
-// P9 generates TWO independent formula briefs in parallel:
-//   1. Grok 4.2 Beta Reasoning  - deep scientific reasoning, like a PhD formulator
-//   2. Claude Sonnet 4.6          - via OpenRouter, 1M context synthesis
+// P9 generates TWO independent formula briefs in parallel (Draft A + Draft B).
 // P10 QA then compares both and produces a final adjudicated formula.
 
-async function callGrok42(prompt) {
-  const key = getXaiKey();
-  if (!key) throw new Error('XAI_API_KEY not found in sterling/.env');
+// 2026-08-28: switched from xAI Grok 4.2 (api.x.ai) to Claude via OpenRouter
+// (ANALYSIS_MODEL, default Sonnet 5), per explicit instruction. NOTE: this is
+// the SAME model as callClaudeSonnet below — P8's "dual-AI" design (Grok +
+// Claude drafting independently, P9 adjudicating) now has BOTH drafts from
+// the same model. This is a real regression of the documented "Dual-AI
+// formulation" never-regress principle (two independent model perspectives
+// for P9 to adjudicate between). Flagged prominently in the final report;
+// proceeding anyway because Goal 1 explicitly requires zero remaining
+// non-Sonnet-5 model strings in active code, including api.x.ai/grok-.
+async function callGrok42(prompt, maxTokens = 16000) {
+  const key = getOpenRouterKey();
+  if (!key) throw new Error('OPENROUTER_API_KEY not found');
   const start = Date.now();
-  const res = await fetch('https://api.x.ai/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'grok-4.20-beta-0309-reasoning',
-      max_tokens: 16000,
-      messages: [{ role: 'user', content: prompt }],
-    }),
-  });
-  const j = await res.json();
-  if (j.error) throw new Error(`Grok 4.2 error: ${j.error.message}`);
-  const output = j.choices?.[0]?.message?.content || null;
-  console.log(`  ✅ Grok 4.2 done (${Math.round((Date.now()-start)/1000)}s, ${Math.round((output?.length||0)/1000)}k chars)`);
-  return output;
+  const doCall = async (mt) => {
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${key}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://dovive.com',
+        'X-Title': 'DOVIVE Scout P8 Formula (Draft A)',
+      },
+      body: JSON.stringify({
+        model: ANALYSIS_MODEL,
+        max_tokens: mt,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+    const j = await res.json();
+    if (j.error) throw new Error(`Claude (Draft A) error: ${j.error.message}`);
+    const choice = j.choices?.[0];
+    return { content: choice?.message?.content || null, finishReason: choice?.finish_reason || 'unknown' };
+  };
+  let { content, finishReason } = await doCall(maxTokens);
+  console.log(`  finish_reason: ${finishReason}`);
+  if (!content || finishReason === 'length') {
+    console.log(`  ⚠️  Truncated/empty — retrying once at ${Math.round(maxTokens * 1.25)} tokens...`);
+    const retry = await doCall(Math.round(maxTokens * 1.25));
+    console.log(`  finish_reason (retry): ${retry.finishReason}`);
+    content = retry.content || content;
+  }
+  if (!content) content = '[ERROR: truncated/empty]';
+  console.log(`  ✅ Claude (Draft A) done (${Math.round((Date.now()-start)/1000)}s, ${Math.round((content?.length||0)/1000)}k chars)`);
+  return content;
 }
 
-async function callClaudeSonnet(prompt) {
+async function callClaudeSonnetOnce(prompt, maxTokens) {
   const key = getOpenRouterKey();
   if (!key) throw new Error('OPENROUTER_API_KEY not found in sterling/.env');
   const start = Date.now();
@@ -80,20 +104,21 @@ async function callClaudeSonnet(prompt) {
         'Authorization': `Bearer ${key}`,
         'Content-Type': 'application/json',
         'HTTP-Referer': 'https://dovive.com',
-        'X-Title': 'DOVIVE Scout P8 Formula',
+        'X-Title': 'DOVIVE Scout P8 Formula (Draft B)',
       },
       body: JSON.stringify({
         model: ANALYSIS_MODEL,
-        max_tokens: 16000,
+        max_tokens: maxTokens,
         stream: true,
         messages: [{ role: 'user', content: prompt }],
       }),
     });
     if (!res.ok) {
       const errText = await res.text();
-      throw new Error(`Claude Sonnet 4.6 error ${res.status}: ${errText.slice(0, 200)}`);
+      throw new Error(`Claude (Draft B) error ${res.status}: ${errText.slice(0, 200)}`);
     }
     let output = '';
+    let finishReason = null;
     const text = await res.text();
     for (const line of text.split('\n')) {
       if (!line.startsWith('data: ')) continue;
@@ -101,19 +126,34 @@ async function callClaudeSonnet(prompt) {
       if (data === '[DONE]') break;
       try {
         const j = JSON.parse(data);
-        if (j.error) throw new Error(`Claude Sonnet 4.6 error: ${j.error.message || JSON.stringify(j.error)}`);
+        if (j.error) throw new Error(`Claude (Draft B) error: ${j.error.message || JSON.stringify(j.error)}`);
         const delta = j.choices?.[0]?.delta?.content;
         if (delta) output += delta;
+        if (j.choices?.[0]?.finish_reason) finishReason = j.choices[0].finish_reason;
       } catch (e) {
-        if (e.message.startsWith('Claude Sonnet 4.6 error')) throw e;
+        if (e.message.startsWith('Claude (Draft B) error')) throw e;
       }
     }
-    if (!output) throw new Error('Claude Sonnet 4.6 returned empty response');
-    console.log(`  ✅ Claude Sonnet 4.6 done (${Math.round((Date.now()-start)/1000)}s, ${Math.round(output.length/1000)}k chars)`);
-    return output;
+    console.log(`  finish_reason: ${finishReason || 'unknown'}`);
+    console.log(`  ✅ Claude (Draft B) call done (${Math.round((Date.now()-start)/1000)}s, ${Math.round(output.length/1000)}k chars)`);
+    return { output, finishReason };
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function callClaudeSonnet(prompt) {
+  let { output, finishReason } = await callClaudeSonnetOnce(prompt, 16000);
+  if (!output || finishReason === 'length') {
+    console.warn(`  ⚠ Claude (Draft B) truncated/empty (finish_reason=${finishReason}) — retrying once at 20000 tokens...`);
+    const retry = await callClaudeSonnetOnce(prompt, 20000);
+    output = retry.output || output;
+  }
+  if (!output) {
+    console.error(`  ❌ Claude (Draft B) still empty after retry — persisting explicit error marker instead of throwing/nulling.`);
+    return '[ERROR: truncated/empty]';
+  }
+  return output;
 }
 // ─── P5 Deep Research Fetch ───────────────────────────────────────────────────
 async function fetchP5DeepResearch(keyword) {
@@ -241,7 +281,7 @@ async function compileMarketData(categoryId) {
     .eq('category_id', categoryId)
     .not('bsr_current', 'is', null)
     .order('bsr_current', { ascending: true })
-    .limit(20);
+    .limit(50);
 
   const top5 = top20?.slice(0, 5) || [];
 
@@ -258,7 +298,7 @@ async function compileMarketData(categoryId) {
     .lt('bsr_current', 30000)
     .lt('rating_count', 500)
     .order('monthly_revenue', { ascending: false })
-    .limit(5);
+    .limit(15);
 
   // All products for aggregates
   const { data: allProducts } = await DASH.from('products')
@@ -318,7 +358,7 @@ async function compileMarketData(categoryId) {
 
   const topIngredients = Object.entries(ingredientMap)
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 20)
+    .slice(0, 40)
     .map(([ingredient, count]) => ({
       ingredient,
       count,
@@ -327,12 +367,12 @@ async function compileMarketData(categoryId) {
 
   const topClaims = Object.entries(claimMap)
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 15)
+    .slice(0, 30)
     .map(([claim, count]) => ({ claim, count }));
 
   const topPainPoints = Object.entries(painPointMap)
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 20)
+    .slice(0, 40)
     .map(([keyword, mentions]) => ({ keyword, mentions }));
 
   const commonForms = Object.entries(formMap)
@@ -368,7 +408,7 @@ async function compileMarketData(categoryId) {
   const dosageRanges = Object.entries(dosageRangeMap)
     .filter(([, vals]) => vals.length >= 2)
     .sort((a, b) => b[1].length - a[1].length)
-    .slice(0, 20)
+    .slice(0, 40)
     .map(([ing, vals]) => {
       const min = Math.min(...vals), max = Math.max(...vals), avg = Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
       return `${ing}: min ${min} / avg ${avg} / max ${max} (${vals.length} products)`;
@@ -424,14 +464,14 @@ async function compileMarketData(categoryId) {
     if (allAsins.length) {
       const { data: rawPos } = await DOVIVE.from('dovive_reviews')
         .select('asin, rating, title, body').in('asin', allAsins)
-        .gte('rating', 4).not('body', 'is', null).limit(30);
+        .gte('rating', 4).not('body', 'is', null).limit(100);
       const { data: rawNeg } = await DOVIVE.from('dovive_reviews')
         .select('asin, rating, title, body').in('asin', allAsins)
-        .lte('rating', 2).not('body', 'is', null).limit(30);
-      rawReviewText.positive = (rawPos || []).sort(() => Math.random()-0.5).slice(0,20)
-        .map(r => `[★${r.rating}] "${r.title || ''}" — ${(r.body||'').slice(0,250)}`);
-      rawReviewText.negative = (rawNeg || []).sort(() => Math.random()-0.5).slice(0,20)
-        .map(r => `[★${r.rating}] "${r.title || ''}" — ${(r.body||'').slice(0,250)}`);
+        .lte('rating', 2).not('body', 'is', null).limit(100);
+      rawReviewText.positive = (rawPos || []).sort(() => Math.random()-0.5).slice(0,60)
+        .map(r => `[★${r.rating}] "${r.title || ''}" — ${(r.body||'').slice(0,900)}`);
+      rawReviewText.negative = (rawNeg || []).sort(() => Math.random()-0.5).slice(0,60)
+        .map(r => `[★${r.rating}] "${r.title || ''}" — ${(r.body||'').slice(0,900)}`);
     }
   } catch(e) { /* reviews optional */ }
 
@@ -483,7 +523,7 @@ async function compileMarketData(categoryId) {
       return {
         rank: idx + 1,
         brand: p.brand,
-        title: (p.title || '').substring(0, 70),
+        title: (p.title || '').substring(0, 200),
         asin: p.asin,
         bsr: p.bsr_current,
         monthly_revenue: p.monthly_revenue,
@@ -507,7 +547,7 @@ async function compileMarketData(categoryId) {
         key_strengths: pi.key_strengths || [],
         key_weaknesses: pi.key_weaknesses || [],
         // Raw OCR for accurate formula reconstruction
-        supplement_facts_raw: (p.supplement_facts_raw || '').substring(0, 800),
+        supplement_facts_raw: (p.supplement_facts_raw || '').substring(0, 3000),
         other_ingredients: p.other_ingredients,
       };
     }),
@@ -562,14 +602,14 @@ ${pkgIntel.labelHierarchyPatterns?.join('\n') || 'Not available'}
     ? `## P6 MARKET INTELLIGENCE REPORT
 *AI-generated single market analysis across all ${cs.total_products} products. Source: phase6-market-analysis.js*
 
-${mi.report?.substring(0, 6000) || 'Not available'}
-${(mi.report?.length || 0) > 6000 ? '\n[... report continues â€" using first 6k chars for context ...]\n' : ''}`
+${mi.report?.substring(0, 30000) || 'Not available'}
+${(mi.report?.length || 0) > 30000 ? '\n[... report continues â€" using first 30k chars for context ...]\n' : ''}`
     : `## P6 MARKET INTELLIGENCE
 âš ï¸ Not yet generated. Run: node phase6-market-analysis.js --keyword "${KEYWORD}"
 P8 will still run but with reduced market context.`;
 
   // Top 20 competitor formula table
-  const top20FormulasSection = top20.slice(0, 20).map(c => `
+  const top20FormulasSection = top20.slice(0, 50).map(c => `
 ### #${c.rank} ${c.brand} â€" BSR ${c.bsr?.toLocaleString()} | $${c.monthly_revenue?.toLocaleString()}/mo | $${c.price} | ${c.rating}â­ (${c.reviews?.toLocaleString()} reviews)
 **Formula:** ${c.ashwagandha_mg || '?'}mg ${c.extract_type || 'Unknown'} ${c.withanolides ? `(${c.withanolides} withanolides)` : ''}
 **Bonus ingredients:** ${c.bonus_ingredients.join(', ') || 'None'}
@@ -599,7 +639,7 @@ ${leader.supplement_facts_raw || JSON.stringify(leader.all_nutrients || 'Not ava
 ` : 'Top performer data not available';
 
   const newWinnersSection = refs && refs.length > 0
-    ? refs.slice(0, 5).map((p, i) => `
+    ? refs.slice(0, 15).map((p, i) => `
 New Winner #${i + 1}: ${p.brand} (BSR: ${p.bsr_current?.toLocaleString()}, Rev: $${(p.monthly_revenue || 0).toLocaleString()}/mo, Reviews: ${p.rating_count || 'unknown'})
 - Form: ${p.packaging_type || 'Not specified'} | Serving: ${p.serving_size || 'Not specified'}
 - Claims: ${(p.claims_on_label || []).join(', ') || 'Not available'}
@@ -623,7 +663,7 @@ ${p.other_ingredients || 'Not specified'}
 - Price: ${p.price ? `$${p.price}` : 'N/A'}
 - Key Claims: ${(p.claims_on_label || []).slice(0, 5).join(', ') || 'Not available'}
 - Monthly Revenue: $${(p.monthly_revenue || 0).toLocaleString()}
-- Ingredients: ${p.supplement_facts_raw ? p.supplement_facts_raw.substring(0, 400) : JSON.stringify((p.all_nutrients || []).slice ? (p.all_nutrients || []).slice(0, 10) : p.all_nutrients || 'Not available')}
+- Ingredients: ${p.supplement_facts_raw ? p.supplement_facts_raw.substring(0, 1500) : JSON.stringify((p.all_nutrients || []).slice ? (p.all_nutrients || []).slice(0, 15) : p.all_nutrients || 'Not available')}
 `).join('\n---\n');
 
   const ingredientFrequency = cs.top_ingredients.length > 0
@@ -641,7 +681,7 @@ ${p.other_ingredients || 'Not specified'}
   const flavorIntelSection = (() => {
     const lines = [];
     // Flavor data from top competitors (titles + other_ingredients)
-    const flavorCompetitors = top20.slice(0, 10).filter(c => c.supplement_facts_raw || c.other_ingredients);
+    const flavorCompetitors = top20.slice(0, 30).filter(c => c.supplement_facts_raw || c.other_ingredients);
     flavorCompetitors.forEach(c => {
       const raw = ((c.supplement_facts_raw || '') + ' ' + (c.other_ingredients || '')).toLowerCase();
       const flavors = [];
@@ -1145,7 +1185,7 @@ async function saveToDB(categoryId, grokBrief, claudeBrief, marketData) {
 
   const { error } = await DASH.from('formula_briefs').insert({
     category_id: categoryId,
-    positioning: `Dual AI formula brief for ${KEYWORD} - Grok 4.2 + Claude Sonnet 4.6 vs ${marketData.category_summary.total_products} products`,
+    positioning: `Dual AI formula brief for ${KEYWORD} - Claude Draft A + Claude Draft B (both ${ANALYSIS_MODEL}) vs ${marketData.category_summary.total_products} products`,
     target_customer: `Adults seeking ${KEYWORD} supplementation`,
     form_type: 'gummy',
     form_rationale: 'Category leader uses gummy format',
@@ -1173,7 +1213,7 @@ async function saveToDB(categoryId, grokBrief, claudeBrief, marketData) {
       // Dual outputs - both stored separately for P10 QA comparison
       ai_generated_brief_grok:   grokBrief   || null,
       ai_generated_brief_claude: claudeBrief || null,
-      formula_brief_model_grok:   'grok-4.20-beta-0309-reasoning',
+      formula_brief_model_grok:   ANALYSIS_MODEL,
       formula_brief_model_claude: ANALYSIS_MODEL,
       grok_chars:   grokBrief?.length   || 0,
       claude_chars: claudeBrief?.length || 0,
@@ -1204,7 +1244,7 @@ async function saveToVault(grokBrief, claudeBrief) {
   const dir = 'C:\\SirPercival-Vault\\07_ai-systems\\agents\\scout\\formula-briefs';
   if (grokBrief) {
     const p = `${dir}\\${date}-${KEYWORD.replace(/\s+/g, '-')}-grok42-brief.md`;
-    fs.writeFileSync(p, `# P9 Formula Brief (Grok 4.2 Reasoning) - ${KEYWORD}\n**Date:** ${date}\n**Model:** grok-4.20-beta-0309-reasoning\n\n---\n\n${grokBrief}`, 'utf8');
+    fs.writeFileSync(p, `# P9 Formula Brief (Draft A) - ${KEYWORD}\n**Date:** ${date}\n**Model:** ${ANALYSIS_MODEL}\n\n---\n\n${grokBrief}`, 'utf8');
     console.log(`\n  Grok vault: ${p}`);
   }
   if (claudeBrief) {
@@ -1253,10 +1293,10 @@ async function run() {
   const prompt = buildPrompt(marketData);
   console.log(`Done (${Math.round(prompt.length / 1000)}k chars)\n`);
 
-  // 3. Run DUAL formulation in parallel - Grok 4.2 Deep Reasoning + Claude Sonnet 4.6
+  // 3. Run DUAL formulation in parallel - Draft A + Draft B (both ANALYSIS_MODEL)
   console.log("Running dual AI formulation in parallel...");
-  console.log("  [Grok]   grok-4.20-beta-0309-reasoning - deep scientific thinking");
-  console.log(`  [Claude] ${ANALYSIS_MODEL} via OpenRouter - 1M context synthesis\n`);
+  console.log(`  [Draft A] ${ANALYSIS_MODEL} via OpenRouter - deep scientific thinking`);
+  console.log(`  [Draft B] ${ANALYSIS_MODEL} via OpenRouter - 1M context synthesis\n`);
 
   const [grokResult, claudeResult] = await Promise.allSettled([
     callGrok42(prompt),
@@ -1266,13 +1306,13 @@ async function run() {
   const grokBrief  = grokResult.status  === "fulfilled" ? grokResult.value  : null;
   const claudeBrief = claudeResult.status === "fulfilled" ? claudeResult.value : null;
 
-  if (grokResult.status === "rejected")   console.error("  WARNING: Grok 4.2 failed:", grokResult.reason?.message);
-  if (claudeResult.status === "rejected") console.error("  WARNING: Claude Sonnet failed:", claudeResult.reason?.message);
+  if (grokResult.status === "rejected")   console.error("  WARNING: Draft A failed:", grokResult.reason?.message);
+  if (claudeResult.status === "rejected") console.error("  WARNING: Draft B failed:", claudeResult.reason?.message);
   if (!grokBrief && !claudeBrief) throw new Error("Both AI models failed - no formula output");
 
   console.log("\nDual formulation complete:");
-  console.log(`  Grok 4.2 Reasoning:  ${grokBrief  ? Math.round(grokBrief.length/1000)+"k chars OK" : "FAILED"}`);
-  console.log(`  Claude Sonnet 4.6:     ${claudeBrief ? Math.round(claudeBrief.length/1000)+"k chars OK" : "FAILED"}\n`);
+  console.log(`  Draft A: ${grokBrief  ? Math.round(grokBrief.length/1000)+"k chars OK" : "FAILED"}`);
+  console.log(`  Draft B: ${claudeBrief ? Math.round(claudeBrief.length/1000)+"k chars OK" : "FAILED"}\n`);
 
   // 4. Save to Supabase - both outputs
   process.stdout.write("Saving both briefs to formula_briefs table... ");

@@ -90,7 +90,7 @@ function getOpenRouterKey() {
 
 // ─── Claude Call via OpenRouter (model + max_tokens configurable per call) ────
 
-async function callGrok(prompt, { model = P5_FAST_MODEL, maxTokens = 1600 } = {}) {
+async function callGrokOnce(prompt, model, maxTokens) {
   const key = getOpenRouterKey();
   if (!key) throw new Error('OPENROUTER_API_KEY not found in scout/.env');
 
@@ -110,7 +110,20 @@ async function callGrok(prompt, { model = P5_FAST_MODEL, maxTokens = 1600 } = {}
   });
   const j = await res.json();
   if (j.error) throw new Error(`OpenRouter error (${model}): ${j.error.message || JSON.stringify(j.error)}`);
-  return j.choices?.[0]?.message?.content || null;
+  const choice = j.choices?.[0];
+  return { content: choice?.message?.content || null, finishReason: choice?.finish_reason || 'unknown' };
+}
+
+async function callGrok(prompt, { model = P5_FAST_MODEL, maxTokens = 1600 } = {}) {
+  let { content, finishReason } = await callGrokOnce(prompt, model, maxTokens);
+  if (!content || finishReason === 'length') {
+    console.log(`  ⚠️  P5 truncated/empty (finish_reason=${finishReason}) — retrying once at ${Math.round(maxTokens * 1.5)} tokens...`);
+    const retry = await callGrokOnce(prompt, model, Math.round(maxTokens * 1.5));
+    if (retry.content) content = retry.content;
+  }
+  // Never silently coerce to null; caller (researchOneProduct) already throws on empty,
+  // which is the correct never-silent behavior for a per-product research call.
+  return content;
 }
 
 // ─── Tiny concurrency pool (no external dependency) ────────────────────────────
@@ -143,10 +156,10 @@ async function fetchGroundingData(asin, keyword) {
       .eq('asin', asin).ilike('keyword', `%${keyword.split(' ')[0]}%`).limit(1).maybeSingle(),
     DOVIVE.from('dovive_ocr')
       .select('supplement_facts, other_ingredients, health_claims, certifications')
-      .eq('asin', asin).order('image_index', { ascending: true }).limit(3),
+      .eq('asin', asin).order('image_index', { ascending: true }).limit(8),
     DOVIVE.from('dovive_reviews')
       .select('rating, title, body, verified_purchase, helpful_votes')
-      .eq('asin', asin).order('helpful_votes', { ascending: false }).limit(10),
+      .eq('asin', asin).order('helpful_votes', { ascending: false }).limit(40),
     DOVIVE.from('dovive_keepa')
       .select('price_usd, bsr_current, bsr_drops_30d, bsr_drops_90d, bsr_history_30d')
       .eq('asin', asin).limit(1).maybeSingle(),
@@ -170,8 +183,8 @@ function formatGroundingForPrompt(grounding) {
     parts.push(`**Bright Data listing (dovive_research):**
 Title: ${research.title || 'N/A'}
 Brand: ${research.brand || 'N/A'}
-Description: ${(research.description || '').substring(0, 400) || 'N/A'}
-Bullet points: ${JSON.stringify(research.bullet_points || []).substring(0, 800)}
+Description: ${(research.description || '').substring(0, 2000) || 'N/A'}
+Bullet points: ${JSON.stringify(research.bullet_points || []).substring(0, 3000)}
 Price: $${research.price || 'N/A'} | Rating: ${research.rating || 'N/A'} (${research.review_count || 0} reviews) | BSR: ${research.bsr || 'N/A'}`);
   } else {
     parts.push('**Bright Data listing:** Not available in dovive_research.');
@@ -179,7 +192,7 @@ Price: $${research.price || 'N/A'} | Rating: ${research.rating || 'N/A'} (${rese
 
   if (ocrRows.length) {
     const facts = ocrRows.map((r, i) =>
-      `  Image ${i + 1} — Supplement Facts: ${JSON.stringify(r.supplement_facts || {}).substring(0, 500)} | Other ingredients: ${(r.other_ingredients || '').substring(0, 200)} | Certifications: ${JSON.stringify(r.certifications || [])} | Health claims: ${JSON.stringify(r.health_claims || [])}`
+      `  Image ${i + 1} — Supplement Facts: ${JSON.stringify(r.supplement_facts || {}).substring(0, 2500)} | Other ingredients: ${(r.other_ingredients || '').substring(0, 1000)} | Certifications: ${JSON.stringify(r.certifications || [])} | Health claims: ${JSON.stringify(r.health_claims || [])}`
     ).join('\n');
     parts.push(`**OCR'd label facts (dovive_ocr, real photos of this product):**\n${facts}`);
   } else {
@@ -187,10 +200,10 @@ Price: $${research.price || 'N/A'} | Rating: ${research.rating || 'N/A'} (${rese
   }
 
   if (reviews.length) {
-    const revText = reviews.slice(0, 8).map(r =>
-      `  [${r.rating}★${r.verified_purchase ? ', verified' : ''}] "${(r.title || '').substring(0, 60)}" — ${(r.body || '').substring(0, 220)}`
+    const revText = reviews.slice(0, 30).map(r =>
+      `  [${r.rating}★${r.verified_purchase ? ', verified' : ''}] "${(r.title || '').substring(0, 150)}" — ${(r.body || '').substring(0, 1200)}`
     ).join('\n');
-    parts.push(`**Real customer reviews (dovive_reviews, top ${Math.min(reviews.length, 8)} by helpfulness):**\n${revText}`);
+    parts.push(`**Real customer reviews (dovive_reviews, top ${Math.min(reviews.length, 30)} by helpfulness):**\n${revText}`);
   } else {
     parts.push('**Real customer reviews:** Not available in dovive_reviews.');
   }
@@ -274,7 +287,7 @@ async function findAndScrapeSource(browserContext, product, keyword) {
       await sourcePage.goto(pick.url, { waitUntil: 'domcontentloaded', timeout: 20000 });
       await sourcePage.waitForTimeout(500);
       const bodyText = await sourcePage.locator('body').innerText({ timeout: 5000 }).catch(() => '');
-      const excerpt = bodyText.replace(/\s+/g, ' ').trim().substring(0, 4000);
+      const excerpt = bodyText.replace(/\s+/g, ' ').trim().substring(0, 15000);
 
       if (!excerpt || excerpt.length < 40) {
         return { skipped: true, reason: 'source page returned no usable text' };
@@ -595,7 +608,7 @@ async function researchOneProduct({ product, rank, pool }, browserContext) {
     sourceBlock = `**Off-Amazon source (${scraped.source_type}, Playwright-scraped just now):**
 URL: ${scraped.source_url}
 Extracted: ${JSON.stringify(scraped.extracted)}
-Page excerpt: ${scraped.raw_html_excerpt.substring(0, 1200)}`;
+Page excerpt: ${scraped.raw_html_excerpt.substring(0, 15000)}`;
     await saveSource(product.asin, KEYWORD, scraped);
   } else if (scraped?.skipped) {
     sourceBlock = `**Off-Amazon source (Playwright scrape):** SKIPPED — ${scraped.reason}. Do not assume brand-site facts; note as unknown.`;

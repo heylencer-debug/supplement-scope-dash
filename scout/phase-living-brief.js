@@ -42,7 +42,9 @@ function getOpenRouterKey() {
   return process.env.OPENROUTER_API_KEY || null;
 }
 
-async function callClaude(prompt, maxTokens = 8000) {
+const ANALYSIS_MODEL = process.env.ANALYSIS_MODEL || 'anthropic/claude-sonnet-5';
+
+async function callClaudeOnce(prompt, maxTokens) {
   const key = getOpenRouterKey();
   if (!key) throw new Error('OPENROUTER_API_KEY not set');
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -53,18 +55,32 @@ async function callClaude(prompt, maxTokens = 8000) {
       'HTTP-Referer': 'https://dovive.com',
     },
     body: JSON.stringify({
-      model: 'anthropic/claude-sonnet-4.6',
+      model: ANALYSIS_MODEL,
       max_tokens: maxTokens,
       messages: [{ role: 'user', content: prompt }],
     }),
   });
   const j = await res.json();
   if (j.error) throw new Error(`Claude error: ${j.error.message}`);
-  return j.choices?.[0]?.message?.content || '';
+  const choice = j.choices?.[0];
+  return { content: choice?.message?.content || '', finishReason: choice?.finish_reason || 'unknown' };
+}
+
+async function callClaude(prompt, maxTokens = 8000) {
+  let { content, finishReason } = await callClaudeOnce(prompt, maxTokens);
+  console.log(`  finish_reason: ${finishReason}`);
+  if (!content || finishReason === 'length') {
+    console.log(`  ⚠️  Truncated/empty — retrying once at ${Math.round(maxTokens * 1.5)} tokens...`);
+    const retry = await callClaudeOnce(prompt, Math.round(maxTokens * 1.5));
+    console.log(`  finish_reason (retry): ${retry.finishReason}`);
+    content = retry.content || content;
+  }
+  if (!content) return '[ERROR: truncated/empty]';
+  return content;
 }
 
 // ─── Claude Vision (for image feedback) ──────────────────────────────────────
-async function callClaudeWithImages(textPrompt, imageUrls, maxTokens = 8000) {
+async function callClaudeWithImagesOnce(textPrompt, imageUrls, maxTokens) {
   const key = getOpenRouterKey();
   if (!key) throw new Error('OPENROUTER_API_KEY not set');
 
@@ -84,14 +100,28 @@ async function callClaudeWithImages(textPrompt, imageUrls, maxTokens = 8000) {
       'HTTP-Referer': 'https://dovive.com',
     },
     body: JSON.stringify({
-      model: 'anthropic/claude-sonnet-4.6',
+      model: ANALYSIS_MODEL,
       max_tokens: maxTokens,
       messages: [{ role: 'user', content }],
     }),
   });
   const j = await res.json();
   if (j.error) throw new Error(`Claude Vision error: ${j.error.message}`);
-  return j.choices?.[0]?.message?.content || '';
+  const choice = j.choices?.[0];
+  return { content: choice?.message?.content || '', finishReason: choice?.finish_reason || 'unknown' };
+}
+
+async function callClaudeWithImages(textPrompt, imageUrls, maxTokens = 8000) {
+  let { content, finishReason } = await callClaudeWithImagesOnce(textPrompt, imageUrls, maxTokens);
+  console.log(`  finish_reason: ${finishReason}`);
+  if (!content || finishReason === 'length') {
+    console.log(`  ⚠️  Truncated/empty — retrying once at ${Math.round(maxTokens * 1.5)} tokens...`);
+    const retry = await callClaudeWithImagesOnce(textPrompt, imageUrls, Math.round(maxTokens * 1.5));
+    console.log(`  finish_reason (retry): ${retry.finishReason}`);
+    content = retry.content || content;
+  }
+  if (!content) return '[ERROR: truncated/empty]';
+  return content;
 }
 
 // ─── Build evaluation prompt ──────────────────────────────────────────────────

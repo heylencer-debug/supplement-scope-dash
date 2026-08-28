@@ -51,7 +51,7 @@ function getOpenRouterKey() {
 // Analysis model — configurable without a rebuild. Default: Claude Sonnet 5 via OpenRouter.
 const ANALYSIS_MODEL = process.env.ANALYSIS_MODEL || 'anthropic/claude-sonnet-5';
 
-async function callClaudeSonnetQA(prompt, maxTokens = 16000) {
+async function callClaudeSonnetQAOnce(prompt, maxTokens) {
   const key = getOpenRouterKey();
   if (!key) throw new Error('No OpenRouter key');
   const controller = new AbortController();
@@ -70,7 +70,7 @@ async function callClaudeSonnetQA(prompt, maxTokens = 16000) {
     }
     // Collect streaming SSE chunks
     let content = '';
-    let promptTokens = 0, completionTokens = 0;
+    let promptTokens = 0, completionTokens = 0, finishReason = null;
     const text = await res.text();
     for (const line of text.split('\n')) {
       if (!line.startsWith('data: ')) continue;
@@ -81,19 +81,34 @@ async function callClaudeSonnetQA(prompt, maxTokens = 16000) {
         if (j.error) throw new Error(`Claude Sonnet QA error: ${j.error.message || JSON.stringify(j.error)}`);
         const delta = j.choices?.[0]?.delta?.content;
         if (delta) content += delta;
+        if (j.choices?.[0]?.finish_reason) finishReason = j.choices[0].finish_reason;
         if (j.usage) { promptTokens = j.usage.prompt_tokens || 0; completionTokens = j.usage.completion_tokens || 0; }
       } catch (e) {
         if (e.message.startsWith('Claude Sonnet QA error')) throw e;
       }
     }
     if (promptTokens || completionTokens) {
-      console.log(`  Tokens: ${promptTokens}→${completionTokens} (total: ${promptTokens + completionTokens})`);
+      console.log(`  Tokens: ${promptTokens}→${completionTokens} (total: ${promptTokens + completionTokens})${finishReason ? ` (finish_reason: ${finishReason})` : ''}`);
       tokenLog.push({ call: tokenLog.length + 1, prompt_tokens: promptTokens, completion_tokens: completionTokens, total_tokens: promptTokens + completionTokens, ts: new Date().toISOString() });
+    } else {
+      console.log(`  finish_reason: ${finishReason || 'unknown'}`);
     }
-    return content || null;
+    return { content: content || null, finishReason };
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function callClaudeSonnetQA(prompt, maxTokens = 16000) {
+  let { content, finishReason } = await callClaudeSonnetQAOnce(prompt, maxTokens);
+  if (!content || finishReason === 'length') {
+    console.warn(`  ⚠ Claude Sonnet QA truncated/empty (finish_reason=${finishReason || 'unknown'}) — retrying once at ${Math.round(maxTokens * 1.5)} tokens...`);
+    const retry = await callClaudeSonnetQAOnce(prompt, Math.round(maxTokens * 1.5));
+    if (retry.content && retry.finishReason !== 'length') return retry.content;
+    if (retry.content) content = retry.content; // still 'length' but longer than nothing — keep the longer draft
+  }
+  if (!content) console.error(`  ❌ Claude Sonnet QA still empty after retry — caller must guard against null (never coerce/persist silently).`);
+  return content || null;
 }
 
 // â"€â"€â"€ Load P6 market intelligence from vault â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
@@ -126,7 +141,7 @@ function buildQAPrompt(grokBrief, marketIntel, competitors, keyword, claudeBrief
 - Strengths: ${(pi.key_strengths || []).join('; ') || 'N/A'}
 - Weaknesses: ${(pi.key_weaknesses || []).join('; ') || 'N/A'}
 - Market Gap: ${pi.market_opportunity_gap || 'N/A'}
-- OCR Supplement Facts: ${(c.supplement_facts_raw || '').substring(0, 500) || 'Not available'}`;
+- OCR Supplement Facts: ${(c.supplement_facts_raw || '').substring(0, 2500) || 'Not available'}`;
   }).join('\n\n---\n');
 
   return `You are a senior pharmaceutical formulator, supplement QA specialist, and competitive intelligence analyst with 20+ years of experience launching successful Amazon supplement products. You have deep knowledge of:
@@ -151,7 +166,7 @@ This is a CRITICAL QA gate. P8 AI may have over-engineered the formula. Be the e
 
 ## DUAL AI FORMULA PROPOSALS (both to be reviewed and adjudicated)
 
-### FORMULA A - Grok 4.2 Deep Reasoning (grok-4.20-beta-0309-reasoning)
+### FORMULA A - Claude Draft A (${ANALYSIS_MODEL})
 ${grokBrief || "Not available"}
 
 ### FORMULA B - Claude (${ANALYSIS_MODEL})
@@ -405,15 +420,15 @@ All three sections are required. If any is missing, pipeline data will not save 
 
 async function generateCompetitorNotesOnly(competitors, qaAdjustedFormula, keyword) {
   /** Separate small API call - guaranteed to complete, not affected by main QA token budget */
-  const lines = competitors.slice(0, 10).map((comp, i) => {
-    const sf = (comp.supplement_facts_raw || '').slice(0, 300);
+  const lines = competitors.slice(0, 30).map((comp, i) => {
+    const sf = (comp.supplement_facts_raw || '').slice(0, 800);
     return `### #${i+1} ASIN: ${comp.asin} - ${comp.brand}\nBSR: ${comp.bsr_current} | ${comp.price} | ${comp.monthly_revenue?.toLocaleString()}/mo revenue\nFormula snippet: ${sf || 'Not available'}`;
   }).join('\n');
 
   const prompt = `You are a supplement product analyst. For each competitor below, write ONE concise sentence comparing their formula to DOVIVE's formula for ${keyword}. Focus on the most important ingredient/dose/quality difference.
 
 DOVIVE's Final Formula (key actives):
-${(qaAdjustedFormula || '').slice(0, 800)}
+${(qaAdjustedFormula || '').slice(0, 3000)}
 
 COMPETITORS:
 ${lines}
@@ -544,11 +559,11 @@ function renderFlavorRecommendationsTable(flavorRecommendations = [], flavorSumm
 
 // ── Build focused Call 2 prompt (Comparison + Flavor + Competitor Notes) ──────
 function buildCall2Prompt(keyword, grokBrief, claudeBrief, adjustedFormula, competitors, marketIntel) {
-  const top10 = (competitors || []).slice(0, 10);
+  const top10 = (competitors || []).slice(0, 25);
 
   // Build competitor ingredient table data
   const compRows = top10.map((c, i) => {
-    const sf = (c.supplement_facts_raw || '').slice(0, 500);
+    const sf = (c.supplement_facts_raw || '').slice(0, 2000);
     const rev = c.monthly_revenue ? `${Math.round(c.monthly_revenue / 1000)}k/mo` : 'N/A';
     return `### Competitor ${i + 1}: ${c.brand} | BSR ${c.bsr_current} | ${rev} | ${c.price}
 ASIN: ${c.asin}
@@ -809,10 +824,10 @@ async function runCall2(keyword, grokBrief, claudeBrief, adjustedFormula, compet
 // ── Call 3: Competitor Notes ONLY - tiny focused JSON call ────────────────────
 async function runCall3CompetitorNotes(keyword, adjustedFormula, competitors) {
   console.log(`\nRunning Call 3: Competitor Notes (JSON only)...`);
-  const top10 = (competitors || []).slice(0, 10);
+  const top10 = (competitors || []).slice(0, 25);
 
   const compLines = top10.map(c => {
-    const sf = (c.supplement_facts_raw || '').slice(0, 300);
+    const sf = (c.supplement_facts_raw || '').slice(0, 800);
     return `ASIN: ${c.asin} | Brand: ${c.brand} | BSR: ${c.bsr_current} | $${c.price}
 Formula: ${sf || 'Not available'}`;
   }).join('\n\n');
@@ -959,7 +974,7 @@ async function run() {
     .eq('category_id', CAT_ID)
     .not('bsr_current', 'is', null)
     .order('bsr_current', { ascending: true })
-    .limit(20);
+    .limit(40);
   console.log(`  OK ${competitors?.length || 0} competitors loaded\n`);
 
   // Build dual-comparison QA prompt

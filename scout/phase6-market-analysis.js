@@ -42,50 +42,82 @@ async function lookupCategoryId(keyword) {
 
 // â"€â"€â"€ xAI Key â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
-function getXaiKey() {
-  return process.env.XAI_API_KEY || null;
+function getOpenRouterKey() {
+  return process.env.OPENROUTER_API_KEY || null;
 }
 
-async function callGrok(prompt, maxTokens = 8000) {
-  const key = getXaiKey();
-  if (!key) throw new Error('No xAI key');
-  const res = await fetch('https://api.x.ai/v1/chat/completions', {
+const ANALYSIS_MODEL = process.env.ANALYSIS_MODEL || 'anthropic/claude-sonnet-5';
+
+async function callGrokOnce(prompt, maxTokens) {
+  const key = getOpenRouterKey();
+  if (!key) throw new Error('No OpenRouter key');
+  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+    headers: {
+      'Authorization': `Bearer ${key}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': 'https://dovive.com',
+      'X-Title': 'DOVIVE Scout P6 Market Analysis',
+    },
     body: JSON.stringify({
-      model: 'grok-4.20-beta-0309-reasoning',
+      model: ANALYSIS_MODEL,
       max_tokens: maxTokens,
       messages: [{ role: 'user', content: prompt }],
     }),
   });
   const j = await res.json();
-  if (j.error) throw new Error(`Grok: ${j.error.message}`);
-  return j.choices?.[0]?.message?.content || null;
+  if (j.error) throw new Error(`OpenRouter: ${j.error.message || JSON.stringify(j.error)}`);
+  const choice = j.choices?.[0];
+  const content = choice?.message?.content || null;
+  const finishReason = choice?.finish_reason || 'unknown';
+  return { content, finishReason };
+}
+
+async function callGrok(prompt, maxTokens = 16000) {
+  let { content, finishReason } = await callGrokOnce(prompt, maxTokens);
+  console.log(`  finish_reason: ${finishReason}`);
+  const truncatedOrEmpty = !content || finishReason === 'length';
+  if (truncatedOrEmpty) {
+    console.log(`  ⚠️  Truncated/empty response (finish_reason=${finishReason}) — retrying once at ${maxTokens * 1.5} tokens...`);
+    const retry = await callGrokOnce(prompt, Math.round(maxTokens * 1.5));
+    console.log(`  finish_reason (retry): ${retry.finishReason}`);
+    if (retry.content && retry.finishReason !== 'length') {
+      return retry.content;
+    }
+    if (retry.content) {
+      // Still marked truncated but has content — keep it, better than nothing, but flag.
+      console.log(`  ⚠️  Retry still truncated — keeping partial content, flagging in report.`);
+      return retry.content;
+    }
+    console.log(`  ❌ Retry produced empty content — persisting explicit error marker (never silently null).`);
+    return '[ERROR: truncated/empty]';
+  }
+  return content;
 }
 
 // â"€â"€â"€ Data aggregation â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 // ─── Fetch raw reviews for richer consumer signal ─────────────────────────────
 async function fetchRawReviews(categoryId) {
-  const { data: prods } = await DASH.from('products').select('asin').eq('category_id', categoryId).limit(200);
+  const { data: prods } = await DASH.from('products').select('asin').eq('category_id', categoryId).limit(500);
   if (!prods?.length) return { positive: [], critical: [] };
   const asins = prods.map(p => p.asin);
   const DOVIVE_SB = require('@supabase/supabase-js').createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
   const { data: reviews } = await DOVIVE_SB.from('dovive_reviews')
-    .select('asin, rating, title, body').in('asin', asins.slice(0, 100))
-    .not('body', 'is', null).limit(600);
+    .select('asin, rating, title, body').in('asin', asins.slice(0, 400))
+    .not('body', 'is', null).limit(3000);
   if (!reviews?.length) return { positive: [], critical: [] };
-  const positive = reviews.filter(r => r.rating >= 4).sort(() => Math.random() - 0.5).slice(0, 25);
-  const critical = reviews.filter(r => r.rating <= 2).sort(() => Math.random() - 0.5).slice(0, 25);
+  const positive = reviews.filter(r => r.rating >= 4).sort(() => Math.random() - 0.5).slice(0, 80);
+  const critical = reviews.filter(r => r.rating <= 2).sort(() => Math.random() - 0.5).slice(0, 80);
   return { positive, critical };
 }
 
 function buildDosageTable(products) {
   const rows = [];
-  for (const p of products.slice(0, 20)) {
+  for (const p of products.slice(0, 60)) {
     const nutrients = p.all_nutrients;
     if (!nutrients || !Array.isArray(nutrients) || !nutrients.length) continue;
-    const key = nutrients.slice(0, 6).map(n => `${n.name || n.ingredient || '?'}: ${n.amount || n.quantity || '?'}`).join(' | ');
+    const key = nutrients.slice(0, 15).map(n => `${n.name || n.ingredient || '?'}: ${n.amount || n.quantity || '?'}`).join(' | ');
     rows.push(`${p.brand || '?'} (BSR ${p.bsr_current?.toLocaleString() || '?'}): ${key}`);
   }
   return rows.length ? rows.join('\n') : 'OCR dosage data not yet available';
@@ -101,7 +133,7 @@ function buildIngredientWhiteSpace(products) {
   }
   return Object.entries(freqMap)
     .filter(([, count]) => count / total < 0.15 && count >= 2)
-    .sort((a, b) => b[1] - a[1]).slice(0, 15)
+    .sort((a, b) => b[1] - a[1]).slice(0, 30)
     .map(([ing, count]) => `${ing}: ${count} products (${Math.round(count/total*100)}%)`)
     .join('\n') || 'None detected';
 }
@@ -168,7 +200,7 @@ function buildMarketContext(products) {
 
   // Sort top ingredients
   const topBonusIngredients = Object.entries(bonusCounts)
-    .sort((a, b) => b[1] - a[1]).slice(0, 20)
+    .sort((a, b) => b[1] - a[1]).slice(0, 40)
     .map(([name, count]) => `${name}: ${count} products (${pct(count, total)})`);
 
   const topCerts = Object.entries(certCounts)
@@ -183,10 +215,10 @@ function buildMarketContext(products) {
   const topPerformers = products
     .filter(p => p.bsr_current && p.bsr_current < 8000)
     .sort((a, b) => a.bsr_current - b.bsr_current)
-    .slice(0, 15)
+    .slice(0, 40)
     .map(p => {
       const pi = p.marketing_analysis?.product_intelligence || {};
-      return `  - ${p.brand || 'Unknown'} | BSR ${p.bsr_current?.toLocaleString()} | $${p.price} | Rev $${(p.monthly_revenue||0).toLocaleString()}/mo | ${pi.ashwagandha_extract_type || 'Unknown'} ${pi.ashwagandha_amount_mg ? pi.ashwagandha_amount_mg + 'mg' : ''} | Score ${pi.formula_quality_score || '?'}/10 | ${(pi.certifications||[]).join(', ')||'No certs'} | Bonus: ${(pi.bonus_ingredients||[]).slice(0,3).join(', ')||'None'}`;
+      return `  - ${p.brand || 'Unknown'} | BSR ${p.bsr_current?.toLocaleString()} | $${p.price} | Rev $${(p.monthly_revenue||0).toLocaleString()}/mo | ${pi.ashwagandha_extract_type || 'Unknown'} ${pi.ashwagandha_amount_mg ? pi.ashwagandha_amount_mg + 'mg' : ''} | Score ${pi.formula_quality_score || '?'}/10 | ${(pi.certifications||[]).join(', ')||'No certs'} | Bonus: ${(pi.bonus_ingredients||[]).slice(0,8).join(', ')||'None'}`;
     }).join('\n');
 
   // â"€â"€ Rising stars (positive BSR velocity) â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
@@ -200,10 +232,10 @@ function buildMarketContext(products) {
       const vb = b.marketing_analysis?.product_intelligence?.velocity_score || 0;
       return vb - va;
     })
-    .slice(0, 10)
+    .slice(0, 25)
     .map(p => {
       const pi = p.marketing_analysis?.product_intelligence || {};
-      return `  - ${p.brand || '?'} | BSR ${p.bsr_current?.toLocaleString()} | ${pi.bsr_trend_label} | $${p.price} | ${pi.ashwagandha_extract_type} | Bonus: ${(pi.bonus_ingredients||[]).slice(0,3).join(', ')||'None'}`;
+      return `  - ${p.brand || '?'} | BSR ${p.bsr_current?.toLocaleString()} | ${pi.bsr_trend_label} | $${p.price} | ${pi.ashwagandha_extract_type} | Bonus: ${(pi.bonus_ingredients||[]).slice(0,8).join(', ')||'None'}`;
     }).join('\n');
 
   // â"€â"€ Consumer pain points from reviews â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
@@ -212,7 +244,7 @@ function buildMarketContext(products) {
     const ra = p.review_analysis;
     if (!ra) continue;
     const raw = typeof ra === 'string' ? ra : JSON.stringify(ra);
-    if (raw.length > 50) painPoints.push(raw.substring(0, 400));
+    if (raw.length > 50) painPoints.push(raw.substring(0, 1500));
   }
 
   // â"€â"€ Price distribution â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
@@ -246,8 +278,8 @@ function buildMarketContext(products) {
     priceRanges,
     topPerformers,
     risingStars,
-    opportunityGaps: opportunityGaps.slice(0, 30),
-    painPointsSample: painPoints.slice(0, 20),
+    opportunityGaps: opportunityGaps.slice(0, 60),
+    painPointsSample: painPoints.slice(0, 50),
     reviewCoverage: `${products.filter(p => p.review_analysis).length}/${total}`,
     dosageTable: buildDosageTable(products),
     ingredientWhiteSpace: buildIngredientWhiteSpace(products),
@@ -259,10 +291,10 @@ function buildMarketContext(products) {
 
 function buildPrompt(ctx, keyword, rawReviews) {
   const s = ctx.summary;
-  const positiveReviewSample = (rawReviews?.positive || []).slice(0, 15)
-    .map(r => `[★${r.rating}] "${r.title || ''}" — ${(r.body || '').slice(0, 200)}`).join('\n');
-  const criticalReviewSample = (rawReviews?.critical || []).slice(0, 15)
-    .map(r => `[★${r.rating}] "${r.title || ''}" — ${(r.body || '').slice(0, 200)}`).join('\n');
+  const positiveReviewSample = (rawReviews?.positive || []).slice(0, 60)
+    .map(r => `[★${r.rating}] "${r.title || ''}" — ${(r.body || '').slice(0, 800)}`).join('\n');
+  const criticalReviewSample = (rawReviews?.critical || []).slice(0, 60)
+    .map(r => `[★${r.rating}] "${r.title || ''}" — ${(r.body || '').slice(0, 800)}`).join('\n');
 
   return `You are a senior market intelligence analyst for DOVIVE, a supplement brand entering the ${keyword} market on Amazon US. Your job is to produce a comprehensive, CMO-ready market intelligence report that will directly inform product formulation and go-to-market strategy.
 
@@ -319,10 +351,10 @@ ${ctx.topPerformers}
 ${ctx.risingStars || 'None detected'}
 
 ### Market Opportunity Gaps (AI-detected per product)
-${ctx.opportunityGaps.slice(0, 20).map((g, i) => `${i+1}. ${g}`).join('\n')}
+${ctx.opportunityGaps.slice(0, 40).map((g, i) => `${i+1}. ${g}`).join('\n')}
 
 ### Consumer Pain Points (from review analysis, ${ctx.reviewCoverage} products)
-${ctx.painPointsSample.slice(0, 10).map((p, i) => `${i+1}. ${p.substring(0, 250)}`).join('\n\n')}
+${ctx.painPointsSample.slice(0, 40).map((p, i) => `${i+1}. ${p.substring(0, 1200)}`).join('\n\n')}
 
 ---
 
@@ -392,7 +424,7 @@ async function saveToSupabase(categoryId, keyword, report, ctx) {
   const marketPayload = {
     ai_market_analysis: report,
     generated_at: new Date().toISOString(),
-    grok_model: 'grok-4.20-beta-0309-reasoning',
+    grok_model: ANALYSIS_MODEL,
     products_analyzed: ctx.summary.total_products,
     review_coverage: ctx.reviewCoverage,
   };
@@ -476,9 +508,9 @@ async function run() {
 
   // Build prompt
   const prompt = buildPrompt(ctx, KEYWORD);
-  console.log(`Calling Grok (grok-4-1-fast-reasoning)... prompt: ${Math.round(prompt.length / 1000)}k chars`);
+  console.log(`Calling ${ANALYSIS_MODEL} via OpenRouter... prompt: ${Math.round(prompt.length / 1000)}k chars`);
   const startTime = Date.now();
-  const report = await callGrok(prompt, 8000);
+  const report = await callGrok(prompt, 16000);
   const elapsed = Math.round((Date.now() - startTime) / 1000);
   console.log(`  âœ… Done (${elapsed}s, ${Math.round(report.length / 1000)}k chars output)\n`);
 

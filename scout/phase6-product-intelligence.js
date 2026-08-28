@@ -52,7 +52,7 @@ function getOpenRouterKey() {
 // Analysis model — configurable without a rebuild. Default: Claude Sonnet 5 via OpenRouter.
 const ANALYSIS_MODEL = process.env.ANALYSIS_MODEL || 'anthropic/claude-sonnet-5';
 
-async function callGrok(prompt, maxTokens = 6000) {
+async function callGrokOnce(prompt, maxTokens) {
   const key = getOpenRouterKey();
   if (!key) throw new Error('No OpenRouter key');
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -71,7 +71,22 @@ async function callGrok(prompt, maxTokens = 6000) {
   });
   const j = await res.json();
   if (j.error) throw new Error(`OpenRouter: ${j.error.message || JSON.stringify(j.error)}`);
-  return j.choices?.[0]?.message?.content || null;
+  const choice = j.choices?.[0];
+  return { content: choice?.message?.content || null, finishReason: choice?.finish_reason || 'unknown' };
+}
+
+async function callGrok(prompt, maxTokens = 6000) {
+  let { content, finishReason } = await callGrokOnce(prompt, maxTokens);
+  console.log(`  finish_reason: ${finishReason}`);
+  if (!content || finishReason === 'length') {
+    console.log(`  ⚠️  Truncated/empty (finish_reason=${finishReason}) — retrying once at ${Math.round(maxTokens * 1.5)} tokens...`);
+    const retry = await callGrokOnce(prompt, Math.round(maxTokens * 1.5));
+    console.log(`  finish_reason (retry): ${retry.finishReason}`);
+    if (retry.content) content = retry.content;
+  }
+  // Never silently coerce to null; caller throws on empty ('Empty AI response'), which
+  // is the correct never-silent behavior since this is a batched multi-product JSON array.
+  return content;
 }
 
 // ─── Market Metrics (computed locally, no AI needed) ──────────────────────────
@@ -328,7 +343,7 @@ async function analyzeWithGrok(products, marketMetricsMap, categoryMedianPrice) 
     const pricePerServing = (price && servings) ? (price / servings).toFixed(2) : 'N/A';
     return `
 PRODUCT ${i + 1} [ASIN: ${p.asin}]
-Brand/Title: ${p.brand || '?'} - ${(p.title || '').substring(0, 80)}
+Brand/Title: ${p.brand || '?'} - ${(p.title || '').substring(0, 200)}
 BSR: ${p.bsr_current?.toLocaleString() || 'N/A'} | Price: $${price || 'N/A'} | Rating: ${p.rating_value || 'N/A'} ⭐ (${(p.rating_count || 0).toLocaleString()} reviews)
 Revenue: $${(p.monthly_revenue || 0).toLocaleString()}/mo | Sales: ${(p.monthly_sales || 0).toLocaleString()}/mo
 Servings: ${servings || 'N/A'} | Price/Serving: $${pricePerServing}
@@ -338,8 +353,8 @@ Price Tier: ${TIER_LABELS[mm.price_positioning_tier]} (category median: $${categ
 Revenue/Review Ratio: $${mm.revenue_per_review || 'N/A'}/review (${mm.revenue_per_review_label})
 --- FORMULA DATA ---
 Claims: ${(p.claims_on_label || []).join(', ') || 'N/A'}
-Feature Bullets: ${(p.feature_bullets_text || '').substring(0, 250) || 'N/A'}
-Supplement Facts (OCR): ${(p.supplement_facts_raw || '').substring(0, 500) || 'Not available'}`;
+Feature Bullets: ${(p.feature_bullets_text || '').substring(0, 1200) || 'N/A'}
+Supplement Facts (OCR): ${(p.supplement_facts_raw || '').substring(0, 2500) || 'Not available'}`;
   }).join('\n═══\n');
 
   const prompt = `You are a supplement industry expert analyzing competitor supplement products for DOVIVE brand's product development team.

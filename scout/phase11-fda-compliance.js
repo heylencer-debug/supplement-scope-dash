@@ -6,8 +6,8 @@
  *
  * Anti-hallucination architecture:
  *   1. Fetches actual NIH ODS fact sheets per ingredient at runtime (real UL values)
- *   2. Claude Opus 4.6 (primary) — validates using ONLY fetched data, flags unverifiable claims
- *   3. Claude Sonnet 4.6 validates Claude Opus findings — adversarial cross-check for missed issues
+ *   2. Claude (via OpenRouter) (primary) — validates using ONLY fetched data, flags unverifiable claims
+ *   3. Claude (via OpenRouter) validates Claude Opus findings — adversarial cross-check for missed issues
  *   4. Every dose limit must cite a fetched URL — "training_data_unverified" if not found
  *   5. No disease claims, only DSHEA-compliant structure/function claims
  *
@@ -103,7 +103,13 @@ const NIH_ODS_MAP = {
 function getOpenRouterKey()  { return process.env.OPENROUTER_API_KEY || null; }
 
 // Analysis model — configurable without a rebuild. Default: Claude Sonnet 5 via OpenRouter.
-// Opus (primary tier) is intentionally left untouched — not part of this migration.
+// 2026-08-28: Opus primary tier (callClaudeOpus) now ALSO points at ANALYSIS_MODEL
+// (Sonnet 5), per explicit instruction. NOTE: primary (Call 1) and validation (Call 2)
+// are now the SAME model — the adversarial cross-check loses the independent-model
+// value it had when Sonnet validated Opus's findings. It still re-reads the source
+// data fresh and can catch its own arithmetic/omission errors, but this is weaker
+// than a genuinely different model's second opinion. Flagged per explicit instruction
+// to proceed with the swap anyway.
 const ANALYSIS_MODEL = process.env.ANALYSIS_MODEL || 'anthropic/claude-sonnet-5';
 
 async function callClaudeOpus(prompt, maxTokens = 12000) {
@@ -122,7 +128,7 @@ async function callClaudeOpus(prompt, maxTokens = 12000) {
         'X-Title': 'DOVIVE Scout P12 FDA Compliance',
       },
       body: JSON.stringify({
-        model: 'anthropic/claude-opus-4.6',
+        model: ANALYSIS_MODEL,
         max_tokens: maxTokens,
         stream: true,
         messages: [{ role: 'user', content: prompt }],
@@ -267,10 +273,10 @@ async function fetchNIHData(ingredientNames) {
         safetyIdx >= 0 ? safetyIdx : text.length,
         dosageIdx >= 0 ? dosageIdx : text.length
       );
-      // Take 3000 chars around the safety section, or first 2000 chars if no safety section
+      // Take 6000 chars around the safety section, or first 5000 chars if no safety section
       const excerpt = startIdx < text.length
-        ? text.slice(Math.max(0, startIdx - 300), startIdx + 2700)
-        : text.slice(0, 2000);
+        ? text.slice(Math.max(0, startIdx - 500), startIdx + 5500)
+        : text.slice(0, 5000);
 
       results[name] = { url, text: excerpt, status: 'ok' };
       console.log(`  ✅ ${name}: ${Math.round(excerpt.length / 100) * 100} chars of safety data`);
@@ -313,7 +319,7 @@ function extractIngredientNames(formulaText) {
     if (name.length > 3 && !/serving|total|per|dose|gummy|tablet|capsule/i.test(name)) names.add(name);
   }
 
-  return [...names].slice(0, 20);
+  return [...names].slice(0, 40);
 }
 
 // ─── Build Claude Opus Primary Prompt ─────────────────────────────────────────
@@ -324,7 +330,7 @@ function buildOpusPrimaryPrompt(adjustedFormula, nihData, keyword) {
       return `### ${ingredient}
 Source: ${data.url}
 Key safety data (NIH ODS excerpt):
-${data.text.slice(0, 1500)}
+${data.text.slice(0, 6000)}
 `;
     }
     return `### ${ingredient}
@@ -352,7 +358,7 @@ ${nihSection}
 ## YOUR DELIVERABLE
 
 # P12 FDA COMPLIANCE REVIEW — ${keyword.toUpperCase()}
-*Primary analysis: Claude Opus 4.6*
+*Primary analysis: Claude (via OpenRouter)*
 *NIH data: fetched live at ${new Date().toISOString().split('T')[0]}*
 
 ## EXECUTIVE SUMMARY
@@ -443,7 +449,7 @@ function buildSonnetValidationPrompt(adjustedFormula, nihData, opusAnalysis, key
   return `You are a dietary supplement regulatory expert cross-validating a compliance analysis.
 
 ## YOUR MISSION
-Review the FDA compliance analysis below (produced by Claude Opus 4.6). Your job is to:
+Review the FDA compliance analysis below (produced by Claude (via OpenRouter)). Your job is to:
 1. Verify that UL values cited are consistent with the NIH data available
 2. Check for disease claims that were MISSED by Claude Opus
 3. Check for over-flagged structure/function claims (false positives)
@@ -451,21 +457,21 @@ Review the FDA compliance analysis below (produced by Claude Opus 4.6). Your job
 5. Verify the compliance score is appropriate
 
 ## DOVIVE FORMULA
-${(adjustedFormula || '').slice(0, 2000)}
+${(adjustedFormula || '').slice(0, 10000)}
 
 ## NIH DATA AVAILABILITY (ingredients with fetched data)
 ${nihSummary}
 
 ## CLAUDE OPUS 4.6 COMPLIANCE ANALYSIS (to validate)
-${opusAnalysis?.slice(0, 6000) || 'Not available'}
-${opusAnalysis && opusAnalysis.length > 6000 ? '\n[Analysis continues — key sections shown]\n' : ''}
+${opusAnalysis?.slice(0, 40000) || 'Not available'}
+${opusAnalysis && opusAnalysis.length > 40000 ? '\n[Analysis continues — key sections shown]\n' : ''}
 
 ---
 
 ## YOUR DELIVERABLE
 
 # P12 GROK VALIDATION REPORT
-*Validating Claude Opus 4.6 compliance analysis for ${keyword}*
+*Validating Claude (via OpenRouter) compliance analysis for ${keyword}*
 
 ## VALIDATION SUMMARY
 | Check | Result |
@@ -592,7 +598,7 @@ async function run() {
   // Same class of bug as P9 Call2 / P10(P11) sonnet_draft truncation (2026-08-28):
   // low max_tokens can leave output empty, which used to be coerced to `null` and
   // persisted that way. Raised budgets + retry-once + never-null guard applied here too.
-  console.log(`\nCall 1: Claude Opus 4.6 primary compliance analysis...`);
+  console.log(`\nCall 1: Claude (via OpenRouter) primary compliance analysis...`);
   const opusPrompt = buildOpusPrimaryPrompt(adjustedFormula, nihData, KEYWORD);
   console.log(`  Prompt: ${Math.round(opusPrompt.length / 1000)}k chars`);
   let opusAnalysis = await callClaudeOpus(opusPrompt, 16000);
@@ -605,7 +611,7 @@ async function run() {
   }
 
   // ── Call 2: Claude Sonnet validation ──────────────────────────────────────
-  console.log(`\nCall 2: Claude Sonnet 4.6 validating Claude Opus findings...`);
+  console.log(`\nCall 2: Claude (via OpenRouter) validating Claude Opus findings...`);
   const sonnetPrompt = buildSonnetValidationPrompt(adjustedFormula, nihData, opusAnalysis, KEYWORD);
   console.log(`  Prompt: ${Math.round(sonnetPrompt.length / 1000)}k chars`);
   let sonnetValidation = await callClaudeSonnet(sonnetPrompt, 12000);
@@ -644,7 +650,7 @@ async function run() {
     nih_coverage: { fetched: nihHits, no_page: nihMiss, failed: nihFail, total: ingredientNames.length },
     ingredients_reviewed: ingredientNames,
     generated_at: new Date().toISOString(),
-    models_used: { primary: 'anthropic/claude-opus-4.6', validation: ANALYSIS_MODEL },
+    models_used: { primary: ANALYSIS_MODEL, validation: ANALYSIS_MODEL },
     data_sources: Object.fromEntries(
       Object.entries(nihData).filter(([,d]) => d.url).map(([name, d]) => [name, d.url])
     ),

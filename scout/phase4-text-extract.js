@@ -26,6 +26,7 @@ const LIMIT     = LIMIT_IDX > -1 ? parseInt(process.argv[LIMIT_IDX + 1]) : null;
 
 const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY;
+const ANALYSIS_MODEL = process.env.ANALYSIS_MODEL || 'anthropic/claude-sonnet-5';
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
@@ -79,8 +80,8 @@ Return ONLY valid JSON, no markdown.`;
           'X-Title': 'Dovive Scout P4'
         },
         body: JSON.stringify({
-          model: 'openai/gpt-4o',
-          max_tokens: 1000,
+          model: ANALYSIS_MODEL,
+          max_tokens: 2000,
           messages: [{ role: 'user', content: prompt }]
         })
       });
@@ -91,7 +92,37 @@ Return ONLY valid JSON, no markdown.`;
       }
 
       const data = await res.json();
-      const content = data.choices?.[0]?.message?.content || '';
+      const choice = data.choices?.[0];
+      const content = choice?.message?.content || '';
+      const finishReason = choice?.finish_reason || 'unknown';
+      console.log(`  finish_reason: ${finishReason}`);
+      if (finishReason === 'length' || !content) {
+        console.log(`  ⚠️  Truncated/empty (finish_reason=${finishReason}) — retrying once at higher max_tokens...`);
+        const retryRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${OPENROUTER_KEY}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': 'https://dovive.com',
+            'X-Title': 'Dovive Scout P4'
+          },
+          body: JSON.stringify({
+            model: ANALYSIS_MODEL,
+            max_tokens: 4000,
+            messages: [{ role: 'user', content: prompt }]
+          })
+        });
+        const retryData = await retryRes.json();
+        const retryChoice = retryData.choices?.[0];
+        const retryContent = retryChoice?.message?.content || '';
+        console.log(`  finish_reason (retry): ${retryChoice?.finish_reason || 'unknown'}`);
+        if (!retryContent) {
+          throw new Error('[ERROR: truncated/empty] — retry still produced no content');
+        }
+        const retryParsed = parseModelJson(retryContent);
+        if (!retryParsed.parsed) throw new Error(`Could not parse retry response (${retryParsed.method})`);
+        return retryParsed.parsed;
+      }
       const parsed = parseModelJson(content);
       if (!parsed.parsed) throw new Error(`Could not parse GPT response (${parsed.method})`);
       return parsed.parsed;
@@ -178,7 +209,7 @@ async function main() {
           health_claims: hasClaims ? extracted.health_claims : null,
           certifications: extracted.certifications?.length ? extracted.certifications : null,
           raw_text: Array.isArray(p.bullet_points) ? p.bullet_points.join('\n') : p.bullet_points,
-          gpt_model: 'openrouter/gpt-4o-text',
+          gpt_model: ANALYSIS_MODEL,
           processed_at: new Date().toISOString()
         };
 

@@ -157,6 +157,83 @@ async function callClaudeSonnet(prompt) {
   }
   return output;
 }
+// ─── Positioning / Target Customer Extraction ────────────────────────────────
+// 2026-08-28 FIX: formula_briefs.positioning and .target_customer were being
+// written as literal templated strings ("Dual AI formula brief for X - Draft
+// A (model)...", "Adults seeking X supplementation") — never real analysis,
+// even though the primary brief's "## 1. EXECUTIVE SUMMARY" section already
+// contains real, grounded positioning/target-market content (product name,
+// target market, key differentiators vs #1). That section is free-text
+// prose mixed with dosage-form/serving-size details, not cleanly separated
+// into positioning vs audience — a regex/string extraction would produce
+// garbled or wrong output. A small targeted Sonnet-5 call (same
+// truncation-safe pattern as the rest of P8) extracts exactly those two
+// fields FROM the already-generated Executive Summary text — no new
+// research, no invented content, and no generic filler on failure (returns
+// nulls, so the UI's "Pending analysis" state stays truthful).
+async function extractPositioningAudience(primaryBrief, marketData) {
+  if (!primaryBrief || primaryBrief.startsWith('[ERROR')) return { positioning: null, target_customer: null };
+  const key = getOpenRouterKey();
+  if (!key) return { positioning: null, target_customer: null };
+
+  const execMatch = primaryBrief.match(/##\s*1\.\s*EXECUTIVE SUMMARY([\s\S]*?)(?=##\s*2\.)/i);
+  const execText = (execMatch ? execMatch[1] : primaryBrief).trim().slice(0, 4000);
+  if (!execText) return { positioning: null, target_customer: null };
+
+  const prompt = `Extract exactly two fields from this real supplement formula brief's Executive Summary for the "${KEYWORD}" category (${marketData.category_summary.total_products} real competitor products analyzed, avg price ${marketData.category_summary.avg_price}).
+
+EXECUTIVE SUMMARY TEXT:
+"""
+${execText}
+"""
+
+Return ONLY valid JSON (no markdown fences, no commentary):
+{
+  "positioning": "1-2 sentence real market positioning statement for this DOVIVE concept vs the category leader/competitors, grounded strictly in the text above",
+  "target_customer": "1-2 sentence real target customer description grounded strictly in the text above"
+}
+If the text above genuinely does not contain enough information for a field, use null for that field — do NOT invent generic filler.`;
+
+  const doCall = async (mt) => {
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${key}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://dovive.com',
+        'X-Title': 'DOVIVE Scout P8 Positioning Extract',
+      },
+      body: JSON.stringify({
+        model: ANALYSIS_MODEL,
+        max_tokens: mt,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+    const j = await res.json();
+    if (j.error) throw new Error(`Positioning extract error: ${j.error.message}`);
+    const choice = j.choices?.[0];
+    return { content: choice?.message?.content || null, finishReason: choice?.finish_reason || 'unknown' };
+  };
+
+  try {
+    let { content, finishReason } = await doCall(600);
+    if (!content || finishReason === 'length') {
+      const retry = await doCall(900);
+      content = retry.content || content;
+    }
+    if (!content) return { positioning: null, target_customer: null };
+    const cleaned = content.trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+    const parsed = JSON.parse(cleaned);
+    return {
+      positioning: typeof parsed.positioning === 'string' && parsed.positioning.trim() ? parsed.positioning.trim() : null,
+      target_customer: typeof parsed.target_customer === 'string' && parsed.target_customer.trim() ? parsed.target_customer.trim() : null,
+    };
+  } catch (e) {
+    console.warn('  ⚠️ Positioning/audience extraction failed (non-fatal):', e.message);
+    return { positioning: null, target_customer: null };
+  }
+}
+
 // ─── P5 Deep Research Fetch ───────────────────────────────────────────────────
 async function fetchP5DeepResearch(keyword) {
   try {
@@ -320,9 +397,28 @@ async function compileMarketData(categoryId) {
     .eq('category_id', categoryId)
     .not('marketing_analysis', 'is', null);
 
-  const { count: total } = await DASH.from('products')
+  // Fallback: if the exact-count query above errored or returned falsy while
+  // real product rows demonstrably exist for this category, use the larger
+  // of top20/allProducts as a floor rather than persisting 0.
+  if (!total) {
+    const liveFloor = Math.max(allProducts?.length || 0, top20?.length || 0);
+    if (liveFloor > 0) {
+      console.warn(`  ⚠️ total_products count was ${total}, but ${liveFloor} live product rows exist — using floor of ${liveFloor}`);
+      total = liveFloor;
+    }
+  }
+
+  // 2026-08-28: this query is already scoped to `categoryId`, which the
+  // caller (run()) resolves via resolveCategory() — the same deterministic
+  // highest-live-product-count tie-break used pipeline-wide since the
+  // duplicate-category fix (commit 566732c). If this count query errors or
+  // returns null/0 while real product rows clearly exist (allProducts
+  // fetched below), fall back to a live count instead of silently
+  // persisting 0 into formula_briefs.market_summary.
+  let { count: total, error: totalErr } = await DASH.from('products')
     .select('*', { count: 'exact', head: true })
     .eq('category_id', categoryId);
+  if (totalErr) console.warn('  ⚠️ total_products count query failed (non-fatal):', totalErr.message);
 
   // â"€â"€ Aggregate ingredient frequency from P6 â"€â"€
   const ingredientMap = {};
@@ -1186,7 +1282,7 @@ Target Length: 3,000-4,000 words (focused on FORMULA, not process)`;
 
 // â"€â"€â"€ Save to DB â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
-async function saveToDB(categoryId, grokBrief, claudeBrief, marketData) {
+async function saveToDB(categoryId, grokBrief, claudeBrief, marketData, positioningData = {}) {
   // Preserve market_intelligence before delete (it gets wiped otherwise)
   const { data: existingFB } = await DASH.from('formula_briefs').select('ingredients').eq('category_id', categoryId).limit(1).maybeSingle();
   const preservedMarketIntel = existingFB?.ingredients?.market_intelligence || null;
@@ -1199,8 +1295,13 @@ async function saveToDB(categoryId, grokBrief, claudeBrief, marketData) {
 
   const { error } = await DASH.from('formula_briefs').insert({
     category_id: categoryId,
-    positioning: `Dual AI formula brief for ${KEYWORD} - Draft A (${VALIDATION_MODEL}) + Draft B (${ANALYSIS_MODEL}) vs ${marketData.category_summary.total_products} products`,
-    target_customer: `Adults seeking ${KEYWORD} supplementation`,
+    // 2026-08-28 FIX: previously hardcoded templated strings (never real
+    // analysis). Now extracted from the primary brief's real, AI-generated
+    // Executive Summary via extractPositioningAudience() — left null (not
+    // generic filler) if extraction genuinely fails, so the UI's "Pending
+    // analysis" state stays truthful instead of showing fake-real text.
+    positioning: positioningData?.positioning || null,
+    target_customer: positioningData?.target_customer || null,
     form_type: 'gummy',
     form_rationale: 'Category leader uses gummy format',
     flavor_profile: 'See variant lineup in brief',
@@ -1359,9 +1460,16 @@ async function run() {
   console.log(`  Draft A: ${grokBrief  ? Math.round(grokBrief.length/1000)+"k chars OK" : "FAILED"}`);
   console.log(`  Draft B: ${claudeBrief ? Math.round(claudeBrief.length/1000)+"k chars OK" : "FAILED"}\n`);
 
+  // 3b. Extract real positioning/target_customer from the primary brief's
+  // Executive Summary (see extractPositioningAudience — replaces the old
+  // templated placeholder strings).
+  process.stdout.write("Extracting positioning/target customer... ");
+  const positioningData = await extractPositioningAudience(grokBrief || claudeBrief, marketData);
+  console.log(`Done (positioning=${positioningData.positioning ? 'ok' : 'null'}, target_customer=${positioningData.target_customer ? 'ok' : 'null'})\n`);
+
   // 4. Save to Supabase - both outputs
   process.stdout.write("Saving both briefs to formula_briefs table... ");
-  await saveToDB(cat.id, grokBrief, claudeBrief, marketData);
+  await saveToDB(cat.id, grokBrief, claudeBrief, marketData, positioningData);
   console.log("Done\n");
 
   // 5. Save to vault - both outputs

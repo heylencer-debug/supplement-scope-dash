@@ -1,5 +1,57 @@
 # Scout pipeline — Cloud Run Job deploy notes
 
+## 2026-08-28 follow-up 6: formula_briefs UI-critical fields — real positioning/target_customer, robust market_summary count
+
+Re-diagnosed the "OUR CONCEPT" card / brief UI fields against the ACTUAL
+running code (not prior claims) on a real completed run ("sea moss
+gummies"):
+
+- `positioning` / `target_customer` were STILL hardcoded templated strings
+  in `phase8-formula-brief.js`'s `saveToDB()` — `` `Dual AI formula brief
+  for ${KEYWORD} - Draft A (...) + Draft B (...) vs N products` `` and
+  `` `Adults seeking ${KEYWORD} supplementation` `` — never touched by the
+  2026-08-28 pass that fixed `key_differentiators`/`opportunity_insights`/
+  `risk_factors` (those 3 were genuinely fixed then; positioning/
+  target_customer were missed). Root cause: no writer ever extracted these
+  from the real AI-generated brief content. Fix: new
+  `extractPositioningAudience(primaryBrief, marketData)` — pulls the
+  brief's already-generated `## 1. EXECUTIVE SUMMARY` section (real,
+  grounded content: product name, target market, key differentiators vs
+  #1) and runs one small targeted `ANALYSIS_MODEL` (Sonnet 5) call asking
+  for exactly two JSON fields (`positioning`, `target_customer`) extracted
+  strictly from that text — not a new research call, just structuring
+  content P8 already produced. Same truncation-safe pattern as the rest of
+  P8 (retry once at higher max_tokens on empty/`length` finish_reason). On
+  any failure (no key, no brief, parse error) returns `{positioning: null,
+  target_customer: null}` — `saveToDB()` now writes `null`, never generic
+  filler, so the UI's "Pending analysis" empty state stays truthful per the
+  never-fabricate rule.
+- `key_differentiators`/`opportunity_insights`/`risk_factors` — confirmed
+  the 2026-08-28 fix (commit `2296577`) is correctly wired and unchanged;
+  they were empty on the "sea moss gummies" row specifically because that
+  row predates the fix and P8 skips regeneration when a brief already has
+  `ai_generated_brief` content (`--force` required to regenerate stale
+  rows).
+- `market_summary.total_products` showing 0: the count query in
+  `compileMarketData()` is already scoped to the `categoryId` resolved via
+  `resolveCategory()`'s deterministic highest-live-product-count tie-break
+  (same as every other phase, since the duplicate-category fix in commit
+  `566732c`) — code-level this is correct today. The observed 0 is
+  consistent with a STALE brief row written before that fix (or before a
+  count query transiently failed) that was never regenerated (same
+  `--force` gate as above). Hardened anyway for defense-in-depth: the count
+  query's error is now logged instead of silently swallowed, and if the
+  count comes back falsy while `allProducts`/`top20` demonstrably have real
+  rows for the category, `total` falls back to the larger of those two
+  array lengths instead of persisting 0.
+- **Action needed to see corrected values on existing categories**: run P8
+  with `--force` for any keyword whose `formula_briefs` row predates this
+  fix (e.g. `node phase8-formula-brief.js --keyword "sea moss gummies"
+  --force`) — the FORCE-skip gate only checks for `ai_generated_brief`
+  presence, not field freshness, so old rows won't self-heal without it.
+
+---
+
 ## 2026-08-28 follow-up 5: P5 off-Amazon rebuild — Perplexity discovery + Bright Data raw-fetch retry
 
 Confirmed the Bright Data ISP proxy fix from follow-up 4 did NOT solve P5

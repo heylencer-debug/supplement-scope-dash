@@ -452,7 +452,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="dark space-y-4 md:space-y-6 pb-12 md:pb-16 overflow-x-hidden bg-background text-foreground text-[13px]">
+    <div className="space-y-4 md:space-y-6 pb-12 md:pb-16 overflow-x-hidden bg-background text-foreground text-[13px]">
       {/* SECTION 1: Hero Header with Executive Summary */}
       <div className="animate-fade-in">
         <HeroHeader

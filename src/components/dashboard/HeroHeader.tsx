@@ -31,10 +31,10 @@ export function HeroHeader({
   const cleanCategoryName = categoryName.replace(/^=+/, '').trim();
   const getVerdictColor = (rec: string | null) => {
     const r = (rec || "").toUpperCase();
-    if (r.includes("PROCEED") || r.includes("HIGH")) return "bg-chart-4/90 text-primary-foreground border-chart-4";
-    if (r.includes("CONSIDER") || r.includes("CAUTION")) return "bg-chart-2/90 text-primary-foreground border-chart-2";
-    if (r.includes("SKIP") || r.includes("AVOID")) return "bg-destructive/90 text-destructive-foreground border-destructive";
-    return "bg-secondary/90 text-secondary-foreground";
+    if (r.includes("PROCEED") || r.includes("HIGH")) return "bg-chart-4/10 text-chart-4 border-chart-4/30";
+    if (r.includes("CONSIDER") || r.includes("CAUTION")) return "bg-chart-2/10 text-chart-2 border-chart-2/30";
+    if (r.includes("SKIP") || r.includes("AVOID")) return "bg-destructive/10 text-destructive border-destructive/30";
+    return "bg-secondary text-secondary-foreground";
   };
   const getScoreColor = (score: number) => {
     if (score >= 70) return "bg-chart-4";
@@ -62,12 +62,9 @@ export function HeroHeader({
   const score10 = opportunityIndex > 10 ? opportunityIndex / 10 : opportunityIndex;
   const normalizedScore = Math.min(100, Math.max(0, score10 * 10));
   const displayScore = score10.toFixed(1);
-  return <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-primary via-primary/90 to-primary p-4 sm:p-6 md:p-8 text-primary-foreground shadow-lg">
-      {/* Subtle background pattern */}
-      <div className="absolute inset-0 opacity-5">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-white rounded-full blur-3xl -translate-y-1/2 translate-x-1/3" />
-        <div className="absolute bottom-0 left-0 w-64 h-64 bg-white rounded-full blur-3xl translate-y-1/2 -translate-x-1/4" />
-      </div>
+  return <div className="relative overflow-hidden rounded-xl bg-card border border-border p-4 sm:p-6 md:p-8 text-foreground">
+      {/* Thin electric accent line — the only "billboard" left */}
+      <div className="absolute top-0 left-0 right-0 h-[3px] bg-primary" />
 
       <div className="relative space-y-5">
         {/* Top Row: Title, Score, and Product Images */}
@@ -75,14 +72,14 @@ export function HeroHeader({
           {/* Left Section: Title, Badge, Score */}
           <div className="flex-1 space-y-3">
             {isLoading ? <>
-                <Skeleton className="h-8 w-64 bg-white/20" />
-                <Skeleton className="h-6 w-32 bg-white/20" />
+                <Skeleton className="h-8 w-64" />
+                <Skeleton className="h-6 w-32" />
               </> : <>
                 <div className="space-y-2 animate-enter">
-                  <h1 className="text-xl md:text-2xl lg:text-3xl font-bold tracking-tight text-primary-foreground">
+                  <h1 className="text-xl md:text-2xl lg:text-3xl font-bold tracking-tight text-foreground">
                     {cleanCategoryName}
                   </h1>
-                  {recommendation && <Badge className={`text-xs px-3 py-1 font-medium ${getVerdictColor(recommendation)}`}>
+                  {recommendation && <Badge className={`text-xs px-3 py-1 font-medium border ${getVerdictColor(recommendation)}`}>
                       {recommendation}
                     </Badge>}
                 </div>
@@ -91,19 +88,19 @@ export function HeroHeader({
                 <div className="flex flex-wrap items-center gap-3 md:gap-4 animate-enter" style={{ animationDelay: '0.1s' }}>
                   <div className="flex items-center gap-2 md:gap-3">
                     <div className="flex items-baseline gap-1">
-                      <span className="text-2xl md:text-3xl font-bold">{displayScore}</span>
-                      <span className="text-xs md:text-sm text-white/60">/10</span>
+                      <span className="text-2xl md:text-3xl font-bold text-foreground">{displayScore}</span>
+                      <span className="text-xs md:text-sm text-muted-foreground">/10</span>
                     </div>
                     <div className="flex flex-col gap-1">
-                      <span className="text-[10px] md:text-xs text-white/70">Opportunity Score</span>
-                      <div className="w-20 md:w-32 h-1.5 md:h-2 bg-white/20 rounded-full overflow-hidden">
+                      <span className="text-[10px] md:text-xs text-muted-foreground">Opportunity Score</span>
+                      <div className="w-20 md:w-32 h-1.5 md:h-2 bg-muted rounded-full overflow-hidden">
                         <div className={`h-full rounded-full transition-all duration-500 ${getScoreColor(normalizedScore)}`} style={{
                       width: `${normalizedScore}%`
                     }} />
                       </div>
                     </div>
                   </div>
-                  <Badge variant="outline" className="text-[10px] md:text-xs text-white/80 border-white/30 bg-white/10">
+                  <Badge variant="outline" className="text-[10px] md:text-xs text-muted-foreground border-border bg-secondary">
                     {getTierDisplay()}
                   </Badge>
                 </div>
@@ -113,9 +110,9 @@ export function HeroHeader({
           {/* Right Section: Top Products - Bigger Images */}
           <div className="flex flex-col items-start lg:items-end gap-2">
             {isLoading ? <div className="flex -space-x-4">
-                {[...Array(5)].map((_, i) => <Skeleton key={i} className="w-14 h-14 md:w-16 md:h-16 rounded-lg bg-white/20 ring-2 ring-white/30" />)}
+                {[...Array(5)].map((_, i) => <Skeleton key={i} className="w-14 h-14 md:w-16 md:h-16 rounded-lg ring-2 ring-border" />)}
               </div> : topProducts.length > 0 ? <>
-                <span className="text-[10px] md:text-xs font-medium text-white/60 uppercase tracking-wider">
+                <span className="text-[10px] md:text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Top Brands
                 </span>
                 <TooltipProvider>
@@ -123,7 +120,7 @@ export function HeroHeader({
                     {topProducts.slice(0, 5).map((product, index) => <Tooltip key={index}>
                         <TooltipTrigger asChild>
                           <div className="relative transition-transform hover:scale-110 hover:z-10">
-                            <div className="w-14 h-14 md:w-16 md:h-16 lg:w-20 lg:h-20 rounded-lg ring-2 ring-white/80 bg-white shadow-md overflow-hidden">
+                            <div className="w-14 h-14 md:w-16 md:h-16 lg:w-20 lg:h-20 rounded-lg ring-2 ring-border bg-white shadow-sm overflow-hidden">
                               {product.main_image_url ? <img src={product.main_image_url} alt={product.brand || 'Product'} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-slate-600 text-xs md:text-sm font-medium">
                                   {(product.brand || 'P').slice(0, 2).toUpperCase()}
                                 </div>}
@@ -142,13 +139,13 @@ export function HeroHeader({
         </div>
 
         {/* Executive Summary */}
-        {!isLoading && executiveSummary && <div className="pt-3 border-t border-white/10 animate-enter" style={{ animationDelay: '0.2s' }}>
-            <p className="text-xs md:text-sm text-white/80 leading-relaxed line-clamp-3 md:line-clamp-none">
+        {!isLoading && executiveSummary && <div className="pt-3 border-t border-border animate-enter" style={{ animationDelay: '0.2s' }}>
+            <p className="text-xs md:text-sm text-muted-foreground leading-relaxed line-clamp-3 md:line-clamp-none">
               {executiveSummary}
             </p>
           </div>}
-        {isLoading && <div className="pt-3 border-t border-white/10">
-            <Skeleton className="h-12 w-full bg-white/20" />
+        {isLoading && <div className="pt-3 border-t border-border">
+            <Skeleton className="h-12 w-full" />
           </div>}
       </div>
     </div>;

@@ -77,6 +77,20 @@
     --pearl-shadow-sm: 0 1px 3px 0px rgba(0, 0, 0, 0.06), 0 1px 2px -1px rgba(0, 0, 0, 0.06);
     --pearl-shadow-md: 0 1px 3px 0px rgba(0, 0, 0, 0.08), 0 4px 10px -2px rgba(0, 0, 0, 0.08);
 
+    /* Ink glossy-pearl recipe (getnoodle's real .pearl-button ring, ported
+       1:1 from ~/getnoodle/src/index.css — a bright top pool, a thin dark
+       counter-line, and a broad light bounce at the bottom, plus a waterline
+       dome (::before) and a masked gloss cap (::after)). Dark-fill defaults —
+       the reference's own values — since our primary CTA IS a dark ink fill. */
+    --pearl-c-hi: #ffe7ff;
+    --pearl-c-lo: #000;
+    --pearl-c-sheen: #ffe7ff;
+    --pearl-s-top: 30%;
+    --pearl-s-line: 70%;
+    --pearl-s-bounce: 50%;
+    --pearl-s-arc: 12%;
+    --pearl-s-cap: 30%;
+
     /* Light sidebar - white w/ electric accent */
     --sidebar-background: var(--brand-white);
     --sidebar-foreground: var(--brand-ink);
@@ -271,57 +285,165 @@
     cursor: not-allowed;
   }
 
-  /* PRIMARY — electric blue fill, soft shadow */
-  .pearl-button {
-    background: hsl(var(--brand-electric));
+  /* PRIMARY + PILL(default) — the getnoodle signature: an INK glossy pearl
+     shell. Ported faithfully from ~/getnoodle/src/index.css's `.pearl-button`
+     ring (its own comments: "the ring is FOUR-part: a bright pool at the top,
+     a thin dark line under it, then a second BROAD light pool at the
+     bottom... drop it and the button goes flat immediately"), plus the
+     waterline dome (::before) and masked gloss cap (::after). This IS the
+     brand — not approximated. */
+  .pearl-button,
+  .pearl-pill:not(.pearl-neon) {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    background: hsl(var(--brand-ink));
     color: #fff;
-    box-shadow: var(--pearl-shadow-sm);
-  }
-  .pearl-button:hover:not(:disabled) {
-    background: hsl(var(--brand-electric) / 0.92);
-    box-shadow: var(--pearl-shadow-md);
+    box-shadow:
+      0 1px 2px rgba(0, 0, 0, 0.28),
+      0 10px 24px -10px rgba(0, 0, 0, 0.45),
+      inset 0 0.192em 0.576em color-mix(in oklab, var(--pearl-c-hi) var(--pearl-s-top), transparent),
+      inset 0 -0.064em 0.192em color-mix(in oklab, var(--pearl-c-lo) var(--pearl-s-line), transparent),
+      inset 0 -0.256em 0.576em color-mix(in oklab, var(--pearl-c-hi) var(--pearl-s-bounce), transparent);
   }
 
-  /* SECONDARY — white fill with light border, clinical */
+  .pearl-button::before,
+  .pearl-button::after,
+  .pearl-pill:not(.pearl-neon)::before,
+  .pearl-pill:not(.pearl-neon)::after {
+    content: '';
+    position: absolute;
+    pointer-events: none;
+    transition: all 0.3s ease;
+    z-index: -1;
+  }
+
+  /* THE WATERLINE — the dome curve that reads as a sphere's terminator. */
+  .pearl-button::before,
+  .pearl-pill:not(.pearl-neon)::before {
+    left: -18%;
+    right: -18%;
+    top: -100%;
+    bottom: 34%;
+    border-radius: 50%;
+    background-image: linear-gradient(
+      to bottom,
+      transparent 72%,
+      color-mix(in oklab, var(--pearl-c-hi) var(--pearl-s-arc), transparent) 100%
+    );
+  }
+
+  /* THE GLOSS CAP — a hard-edged reflective pane, masked so its edges fade
+     rather than crop. */
+  .pearl-button::after,
+  .pearl-pill:not(.pearl-neon)::after {
+    left: 6%;
+    right: 6%;
+    top: 12%;
+    bottom: 40%;
+    border-radius: 9999px 9999px 0 0;
+    box-shadow: inset 0 0.4em 0.32em -0.4em
+      color-mix(in oklab, var(--pearl-c-sheen) min(100%, calc(var(--pearl-s-cap) * 8 / 3)), transparent);
+    background: linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--pearl-c-sheen) var(--pearl-s-cap), transparent) 0%,
+      color-mix(in oklab, var(--pearl-c-sheen) calc(var(--pearl-s-cap) / 2), transparent) 44%,
+      transparent 78%,
+      transparent 100%
+    );
+    -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 16%, #000 84%, transparent 100%);
+    mask-image: linear-gradient(90deg, transparent 0%, #000 16%, #000 84%, transparent 100%);
+  }
+
+  .pearl-button:hover:not(:disabled),
+  .pearl-pill:not(.pearl-neon):hover:not(:disabled) {
+    transform: scale(1.025);
+    background: hsl(0 0% 14%);
+    box-shadow:
+      0 2px 4px rgba(0, 0, 0, 0.32),
+      0 12px 28px -10px rgba(0, 0, 0, 0.5),
+      inset 0 0.192em 0.32em color-mix(in oklab, var(--pearl-c-hi) 40%, transparent),
+      inset 0 -0.064em 0.192em color-mix(in oklab, var(--pearl-c-lo) var(--pearl-s-line), transparent),
+      inset 0 -0.256em 0.576em color-mix(in oklab, var(--pearl-c-hi) 70%, transparent);
+  }
+  .pearl-button:hover:not(:disabled)::before,
+  .pearl-pill:not(.pearl-neon):hover:not(:disabled)::before { transform: translateY(-0.3em); }
+  .pearl-button:hover:not(:disabled)::after,
+  .pearl-pill:not(.pearl-neon):hover:not(:disabled)::after { opacity: 0.4; transform: translateY(0.26em); }
+  .pearl-button:hover:not(:disabled) .pearl-label,
+  .pearl-pill:not(.pearl-neon):hover:not(:disabled) .pearl-label { transform: translateY(-4%) scale(1.03); }
+
+  /* SECONDARY — white pill w/ border, the same shell recipe but a light fill:
+     hi/lo swap per the reference's own rule ("white highlights are invisible
+     on a light fill, so the modelling has to be done with ink instead"). */
   .pearl-secondary {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
     background: hsl(var(--brand-white));
     color: hsl(var(--brand-ink));
     border: 1px solid hsl(var(--brand-border));
-    box-shadow: var(--pearl-shadow-sm);
+    box-shadow:
+      var(--pearl-shadow-sm),
+      inset 0 0.15em 0.4em rgba(0, 0, 0, 0.05),
+      inset 0 -0.1em 0.3em rgba(255, 255, 255, 0.7);
+  }
+  .pearl-secondary::after {
+    content: '';
+    position: absolute;
+    left: 6%;
+    right: 6%;
+    top: 10%;
+    bottom: 55%;
+    border-radius: 9999px 9999px 0 0;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), transparent);
+    pointer-events: none;
+    -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 16%, #000 84%, transparent 100%);
+    mask-image: linear-gradient(90deg, transparent 0%, #000 16%, #000 84%, transparent 100%);
   }
   .pearl-secondary:hover:not(:disabled) {
     background: hsl(var(--brand-smoke));
   }
 
-  /* QUIET — near-transparent, brightens on hover/focus (double class beats
-     the ambient sweep selector, mirroring the getnoodle specificity fight) */
+  /* QUIET — the real quiet-chrome treatment: near-invisible resting gloss
+     that brightens on hover, per the reference's `.pearl-quiet` tier (double
+     class beats the ambient sweep selector, mirroring the getnoodle
+     specificity fight). */
   .pearl-quiet.pearl-quiet {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
     background: transparent;
     color: hsl(var(--brand-muted));
     border: 1px solid hsl(var(--brand-border));
+    box-shadow:
+      inset 0 0.1em 0.2em rgba(0, 0, 0, 0.02),
+      inset 0 -0.08em 0.16em rgba(255, 255, 255, 0.16);
   }
   .pearl-quiet.pearl-quiet:hover:not(:disabled) {
     background: hsl(var(--brand-smoke));
     color: hsl(var(--brand-ink));
+    box-shadow:
+      inset 0 0.15em 0.3em rgba(0, 0, 0, 0.04),
+      inset 0 -0.1em 0.25em rgba(255, 255, 255, 0.4);
   }
 
-  /* DANGER — red fill, same soft-shadow recipe */
+  /* DANGER — red fill, same soft-shadow recipe as secondary/quiet */
   .pearl-danger {
     background: hsl(0 72% 51%);
     color: #fff;
     box-shadow: var(--pearl-shadow-sm);
   }
 
-  /* PILL — fully rounded electric/neon CTA (e.g. "Generate Manufacturer Link") */
+  /* PILL(neon) — the one deliberate accent exception: fully rounded neon
+     fill w/ ink text, reserved for a small status-pop CTA, not the default. */
   .pearl-pill {
     border-radius: 999px;
-    background: hsl(var(--brand-electric));
-    color: #fff;
-    box-shadow: var(--pearl-shadow-sm);
   }
   .pearl-pill.pearl-neon {
     background: hsl(var(--brand-neon));
     color: hsl(var(--brand-ink));
+    box-shadow: var(--pearl-shadow-sm);
   }
 
   .pearl-wrap,
@@ -329,6 +451,7 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
+    transition: transform 0.2s ease;
   }
   .pearl-spark-idle,
   .pearl-spark-hover {
@@ -365,6 +488,7 @@
   .pearl-tab[data-state='active'] {
     background: hsl(var(--brand-ink));
     color: hsl(var(--brand-neon));
+    border-color: transparent;
     box-shadow: var(--pearl-shadow-sm);
   }
 

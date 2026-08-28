@@ -27,9 +27,13 @@ const TabsTrigger = React.forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      "inline-flex items-center justify-center whitespace-nowrap rounded-xl px-4 py-2 text-sm font-bold tracking-wide ring-offset-background transition-all duration-300 ease-out",
-      "hover:bg-primary/10 hover:text-primary hover:-translate-y-0.5",
-      "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_4px_14px_hsl(var(--primary)/0.4)] data-[state=active]:translate-y-0 data-[state=active]:scale-[1.02]",
+      /* Restrained default: electric-underline active state, not a solid
+         blue fill — components that want the ink-pearl-pill look (the main
+         Dashboard tab bar) add `.pearl-tab`, whose CSS then wins cleanly
+         since this default no longer competes for `background`. */
+      "inline-flex items-center justify-center whitespace-nowrap rounded-xl px-4 py-2 text-sm font-bold tracking-wide ring-offset-background transition-all duration-300 ease-out border-b-2 border-transparent",
+      "hover:text-primary",
+      "data-[state=active]:text-primary data-[state=active]:border-primary",
       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
       className,
     )}

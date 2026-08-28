@@ -178,6 +178,7 @@ async function run() {
   let migrated = 0;
   let skipped = 0;
   let errors = 0;
+  let warnedNoConstraint = false;
 
   for (const p of products) {
     if (existingAsins.has(p.asin)) { skipped++; continue; }
@@ -223,25 +224,32 @@ async function run() {
       updated_at: new Date().toISOString(),
     };
 
-    // 2026-08-29: PROGRAMMATIC upsert — the previous `.upsert(row,
-    // {onConflict:'asin,category_id'})` failed on EVERY row ("no unique or
-    // exclusion constraint matching the ON CONFLICT specification") because
-    // the live products table has NO unique constraint on that pair (it
-    // can't be added until the stale-duplicate cleanup runs). Select the
-    // existing row id for (asin, category_id) and UPDATE it in place, else
-    // INSERT — no DB constraint required, same no-orphans guarantee.
-    const { data: existRows, error: existErr } = await DASH.from('products')
-      .select('id').eq('asin', p.asin).eq('category_id', categoryId).limit(2);
-    let error = existErr || null;
-    if (!error) {
-      if (existRows && existRows.length > 0) {
-        // Update the first; if a same-category dupe somehow exists, remove it.
-        ({ error } = await DASH.from('products').update(row).eq('id', existRows[0].id));
-        if (!error && existRows.length > 1) {
-          await DASH.from('products').delete().eq('asin', p.asin).eq('category_id', categoryId).neq('id', existRows[0].id);
+    // 2026-08-29 (bulletproof pass): native upsert FIRST — atomic under the
+    // products_asin_category_unique constraint (migration 005, added after
+    // the stale-duplicate cleanup made it possible). If the constraint is
+    // missing (fresh env, migration not applied yet) PostgREST returns the
+    // "no unique or exclusion constraint" error — fall back to the
+    // programmatic select-then-update-or-insert path, which needs no
+    // constraint and gives the same no-orphans guarantee (non-atomic).
+    let { error } = await DASH.from('products').upsert(row, { onConflict: 'asin,category_id' });
+    if (error && /no unique or exclusion constraint/i.test(error.message || '')) {
+      if (!warnedNoConstraint) {
+        console.warn('  ⚠️ products(asin,category_id) unique constraint missing — using programmatic upsert (apply migrations/005 for atomic writes)');
+        warnedNoConstraint = true;
+      }
+      const { data: existRows, error: existErr } = await DASH.from('products')
+        .select('id').eq('asin', p.asin).eq('category_id', categoryId).limit(2);
+      error = existErr || null;
+      if (!error) {
+        if (existRows && existRows.length > 0) {
+          // Update the first; if a same-category dupe somehow exists, remove it.
+          ({ error } = await DASH.from('products').update(row).eq('id', existRows[0].id));
+          if (!error && existRows.length > 1) {
+            await DASH.from('products').delete().eq('asin', p.asin).eq('category_id', categoryId).neq('id', existRows[0].id);
+          }
+        } else {
+          ({ error } = await DASH.from('products').insert(row));
         }
-      } else {
-        ({ error } = await DASH.from('products').insert(row));
       }
     }
     if (error) {

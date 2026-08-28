@@ -195,7 +195,7 @@ async function fetchPipelineStatus(categoryId: string): Promise<PhaseStatus[]> {
     {
       phase: 5,
       label: "Deep Research",
-      description: "Top 10 BSR + Top 10 New Brands - Grok 4.1 fast competitive intelligence",
+      description: "Top 10 BSR + Top 10 New Brands - Claude Sonnet 5 competitive intelligence",
       total: P5_TARGET,
       complete: p5Count,
       status: p5Count >= P5_TARGET ? "complete" : p5Count >= 10 ? "partial" : p5Count > 0 ? "partial" : "not_started",
@@ -213,7 +213,7 @@ async function fetchPipelineStatus(categoryId: string): Promise<PhaseStatus[]> {
     {
       phase: 7,
       label: "Market Intel",
-      description: "Category-level Grok market report - powers Market tab analysis",
+      description: "Category-level Sonnet 5 market report - powers Market tab analysis",
       total: 1,
       complete: p7Complete,
       status: p7Complete > 0 ? "complete" : (p6_pi.count ?? 0) > 0 ? "not_started" : "pending",
@@ -231,7 +231,7 @@ async function fetchPipelineStatus(categoryId: string): Promise<PhaseStatus[]> {
     {
       phase: 9,
       label: "Formula Brief",
-      description: `AI formula spec - Grok 4.2 deep reasoning + Claude Opus 4.6${p9HasClaude ? " ✓ dual" : p9HasBrief ? " ✓ single" : ""}`,
+      description: `AI formula spec - Opus 5 + Sonnet 5 dual drafts${p9HasClaude ? " ✓ dual" : p9HasBrief ? " ✓ single" : ""}`,
       total: 1,
       complete: p9BriefComplete,
       status: p9BriefComplete > 0 ? "complete" : "not_started",
@@ -249,7 +249,7 @@ async function fetchPipelineStatus(categoryId: string): Promise<PhaseStatus[]> {
     {
       phase: 11,
       label: "Competitive Benchmark",
-      description: `Ingredient-by-ingredient vs competitors — Claude Sonnet 4.6 draft + Opus validation${p11Score !== null ? ` · Score: ${p11Score}/10` : ""}`,
+      description: `Ingredient-by-ingredient vs competitors — Sonnet 5 draft + Opus 5 validation${p11Score !== null ? ` · Score: ${p11Score}/10` : ""}`,
       total: 1,
       complete: p11Complete,
       status: p11Complete > 0 ? "complete" : p10Complete > 0 ? "not_started" : "pending",
@@ -258,7 +258,7 @@ async function fetchPipelineStatus(categoryId: string): Promise<PhaseStatus[]> {
     {
       phase: 12,
       label: "FDA Compliance",
-      description: `NIH ODS live data · DSHEA claim validation · Claude Opus 4.6${p12Score !== null ? ` · Score: ${p12Score}/100` : ""}`,
+      description: `NIH ODS live data · DSHEA claim validation · Claude Opus 5${p12Score !== null ? ` · Score: ${p12Score}/100` : ""}`,
       total: 1,
       complete: p12Complete,
       status: p12Complete > 0 ? "complete" : p11Complete > 0 ? "not_started" : "pending",

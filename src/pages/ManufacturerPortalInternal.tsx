@@ -231,14 +231,14 @@ export default function ManufacturerPortalInternal() {
           const promotedVersion = promotedPipelineVersions.get("grok");
           all.push({
             id: "grok",
-            label: "Formula A — Grok",
+            label: "Formula A — Opus 5",
             category_id: selectedCat.id,
             created_at: briefData.created_at ?? "",
             version_number: -1,
             is_active: promotedVersion?.is_active ?? false,
             formula_brief_content: ing.ai_generated_brief_grok,
             change_summary: "Deep scientific reasoning",
-            comment_labels: promotedVersion ? ["Formula A — Grok", `v${promotedVersion.version_number}`] : ["Formula A — Grok"],
+            comment_labels: promotedVersion ? ["Formula A — Opus 5", `v${promotedVersion.version_number}`] : ["Formula A — Opus 5"],
             source: "pipeline",
             emoji: "🤖",
             subtitle: "Deep scientific reasoning",

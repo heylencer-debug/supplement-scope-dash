@@ -2,7 +2,7 @@
  * FormulaValidationTab — P11 Competitive Benchmarking + P12 FDA Compliance
  * Shows ingredient-by-ingredient competitor analysis and FDA regulatory compliance,
  * both grounded in real data (P4 OCR + live NIH ODS fact sheets).
- * Dual-model: Claude Sonnet 4.6 (draft/validation) + Claude Opus 4.6 (primary).
+ * Dual-model: Claude Sonnet 5 (draft) + Claude Opus 5 (validation).
  */
 
 import { useState } from "react";
@@ -343,7 +343,7 @@ export function FormulaValidationTab({ categoryId, categoryName, activeVersionIn
         <ExpandableCard
           emoji="📊"
           title="P11 — Competitive Benchmarking · Opus Validation"
-          subtitle={`Claude Opus 4.6 reviewed Sonnet's analysis · ${p11Date || ""}`}
+          subtitle={`Claude Opus 5 reviewed Sonnet's analysis · ${p11Date || ""}`}
           badge={p11Score != null ? `${p11Score}/10` : "Validated"}
           badgeColor="bg-blue-500/10 text-blue-400"
           borderColor="border-blue-500/30"
@@ -360,7 +360,7 @@ export function FormulaValidationTab({ categoryId, categoryName, activeVersionIn
         <ExpandableCard
           emoji="🔬"
           title="P11 — Competitive Benchmarking · Sonnet Draft"
-          subtitle="Claude Sonnet 4.6 ingredient-by-ingredient analysis · grounded in P4 OCR data"
+          subtitle="Claude Sonnet 5 ingredient-by-ingredient analysis · grounded in P4 OCR data"
           badge={`${Math.round(((benchmarking.sonnet_draft || benchmarking.grok_draft) as string).length / 1000)}k chars`}
           badgeColor="bg-blue-500/10 text-blue-400"
           borderColor="border-blue-500/20"
@@ -377,7 +377,7 @@ export function FormulaValidationTab({ categoryId, categoryName, activeVersionIn
         <ExpandableCard
           emoji="⚖️"
           title="P12 — FDA Compliance Analysis"
-          subtitle={`Claude Opus 4.6 · NIH ODS fact sheets fetched live · ${p12Date || ""}`}
+          subtitle={`Claude Opus 5 · NIH ODS fact sheets fetched live · ${p12Date || ""}`}
           badge={p12Score != null ? `${p12Score}/100` : "Analyzed"}
           badgeColor="bg-green-500/10 text-green-400"
           borderColor="border-green-500/30"
@@ -394,7 +394,7 @@ export function FormulaValidationTab({ categoryId, categoryName, activeVersionIn
         <ExpandableCard
           emoji="✅"
           title="P12 — Compliance Validation"
-          subtitle="Claude Sonnet 4.6 cross-check on Opus findings"
+          subtitle="Claude Sonnet 5 cross-check on Opus findings"
           badge="Validated"
           badgeColor="bg-green-500/10 text-green-400"
           borderColor="border-green-500/20"

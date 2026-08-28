@@ -457,7 +457,7 @@ const PHASES = [
     }
   },
   {
-    num: 5, name: 'Deep Research', description: 'Top 10 BSR + Top 10 New Brands — Grok 4.2 deep reasoning per product',
+    num: 5, name: 'Deep Research', description: 'Top 10 BSR + Top 10 New Brands — Claude Sonnet 5 deep research per product',
     run: async () => runScript('phase5-deep-research.js', ['--keyword', KEYWORD, ...(FORCE ? ['--force'] : [])])
   },
   {
@@ -465,7 +465,7 @@ const PHASES = [
     run: async () => runScript('phase6-product-intelligence.js', ['--keyword', KEYWORD, ...(FORCE ? ['--force'] : [])])
   },
   {
-    num: 7, name: 'Market Intelligence', description: 'Category-level Grok market report — powers Market tab analysis',
+    num: 7, name: 'Market Intelligence', description: 'Category-level Sonnet 5 market report — powers Market tab analysis',
     run: async () => runScript('phase6-market-analysis.js', ['--keyword', KEYWORD, ...(FORCE ? ['--force'] : [])])
   },
   {
@@ -488,11 +488,11 @@ const PHASES = [
     }
   },
   {
-    num: 11, name: 'Competitive Formula Benchmarking', description: 'Ingredient-by-ingredient vs every competitor — Grok drafts, Claude Opus 4.6 validates',
+    num: 11, name: 'Competitive Formula Benchmarking', description: 'Ingredient-by-ingredient vs every competitor — Sonnet 5 drafts, Claude Opus 5 validates',
     run: async () => runScript('phase10-competitive-benchmarking.js', ['--keyword', KEYWORD, ...(FORCE ? ['--force'] : [])])
   },
   {
-    num: 12, name: 'FDA Compliance', description: 'FDA/DSHEA compliance with live NIH ODS data — Claude Opus 4.6 primary, Grok validates',
+    num: 12, name: 'FDA Compliance', description: 'FDA/DSHEA compliance with live NIH ODS data — Claude Opus 5 primary, Sonnet 5 cross-checks',
     run: async () => runScript('phase11-fda-compliance.js', ['--keyword', KEYWORD, ...(FORCE ? ['--force'] : [])])
   },
 ];

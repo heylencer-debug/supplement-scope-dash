@@ -344,7 +344,7 @@ export function FormulaBriefTab({ categoryId, categoryName }: Props) {
       grokBrief && {
         id: 'grok',
         emoji: '🤖',
-        title: 'Formula A — Grok 4.2',
+        title: 'Formula A — Claude Opus 5',
         subtitle: 'Deep scientific reasoning',
         badge: `${Math.round(grokBrief.length / 1000)}k chars`,
         borderColor: 'border-blue-500/40',
@@ -355,7 +355,7 @@ export function FormulaBriefTab({ categoryId, categoryName }: Props) {
       claudeBrief && {
         id: 'claude',
         emoji: '🧠',
-        title: 'Formula B — Claude Sonnet 4.6',
+        title: 'Formula B — Claude Sonnet 5',
         subtitle: '1M context synthesis',
         badge: `${Math.round(claudeBrief.length / 1000)}k chars`,
         borderColor: 'border-purple-500/40',
@@ -367,7 +367,7 @@ export function FormulaBriefTab({ categoryId, categoryName }: Props) {
         id: 'final',
         emoji: '✅',
         title: 'Final Formula — QA Approved',
-        subtitle: (finalFormulaBrief ? 'Complete brief · ' : 'Adjustments only · ') + 'Claude Sonnet 4.6 adjudication · ' + (qaVerdict?.verdict || 'Reviewed'),
+        subtitle: (finalFormulaBrief ? 'Complete brief · ' : 'Adjustments only · ') + 'Claude Opus 5 adjudication · ' + (qaVerdict?.verdict || 'Reviewed'),
         badge: qaVerdict?.score ? `${qaVerdict.score}/10` : 'QA',
         borderColor: 'border-green-500/40',
         bgColor: 'bg-green-500/5',
@@ -397,7 +397,7 @@ export function FormulaBriefTab({ categoryId, categoryName }: Props) {
           <FlaskConical className="h-4 w-4 text-primary shrink-0" />
           <span>
             <strong className="text-foreground">Formula Brief</strong>
-            {grokBrief && claudeBrief ? ' — Dual-model: Grok 4.2 + Claude Sonnet 4.6 ran in parallel. Click a card to expand.' : ' — Click a card to expand.'}
+            {grokBrief && claudeBrief ? ' — Dual-model: Claude Opus 5 + Claude Sonnet 5 ran in parallel. Click a card to expand.' : ' — Click a card to expand.'}
           </span>
           {dataSources && (
             <span className="ml-auto text-xs hidden sm:block">

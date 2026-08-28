@@ -714,7 +714,7 @@ export default function Dashboard() {
 
         <TabsContent value="market" className="space-y-4 mt-3">
 
-          {/* P6 Grok Market Intelligence — always at top */}
+          {/* P6 Market Intelligence — always at top */}
           {category?.id && (
             <MarketIntelligenceReport categoryId={category.id} categoryName={categoryName || ""} />
           )}

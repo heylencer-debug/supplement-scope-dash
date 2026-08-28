@@ -1,5 +1,5 @@
 /**
- * MarketIntelligenceReport — P6 Grok Market Demand Analysis
+ * MarketIntelligenceReport — P6 Market Demand Analysis (Claude Sonnet 5)
  * Structured, formatted display of the AI market intelligence report.
  * Market tab only — Products tab is untouched.
  * Design system tokens only.
@@ -265,7 +265,7 @@ export function MarketIntelligenceReport({ categoryId, categoryName }: MarketInt
               <Star className="w-4 h-4" />
               DOVIVE Strategic Recommendation
             </CardTitle>
-            <CardDescription>Grok AI — actionable steps to win in this category</CardDescription>
+            <CardDescription>Claude Sonnet 5 — actionable steps to win in this category</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

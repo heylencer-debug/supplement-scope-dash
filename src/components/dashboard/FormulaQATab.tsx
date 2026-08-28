@@ -225,7 +225,7 @@ export function FormulaQATab({ categoryId, categoryName, activeVersionInfo }: Pr
               {verdictCfg.label}
             </h2>
             <p className="text-sm text-foreground/80 mt-1 max-w-2xl">{qa.qa_verdict?.summary}</p>
-            {genDate && <p className="text-xs text-muted-foreground mt-1.5">QA run: {genDate} · Claude Sonnet 4.6 adjudicator</p>}
+            {genDate && <p className="text-xs text-muted-foreground mt-1.5">QA run: {genDate} · Claude Opus 5 adjudicator</p>}
           </div>
         </div>
         <div className="flex items-center gap-4 flex-wrap">
@@ -248,7 +248,7 @@ export function FormulaQATab({ categoryId, categoryName, activeVersionInfo }: Pr
         {[
           { icon: ShieldCheck, label: "QA Gate", value: verdictCfg.label.split(" ").slice(-1)[0], color: verdictCfg.color },
           { icon: Scale,      label: "Scored Against", value: "Top 20 competitors", color: "text-foreground" },
-          { icon: FlaskConical, label: "QA Adjudicator", value: "Claude Sonnet 4.6", color: "text-foreground" },
+          { icon: FlaskConical, label: "QA Adjudicator", value: "Claude Opus 5", color: "text-foreground" },
           { icon: Target,     label: "Category", value: categoryName || "—", color: "text-foreground" },
         ].map(({ icon: Icon, label, value, color }) => (
           <Panel key={label}>

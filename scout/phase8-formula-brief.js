@@ -39,20 +39,22 @@ function getOpenRouterKey() {
 
 // Analysis model — configurable without a rebuild. Default: Claude Sonnet 5 via OpenRouter.
 const ANALYSIS_MODEL = process.env.ANALYSIS_MODEL || 'anthropic/claude-sonnet-5';
+// Validation/second-opinion model — restores an INDEPENDENT cross-check
+// model instead of the same model checking itself. Default: Claude Opus 5
+// via OpenRouter (1M context, valid OpenRouter model id).
+const VALIDATION_MODEL = process.env.VALIDATION_MODEL || 'anthropic/claude-opus-5';
 
 // ─── DUAL AI Formulation ───────────────────────────────────────────────────────
 // P9 generates TWO independent formula briefs in parallel (Draft A + Draft B).
 // P10 QA then compares both and produces a final adjudicated formula.
 
-// 2026-08-28: switched from xAI Grok 4.2 (api.x.ai) to Claude via OpenRouter
-// (ANALYSIS_MODEL, default Sonnet 5), per explicit instruction. NOTE: this is
-// the SAME model as callClaudeSonnet below — P8's "dual-AI" design (Grok +
-// Claude drafting independently, P9 adjudicating) now has BOTH drafts from
-// the same model. This is a real regression of the documented "Dual-AI
-// formulation" never-regress principle (two independent model perspectives
-// for P9 to adjudicate between). Flagged prominently in the final report;
-// proceeding anyway because Goal 1 explicitly requires zero remaining
-// non-Sonnet-5 model strings in active code, including api.x.ai/grok-.
+// 2026-08-28: switched from xAI Grok 4.2 (api.x.ai) to Claude via OpenRouter.
+// Originally both drafts landed on the SAME model (ANALYSIS_MODEL) as part of
+// the all-Sonnet-5 migration — a real regression of the "Dual-AI formulation"
+// never-regress principle (two independent model perspectives for P9 to
+// adjudicate between). RESTORED per explicit follow-up instruction: Draft A
+// now uses VALIDATION_MODEL (Opus 5) and Draft B uses ANALYSIS_MODEL
+// (Sonnet 5) — two genuinely different models drafting independently again.
 async function callGrok42(prompt, maxTokens = 16000) {
   const key = getOpenRouterKey();
   if (!key) throw new Error('OPENROUTER_API_KEY not found');
@@ -67,7 +69,7 @@ async function callGrok42(prompt, maxTokens = 16000) {
         'X-Title': 'DOVIVE Scout P8 Formula (Draft A)',
       },
       body: JSON.stringify({
-        model: ANALYSIS_MODEL,
+        model: VALIDATION_MODEL,
         max_tokens: mt,
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -159,10 +161,22 @@ async function callClaudeSonnet(prompt) {
 async function fetchP5DeepResearch(keyword) {
   try {
     const firstWord = keyword.split(' ')[0].toLowerCase();
+    // 2026-08-28 FIX: this select previously used stale column names
+    // (bsr/monthly_revenue/research_type/ai_analysis/key_findings/
+    // formula_insights/competitive_strengths/competitive_weaknesses/
+    // market_opportunity/recommended_positioning) that do NOT exist on
+    // dovive_phase5_research's current schema (see phase5-deep-research.js —
+    // rebuilt 2026-08-28 with columns asin/brand/bsr_rank/pool/benefits/
+    // formula_notes/key_strengths/key_weaknesses/competitor_angle/
+    // full_research/certifications/third_party_tested/researched_by).
+    // PostgREST errors on unknown columns, which the catch below silently
+    // swallowed into an empty array — so P5's real deep-research content
+    // NEVER reached P8's prompt on any run, regardless of how much P5 data
+    // existed. Select the real columns now.
     const { data } = await DOVIVE.from('dovive_phase5_research')
-      .select('asin, brand, title, bsr, monthly_revenue, research_type, ai_analysis, key_findings, formula_insights, competitive_strengths, competitive_weaknesses, market_opportunity, recommended_positioning')
+      .select('asin, brand, bsr_rank, pool, benefits, formula_notes, key_strengths, key_weaknesses, competitor_angle, certifications, third_party_tested, full_research, researched_by, data_grounding')
       .or(`keyword.ilike.%${firstWord}%,keyword.ilike.%${keyword}%`)
-      .order('bsr', { ascending: true })
+      .order('bsr_rank', { ascending: true })
       .limit(20);
     return data || [];
   } catch (e) {
@@ -568,14 +582,14 @@ function buildPrompt(marketData) {
   // ── P5 Deep Research Section ──────────────────────────────────────────────
   const p5Section = p5.length > 0
     ? p5.map((r, i) => `
-### P5 Research #${i + 1}: ${r.brand} — BSR ${r.bsr?.toLocaleString()} | $${(r.monthly_revenue || 0).toLocaleString()}/mo [${r.research_type || 'bsr'}]
-**AI Analysis:** ${r.ai_analysis || 'N/A'}
-**Key Findings:** ${Array.isArray(r.key_findings) ? r.key_findings.join('; ') : (r.key_findings || 'N/A')}
-**Formula Insights:** ${r.formula_insights || 'N/A'}
-**Competitive Strengths:** ${Array.isArray(r.competitive_strengths) ? r.competitive_strengths.join('; ') : (r.competitive_strengths || 'N/A')}
-**Competitive Weaknesses:** ${Array.isArray(r.competitive_weaknesses) ? r.competitive_weaknesses.join('; ') : (r.competitive_weaknesses || 'N/A')}
-**Market Opportunity:** ${r.market_opportunity || 'N/A'}
-**Recommended Positioning:** ${r.recommended_positioning || 'N/A'}
+### P5 Research #${i + 1}: ${r.brand} — BSR Rank ${r.bsr_rank?.toLocaleString() || 'N/A'} [${r.pool || 'bsr'}]
+**Benefits (from real data):** ${Array.isArray(r.benefits) ? r.benefits.join('; ') : (r.benefits || 'N/A')}
+**Formula Notes:** ${r.formula_notes || 'N/A'}
+**Key Strengths:** ${r.key_strengths || 'N/A'}
+**Key Weaknesses:** ${r.key_weaknesses || 'N/A'}
+**DOVIVE Competitive Angle:** ${r.competitor_angle || 'N/A'}
+**Certifications:** ${Array.isArray(r.certifications) ? r.certifications.join(', ') : 'None found'} (third-party tested: ${r.third_party_tested ? 'yes' : 'no/unknown'})
+**Full Research Brief:** ${(r.full_research || '').substring(0, 2500) || 'N/A'}
 `).join('\n---\n')
     : '⚠️ P5 deep research not yet run for this keyword. Run phase5-deep-research.js first.';
 
@@ -1185,7 +1199,7 @@ async function saveToDB(categoryId, grokBrief, claudeBrief, marketData) {
 
   const { error } = await DASH.from('formula_briefs').insert({
     category_id: categoryId,
-    positioning: `Dual AI formula brief for ${KEYWORD} - Claude Draft A + Claude Draft B (both ${ANALYSIS_MODEL}) vs ${marketData.category_summary.total_products} products`,
+    positioning: `Dual AI formula brief for ${KEYWORD} - Draft A (${VALIDATION_MODEL}) + Draft B (${ANALYSIS_MODEL}) vs ${marketData.category_summary.total_products} products`,
     target_customer: `Adults seeking ${KEYWORD} supplementation`,
     form_type: 'gummy',
     form_rationale: 'Category leader uses gummy format',
@@ -1207,13 +1221,44 @@ async function saveToDB(categoryId, grokBrief, claudeBrief, marketData) {
       frequency: p.mentions,
       solution: 'See AI brief',
     })),
+    // 2026-08-28 FIX: these 3 columns are read by the dashboard
+    // (FormulaBriefTab, EnhancedBenchmarkComparison, VersionComparisonView,
+    // DualPackagingStrategies — see src/integrations/supabase/types.ts and
+    // src/components/dashboard/*) but were never populated by any phase that
+    // actually runs. The only writer was seed-category-analysis.js, which
+    // turned out to be a dead stub (defines a hardcoded ashwagandha/Goli demo
+    // record via buildRecord() but never calls it or writes to Supabase at
+    // all — confirmed by inspection, no top-level execution in that file).
+    // Populated here instead from data P8 has already computed for this run
+    // (real packaging-gap analysis + P5's real off-Amazon/grounded competitor
+    // angles), so every run gets non-empty values without relying on the
+    // dead seed script or fabricated demo content.
+    key_differentiators: [
+      ...(marketData.packaging_intelligence?.differentiationOpps || []).slice(0, 5),
+      ...(marketData.p5_deep_research || []).map(r => r.competitor_angle).filter(Boolean).slice(0, 5),
+    ].filter(Boolean).slice(0, 8),
+    opportunity_insights: [
+      marketData.category_summary.total_products
+        ? `${marketData.category_summary.total_products} competitors analyzed at avg price ${marketData.category_summary.avg_price}.`
+        : null,
+      (marketData.packaging_intelligence?.whiteSpaceGaps || []).length
+        ? `Packaging whitespace gaps: ${marketData.packaging_intelligence.whiteSpaceGaps.slice(0, 5).join('; ')}.`
+        : null,
+      marketData.category_summary.top_pain_points?.length
+        ? `Top unmet consumer pain points: ${marketData.category_summary.top_pain_points.slice(0, 5).map(p => p.keyword).join(', ')}.`
+        : null,
+    ].filter(Boolean).join(' ') || null,
+    risk_factors: [
+      ...(marketData.packaging_intelligence?.competitorWeaknesses || []).slice(0, 5),
+      ...(marketData.p5_deep_research || []).map(r => r.key_weaknesses).filter(Boolean).slice(0, 3),
+    ].filter(Boolean).slice(0, 8),
     ingredients: {
       // Primary (Grok) - used by dashboard and backward-compat fields
       ai_generated_brief: primaryBrief,
       // Dual outputs - both stored separately for P10 QA comparison
       ai_generated_brief_grok:   grokBrief   || null,
       ai_generated_brief_claude: claudeBrief || null,
-      formula_brief_model_grok:   ANALYSIS_MODEL,
+      formula_brief_model_grok:   VALIDATION_MODEL,
       formula_brief_model_claude: ANALYSIS_MODEL,
       grok_chars:   grokBrief?.length   || 0,
       claude_chars: claudeBrief?.length || 0,
@@ -1244,7 +1289,7 @@ async function saveToVault(grokBrief, claudeBrief) {
   const dir = 'C:\\SirPercival-Vault\\07_ai-systems\\agents\\scout\\formula-briefs';
   if (grokBrief) {
     const p = `${dir}\\${date}-${KEYWORD.replace(/\s+/g, '-')}-grok42-brief.md`;
-    fs.writeFileSync(p, `# P9 Formula Brief (Draft A) - ${KEYWORD}\n**Date:** ${date}\n**Model:** ${ANALYSIS_MODEL}\n\n---\n\n${grokBrief}`, 'utf8');
+    fs.writeFileSync(p, `# P9 Formula Brief (Draft A) - ${KEYWORD}\n**Date:** ${date}\n**Model:** ${VALIDATION_MODEL}\n\n---\n\n${grokBrief}`, 'utf8');
     console.log(`\n  Grok vault: ${p}`);
   }
   if (claudeBrief) {
@@ -1293,9 +1338,9 @@ async function run() {
   const prompt = buildPrompt(marketData);
   console.log(`Done (${Math.round(prompt.length / 1000)}k chars)\n`);
 
-  // 3. Run DUAL formulation in parallel - Draft A + Draft B (both ANALYSIS_MODEL)
+  // 3. Run DUAL formulation in parallel - Draft A (VALIDATION_MODEL) + Draft B (ANALYSIS_MODEL)
   console.log("Running dual AI formulation in parallel...");
-  console.log(`  [Draft A] ${ANALYSIS_MODEL} via OpenRouter - deep scientific thinking`);
+  console.log(`  [Draft A] ${VALIDATION_MODEL} via OpenRouter - deep scientific thinking (independent second opinion)`);
   console.log(`  [Draft B] ${ANALYSIS_MODEL} via OpenRouter - 1M context synthesis\n`);
 
   const [grokResult, claudeResult] = await Promise.allSettled([

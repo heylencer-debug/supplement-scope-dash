@@ -41,15 +41,15 @@ const FORCE = process.argv.includes('--force');
 function getOpenRouterKey()   { return process.env.OPENROUTER_API_KEY || null; }
 
 // Analysis model — configurable without a rebuild. Default: Claude Sonnet 5 via OpenRouter.
-// 2026-08-28: Opus validation tier (callClaudeOpus) now ALSO points at ANALYSIS_MODEL
-// (Sonnet 5), per explicit instruction. NOTE: draft (Call 1) and validation (Call 2)
-// are now the SAME model — the validation step no longer provides independent-model
-// cross-checking the way a different model (Opus) validating a Sonnet draft did.
-// It still re-reads the competitor OCR data fresh and can catch the draft's own
-// hallucinations/arithmetic errors, but same-model validation is weaker than a
-// genuinely different model's second opinion. Flagged per explicit instruction to
-// proceed with the swap anyway.
+// 2026-08-28: RESTORED independent-model validation per explicit follow-up
+// instruction. callClaudeOpus (Call 2, the validation tier) now points at
+// VALIDATION_MODEL (Opus 5, a genuinely different model) instead of
+// ANALYSIS_MODEL — draft (Call 1, Sonnet 5) and validation (Call 2, Opus 5)
+// are independent models again, so the validation step can actually catch
+// the draft's hallucinations/arithmetic errors with a fresh perspective
+// instead of the same model checking itself.
 const ANALYSIS_MODEL = process.env.ANALYSIS_MODEL || 'anthropic/claude-sonnet-5';
+const VALIDATION_MODEL = process.env.VALIDATION_MODEL || 'anthropic/claude-opus-5';
 
 async function callClaudeSonnet(prompt, maxTokens = 12000) {
   const key = getOpenRouterKey();
@@ -108,7 +108,7 @@ async function callClaudeSonnet(prompt, maxTokens = 12000) {
   }
 }
 
-async function callClaudeOpus(prompt, maxTokens = 12000) {
+async function callClaudeOpus(prompt, maxTokens = 16000) {
   const key = getOpenRouterKey();
   if (!key) throw new Error('OPENROUTER_API_KEY not set');
   const start = Date.now();
@@ -124,7 +124,7 @@ async function callClaudeOpus(prompt, maxTokens = 12000) {
         'X-Title': 'DOVIVE Scout P11 Benchmarking',
       },
       body: JSON.stringify({
-        model: ANALYSIS_MODEL,
+        model: VALIDATION_MODEL,
         max_tokens: maxTokens,
         stream: true,
         messages: [{ role: 'user', content: prompt }],
@@ -209,7 +209,7 @@ Produce this exact structure:
 
 # P11 COMPETITIVE FORMULA BENCHMARKING — ${keyword.toUpperCase()}
 *Data source: P4 OCR extraction + P10 adjusted formula*
-*Benchmarking model: Claude (${ANALYSIS_MODEL}) (draft) — to be validated by Claude (${ANALYSIS_MODEL})*
+*Benchmarking model: Claude (${ANALYSIS_MODEL}) (draft) — to be validated by Claude (${VALIDATION_MODEL})*
 
 ## EXECUTIVE SUMMARY
 | Metric | Value |
@@ -491,7 +491,7 @@ async function run() {
     competitors_with_formula: withFormula.length,
     competitors_without_formula: withoutFormula.length,
     generated_at: new Date().toISOString(),
-    models_used: { draft: ANALYSIS_MODEL, validation: ANALYSIS_MODEL },
+    models_used: { draft: ANALYSIS_MODEL, validation: VALIDATION_MODEL },
   };
 
   const updatedIngredients = {
@@ -521,7 +521,7 @@ async function run() {
       `Generated: ${new Date().toISOString()}`,
       `Formula score: ${formulaScore}/10 | Validation: ${validationResult}`,
       `Competitors with formula data: ${withFormula.length} | Without: ${withoutFormula.length}`,
-      `Models: ${ANALYSIS_MODEL} (draft) + ${ANALYSIS_MODEL} (validation)`,
+      `Models: ${ANALYSIS_MODEL} (draft) + ${VALIDATION_MODEL} (validation)`,
       ``,
       `---`,
       ``,

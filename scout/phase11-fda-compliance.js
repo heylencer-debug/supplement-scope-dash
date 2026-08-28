@@ -103,14 +103,14 @@ const NIH_ODS_MAP = {
 function getOpenRouterKey()  { return process.env.OPENROUTER_API_KEY || null; }
 
 // Analysis model — configurable without a rebuild. Default: Claude Sonnet 5 via OpenRouter.
-// 2026-08-28: Opus primary tier (callClaudeOpus) now ALSO points at ANALYSIS_MODEL
-// (Sonnet 5), per explicit instruction. NOTE: primary (Call 1) and validation (Call 2)
-// are now the SAME model — the adversarial cross-check loses the independent-model
-// value it had when Sonnet validated Opus's findings. It still re-reads the source
-// data fresh and can catch its own arithmetic/omission errors, but this is weaker
-// than a genuinely different model's second opinion. Flagged per explicit instruction
-// to proceed with the swap anyway.
+// 2026-08-28: RESTORED independent-model adversarial cross-check per explicit
+// follow-up instruction. Primary (Call 1, callClaudeOpus) stays on
+// ANALYSIS_MODEL (Sonnet 5); validation (Call 2, callClaudeSonnet — despite
+// the function name, this is now the VALIDATION tier) points at
+// VALIDATION_MODEL (Opus 5, a genuinely different model). The adversarial
+// cross-check is independent-model again.
 const ANALYSIS_MODEL = process.env.ANALYSIS_MODEL || 'anthropic/claude-sonnet-5';
+const VALIDATION_MODEL = process.env.VALIDATION_MODEL || 'anthropic/claude-opus-5';
 
 async function callClaudeOpus(prompt, maxTokens = 12000) {
   const key = getOpenRouterKey();
@@ -164,7 +164,7 @@ async function callClaudeOpus(prompt, maxTokens = 12000) {
   }
 }
 
-async function callClaudeSonnet(prompt, maxTokens = 8000) {
+async function callClaudeSonnet(prompt, maxTokens = 16000) {
   const key = getOpenRouterKey();
   if (!key) throw new Error('OPENROUTER_API_KEY not set');
   const start = Date.now();
@@ -180,7 +180,7 @@ async function callClaudeSonnet(prompt, maxTokens = 8000) {
         'X-Title': 'DOVIVE Scout P12 FDA Compliance',
       },
       body: JSON.stringify({
-        model: ANALYSIS_MODEL,
+        model: VALIDATION_MODEL,
         max_tokens: maxTokens,
         stream: true,
         messages: [{ role: 'user', content: prompt }],
@@ -650,7 +650,7 @@ async function run() {
     nih_coverage: { fetched: nihHits, no_page: nihMiss, failed: nihFail, total: ingredientNames.length },
     ingredients_reviewed: ingredientNames,
     generated_at: new Date().toISOString(),
-    models_used: { primary: ANALYSIS_MODEL, validation: ANALYSIS_MODEL },
+    models_used: { primary: ANALYSIS_MODEL, validation: VALIDATION_MODEL },
     data_sources: Object.fromEntries(
       Object.entries(nihData).filter(([,d]) => d.url).map(([name, d]) => [name, d.url])
     ),

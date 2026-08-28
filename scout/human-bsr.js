@@ -14,6 +14,7 @@
 
 require('dotenv').config();
 const { chromium } = require('playwright-extra');
+const { launchBrowserContext } = require('./utils/bright-data-browser');
 const stealth = require('puppeteer-extra-plugin-stealth');
 chromium.use(stealth());
 
@@ -434,17 +435,28 @@ async function attemptPlaywrightGather(attemptNum, alreadyScraped) {
   console.log(`   UA: ${userAgent.slice(0, 60)}...`);
   console.log(`   Viewport: ${viewport.width}x${viewport.height}`);
 
-  const browser = await chromium.launch({ headless: process.platform !== 'win32' });
-  const context = await browser.newContext({
-    userAgent,
-    viewport,
-    locale: 'en-US',
-    timezoneId: 'America/New_York',
-    extraHTTPHeaders: {
-      'Accept-Language': 'en-US,en;q=0.9',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+  // 2026-08-28: if BRIGHTDATA_BROWSER_WSS is set, connect over CDP to
+  // Bright Data's Scraping Browser (real Chromium, residential IP pool) —
+  // this is what actually unblocks Amazon from Cloud Run's datacenter IP.
+  // Falls back to a local Playwright browser (with the same per-attempt
+  // randomized UA/viewport fingerprint as before) if the env var is unset
+  // or the CDP connect fails; the existing Bright Data Datasets API fallback
+  // (attemptBrightDataFallback, below) remains a further fallback after that.
+  const { browser, context, viaBrightData } = await launchBrowserContext({
+    label: 'P1 browser',
+    blockMedia: false, // Amazon page rendering relies on some image-based layout checks
+    localContextOptions: {
+      userAgent,
+      viewport,
+      locale: 'en-US',
+      timezoneId: 'America/New_York',
+      extraHTTPHeaders: {
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+      },
     },
   });
+  if (viaBrightData) console.log('   Network: Bright Data Scraping Browser (residential IP)');
 
   // Load saved cookies (return visitor fingerprint)
   await loadCookies(context);

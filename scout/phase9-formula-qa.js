@@ -50,8 +50,12 @@ function getOpenRouterKey() {
 
 // Analysis model — configurable without a rebuild. Default: Claude Sonnet 5 via OpenRouter.
 const ANALYSIS_MODEL = process.env.ANALYSIS_MODEL || 'anthropic/claude-sonnet-5';
+// Validation/adjudication model — an INDEPENDENT model from the drafting
+// model, so P9's Call 1 (QA adjudicator that reviews both P8 drafts) isn't
+// the same model checking itself. Default: Claude Opus 5 via OpenRouter.
+const VALIDATION_MODEL = process.env.VALIDATION_MODEL || 'anthropic/claude-opus-5';
 
-async function callClaudeSonnetQAOnce(prompt, maxTokens) {
+async function callClaudeSonnetQAOnce(prompt, maxTokens, model = ANALYSIS_MODEL) {
   const key = getOpenRouterKey();
   if (!key) throw new Error('No OpenRouter key');
   const controller = new AbortController();
@@ -62,7 +66,7 @@ async function callClaudeSonnetQAOnce(prompt, maxTokens) {
       method: 'POST',
       signal: controller.signal,
       headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://dovive.com', 'X-Title': 'DOVIVE Scout P10 QA' },
-      body: JSON.stringify({ model: ANALYSIS_MODEL, max_tokens: maxTokens, stream: true, messages: [{ role: 'user', content: prompt }] }),
+      body: JSON.stringify({ model, max_tokens: maxTokens, stream: true, messages: [{ role: 'user', content: prompt }] }),
     });
     if (!res.ok) {
       const errText = await res.text();
@@ -99,11 +103,11 @@ async function callClaudeSonnetQAOnce(prompt, maxTokens) {
   }
 }
 
-async function callClaudeSonnetQA(prompt, maxTokens = 16000) {
-  let { content, finishReason } = await callClaudeSonnetQAOnce(prompt, maxTokens);
+async function callClaudeSonnetQA(prompt, maxTokens = 16000, model = ANALYSIS_MODEL) {
+  let { content, finishReason } = await callClaudeSonnetQAOnce(prompt, maxTokens, model);
   if (!content || finishReason === 'length') {
-    console.warn(`  ⚠ Claude Sonnet QA truncated/empty (finish_reason=${finishReason || 'unknown'}) — retrying once at ${Math.round(maxTokens * 1.5)} tokens...`);
-    const retry = await callClaudeSonnetQAOnce(prompt, Math.round(maxTokens * 1.5));
+    console.warn(`  ⚠ Claude Sonnet QA (${model}) truncated/empty (finish_reason=${finishReason || 'unknown'}) — retrying once at ${Math.round(maxTokens * 1.5)} tokens...`);
+    const retry = await callClaudeSonnetQAOnce(prompt, Math.round(maxTokens * 1.5), model);
     if (retry.content && retry.finishReason !== 'length') return retry.content;
     if (retry.content) content = retry.content; // still 'length' but longer than nothing — keep the longer draft
   }
@@ -983,9 +987,9 @@ async function run() {
   console.log(`  Prompt size: ${Math.round(prompt.length / 1000)}k chars\n`);
 
   // â"€â"€ Call Grok â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
-  console.log(`Calling Claude Sonnet 4.6 via OpenRouter (QA adjudicator)...`);
+  console.log(`Calling ${VALIDATION_MODEL} via OpenRouter (QA adjudicator — independent validation model)...`);
   const startTime = Date.now();
-  const qaReport = await callClaudeSonnetQA(prompt, 16000);
+  const qaReport = await callClaudeSonnetQA(prompt, 16000, VALIDATION_MODEL);
   const elapsed = Math.round((Date.now() - startTime) / 1000);
   console.log(`  âœ… Done (${elapsed}s, ${Math.round(qaReport.length / 1000)}k chars)\n`);
 
@@ -1223,7 +1227,7 @@ async function run() {
     const runAuditMd = buildRunAuditMarkdown({
       timestamp: pipelineMetadata.generated_at,
       keyword: KEYWORD,
-      model: ANALYSIS_MODEL,
+      model: `Call1(adjudicator)=${VALIDATION_MODEL} | Call2/3=${ANALYSIS_MODEL}`,
       call1Status: pipelineMetadata.call1_status,
       call1Elapsed: elapsed,
       call2Status,
@@ -1246,6 +1250,14 @@ async function run() {
           flavor_qa: flavorQA,
           flavor_recommendations: flavorRecommendations,
           flavor_summary: flavorSummary,
+          // 2026-08-28 FIX: competitor_notes_json was computed (finalNotes,
+          // merged from Call 1/2/3) and saved per-product to
+          // products.marketing_analysis.qa_comparison_note, but was NEVER
+          // written to formula_briefs.ingredients.competitor_notes_json —
+          // the exact key the dashboard's data-completeness audit
+          // (src/hooks/useDataCompleteness.ts) and other UI reads expect.
+          // Saved here too now so the UI-facing column is populated.
+          competitor_notes_json: finalNotes,
           // Raw Call 2 model output, always saved regardless of parse
           // outcome — never silently drop model output (same principle as
           // the P5 full_research fix).
@@ -1255,7 +1267,7 @@ async function run() {
           qa_pipeline_metadata: pipelineMetadata,
           qa_run_audit: {
             timestamp: pipelineMetadata.generated_at,
-            model: ANALYSIS_MODEL,
+            model: `Call1(adjudicator)=${VALIDATION_MODEL} | Call2/3=${ANALYSIS_MODEL}`,
             call1_status: pipelineMetadata.call1_status,
             call2_status: call2Status,
             call2_parse_status: call2ParseStatus,

@@ -60,9 +60,7 @@
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const { resolveCategory } = require('./utils/category-resolver');
-const { chromium } = require('playwright-extra');
-const stealth = require('puppeteer-extra-plugin-stealth');
-chromium.use(stealth());
+const { launchBrowserContext } = require('./utils/bright-data-browser');
 
 const DASH   = createClient(process.env.DASH_URL || process.env.SUPABASE_URL, process.env.DASH_KEY || process.env.SUPABASE_KEY);
 const DOVIVE = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
@@ -219,9 +217,76 @@ BSR drops (30d/90d — proxy for sales velocity): ${keepa.bsr_drops_30d ?? 'N/A'
   return parts.join('\n\n');
 }
 
-// ─── Off-Amazon source discovery + scrape (Playwright, no Bright Data needed) ──
+// ─── Off-Amazon source discovery ────────────────────────────────────────────
+// 2026-08-28 FIX: the SEARCH step was going straight from the Cloud Run
+// container to DuckDuckGo's HTML endpoint (duckduckgo.com/html/) via
+// Playwright. That endpoint returns an empty/challenge page to datacenter
+// IPs, so `links` was empty on every single product and
+// dovive_p5_sources stayed at 0 rows on every run — confirmed root cause
+// (every P5 product logged researched_by with no source, 100% of the time).
+// The DESTINATION brand/retailer page scrape works fine from Cloud Run
+// (plain Playwright, no residential IP needed) — only the SEARCH step was
+// blocked. Fix: route the search through Bright Data (residential IPs),
+// same BRIGHTDATA_API_KEY/BRIGHTDATA env var already used by P1/reviews
+// (bright-data-amazon.js). Uses Bright Data's unified Web Unlocker/SERP
+// endpoint (POST https://api.brightdata.com/request with a SERP-enabled
+// zone) requesting Google's structured JSON output (`&brd_json=1`). Falls
+// back to the old DDG-via-Playwright path (now with loud per-product
+// logging) if BRIGHTDATA_API_KEY/BRIGHTDATA is unset or the SERP zone
+// isn't available on the account — so the failure is always visible in
+// logs instead of a silent 100%-skip.
+
+function getBrightDataKey() {
+  const key = process.env.BRIGHTDATA_API_KEY || process.env.BRIGHTDATA || null;
+  return (key && !/^REPLACE_ME/i.test(key)) ? key : null;
+}
+
+const BRIGHTDATA_SERP_ZONE = process.env.BRIGHTDATA_SERP_ZONE || process.env.BRIGHTDATA_ZONE || 'serp_api1';
+
+/**
+ * Search via Bright Data's unified Web Unlocker/SERP endpoint. Returns
+ * { links: [{href,text}], engine: 'brightdata' } on success, or null if
+ * Bright Data isn't configured/available (caller falls back to DDG).
+ * Throws only for genuinely unexpected shapes — network/auth/zone errors
+ * are caught and logged, then null is returned so the caller can fall back.
+ */
+async function searchViaBrightData(query) {
+  const key = getBrightDataKey();
+  if (!key) return null;
+
+  const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}&brd_json=1`;
+  try {
+    const res = await fetch('https://api.brightdata.com/request', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ zone: BRIGHTDATA_SERP_ZONE, url: googleUrl, format: 'raw' }),
+    });
+    const text = await res.text();
+    if (!res.ok) {
+      console.log(`  ⚠️  P5 Bright Data SERP call failed [${res.status}] (zone=${BRIGHTDATA_SERP_ZONE}): ${text.slice(0, 200)} — falling back to DDG`);
+      return null;
+    }
+    let parsed;
+    try { parsed = JSON.parse(text); } catch {
+      console.log(`  ⚠️  P5 Bright Data SERP returned non-JSON (zone "${BRIGHTDATA_SERP_ZONE}" may not be SERP-enabled) — falling back to DDG`);
+      return null;
+    }
+    const organic = parsed?.organic || parsed?.results?.organic || [];
+    const links = organic
+      .map(r => ({ href: r.link || r.url || '', text: r.title || '' }))
+      .filter(l => l.href)
+      .slice(0, 8);
+    return { links, engine: 'brightdata' };
+  } catch (err) {
+    console.log(`  ⚠️  P5 Bright Data SERP request errored (${err.message}) — falling back to DDG`);
+    return null;
+  }
+}
+
 // Brand sites and major retailers (iHerb/Walmart) don't typically block
-// datacenter IPs the way Amazon does, so plain Playwright is sufficient here.
+// datacenter IPs the way Amazon does, so plain Playwright is sufficient for
+// scraping the DESTINATION page once a confident URL is picked — only the
+// search step needed Bright Data.
 
 const RETAILER_DOMAINS = [
   { match: /iherb\.com/i,        type: 'iherb' },
@@ -255,16 +320,15 @@ function pickConfidentResult(links, brand) {
   return null;
 }
 
-async function findAndScrapeSource(browserContext, product, keyword) {
-  const brand = product.brand || '';
-  const title = product.title || '';
-  if (!brand && !title) return null;
-
-  const query = `${brand} ${title}`.trim().substring(0, 120);
+async function searchViaDuckDuckGo(browserContext, query, asin) {
   const page = await browserContext.newPage();
   try {
-    // DuckDuckGo HTML search — no login wall, no heavy JS, tolerant of
-    // datacenter IPs (unlike Google, which frequently CAPTCHAs them).
+    // DuckDuckGo HTML fallback — no login wall, no heavy JS. NOTE: from a
+    // Cloud Run datacenter IP this frequently returns an empty/challenge
+    // page (this was the root cause of P5's 100% search-skip rate before
+    // the Bright Data routing above was added) — kept only as a fallback
+    // when Bright Data isn't configured/available, with loud logging so a
+    // silent 0-links result is never mistaken for "no match found".
     await page.goto(`https://duckduckgo.com/html/?q=${encodeURIComponent(query)}`, {
       waitUntil: 'domcontentloaded', timeout: 20000,
     });
@@ -276,11 +340,59 @@ async function findAndScrapeSource(browserContext, product, keyword) {
         .filter(l => l.href && !/duckduckgo\.com/i.test(l.href))
         .slice(0, 8);
     });
+    console.log(`  [P5 search/${asin}] DuckDuckGo fallback returned ${links.length} link(s) for "${query}"${links.length === 0 ? ' — likely blocked from this IP' : ''}`);
+    return links;
+  } finally {
+    await page.close();
+  }
+}
+
+async function findAndScrapeSource(browserContext, product, keyword) {
+  const brand = product.brand || '';
+  const title = product.title || '';
+  const asin = product.asin;
+  if (!brand && !title) {
+    console.log(`  [P5 search/${asin}] skipped — no brand/title to search`);
+    return null;
+  }
+
+  const query = `${brand} ${title}`.trim().substring(0, 120);
+  let links = [];
+  let engine = 'none';
+
+  try {
+    // Primary: real Playwright search (browserContext may be connected via
+    // Bright Data's Scraping Browser over CDP — see utils/bright-data-browser.js
+    // — in which case this now runs through a residential IP and DDG stops
+    // being blocked; if BRIGHTDATA_BROWSER_WSS isn't set yet it's the same
+    // local-Playwright DDG call as before).
+    links = await searchViaDuckDuckGo(browserContext, query, asin);
+    engine = 'duckduckgo';
+
+    // Secondary fallback: Bright Data's REST SERP endpoint, in case the
+    // Playwright search path still comes back empty (e.g. local Playwright
+    // with no Bright Data browser configured yet).
+    if (links.length === 0) {
+      const bd = await searchViaBrightData(query);
+      if (bd && bd.links.length) {
+        links = bd.links;
+        engine = 'brightdata-serp';
+        console.log(`  [P5 search/${asin}] Bright Data SERP REST fallback returned ${links.length} link(s) for "${query}"`);
+      }
+    }
+
+    if (links.length === 0) {
+      const reason = 'search returned 0 links via both DuckDuckGo-Playwright and the Bright Data SERP REST fallback';
+      console.log(`  [P5 search/${asin}] SKIPPED — ${reason}`);
+      return { skipped: true, reason };
+    }
 
     const pick = pickConfidentResult(links, brand);
     if (!pick) {
-      return { skipped: true, reason: 'no confident brand/retailer match in search results' };
+      console.log(`  [P5 search/${asin}] SKIPPED — ${links.length} link(s) found via ${engine} but none matched the brand/retailer confidence filter`);
+      return { skipped: true, reason: `no confident brand/retailer match in ${links.length} ${engine} search results` };
     }
+    console.log(`  [P5 search/${asin}] confident match via ${engine}: ${pick.url} (${pick.type})`);
 
     const sourcePage = await browserContext.newPage();
     try {
@@ -306,9 +418,8 @@ async function findAndScrapeSource(browserContext, product, keyword) {
       await sourcePage.close();
     }
   } catch (err) {
+    console.log(`  [P5 search/${asin}] SKIPPED — scrape error: ${err.message}`);
     return { skipped: true, reason: `scrape error: ${err.message}` };
-  } finally {
-    await page.close();
   }
 }
 
@@ -684,12 +795,7 @@ async function run() {
     return;
   }
 
-  const browser = await chromium.launch({ headless: process.platform !== 'win32' });
-  const browserContext = await browser.newContext({
-    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36',
-    viewport: { width: 1440, height: 900 },
-    locale: 'en-US',
-  });
+  const { context: browserContext, close: closeBrowser } = await launchBrowserContext({ label: 'P5 browser' });
 
   const overallStart = Date.now();
   let done = 0, failed = 0;
@@ -704,7 +810,7 @@ async function run() {
     return r;
   });
 
-  await browser.close();
+  await closeBrowser();
 
   for (const r of results) {
     if (r.ok) done++;

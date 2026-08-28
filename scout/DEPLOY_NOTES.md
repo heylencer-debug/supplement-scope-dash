@@ -1,5 +1,123 @@
 # Scout pipeline — Cloud Run Job deploy notes
 
+## 2026-08-28 follow-up 4: P5 off-Amazon fix, dead-handoff repairs, independent validation model, missing UI fields
+
+**GOAL A — P5 off-Amazon search fix.** Root cause confirmed: P5's search step
+(`findAndScrapeSource()` in `phase5-deep-research.js`) hit DuckDuckGo's HTML
+endpoint directly from the Cloud Run container's datacenter IP, which returns
+an empty/challenge page — `links` was always empty, `dovive_p5_sources` sat
+at 0 rows on every run. Two-layer fix:
+1. **Real Playwright via Bright Data Scraping Browser (primary, per
+   coordinator direction change)** — new `scout/utils/bright-data-browser.js`
+   helper: when env `BRIGHTDATA_BROWSER_WSS` (a full
+   `wss://brd-customer-<id>-zone-<zone>:<password>@brd.superproxy.io:9222`
+   CDP URL) is set, connects via `chromium.connectOverCDP()` to a real remote
+   Chromium routed through Bright Data's residential IP pool — keeps live
+   browser behavior (real SERP order, sponsored flags, session state) while
+   unblocking the IP. Blocks image/media/font requests to control per-GB
+   cost; 45s default timeouts (Scraping Browser sessions are slower to first
+   byte). **Env-gated and degrades gracefully**: if the env var is unset or
+   the CDP connect throws, falls back to a local headless Playwright browser
+   (identical to prior behavior) — nothing breaks before credentials are
+   provisioned. Wired into BOTH:
+   - `phase5-deep-research.js` — the off-Amazon search (DuckDuckGo) + the
+     brand/retailer page scrape both now run through this connection.
+   - `human-bsr.js` (P1) — the Amazon scrape (`attemptPlaywrightGather`) now
+     also tries this path first, with the existing Bright Data Datasets API
+     fallback (`bright-data-amazon.js`) kept as a further fallback if the
+     browser path also errors.
+   **Action needed from user**: create a Bright Data Scraping Browser zone
+   and provide the WSS string. Coordinator will set it as GCP Secret Manager
+   secret `scout-brightdata-browser-wss` and bind env `BRIGHTDATA_BROWSER_WSS`
+   to the `dovive-scout` Cloud Run Job.
+2. **Bright Data SERP REST (secondary fallback)** — `searchViaBrightData()`
+   in `phase5-deep-research.js` POSTs to `https://api.brightdata.com/request`
+   with a SERP-enabled zone (`BRIGHTDATA_SERP_ZONE`/`BRIGHTDATA_ZONE`, default
+   `serp_api1`) requesting Google's `&brd_json=1` structured output — used
+   only if the Playwright search still comes back with 0 links.
+3. **Logging**: every search attempt now logs `[P5 search/<asin>]` with link
+   counts per engine and the exact skip reason (never a silent `source=false`
+   again).
+
+**GOAL B — handoff audit.** Widened input caps from the previous pass
+(f1308ed) verified intact (P6/P8/P9/P10/P11 all in the dozens-to-thousands
+range, no stale tight slices found). One CRITICAL broken handoff found and
+fixed: `phase8-formula-brief.js`'s `fetchP5DeepResearch()` selected columns
+(`bsr`, `monthly_revenue`, `research_type`, `ai_analysis`, `key_findings`,
+`formula_insights`, `competitive_strengths`, `competitive_weaknesses`,
+`market_opportunity`, `recommended_positioning`) that do NOT exist on
+`dovive_phase5_research`'s current (2026-08-28-rebuilt) schema — PostgREST
+errored on every unknown-column select, silently caught into an empty array.
+**P5's real deep-research content never reached P8's prompt on any run,
+regardless of how much P5 data existed.** Fixed the select + prompt-section
+mapping to the real P5 columns (`asin, brand, bsr_rank, pool, benefits,
+formula_notes, key_strengths, key_weaknesses, competitor_angle,
+certifications, third_party_tested, full_research, researched_by,
+data_grounding`).
+
+**GOAL C — UI-critical field population.**
+- `key_differentiators` / `opportunity_insights` / `risk_factors`
+  (`formula_briefs` top-level columns, read by `FormulaBriefTab`,
+  `EnhancedBenchmarkComparison`, `VersionComparisonView`,
+  `DualPackagingStrategies`): confirmed `seed-category-analysis.js` is a
+  **dead stub** — it defines `buildRecord()` with hardcoded fake
+  ashwagandha/Goli/KSM-66 demo data but never calls it and never writes to
+  Supabase at all (no top-level execution, `resolveCatId()`/`buildRecord()`
+  are both unused). It IS spawned by `run-pipeline.js` (phase 10, after P9),
+  so this was never a "not wired" problem — it was a no-op script that also
+  would have poisoned every keyword with fake ashwagandha content had it
+  worked. Rather than fix/wire the fake-data stub, populated these 3 columns
+  directly in `phase8-formula-brief.js`'s `saveToDB()` from real data P8
+  already computes: `key_differentiators` from packaging
+  `differentiationOpps` + P5 `competitor_angle`; `opportunity_insights` from
+  category summary + packaging whitespace gaps + top pain points;
+  `risk_factors` from packaging `competitorWeaknesses` + P5 `key_weaknesses`.
+  `seed-category-analysis.js` left untouched/unexecuted-effectively (still
+  spawned by the pipeline as a harmless no-op) — flagged for a future
+  decision on whether to delete it or actually implement it as a real
+  category-analyses seeder.
+- `ingredients.flavor_qa` / `comprehensive_comparison`: confirmed already
+  saved under the exact keys the UI reads (`FormulaQATab`,
+  `FormulaBriefTab`, `P9DoseAnalysis`, `P9BenchmarkOverview`) — no bug here,
+  the earlier truncation fix (commit `59cf9a3`) already made these non-empty.
+- `ingredients.competitor_notes_json`: confirmed the parsed/merged
+  competitor notes (`finalNotes`, merged from Call 1/2/3) were computed but
+  only ever saved per-product to `products.marketing_analysis.qa_comparison_note`
+  — never written to `formula_briefs.ingredients.competitor_notes_json`, the
+  exact key `src/hooks/useDataCompleteness.ts`'s new completeness audit tab
+  (added in `bd2d805`, the frontend agent's concurrent commit) reads. Added
+  `competitor_notes_json: finalNotes` to P9's `formula_briefs.ingredients`
+  update payload alongside `comprehensive_comparison`/`flavor_qa`.
+
+**GOAL D — restored independent draft/validation models (dual-AI design).**
+New `VALIDATION_MODEL` env var (default `anthropic/claude-opus-5`),
+parallel to `ANALYSIS_MODEL` (`anthropic/claude-sonnet-5`). Applied to every
+dual-tier phase so draft and validation are genuinely different models
+again:
+- `phase8-formula-brief.js`: Draft A (`callGrok42`) → `VALIDATION_MODEL`
+  (Opus 5); Draft B (`callClaudeSonnet`) → stays `ANALYSIS_MODEL` (Sonnet 5).
+- `phase9-formula-qa.js`: Call 1 (QA adjudicator, reviews both P8 drafts) →
+  `VALIDATION_MODEL` (Opus 5); Call 2 (comprehensive comparison/flavor
+  QA/competitor notes — a content-generation task, not adjudication) stays
+  `ANALYSIS_MODEL` (Sonnet 5).
+- `phase10-competitive-benchmarking.js`: Call 1 draft (`callClaudeSonnet`)
+  stays `ANALYSIS_MODEL`; Call 2 validation (`callClaudeOpus`) →
+  `VALIDATION_MODEL`, default `maxTokens` raised 12000→16000.
+- `phase11-fda-compliance.js`: Call 1 primary (`callClaudeOpus`) stays
+  `ANALYSIS_MODEL`; Call 2 validation (`callClaudeSonnet` — function name
+  predates this change, now the validation tier) → `VALIDATION_MODEL`,
+  default `maxTokens` raised 8000→16000.
+All 4 phases keep the existing truncation hardening (finish_reason logging,
+retry-once, `[ERROR: truncated/empty]` marker, never-silent-null) on the
+Opus 5 calls too — no new gaps introduced. Metadata/label fields
+(`models_used`, `qa_run_audit.model`, vault filenames' `**Model:**` line,
+etc.) updated to reflect which model actually ran each tier.
+
+All edited files verified with `node --check`. No cloud run triggered —
+coordinator/user runs their own validation.
+
+---
+
 ## 2026-08-28 follow-up 3: full-repo Sonnet-5 sweep + truncation-hardening audit (final pass)
 
 **Trigger**: coordinator-requested full audit to guarantee zero remaining

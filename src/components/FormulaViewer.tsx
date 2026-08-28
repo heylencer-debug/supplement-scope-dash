@@ -81,7 +81,7 @@ function InlineText({ text }: { text: string }) {
       parts.push(<span key={key++}>{remaining.slice(boldIdx)}</span>);
       break;
     }
-    parts.push(<strong key={key++} className="font-semibold text-gray-900">{remaining.slice(boldIdx + 2, closeIdx)}</strong>);
+    parts.push(<strong key={key++} className="font-semibold text-foreground">{remaining.slice(boldIdx + 2, closeIdx)}</strong>);
     remaining = remaining.slice(closeIdx + 2);
   }
   return <>{parts}</>;
@@ -97,47 +97,47 @@ interface FormulaViewerProps {
 
 export function FormulaViewer({ text, fallback = "No formula content available.", className = "" }: FormulaViewerProps) {
   if (!text?.trim()) {
-    return <p className="text-sm text-gray-400 py-4">{fallback}</p>;
+    return <p className="text-sm text-muted-foreground py-4">{fallback}</p>;
   }
 
   const lines = parseLines(text);
 
   return (
-    <div className={`formula-viewer space-y-0.5 text-sm text-gray-700 ${className}`}>
+    <div className={`formula-viewer space-y-0.5 text-sm text-foreground/80 ${className}`}>
       {lines.map((line, i) => {
         switch (line.type) {
           case "h1":
             return (
-              <h2 key={i} className="text-base font-bold text-gray-900 pt-5 pb-1 first:pt-0">
+              <h2 key={i} className="text-base font-bold text-foreground pt-5 pb-1 first:pt-0">
                 <InlineText text={line.text} />
               </h2>
             );
           case "h2":
             return (
-              <h3 key={i} className="text-sm font-bold text-gray-800 pt-4 pb-0.5">
+              <h3 key={i} className="text-sm font-bold text-foreground pt-4 pb-0.5">
                 <InlineText text={line.text} />
               </h3>
             );
           case "h3":
             return (
-              <h4 key={i} className="text-xs font-bold text-gray-700 uppercase tracking-wide pt-3 pb-0.5">
+              <h4 key={i} className="text-xs font-bold text-foreground/90 uppercase tracking-wide pt-3 pb-0.5">
                 <InlineText text={line.text} />
               </h4>
             );
           case "separator":
-            return <hr key={i} className="border-gray-200 my-3" />;
+            return <hr key={i} className="border-border my-3" />;
           case "empty":
             return <div key={i} className="h-2" />;
           case "bullet":
             return (
               <div key={i} className="flex gap-2 pl-2">
-                <span className="text-gray-400 shrink-0 mt-px">•</span>
+                <span className="text-muted-foreground shrink-0 mt-px">•</span>
                 <span className="leading-relaxed"><InlineText text={line.text} /></span>
               </div>
             );
           case "table":
             return (
-              <div key={i} className={`flex gap-0 ${line.isTableHeader ? "border-b border-gray-300 font-semibold text-gray-900 bg-gray-50" : "border-b border-gray-100"}`}>
+              <div key={i} className={`flex gap-0 ${line.isTableHeader ? "border-b border-border font-semibold text-foreground bg-muted/50" : "border-b border-border/50"}`}>
                 {(line.cells ?? []).map((cell, ci) => (
                   <div key={ci} className="flex-1 px-2 py-1.5 text-xs">
                     <InlineText text={cell} />

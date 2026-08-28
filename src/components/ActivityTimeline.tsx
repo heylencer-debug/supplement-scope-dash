@@ -65,14 +65,14 @@ export function ActivityTimeline({ comments, versions, showVersionChip = true }:
 
   if (events.length === 0) {
     return (
-      <p className="text-sm text-gray-400 py-8 text-center">No activity yet for this project.</p>
+      <p className="text-sm text-muted-foreground py-8 text-center">No activity yet for this project.</p>
     );
   }
 
   return (
     <div className="relative">
       {/* vertical line */}
-      <div className="absolute left-[15px] top-2 bottom-2 w-px bg-gray-100" />
+      <div className="absolute left-[15px] top-2 bottom-2 w-px bg-border" />
 
       <div className="space-y-5">
         {events.map((event) => {
@@ -89,17 +89,17 @@ export function ActivityTimeline({ comments, versions, showVersionChip = true }:
                 </div>
                 <div className="flex-1 min-w-0 pt-0.5">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <span className="text-xs font-semibold text-gray-800">{c.author_name}</span>
+                    <span className="text-xs font-semibold text-foreground">{c.author_name}</span>
                     {!isInternal && (
                       <span className="text-[9px] px-1.5 py-0 bg-purple-100 text-purple-600 rounded-full">manufacturer</span>
                     )}
                     {showVersionChip && (
-                      <span className="text-[9px] px-1.5 py-0 bg-gray-100 text-gray-500 rounded-full">{c.version_label}</span>
+                      <span className="text-[9px] px-1.5 py-0 bg-muted text-muted-foreground rounded-full">{c.version_label}</span>
                     )}
-                    <span className="text-[10px] text-gray-400 ml-auto">{formatDateTime(c.created_at)}</span>
+                    <span className="text-[10px] text-muted-foreground ml-auto">{formatDateTime(c.created_at)}</span>
                   </div>
                   {c.comment && (
-                    <p className="text-sm text-gray-600 leading-relaxed">{c.comment}</p>
+                    <p className="text-sm text-foreground/80 leading-relaxed">{c.comment}</p>
                   )}
                   {c.attachment_url && (
                     <div className="mt-1.5">
@@ -108,7 +108,7 @@ export function ActivityTimeline({ comments, versions, showVersionChip = true }:
                           <img
                             src={c.attachment_url}
                             alt={c.attachment_name ?? "attachment"}
-                            className="max-w-xs max-h-32 rounded-lg border border-gray-200 object-cover hover:opacity-90 transition-opacity"
+                            className="max-w-xs max-h-32 rounded-lg border border-border object-cover hover:opacity-90 transition-opacity"
                           />
                         </a>
                       ) : (
@@ -116,7 +116,7 @@ export function ActivityTimeline({ comments, versions, showVersionChip = true }:
                           href={c.attachment_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 bg-blue-50 border border-blue-100 rounded-lg px-2.5 py-1.5 transition-colors"
+                          className="inline-flex items-center gap-1.5 text-xs text-primary hover:opacity-80 bg-primary/5 border border-primary/10 rounded-lg px-2.5 py-1.5 transition-colors"
                         >
                           <FileText className="w-3 h-3 shrink-0" />
                           <span className="truncate max-w-[180px]">{c.attachment_name ?? "Attachment"}</span>
@@ -141,13 +141,13 @@ export function ActivityTimeline({ comments, versions, showVersionChip = true }:
                 </div>
                 <div className="flex-1 min-w-0 pt-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-semibold text-gray-700">
+                    <span className="text-xs font-semibold text-foreground/90">
                       {isPipeline ? `${v.label} generated` : `${v.label} created`}
                     </span>
-                    <span className="text-[10px] text-gray-400 ml-auto">{formatDateTime(v.created_at)}</span>
+                    <span className="text-[10px] text-muted-foreground ml-auto">{formatDateTime(v.created_at)}</span>
                   </div>
                   {v.change_summary && (
-                    <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">{v.change_summary}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{v.change_summary}</p>
                   )}
                 </div>
               </div>

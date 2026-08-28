@@ -6,6 +6,7 @@ import { Panel } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { PDFDownloadLink } from "@react-pdf/renderer";
@@ -73,10 +74,10 @@ type VerdictKey = "APPROVED" | "ADJUSTMENTS" | "NON-COMPLIANT" | "COMPLIANT" | "
 
 function verdictBadge(verdict: string | null) {
   if (!verdict)
-    return <Badge className="text-xs bg-gray-100 text-gray-600 border-gray-200">No QA</Badge>;
+    return <Badge className="text-xs bg-muted text-muted-foreground border-border">No QA</Badge>;
   const upper = verdict.toUpperCase();
   if (upper.includes("APPROVED") && !upper.includes("ADJUST"))
-    return <Badge className="text-xs bg-green-50 text-green-700 border-green-200">APPROVED</Badge>;
+    return <Badge className="text-xs bg-chart-4/10 text-chart-4 border-chart-4/20">APPROVED</Badge>;
   if (upper.includes("ADJUST"))
     return (
       <Badge className="text-xs bg-amber-50 text-amber-700 border-amber-200">
@@ -84,10 +85,10 @@ function verdictBadge(verdict: string | null) {
       </Badge>
     );
   if (upper.includes("NON") || upper.includes("FAIL"))
-    return <Badge className="text-xs bg-red-50 text-red-700 border-red-200">NON-COMPLIANT</Badge>;
+    return <Badge className="text-xs bg-destructive/10 text-destructive border-destructive/20">NON-COMPLIANT</Badge>;
   if (upper.includes("COMPLIANT"))
-    return <Badge className="text-xs bg-green-50 text-green-700 border-green-200">COMPLIANT</Badge>;
-  return <Badge className="text-xs bg-gray-100 text-gray-600 border-gray-200">{verdict}</Badge>;
+    return <Badge className="text-xs bg-chart-4/10 text-chart-4 border-chart-4/20">COMPLIANT</Badge>;
+  return <Badge className="text-xs bg-muted text-muted-foreground border-border">{verdict}</Badge>;
 }
 
 function getPromotedPipelineId(changeSummary: string | null | undefined): string | null {
@@ -114,15 +115,15 @@ function getPromotedPipelineId(changeSummary: string | null | undefined): string
 
 function AccessDenied() {
   return (
-    <div className="min-h-screen bg-white flex items-center justify-center">
+    <div className="min-h-screen bg-background flex items-center justify-center">
       <div className="text-center max-w-md px-6">
-        <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
-          <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
+          <svg className="w-6 h-6 text-destructive" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         </div>
-        <h1 className="text-xl font-semibold text-gray-900 mb-2">Access Denied</h1>
-        <p className="text-gray-500 text-sm">
+        <h1 className="text-xl font-semibold text-foreground mb-2">Access Denied</h1>
+        <p className="text-muted-foreground text-sm">
           This link is invalid or has expired. Please contact the team for a new link.
         </p>
       </div>
@@ -134,8 +135,8 @@ function AccessDenied() {
 
 function LoadingScreen() {
   return (
-    <div className="min-h-screen bg-white flex items-center justify-center">
-      <div className="flex items-center gap-3 text-gray-500">
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="flex items-center gap-3 text-muted-foreground">
         <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
@@ -445,25 +446,25 @@ export default function ManufacturerPortal() {
   const selectedCategory = categories.find((c) => c.id === selectedCategoryId);
 
   return (
-    <div className="min-h-screen bg-white flex flex-col" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+    <div className="min-h-screen bg-background flex flex-col" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
       {/* Top bar */}
-      <header className="h-12 border-b border-gray-200 flex items-center px-5 gap-4 shrink-0 bg-white z-10">
-        <span className="font-semibold text-gray-900 text-sm tracking-tight">DOVIVE</span>
-        <span className="text-gray-300 text-sm">|</span>
-        <span className="text-gray-500 text-sm">Manufacturer Portal</span>
+      <header className="h-12 border-b border-border flex items-center px-5 gap-4 shrink-0 bg-background z-10">
+        <span className="font-semibold text-foreground text-sm tracking-tight">DOVIVE</span>
+        <span className="text-muted-foreground/40 text-sm">|</span>
+        <span className="text-muted-foreground text-sm">Manufacturer Portal</span>
         <div className="ml-auto flex items-center gap-2">
-          <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-600">
+          <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground">
             {getInitials(session?.manufacturer_name ?? "M")}
           </div>
-          <span className="text-sm text-gray-700">{session?.manufacturer_name}</span>
+          <span className="text-sm text-foreground/90">{session?.manufacturer_name}</span>
         </div>
       </header>
 
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
-        <aside className="w-56 border-r border-gray-200 bg-[#F8F9FA] shrink-0 flex flex-col">
+        <aside className="w-56 border-r border-border bg-muted/40 shrink-0 flex flex-col">
           <div className="px-4 pt-5 pb-2">
-            <p className="text-[10px] uppercase tracking-widest text-gray-400 font-semibold mb-3">
+            <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-3">
               Projects
             </p>
           </div>
@@ -472,19 +473,20 @@ export default function ManufacturerPortal() {
               {categories.map((cat) => {
                 const active = cat.id === selectedCategoryId;
                 return (
-                  <button
+                  <Button
                     key={cat.id}
+                    variant="ghost"
                     onClick={() => setSelectedCategoryId(cat.id)}
                     className={[
-                      "w-full text-left px-3 py-2 rounded-md text-sm transition-colors",
+                      "w-full justify-start text-left px-3 py-2 h-auto rounded-md text-sm font-normal transition-colors",
                       active
-                        ? "bg-blue-50 text-blue-700 font-medium"
-                        : "text-gray-600 hover:bg-gray-200",
+                        ? "bg-primary/10 text-primary font-medium hover:bg-primary/10"
+                        : "text-muted-foreground hover:bg-muted",
                     ].join(" ")}
                   >
                     <span className="mr-1.5 text-xs">{active ? "●" : "○"}</span>
                     {cat.name.length > 22 ? cat.name.slice(0, 22) + "…" : cat.name}
-                  </button>
+                  </Button>
                 );
               })}
             </div>
@@ -494,38 +496,38 @@ export default function ManufacturerPortal() {
         {/* Main content */}
         <main className="flex-1 overflow-y-auto">
           {!selectedCategory ? (
-            <div className="flex items-center justify-center h-full text-gray-400 text-sm">
+            <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
               Select a project from the sidebar.
             </div>
           ) : (
             <div className="max-w-3xl mx-auto px-8 py-8 space-y-8">
               {/* Category header */}
               <div>
-                <h1 className="text-2xl font-semibold text-gray-900">{selectedCategory.name}</h1>
-                <p className="text-sm text-gray-400 mt-1">{selectedCategory.total_products} products analyzed</p>
+                <h1 className="text-2xl font-semibold text-foreground">{selectedCategory.name}</h1>
+                <p className="text-sm text-muted-foreground mt-1">{selectedCategory.total_products} products analyzed</p>
               </div>
 
               {/* Formula versions */}
               <section>
-                <h2 className="text-xs uppercase tracking-widest text-gray-400 font-semibold mb-3">
+                <h2 className="text-xs uppercase tracking-widest text-muted-foreground font-semibold mb-3">
                   Formula Versions
                 </h2>
 
                 {brifsLoading || publishedLabel === undefined ? (
                   <div className="space-y-3">
                     {[1, 2].map((i) => (
-                      <div key={i} className="h-20 rounded-lg bg-gray-100 animate-pulse" />
+                      <div key={i} className="h-20 rounded-lg bg-muted animate-pulse" />
                     ))}
                   </div>
                 ) : publishedLabel === null ? (
-                  <Panel className="border border-gray-200">
-                    <CardContent className="py-8 text-center text-gray-400 text-sm">
+                  <Panel className="border border-border">
+                    <CardContent className="py-8 text-center text-muted-foreground text-sm">
                       No formula version has been shared yet. Check back soon.
                     </CardContent>
                   </Panel>
                 ) : !publishedVersion ? (
-                  <Panel className="border border-gray-200">
-                    <CardContent className="py-8 text-center text-gray-400 text-sm">
+                  <Panel className="border border-border">
+                    <CardContent className="py-8 text-center text-muted-foreground text-sm">
                       Loading shared formula…
                     </CardContent>
                   </Panel>
@@ -538,19 +540,19 @@ export default function ManufacturerPortal() {
                       <Panel
                         className={[
                           "border transition-shadow",
-                          isCommentActive ? "border-blue-200 shadow-sm" : "border-gray-200",
+                          isCommentActive ? "border-primary/30 shadow-sm" : "border-border",
                         ].join(" ")}
                       >
                         <CardHeader className="pb-2 pt-4 px-5">
                           <div className="flex items-center gap-3 flex-wrap">
-                            <span className="font-semibold text-gray-800 text-sm">{v.label}</span>
-                            <span className="text-xs text-gray-400">{formatDate(v.created_at)}</span>
+                            <span className="font-semibold text-foreground text-sm">{v.label}</span>
+                            <span className="text-xs text-muted-foreground">{formatDate(v.created_at)}</span>
                             {verdictBadge(v.qa_verdict)}
                           </div>
-                          <div className="flex items-center gap-4 mt-1.5 text-xs text-gray-500">
-                            {v.qa_score && <span>QA Score: <strong className="text-gray-700">{v.qa_score}/10</strong></span>}
-                            {v.fda_score && <span>FDA: <strong className="text-gray-700">{v.fda_score}/100</strong></span>}
-                            {v.fda_status && <span className="text-gray-400">{v.fda_status}</span>}
+                          <div className="flex items-center gap-4 mt-1.5 text-xs text-muted-foreground">
+                            {v.qa_score && <span>QA Score: <strong className="text-foreground/90">{v.qa_score}/10</strong></span>}
+                            {v.fda_score && <span>FDA: <strong className="text-foreground/90">{v.fda_score}/100</strong></span>}
+                            {v.fda_status && <span className="text-muted-foreground">{v.fda_status}</span>}
                           </div>
                         </CardHeader>
                         <CardContent className="px-5 pb-4">
@@ -558,7 +560,7 @@ export default function ManufacturerPortal() {
                             <Button
                               variant="outline"
                               size="sm"
-                              className="text-xs h-7 border-gray-200 text-gray-600 hover:bg-gray-50"
+                              className="text-xs h-7"
                               onClick={() => setExpandedVersionId(isExpanded ? null : v.id)}
                             >
                               {isExpanded ? "Hide Formula" : "View Formula"}
@@ -582,7 +584,7 @@ export default function ManufacturerPortal() {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  className="text-xs h-7 border-gray-200 text-gray-600 hover:bg-gray-50 gap-1"
+                                  className="text-xs h-7 gap-1"
                                   disabled={pdfLoading}
                                 >
                                   {pdfLoading ? "Preparing…" : "⬇ Download PDF"}
@@ -592,12 +594,7 @@ export default function ManufacturerPortal() {
                             <Button
                               variant={isCommentActive ? "default" : "ghost"}
                               size="sm"
-                              className={[
-                                "text-xs h-7",
-                                isCommentActive
-                                  ? "bg-blue-600 hover:bg-blue-700 text-white"
-                                  : "text-gray-500 hover:bg-gray-100",
-                              ].join(" ")}
+                              className="text-xs h-7"
                               onClick={() => {
                                 setActiveCommentVersion(v.label);
                                 loadComments(selectedCategoryId!, v.comment_labels ?? [v.label]);
@@ -605,7 +602,7 @@ export default function ManufacturerPortal() {
                             >
                               Comments
                               {isCommentActive && comments.length > 0 && (
-                                <span className="ml-1.5 bg-blue-500 text-white rounded-full px-1.5 py-0 text-[10px]">
+                                <span className="ml-1.5 bg-primary-foreground/20 rounded-full px-1.5 py-0 text-[10px]">
                                   {comments.length}
                                 </span>
                               )}
@@ -613,7 +610,7 @@ export default function ManufacturerPortal() {
                           </div>
 
                           {isExpanded && (
-                            <div className="mt-4 p-5 rounded-lg bg-gray-50 border border-gray-200 max-h-[600px] overflow-y-auto">
+                            <div className="mt-4 p-5 rounded-lg bg-muted/40 border border-border max-h-[600px] overflow-y-auto">
                               <FormulaViewer text={v.formula_text} />
                             </div>
                           )}
@@ -628,27 +625,27 @@ export default function ManufacturerPortal() {
               {activeCommentVersion && (
                 <section>
                   <Separator className="mb-6" />
-                  <h2 className="text-xs uppercase tracking-widest text-gray-400 font-semibold mb-4">
+                  <h2 className="text-xs uppercase tracking-widest text-muted-foreground font-semibold mb-4">
                     Comments on {activeCommentVersion}
                   </h2>
 
                   {/* Comment list */}
                   <div className="space-y-4 mb-6">
                     {comments.length === 0 ? (
-                      <p className="text-sm text-gray-400">No comments yet. Be the first to leave a note.</p>
+                      <p className="text-sm text-muted-foreground">No comments yet. Be the first to leave a note.</p>
                     ) : (
                       comments.map((c) => (
                         <div key={c.id} className="flex gap-3">
-                          <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-600 shrink-0 mt-0.5">
+                          <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground shrink-0 mt-0.5">
                             {getInitials(c.author_name)}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-baseline gap-2 mb-0.5">
-                              <span className="text-sm font-medium text-gray-800">{c.author_name}</span>
-                              <span className="text-xs text-gray-400">{formatTime(c.created_at)}</span>
+                              <span className="text-sm font-medium text-foreground">{c.author_name}</span>
+                              <span className="text-xs text-muted-foreground">{formatTime(c.created_at)}</span>
                             </div>
                             {c.comment && (
-                              <p className="text-sm text-gray-600 leading-relaxed">{c.comment}</p>
+                              <p className="text-sm text-foreground/80 leading-relaxed">{c.comment}</p>
                             )}
                             {c.attachment_url && (
                               <div className="mt-2">
@@ -657,7 +654,7 @@ export default function ManufacturerPortal() {
                                     <img
                                       src={c.attachment_url}
                                       alt={c.attachment_name ?? "attachment"}
-                                      className="max-w-xs max-h-48 rounded-lg border border-gray-200 object-cover hover:opacity-90 transition-opacity"
+                                      className="max-w-xs max-h-48 rounded-lg border border-border object-cover hover:opacity-90 transition-opacity"
                                     />
                                   </a>
                                 ) : (
@@ -665,7 +662,7 @@ export default function ManufacturerPortal() {
                                     href={c.attachment_url}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-2 text-xs text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-100 rounded-lg px-3 py-2 transition-colors"
+                                    className="inline-flex items-center gap-2 text-xs text-primary hover:opacity-80 bg-primary/5 hover:bg-primary/10 border border-primary/10 rounded-lg px-3 py-2 transition-colors"
                                   >
                                     <FileText className="w-3.5 h-3.5 shrink-0" />
                                     <span className="truncate max-w-[200px]">{c.attachment_name ?? "Attachment"}</span>
@@ -680,8 +677,8 @@ export default function ManufacturerPortal() {
                   </div>
 
                   {/* Comment input */}
-                  <div className="border border-gray-200 rounded-lg overflow-hidden">
-                    <input
+                  <div className="border border-border rounded-lg overflow-hidden">
+                    <Input
                       ref={fileInputRef}
                       type="file"
                       className="hidden"
@@ -699,45 +696,49 @@ export default function ManufacturerPortal() {
                       }}
                     />
                     {attachmentFile && (
-                      <div className="px-3 py-2 bg-blue-50 border-t border-blue-100 flex items-center gap-2">
+                      <div className="px-3 py-2 bg-primary/5 border-t border-primary/10 flex items-center gap-2">
                         {attachmentFile.type.startsWith("image/") ? (
-                          <Image className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                          <Image className="w-3.5 h-3.5 text-primary shrink-0" />
                         ) : (
-                          <FileText className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                          <FileText className="w-3.5 h-3.5 text-primary shrink-0" />
                         )}
-                        <span className="text-xs text-blue-700 flex-1 truncate">{attachmentFile.name}</span>
-                        <span className="text-xs text-blue-400">
+                        <span className="text-xs text-primary flex-1 truncate">{attachmentFile.name}</span>
+                        <span className="text-xs text-primary/60">
                           {(attachmentFile.size / 1024 / 1024).toFixed(1)} MB
                         </span>
-                        <button
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           onClick={() => {
                             setAttachmentFile(null);
                             if (fileInputRef.current) fileInputRef.current.value = "";
                           }}
-                          className="text-blue-400 hover:text-blue-600 p-0.5 rounded"
+                          className="h-5 w-5 text-primary/60 hover:text-primary"
                         >
                           <X className="w-3.5 h-3.5" />
-                        </button>
+                        </Button>
                       </div>
                     )}
-                    <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-t border-gray-200">
+                    <div className="flex items-center justify-between px-3 py-2 bg-muted/40 border-t border-border">
                       {submitError ? (
-                        <span className="text-xs text-red-500">{submitError}</span>
+                        <span className="text-xs text-destructive">{submitError}</span>
                       ) : (
                         <div className="flex items-center gap-3">
-                          <button
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             onClick={() => fileInputRef.current?.click()}
-                            className="text-gray-400 hover:text-gray-600 transition-colors"
+                            className="h-6 w-6 text-muted-foreground hover:text-foreground"
                             title="Attach a file"
                           >
                             <Paperclip className="w-4 h-4" />
-                          </button>
-                          <span className="text-xs text-gray-400">Cmd+Enter to send</span>
+                          </Button>
+                          <span className="text-xs text-muted-foreground">Cmd+Enter to send</span>
                         </div>
                       )}
                       <Button
                         size="sm"
-                        className="h-7 text-xs bg-blue-600 hover:bg-blue-700 text-white"
+                        className="h-7 text-xs"
                         disabled={(!commentText.trim() && !attachmentFile) || submitting}
                         onClick={handleSubmitComment}
                       >
@@ -752,7 +753,7 @@ export default function ManufacturerPortal() {
               {(allCatComments.length > 0 || versions.length > 0) && (
                 <section>
                   <Separator className="mb-6" />
-                  <h2 className="text-xs uppercase tracking-widest text-gray-400 font-semibold mb-5">
+                  <h2 className="text-xs uppercase tracking-widest text-muted-foreground font-semibold mb-5">
                     Project History
                   </h2>
                   <ActivityTimeline

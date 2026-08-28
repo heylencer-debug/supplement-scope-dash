@@ -77,20 +77,20 @@ function formatDate(iso: string): string {
 }
 
 function verdictColor(verdict: string): string {
-  if (/APPROVED$/i.test(verdict)) return "bg-green-100 text-green-800 border-green-200";
-  if (/ADJUSTMENTS/i.test(verdict)) return "bg-yellow-100 text-yellow-800 border-yellow-200";
-  if (/NON-COMPLIANT|REVISION|MAJOR/i.test(verdict)) return "bg-red-100 text-red-800 border-red-200";
-  return "bg-gray-100 text-gray-600 border-gray-200";
+  if (/APPROVED$/i.test(verdict)) return "bg-chart-4/10 text-chart-4 border-chart-4/20";
+  if (/ADJUSTMENTS/i.test(verdict)) return "bg-amber-50 text-amber-700 border-amber-200";
+  if (/NON-COMPLIANT|REVISION|MAJOR/i.test(verdict)) return "bg-destructive/10 text-destructive border-destructive/20";
+  return "bg-muted text-muted-foreground border-border";
 }
 
 function ScoreChip({ label, value, max }: { label: string; value: string | null; max: number }) {
   if (!value) return null;
   const pct = Math.min(100, (parseFloat(value) / max) * 100);
-  const color = pct >= 75 ? "text-green-700" : pct >= 50 ? "text-yellow-700" : "text-red-600";
+  const color = pct >= 75 ? "text-chart-4" : pct >= 50 ? "text-amber-700" : "text-destructive";
   return (
     <div className="flex flex-col items-center gap-0.5">
-      <span className={`text-sm font-bold ${color}`}>{value}<span className="text-[10px] text-gray-400">/{max}</span></span>
-      <span className="text-[10px] text-gray-400 uppercase tracking-wide">{label}</span>
+      <span className={`text-sm font-bold ${color}`}>{value}<span className="text-[10px] text-muted-foreground">/{max}</span></span>
+      <span className="text-[10px] text-muted-foreground uppercase tracking-wide">{label}</span>
     </div>
   );
 }
@@ -98,8 +98,8 @@ function ScoreChip({ label, value, max }: { label: string; value: string | null;
 function MetaRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex gap-3">
-      <span className="text-xs text-gray-400 w-32 flex-shrink-0 pt-0.5">{label}</span>
-      <span className="text-xs text-gray-700 flex-1">{value ?? <span className="text-gray-300">—</span>}</span>
+      <span className="text-xs text-muted-foreground w-32 flex-shrink-0 pt-0.5">{label}</span>
+      <span className="text-xs text-foreground/90 flex-1">{value ?? <span className="text-muted-foreground/50">—</span>}</span>
     </div>
   );
 }

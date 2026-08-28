@@ -397,17 +397,6 @@ async function compileMarketData(categoryId) {
     .eq('category_id', categoryId)
     .not('marketing_analysis', 'is', null);
 
-  // Fallback: if the exact-count query above errored or returned falsy while
-  // real product rows demonstrably exist for this category, use the larger
-  // of top20/allProducts as a floor rather than persisting 0.
-  if (!total) {
-    const liveFloor = Math.max(allProducts?.length || 0, top20?.length || 0);
-    if (liveFloor > 0) {
-      console.warn(`  ⚠️ total_products count was ${total}, but ${liveFloor} live product rows exist — using floor of ${liveFloor}`);
-      total = liveFloor;
-    }
-  }
-
   // 2026-08-28: this query is already scoped to `categoryId`, which the
   // caller (run()) resolves via resolveCategory() — the same deterministic
   // highest-live-product-count tie-break used pipeline-wide since the
@@ -419,6 +408,18 @@ async function compileMarketData(categoryId) {
     .select('*', { count: 'exact', head: true })
     .eq('category_id', categoryId);
   if (totalErr) console.warn('  ⚠️ total_products count query failed (non-fatal):', totalErr.message);
+
+  // Fallback: if the exact-count query above errored or returned falsy while
+  // real product rows demonstrably exist for this category, use the larger
+  // of top20/allProducts as a floor rather than persisting 0. (Must run AFTER
+  // `total` is declared above — TDZ bug fixed 2026-08-28.)
+  if (!total) {
+    const liveFloor = Math.max(allProducts?.length || 0, top20?.length || 0);
+    if (liveFloor > 0) {
+      console.warn(`  ⚠️ total_products count was ${total}, but ${liveFloor} live product rows exist — using floor of ${liveFloor}`);
+      total = liveFloor;
+    }
+  }
 
   // â"€â"€ Aggregate ingredient frequency from P6 â"€â"€
   const ingredientMap = {};

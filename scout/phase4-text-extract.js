@@ -26,7 +26,15 @@ const LIMIT     = LIMIT_IDX > -1 ? parseInt(process.argv[LIMIT_IDX + 1]) : null;
 
 const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY;
-const ANALYSIS_MODEL = process.env.ANALYSIS_MODEL || 'anthropic/claude-sonnet-5';
+// 2026-08-28: switched from anthropic/claude-sonnet-5 to Gemini Flash per
+// user directive — routed via OpenRouter so OPENROUTER_API_KEY covers it
+// (Gemini shares the same OpenRouter credit balance as Anthropic calls).
+// `google/gemini-flash-latest` is OpenRouter's maintained alias that always
+// points at the current-generation Gemini Flash model — used here because
+// this sandbox has no network egress to openrouter.ai to verify the exact
+// dated slug (e.g. gemini-3.x-flash) at write time. Override with P4_MODEL
+// once the exact slug is confirmed from a machine with network access.
+const ANALYSIS_MODEL = process.env.P4_MODEL || process.env.ANALYSIS_MODEL || 'google/gemini-flash-latest';
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 

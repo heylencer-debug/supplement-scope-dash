@@ -1,27 +1,38 @@
 /**
- * ocr-phase4.js — Phase 4: Claude Haiku Vision OCR on product images
+ * ocr-phase4.js — Phase 4: Gemini Flash Vision OCR on product images
  *
- * Pulls product images from dovive_research → sends to Claude Haiku 4.5 Vision (via OpenRouter)
- * → extracts structured supplement facts → saves to dovive_ocr table
+ * Pulls product images from dovive_research → sends to Gemini Flash Vision
+ * (via OpenRouter) → extracts structured supplement facts → saves to
+ * dovive_ocr table.
  *
- * Image source note (2026-08-28): this already reads dovive_research.images,
- * which the Bright Data fallback (bright-data-amazon.js normaliseProduct)
- * populates the same as the Playwright path — the full Amazon PDP image
- * gallery, source-agnostic. There is no separate "supplement facts label"
- * scrape to wire; whatever gallery images Bright Data/Playwright captured is
- * what OCR has to work with, same as before.
+ * 2026-08-28: switched from Claude/GPT vision to Gemini Flash per user
+ * directive, routed through OpenRouter so OPENROUTER_API_KEY covers it (same
+ * credit balance as every other OpenRouter call in this pipeline). Model slug
+ * is env-configurable (OCR_MODEL) — defaults to `google/gemini-flash-latest`,
+ * OpenRouter's maintained alias for the current-generation Gemini Flash
+ * model, because this environment has no network egress to openrouter.ai to
+ * confirm the exact dated slug (e.g. a "3.x" release) at write time.
  *
- * REAL LIMITATION: neither Bright Data's Products dataset nor Amazon itself
- * labels which gallery image *is* the facts panel — it's just "image #N" in
+ * Scope/cost control (2026-08-28): only the TOP N products by BSR are
+ * scanned (env OCR_TOP_N, default 20) — this is real image-vision OCR, far
+ * more expensive per call than the P4 text-extraction pass which already
+ * covers ~everything from bullet_points. Per product: scan at most
+ * OCR_MAX_IMAGES (default 5) gallery images, and STOP as soon as one comes
+ * back with has_supplement_facts=true — no need to keep burning calls once
+ * the panel is found. Results here SUPPLEMENT phase4-text-extract.js rows —
+ * migrate-ocr-to-dash.js already picks whichever dovive_ocr row (per ASIN)
+ * has the most supplement_facts items, so a strong text-extraction result is
+ * never clobbered by a weaker image-OCR one.
+ *
+ * Image source note: this reads dovive_research.images, which the Bright
+ * Data fallback (bright-data-amazon.js normaliseProduct) populates the same
+ * as the Playwright path — the full Amazon PDP image gallery, source-
+ * agnostic. Neither Bright Data's Products dataset nor Amazon itself labels
+ * which gallery image *is* the facts panel — it's just "image #N" in
  * whatever order the listing has it, commonly slots 2-7 for supplement
- * products but not guaranteed. Scanning more images per product raises the
- * odds of catching it (bumped 5→8 below) at the cost of more OCR calls; there
- * is no way to guarantee 100% capture without a dedicated per-listing crawl
- * Bright Data doesn't offer for this dataset. OCR already picks whichever
- * image comes back `has_supplement_facts: true`, so this only affects recall
- * on listings where the facts panel is the 6th-8th photo.
+ * products but not guaranteed.
  *
- * Usage: node ocr-phase4.js "<keyword>" [--test]
+ * Usage: node ocr-phase4.js "<keyword>" [--test] [--top-n <n>]
  */
 
 require('dotenv').config();
@@ -30,18 +41,27 @@ const { createClient } = require('@supabase/supabase-js');
 
 const KEYWORD         = process.argv[2] || 'ashwagandha gummies';
 const TEST_MODE       = process.argv.includes('--test');
+const _topNIdx        = process.argv.indexOf('--top-n');
+const OCR_TOP_N        = _topNIdx > -1 ? parseInt(process.argv[_topNIdx + 1]) : parseInt(process.env.OCR_TOP_N || '20');
+const OCR_MAX_IMAGES   = parseInt(process.env.OCR_MAX_IMAGES || '5');
 const OPENROUTER_KEY  = process.env.OPENROUTER_API_KEY;
 const supabase        = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
-const ANALYSIS_MODEL  = process.env.ANALYSIS_MODEL || 'anthropic/claude-sonnet-5';
+// See file header — no network egress here to verify the exact dated Gemini
+// Flash slug, so default to OpenRouter's "latest" alias. Override with
+// OCR_MODEL once confirmed.
+const ANALYSIS_MODEL  = process.env.OCR_MODEL || process.env.ANALYSIS_MODEL || 'google/gemini-flash-latest';
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-// ── Claude Haiku Vision call with retry ──────────────────────
-async function analyzeImageWithGPT(imageUrl, asin, title, retries = 4) {
+// ── Gemini Flash Vision call — no blind retry, honesty policy ───
+// Empty/near-empty output retries ONCE at the same budget. finish_reason
+// length with substantial content is kept as-is (logged, not retried).
+async function analyzeImageWithGemini(imageUrl, asin, title, retries = 3) {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      return await _analyzeImageWithClaude(imageUrl, asin, title);
+      return await _analyzeImageWithGemini(imageUrl, asin, title);
     } catch (err) {
+      if (err.message.includes('[ERROR: credits]')) throw err;
       const isRateLimit = err.message.includes('429') || err.message.includes('rate limit') || err.message.includes('Rate limit');
       const isServer    = err.message.includes('500') || err.message.includes('503');
       if ((isRateLimit || isServer) && attempt < retries) {
@@ -55,7 +75,7 @@ async function analyzeImageWithGPT(imageUrl, asin, title, retries = 4) {
   }
 }
 
-async function _analyzeImageWithClaude(imageUrl, asin, title) {
+async function _analyzeImageWithGemini(imageUrl, asin, title) {
   const prompt = `You are analyzing an Amazon product image for a supplement product.
 ASIN: ${asin}
 Product: ${title}
@@ -77,7 +97,12 @@ Extract ALL text visible in this image and return a JSON object with these field
 If no supplement facts panel is visible, still extract any product claims, ingredients, or certifications visible.
 Return ONLY valid JSON, no markdown.`;
 
-  const doCall = async (maxTokens) => {
+  // Plain OpenAI-shape chat request works for Gemini on OpenRouter. Vision
+  // content parts: {type:'text'} + {type:'image_url', image_url:{url}} —
+  // the OpenAI `detail` hint is dropped (Gemini ignores/doesn't use it).
+  const MAX_TOKENS = 4000;
+
+  const doCall = async () => {
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -88,16 +113,21 @@ Return ONLY valid JSON, no markdown.`;
       },
       body: JSON.stringify({
         model: ANALYSIS_MODEL,
-        max_tokens: maxTokens,
+        max_tokens: MAX_TOKENS,
         messages: [{
           role: 'user',
           content: [
             { type: 'text', text: prompt },
-            { type: 'image_url', image_url: { url: imageUrl, detail: 'high' } }
+            { type: 'image_url', image_url: { url: imageUrl } }
           ]
         }]
       })
     });
+
+    if (res.status === 402) {
+      console.error(`  ❌ OpenRouter credits exhausted — top up at openrouter.ai`);
+      throw new Error('[ERROR: credits] OpenRouter credits exhausted (402)');
+    }
 
     if (!res.ok) {
       const err = await res.text();
@@ -105,24 +135,28 @@ Return ONLY valid JSON, no markdown.`;
     }
 
     const data = await res.json();
-    if (data.error) throw new Error(`Claude OCR error: ${data.error.message || JSON.stringify(data.error)}`);
+    if (data.error) throw new Error(`Gemini OCR error: ${data.error.message || JSON.stringify(data.error)}`);
     const choice = data.choices?.[0];
     const content = choice?.message?.content || '';
     const finishReason = choice?.finish_reason || 'unknown';
     return { content, finishReason, usage: data.usage };
   };
 
-  let { content, finishReason, usage } = await doCall(2000);
-  console.log(`\n  finish_reason: ${finishReason}`);
-  if (finishReason === 'length' || !content) {
-    console.log(`  ⚠️  Truncated/empty — retrying once at 4000 tokens...`);
-    const retry = await doCall(4000);
-    console.log(`  finish_reason (retry): ${retry.finishReason}`);
-    content = retry.content;
-    usage = retry.usage;
-    if (!content) {
+  let { content, finishReason, usage } = await doCall();
+  console.log(`\n  finish_reason: ${finishReason} | output_chars: ${content.length}`);
+
+  if (finishReason === 'length' && content.length > 500) {
+    // Substantial content despite hitting the ceiling — keep it, don't burn tokens retrying.
+    console.log(`  [NOTE: output reached token ceiling] — keeping truncated-but-substantial content`);
+  } else if (content.length < 500) {
+    console.log(`  ⚠️  Near-empty output (finish_reason=${finishReason}) — retrying once at same budget...`);
+    const retry = await doCall();
+    console.log(`  finish_reason (retry): ${retry.finishReason} | output_chars: ${retry.content.length}`);
+    if (retry.content.length < 500) {
       throw new Error('[ERROR: truncated/empty] — retry still produced no content');
     }
+    content = retry.content;
+    usage = retry.usage;
   }
 
   try {
@@ -164,26 +198,32 @@ async function getProcessed(keyword) {
 
 // ── Main ──────────────────────────────────────────────────────
 async function main() {
-  console.log(`\n🔍 Phase 4 — OCR with GPT-4o Vision`);
+  console.log(`\n🔍 Phase 4 — Image OCR with Gemini Flash Vision (${ANALYSIS_MODEL})`);
   console.log(`   Keyword: "${KEYWORD}"`);
-  console.log(`   Mode: ${TEST_MODE ? 'TEST (1 product)' : 'FULL'}`);
+  console.log(`   Mode: ${TEST_MODE ? 'TEST (1 product)' : `TOP ${OCR_TOP_N} by BSR`}`);
+  console.log(`   Max images/product: ${OCR_MAX_IMAGES} (stops early once facts panel found)`);
 
-  // Get products
+  // Get products — ordered by BSR so we scope the expensive vision pass to
+  // the top N products only (env OCR_TOP_N, default 20).
   const { data: products, error } = await supabase
     .from('dovive_research')
-    .select('asin, title, keyword, images, main_image')
+    .select('asin, title, keyword, images, main_image, bsr')
     .ilike('title', `%${KEYWORD.split(' ')[0]}%`)
-    .not('images', 'is', null);
+    .not('images', 'is', null)
+    .order('bsr', { ascending: true, nullsFirst: false });
 
   if (error) throw new Error(error.message);
   console.log(`\nFound ${products.length} products with images`);
 
+  const topByBsr = products.slice(0, OCR_TOP_N);
+  console.log(`Scoped to top ${topByBsr.length} by BSR (OCR_TOP_N=${OCR_TOP_N})`);
+
   const processed = await getProcessed(KEYWORD);
-  const toProcess = products.filter(p => !processed.has(p.asin));
+  const toProcess = topByBsr.filter(p => !processed.has(p.asin));
   console.log(`Already processed: ${processed.size} | To process: ${toProcess.length}`);
 
   const list = TEST_MODE ? toProcess.slice(0, 1) : toProcess;
-  if (!list.length) { console.log('✅ All products already processed!'); return; }
+  if (!list.length) { console.log('✅ All in-scope products already processed!'); return; }
 
   let saved = 0, skipped = 0, totalTokens = 0;
 
@@ -197,26 +237,31 @@ async function main() {
     }
     if (!Array.isArray(images)) images = [images];
     images = images.filter(u => u && typeof u === 'string' && u.startsWith('http'));
-    if (!images.length) { skipped++; continue; }
+    if (!images.length) {
+      console.log(`\n[${i + 1}/${list.length}] [P4 OCR/${product.asin}] images_scanned=0 facts_found=false nutrients=0 (no valid image URLs)`);
+      skipped++;
+      continue;
+    }
 
     console.log(`\n[${i + 1}/${list.length}] ${product.asin} — ${product.title?.slice(0, 55)}`);
-    console.log(`  Images: ${images.length}`);
+    console.log(`  Images available: ${images.length} (scanning up to ${OCR_MAX_IMAGES})`);
 
-    // Analyze ALL images, find the one with supplement facts
+    // Analyze images up to OCR_MAX_IMAGES, STOP as soon as facts panel found.
     let bestResult = null;
     let bestImageIdx = 0;
-    let bestImageUrl = images[0];
+    let imagesScanned = 0;
 
-    for (let imgIdx = 0; imgIdx < Math.min(images.length, 8); imgIdx++) {
+    for (let imgIdx = 0; imgIdx < Math.min(images.length, OCR_MAX_IMAGES); imgIdx++) {
       const imageUrl = images[imgIdx];
       // Skip invalid URLs
       if (!imageUrl || !imageUrl.startsWith('http')) {
         console.log(`  [img ${imgIdx}] Skipped (invalid URL)`);
         continue;
       }
+      imagesScanned++;
       try {
         process.stdout.write(`  [img ${imgIdx}] Analyzing... `);
-        const { result, usage } = await analyzeImageWithGPT(imageUrl, product.asin, product.title);
+        const { result, usage } = await analyzeImageWithGemini(imageUrl, product.asin, product.title);
         totalTokens += usage?.total_tokens || 0;
         process.stdout.write(`${result.has_supplement_facts ? '✅ SUPPLEMENT FACTS' : '⬜ no facts'} | tokens: ${usage?.total_tokens}\n`);
 
@@ -240,25 +285,30 @@ async function main() {
         if (result.has_supplement_facts && !bestResult) {
           bestResult = result;
           bestImageIdx = imgIdx;
-          bestImageUrl = imageUrl;
+          // Stop scanning this product — facts panel found (cost control).
+          break;
         }
 
         await sleep(1500); // Rate limit buffer between images
       } catch (err) {
+        if (err.message.includes('[ERROR: credits]')) throw err;
         console.log(`  [img ${imgIdx}] Error: ${err.message.slice(0, 80)}`);
         await sleep(1000);
       }
     }
 
+    const nutrientsFound = bestResult?.supplement_facts?.length || 0;
+    console.log(`  [P4 OCR/${product.asin}] images_scanned=${imagesScanned} facts_found=${!!bestResult} nutrients=${nutrientsFound}`);
     if (bestResult) {
       console.log(`  ✓ Supplement facts found at image ${bestImageIdx}`);
-      console.log(`    Serving: ${bestResult.serving_size} | Nutrients: ${bestResult.supplement_facts?.length}`);
+      console.log(`    Serving: ${bestResult.serving_size} | Nutrients: ${nutrientsFound}`);
       console.log(`    Claims: ${bestResult.health_claims?.join(', ').slice(0, 80)}`);
       console.log(`    Certs: ${bestResult.certifications?.join(', ')}`);
     }
 
     saved++;
     } catch (productErr) {
+      if (productErr.message.includes('[ERROR: credits]')) throw productErr; // fail fast, don't loop into more 402s
       console.error(`  ✗ Product ${product.asin} fatal error: ${productErr.message?.slice(0, 100)}`);
       skipped++;
     }

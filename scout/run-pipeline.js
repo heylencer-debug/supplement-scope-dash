@@ -450,6 +450,8 @@ const PHASES = [
     num: 4, name: 'OCR / Formula Extraction', description: 'Extract supplement facts from product images',
     run: async () => {
       await runScript('phase4-text-extract.js', ['--keyword', KEYWORD]);
+      console.log('\n→ Running image-vision OCR pass on top products (ocr-phase4.js)...');
+      await runScript('ocr-phase4.js', [KEYWORD]);
       console.log('\n→ Syncing OCR data to dashboard (migrate-ocr-to-dash.js)...');
       await runScript('migrate-ocr-to-dash.js', [KEYWORD]);
     }

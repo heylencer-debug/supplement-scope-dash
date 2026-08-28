@@ -243,7 +243,7 @@ function FormulaCard({ card, categoryName, generatedAt, onManufacturerPDF }: {
         <CardContent className="pt-4 pb-4">
           <div className="flex justify-end mb-3 gap-2 flex-wrap">
             {onManufacturerPDF && (
-              <PearlButton variant="primary" withSparkle={false} onClick={onManufacturerPDF} className="flex items-center gap-2 text-xs h-8">
+              <PearlButton withSparkle={false} onClick={onManufacturerPDF} className="flex items-center gap-2 text-xs h-8">
                 <FileText className="h-3.5 w-3.5" />
                 Manufacturer PDF
               </PearlButton>

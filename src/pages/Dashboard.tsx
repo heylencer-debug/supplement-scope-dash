@@ -885,8 +885,8 @@ export default function Dashboard() {
         <TabsContent value="manufacturer" className="space-y-6 mt-4">
           <div className="flex justify-end">
             <PearlButton
-              variant="pill"
-              neon
+              tone="neon"
+              className="pearl-pill"
               onClick={handleGenerateLink}
               disabled={generatingLink}
             >

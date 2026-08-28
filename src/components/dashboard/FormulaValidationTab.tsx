@@ -310,8 +310,7 @@ export function FormulaValidationTab({ categoryId, categoryName, activeVersionIn
           <CardContent className="py-4 px-5 flex flex-col justify-center gap-2">
             <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Manufacturer Brief</p>
             <PearlButton
-              variant="primary"
-              withSparkle={false}
+                            withSparkle={false}
               className="flex items-center gap-2 w-full h-8"
               onClick={handleManufacturerPDF}
             >

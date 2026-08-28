@@ -1140,8 +1140,7 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                 !(activeTab === 'top_performers' && analysisAvailability.newWinners.available && !newWinnersAnalysis.hasAnalysis && !newWinnersAnalysis.isNotAvailable) && (
                   <div className="flex items-center gap-2">
                     <PearlButton
-                      variant="primary"
-                      withSparkle={false}
+                                            withSparkle={false}
                       className="h-8 px-3 text-xs"
                       onClick={(e) => { e.stopPropagation(); activeAnalysisData.runAnalysis(); }}
                       disabled={activeAnalysisData.isLoading || !categoryId}
@@ -1302,8 +1301,7 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                         </p>
                       </div>
                       <PearlButton
-                        variant="primary"
-                        withSparkle={false}
+                                                withSparkle={false}
                         onClick={() => setActiveTab('new_winners')}
                         className="gap-2"
                       >
@@ -1326,8 +1324,7 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                         </Badge>
                       )}
                       <PearlButton
-                        variant="primary"
-                        withSparkle={false}
+                                                withSparkle={false}
                         onClick={() => activeAnalysisData.runAnalysis()}
                         disabled={activeAnalysisData.isLoading || !categoryId || (activeTab === 'top_performers' && !newWinnersAnalysis.hasAnalysis)}
                         className="gap-2"
@@ -2398,8 +2395,7 @@ export function EnhancedBenchmarkComparison({
                 </Button>
               ) : (
                 <PearlButton
-                  variant="primary"
-                  withSparkle={false}
+                                    withSparkle={false}
                   onClick={runCompetitiveAnalysis}
                   disabled={competitiveLoading || competitivePolling}
                   className="h-8 gap-1.5"

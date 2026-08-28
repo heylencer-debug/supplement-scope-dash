@@ -28,6 +28,8 @@
     --brand-smoke: 0 0% 95%;       /* #F2F2F2 */
     --brand-border: 0 0% 91%;      /* #E7E7E7 */
     --brand-border-2: 0 0% 86%;    /* #DCDCDC */
+    --overlay-bg: rgba(0, 0, 0, 0.6);
+    --overlay-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
     --brand-muted: 0 0% 42%;       /* #6B6B6B */
     --brand-muted-2: 0 0% 60%;     /* #9A9A9A */
 
@@ -90,6 +92,18 @@
     --pearl-s-bounce: 50%;
     --pearl-s-arc: 12%;
     --pearl-s-cap: 30%;
+
+    /* Brand iris-surface tokens — getnoodle's own literal hex values
+       (src/index.css lines 360/363/369/393), ported verbatim for
+       .brand-iris-surface / .brand-glass. New tokens, nothing else in this
+       repo references them, so no collision risk with the existing
+       HSL-triplet --brand-* tokens above. */
+    --brand-iris-magenta: #FC55F9;
+    --brand-iris-cyan: #00ECFF;
+    --brand-iris-purple: #6D28D9;
+    --brand-iris-grain: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNjAiIGhlaWdodD0iMTYwIj48ZmlsdGVyIGlkPSJuIiB4PSIwIiB5PSIwIiBjb2xvci1pbnRlcnBvbGF0aW9uLWZpbHRlcnM9InNSR0IiPjxmZVR1cmJ1bGVuY2UgdHlwZT0iZnJhY3RhbE5vaXNlIiBiYXNlRnJlcXVlbmN5PSIyLjIiIG51bU9jdGF2ZXM9IjEiIHN0aXRjaFRpbGVzPSJzdGl0Y2giLz48ZmVDb2xvck1hdHJpeCB0eXBlPSJtYXRyaXgiIHZhbHVlcz0iMCAwIDAgMCAwICAwIDAgMCAwIDAgIDAgMCAwIDAgMCAgMC4zMyAwLjMzIDAuMzMgMCAwIi8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsdGVyPSJ1cmwoI24pIiBvcGFjaXR5PSIwLjciLz48L3N2Zz4=");
+    --brand-mesh-base: hsl(var(--brand-smoke));
+    --brand-mesh-foreground: hsl(var(--brand-ink));
 
     /* Light sidebar - white w/ electric accent */
     --sidebar-background: var(--brand-white);
@@ -492,29 +506,111 @@
     box-shadow: var(--pearl-shadow-sm);
   }
 
-  /* IRIS/BRAND SURFACE — the card & modal shell. White panel with a subtle
-     electric-tinted wash, per-axis radii preserved as their own longhand
-     declarations (not collapsed to shorthand). */
+  /* ── THE IRIDESCENT BRAND SURFACE ── verbatim from getnoodle's real
+     src/index.css (.brand-iris-surface + ::after), lines ~3862-3946. Only
+     adaptation: var(--brand-ink)/(--brand-smoke)/(--brand-electric)/
+     (--brand-neon)/(--brand-border) wrapped in hsl() since this repo's
+     tokens are HSL-triplet strings, not getnoodle's literal hex — the
+     minimal change needed to compile, math/structure otherwise untouched.
+     Four layers, in order: grain, the orb (eerie-black, off-centre), the
+     purple pinch bottom-left, the electric->cyan->electric->purple->neon
+     sweep. */
   .brand-iris-surface {
-    background-color: hsl(var(--brand-white));
-    background-image: radial-gradient(
-      ellipse var(--iris-orb-rx, 90%) var(--iris-orb-ry, 90%) at var(--iris-orb-x, 60%) var(--iris-orb-y, 60%),
-      hsl(var(--brand-electric) / 0.04) var(--iris-orb-solid, 40%),
-      transparent 100%
-    );
-    border-top-left-radius: var(--radius-lg);
-    border-top-right-radius: var(--radius-lg);
-    border-bottom-right-radius: var(--radius-lg);
-    border-bottom-left-radius: var(--radius-lg);
-    border: 1px solid hsl(var(--brand-border));
-    box-shadow: var(--pearl-shadow-sm);
+    --iris-orb: hsl(var(--brand-ink));
+    --iris-orb-rx: 58%;
+    --iris-orb-ry: 74%;
+    --iris-orb-x: 63%;
+    --iris-orb-y: 72%;
+    --iris-orb-solid: 52%;
+
+    position: relative;
+    color: hsl(var(--brand-smoke));
+    background-color: hsl(var(--brand-neon));
+    background-image:
+      var(--brand-iris-grain),
+      radial-gradient(
+        var(--iris-orb-rx) var(--iris-orb-ry) at var(--iris-orb-x) var(--iris-orb-y),
+        var(--iris-orb) 0%,
+        var(--iris-orb) var(--iris-orb-solid),
+        color-mix(in oklab, var(--iris-orb) 88%, transparent)
+          calc(var(--iris-orb-solid) + 12%),
+        color-mix(in oklab, var(--iris-orb) 55%, transparent)
+          calc(var(--iris-orb-solid) + 24%),
+        color-mix(in oklab, var(--iris-orb) 22%, transparent)
+          calc(var(--iris-orb-solid) + 34%),
+        transparent 100%
+      ),
+      radial-gradient(
+        40% 64% at 2% 104%,
+        color-mix(in oklab, var(--brand-iris-purple) 60%, transparent) 0%,
+        transparent 72%
+      ),
+      linear-gradient(
+        100deg,
+        hsl(var(--brand-electric)) 0%,
+        hsl(var(--brand-electric)) 9%,
+        var(--brand-iris-cyan) 26%,
+        var(--brand-iris-cyan) 44%,
+        hsl(var(--brand-electric)) 58%,
+        var(--brand-iris-purple) 70%,
+        hsl(var(--brand-neon)) 88%,
+        hsl(var(--brand-neon)) 100%
+      );
+    background-size: 160px 160px, 130% 130%, 100% 100%, 100% 100%;
+    background-position: 0 0, var(--iris-orb-x) var(--iris-orb-y), 50% 50%, 50% 50%;
+    background-repeat: repeat, no-repeat, no-repeat, no-repeat;
+    border-radius: var(--radius-lg);
   }
 
+  /* THE EDGE — magenta on the left, smoke on the right. mask-composite, not
+     border-image, so the edge follows border-radius: inherit. */
+  .brand-iris-surface::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    padding: 1px;
+    border-radius: inherit;
+    pointer-events: none;
+    background: linear-gradient(
+      90deg,
+      var(--brand-iris-magenta) 0%,
+      color-mix(in oklab, var(--brand-iris-magenta) 55%, transparent) 14%,
+      color-mix(in oklab, hsl(var(--brand-smoke)) 34%, transparent) 34%,
+      color-mix(in oklab, hsl(var(--brand-smoke)) 62%, transparent) 100%
+    );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask-composite: exclude;
+  }
+
+  /* THE FROSTED PANEL — verbatim from getnoodle's real .brand-glass
+     (src/index.css ~line 2707), same hsl() adaptation as above. */
   .brand-glass {
-    background: hsl(var(--brand-white) / 0.72);
-    -webkit-backdrop-filter: blur(14px);
-    backdrop-filter: blur(14px);
-    border: 1px solid hsl(var(--brand-border));
+    position: relative;
+    background-color: color-mix(in oklab, var(--brand-mesh-base) 55%, transparent);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    backdrop-filter: blur(18px) saturate(140%);
+    border: 1px solid transparent;
+    background-image:
+      linear-gradient(
+        color-mix(in oklab, var(--brand-mesh-base) 55%, transparent),
+        color-mix(in oklab, var(--brand-mesh-base) 55%, transparent)
+      ),
+      linear-gradient(
+        160deg,
+        color-mix(in oklab, var(--brand-mesh-foreground) 34%, transparent) 0%,
+        color-mix(in oklab, var(--brand-mesh-foreground) 6%, transparent) 40%,
+        transparent 70%
+      );
+    background-origin: border-box;
+    background-clip: padding-box, border-box;
+    color: var(--brand-mesh-foreground);
   }
 
   .pearl-rim-electric {

@@ -393,8 +393,7 @@ export default function ProductExplorer() {
             </Button>
           )}
           <PearlButton
-            variant="primary"
-            withSparkle={false}
+                        withSparkle={false}
             className="gap-2"
             onClick={() => navigate(`/products/add?category=${encodeURIComponent(categoryName || "")}`)}
           >

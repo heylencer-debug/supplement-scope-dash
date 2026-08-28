@@ -76,8 +76,7 @@ export function LowConfidenceProducts({ products, categoryId, isLoading }: LowCo
             </CardDescription>
           </div>
           <PearlButton
-            variant="primary"
-            withSparkle={false}
+                        withSparkle={false}
             onClick={handleBulkReanalysis}
             disabled={isAnalyzing || !categoryId}
             className="gap-2 h-8 text-xs"

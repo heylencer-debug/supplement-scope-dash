@@ -33,6 +33,23 @@ function getBrightDataBrowserWSS() {
 }
 
 /**
+ * Bright Data ISP/residential PROXY (cheaper than Scraping Browser; used for
+ * the light non-Amazon targets — the P5 off-Amazon search + brand pages).
+ * Set BRIGHTDATA_PROXY_SERVER (e.g. http://brd.superproxy.io:44445),
+ * BRIGHTDATA_PROXY_USER (brd-customer-<id>-zone-<zone>), BRIGHTDATA_PROXY_PASS.
+ * Playwright launches local Chromium routed through this proxy — real browser,
+ * residential IP, so search engines/brand sites stop blocking the datacenter IP.
+ */
+function getBrightDataProxy() {
+  const server = process.env.BRIGHTDATA_PROXY_SERVER || null;
+  const username = process.env.BRIGHTDATA_PROXY_USER || null;
+  const password = process.env.BRIGHTDATA_PROXY_PASS || null;
+  if (!server || !username || !password) return null;
+  const normalized = /^https?:\/\//i.test(server) ? server : `http://${server}`;
+  return { server: normalized, username, password };
+}
+
+/**
  * Returns { browser, context, viaBrightData, close() }.
  * - If BRIGHTDATA_BROWSER_WSS is set: connects over CDP to Bright Data's
  *   Scraping Browser (residential IP), blocks image/media/font requests to
@@ -67,8 +84,43 @@ async function launchBrowserContext({ label = 'browser', blockMedia = true, loca
     } catch (err) {
       console.log(`  [${label}] Bright Data Scraping Browser connect FAILED (${err.message}) — falling back to local Playwright`);
     }
-  } else {
-    console.log(`  [${label}] BRIGHTDATA_BROWSER_WSS not set — using local Playwright`);
+  }
+
+  // ISP/residential proxy path — local Chromium routed through Bright Data's
+  // residential IP. Preferred for non-Amazon (search + brand pages) when no WSS.
+  const proxy = getBrightDataProxy();
+  if (proxy) {
+    try {
+      console.log(`  [${label}] launching local Playwright via Bright Data ISP proxy (${proxy.server})...`);
+      const browser = await chromium.launch({
+        headless: process.platform !== 'win32',
+        proxy: { server: proxy.server, username: proxy.username, password: proxy.password },
+      });
+      const context = await browser.newContext({
+        userAgent: LOCAL_UA,
+        viewport: { width: 1440, height: 900 },
+        locale: 'en-US',
+        ...localContextOptions,
+      });
+      context.setDefaultTimeout(45000);
+      context.setDefaultNavigationTimeout(45000);
+      if (blockMedia) {
+        await context.route('**/*', (route) => {
+          const type = route.request().resourceType();
+          if (type === 'image' || type === 'media' || type === 'font') return route.abort();
+          return route.continue();
+        });
+      }
+      console.log(`  [${label}] using Bright Data ISP proxy ✓`);
+      return {
+        browser, context, viaBrightData: true,
+        close: async () => { try { await browser.close(); } catch (_) {} },
+      };
+    } catch (err) {
+      console.log(`  [${label}] ISP proxy launch FAILED (${err.message}) — falling back to plain local Playwright`);
+    }
+  } else if (!getBrightDataBrowserWSS()) {
+    console.log(`  [${label}] no Bright Data browser/proxy env set — using plain local Playwright`);
   }
 
   const browser = await chromium.launch({ headless: process.platform !== 'win32' });
@@ -84,4 +136,4 @@ async function launchBrowserContext({ label = 'browser', blockMedia = true, loca
   };
 }
 
-module.exports = { launchBrowserContext, getBrightDataBrowserWSS };
+module.exports = { launchBrowserContext, getBrightDataBrowserWSS, getBrightDataProxy };

@@ -16,126 +16,83 @@
 
 @layer base {
   :root {
-    /* Modern Soft UI - Light Grey/Blue background */
-    --background: 224 50% 98%;
-    --foreground: 228 47% 31%;
-    
-    /* Pure white cards */
-    --card: 0 0% 100%;
-    --card-foreground: 228 47% 31%;
-    
-    /* Pure white popovers */
-    --popover: 0 0% 100%;
-    --popover-foreground: 228 47% 31%;
-    
-    /* Deep Indigo primary accent */
-    --primary: 251 100% 55%;
+    /* Pearl Light — white/smoke canvas, electric blue structural accent,
+       neon yellow reserved for status pops / primary CTA highlights
+       (Option B). */
+    --brand-bg: 0 0% 98%;          /* #FAFAFA */
+    --brand-white: 0 0% 100%;      /* #FFFFFF */
+    --brand-ink: 0 0% 10%;         /* #1A1A1A */
+    --brand-electric: 239 93% 55%; /* #2226F7 */
+    --brand-neon: 63 100% 50%;     /* #F3FE00 */
+    --brand-neon-deep: 63 100% 41%;/* #C9D300 */
+    --brand-smoke: 0 0% 95%;       /* #F2F2F2 */
+    --brand-border: 0 0% 91%;      /* #E7E7E7 */
+    --brand-border-2: 0 0% 86%;    /* #DCDCDC */
+    --brand-muted: 0 0% 42%;       /* #6B6B6B */
+    --brand-muted-2: 0 0% 60%;     /* #9A9A9A */
+
+    --background: var(--brand-bg);
+    --foreground: var(--brand-ink);
+
+    /* White cards */
+    --card: var(--brand-white);
+    --card-foreground: var(--brand-ink);
+
+    /* White popovers */
+    --popover: var(--brand-white);
+    --popover-foreground: var(--brand-ink);
+
+    /* Electric blue primary */
+    --primary: var(--brand-electric);
     --primary-foreground: 0 0% 100%;
-    
-    /* Soft secondary */
-    --secondary: 224 40% 96%;
-    --secondary-foreground: 228 47% 31%;
-    
-    /* Cool Grey muted tones */
-    --muted: 224 30% 95%;
-    --muted-foreground: 224 30% 46%;
-    
-    /* Deep Indigo accent */
-    --accent: 251 100% 55%;
+
+    /* Light secondary */
+    --secondary: var(--brand-smoke);
+    --secondary-foreground: var(--brand-ink);
+
+    /* Light muted */
+    --muted: var(--brand-smoke);
+    --muted-foreground: var(--brand-muted);
+
+    /* Electric blue accent */
+    --accent: var(--brand-electric);
     --accent-foreground: 0 0% 100%;
-    
+
     /* Destructive remains red */
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    
-    /* Very soft borders */
-    --border: 224 30% 92%;
-    --input: 224 30% 94%;
-    --ring: 251 100% 55%;
-    
-    /* Larger radius for softer corners - 20px */
-    --radius: 1.25rem;
-    
-    /* Deep Indigo sidebar */
-    --sidebar-background: 251 100% 55%;
-    --sidebar-foreground: 0 0% 100%;
-    --sidebar-primary: 0 0% 100%;
-    --sidebar-primary-foreground: 251 100% 55%;
-    --sidebar-accent: 251 100% 48%;
-    --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 251 100% 48%;
-    --sidebar-ring: 0 0% 100%;
-    
+
+    /* Soft light borders per mockup */
+    --border: var(--brand-border);
+    --input: var(--brand-border);
+    --ring: var(--brand-electric);
+
+    /* Compact/clinical radius + shadow scale (mockup) */
+    --radius: 12px;
+    --radius-xl: 20px;
+    --radius-lg: 14px;
+    --radius-md: 10px;
+    --pearl-hi: rgba(255, 255, 255, 0.55);
+    --pearl-lo: rgba(0, 0, 0, 0.12);
+    --pearl-shadow-sm: 0 1px 3px 0px rgba(0, 0, 0, 0.06), 0 1px 2px -1px rgba(0, 0, 0, 0.06);
+    --pearl-shadow-md: 0 1px 3px 0px rgba(0, 0, 0, 0.08), 0 4px 10px -2px rgba(0, 0, 0, 0.08);
+
+    /* Light sidebar - white w/ electric accent */
+    --sidebar-background: var(--brand-white);
+    --sidebar-foreground: var(--brand-ink);
+    --sidebar-primary: var(--brand-electric);
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: var(--brand-smoke);
+    --sidebar-accent-foreground: var(--brand-ink);
+    --sidebar-border: var(--brand-border);
+    --sidebar-ring: var(--brand-electric);
+
     /* Modern chart colors - Purple/Orange/Blue */
     --chart-1: 251 100% 55%;
     --chart-2: 24 95% 53%;
     --chart-3: 199 89% 48%;
     --chart-4: 142 70% 45%;
     --chart-5: 262 80% 60%;
-  }
-
-  .dark {
-    /* Pearl Dark — eerie black canvas, electric blue + neon yellow (Option C) */
-    --brand-ink: 0 0% 10%;        /* #1A1A1A */
-    --brand-ink-2: 0 0% 8%;       /* #151515 */
-    --brand-panel: 0 0% 11%;      /* #1D1D1D */
-    --brand-electric: 239 93% 55%;/* #2226F7 */
-    --brand-neon: 63 100% 50%;    /* #F3FE00 */
-    --brand-smoke: 0 0% 95%;      /* #F2F2F2 */
-
-    --background: var(--brand-ink);
-    --foreground: var(--brand-smoke);
-
-    /* Dark cards */
-    --card: var(--brand-panel);
-    --card-foreground: var(--brand-smoke);
-
-    /* Dark popovers */
-    --popover: var(--brand-panel);
-    --popover-foreground: var(--brand-smoke);
-
-    /* Electric blue primary */
-    --primary: var(--brand-electric);
-    --primary-foreground: 0 0% 100%;
-
-    /* Dark secondary */
-    --secondary: 0 0% 16%;
-    --secondary-foreground: var(--brand-smoke);
-
-    /* Dark muted */
-    --muted: 0 0% 16%;
-    --muted-foreground: 0 0% 60%;
-
-    /* Electric blue accent */
-    --accent: var(--brand-electric);
-    --accent-foreground: 0 0% 100%;
-
-    /* Destructive */
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
-
-    /* Thin low-contrast borders per mockup */
-    --border: 0 0% 95% / 0.09;
-    --input: 0 0% 20%;
-    --ring: var(--brand-electric);
-
-    /* Dark sidebar - eerie black w/ electric accent */
-    --sidebar-background: var(--brand-ink-2);
-    --sidebar-foreground: var(--brand-smoke);
-    --sidebar-primary: var(--brand-electric);
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 0 0% 16%;
-    --sidebar-accent-foreground: var(--brand-smoke);
-    --sidebar-border: 0 0% 95% / 0.09;
-    --sidebar-ring: var(--brand-electric);
-
-    /* Compact/glossy radius + shadow scale (mockup) */
-    --radius: 12px;
-    --radius-xl: 16px;
-    --radius-lg: 12px;
-    --radius-md: 8px;
-    --pearl-hi: rgba(255, 255, 255, 0.10);
-    --pearl-lo: rgba(0, 0, 0, 0.35);
   }
 }
 
@@ -270,19 +227,19 @@
 }
 
 /* =====================================================================
-   PEARL COMPONENT SYSTEM — ported from getnoodle (Option C: dark, compact,
-   glossy). Structural recipe per variant: base pill/ring + inset gloss
-   shadows (waterline hi/lo + bounce) matching the getnoodle .pearl-button
-   technique, reduced to rgba() to match this repo's existing token
-   conventions (no color-mix()/oklab — not needed here, keeps the build
-   simple and portable).
+   PEARL COMPONENT SYSTEM — ported from getnoodle (Option B: light, clinical,
+   restrained). White/smoke canvas, electric blue as the structural/primary
+   accent, neon yellow reserved for status pops / primary CTA highlights.
+   Structural recipe per variant: base pill/ring + soft drop shadow, reduced
+   to rgba() to match this repo's existing token conventions (no
+   color-mix()/oklab — not needed here, keeps the build simple and portable).
    ===================================================================== */
 @layer components {
-  .dark .pearl-button,
-  .dark .pearl-secondary,
-  .dark .pearl-quiet,
-  .dark .pearl-danger,
-  .dark .pearl-pill {
+  .pearl-button,
+  .pearl-secondary,
+  .pearl-quiet,
+  .pearl-danger,
+  .pearl-pill {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -294,178 +251,175 @@
     line-height: 1;
     padding: 8px 16px;
     border-radius: 10px;
-    transition: transform 150ms ease, box-shadow 150ms ease, opacity 150ms ease;
+    transition: transform 150ms ease, box-shadow 150ms ease, opacity 150ms ease, background-color 150ms ease;
   }
 
-  .dark .pearl-button:active,
-  .dark .pearl-secondary:active,
-  .dark .pearl-quiet:active,
-  .dark .pearl-danger:active,
-  .dark .pearl-pill:active {
+  .pearl-button:active,
+  .pearl-secondary:active,
+  .pearl-quiet:active,
+  .pearl-danger:active,
+  .pearl-pill:active {
     transform: scale(0.97);
   }
 
-  .dark .pearl-button:disabled,
-  .dark .pearl-secondary:disabled,
-  .dark .pearl-quiet:disabled,
-  .dark .pearl-danger:disabled,
-  .dark .pearl-pill:disabled {
+  .pearl-button:disabled,
+  .pearl-secondary:disabled,
+  .pearl-quiet:disabled,
+  .pearl-danger:disabled,
+  .pearl-pill:disabled {
     opacity: 0.5;
     cursor: not-allowed;
   }
 
-  /* PRIMARY — electric blue fill, gloss inset */
-  .dark .pearl-button {
+  /* PRIMARY — electric blue fill, soft shadow */
+  .pearl-button {
     background: hsl(var(--brand-electric));
     color: #fff;
-    box-shadow:
-      inset 0 0.19em 0.58em var(--pearl-hi),
-      inset 0 -0.06em 0.19em var(--pearl-lo),
-      inset 0 -0.26em 0.58em rgba(255, 255, 255, 0.06);
+    box-shadow: var(--pearl-shadow-sm);
+  }
+  .pearl-button:hover:not(:disabled) {
+    background: hsl(var(--brand-electric) / 0.92);
+    box-shadow: var(--pearl-shadow-md);
   }
 
-  /* SECONDARY — neutral smoke-tinted fill, same gloss recipe */
-  .dark .pearl-secondary {
-    background: rgba(242, 242, 242, 0.08);
-    color: hsl(var(--brand-smoke));
-    border: 1px solid rgba(242, 242, 242, 0.15);
-    box-shadow:
-      inset 0 0.19em 0.4em rgba(255, 255, 255, 0.06),
-      inset 0 -0.06em 0.19em rgba(0, 0, 0, 0.3);
+  /* SECONDARY — white fill with light border, clinical */
+  .pearl-secondary {
+    background: hsl(var(--brand-white));
+    color: hsl(var(--brand-ink));
+    border: 1px solid hsl(var(--brand-border));
+    box-shadow: var(--pearl-shadow-sm);
+  }
+  .pearl-secondary:hover:not(:disabled) {
+    background: hsl(var(--brand-smoke));
   }
 
   /* QUIET — near-transparent, brightens on hover/focus (double class beats
      the ambient sweep selector, mirroring the getnoodle specificity fight) */
-  .dark .pearl-quiet.pearl-quiet {
+  .pearl-quiet.pearl-quiet {
     background: transparent;
-    color: rgba(242, 242, 242, 0.72);
-    border: 1px solid rgba(242, 242, 242, 0.09);
+    color: hsl(var(--brand-muted));
+    border: 1px solid hsl(var(--brand-border));
   }
-  .dark .pearl-quiet.pearl-quiet:hover:not(:disabled) {
-    background: rgba(242, 242, 242, 0.04);
-    color: hsl(var(--brand-smoke));
+  .pearl-quiet.pearl-quiet:hover:not(:disabled) {
+    background: hsl(var(--brand-smoke));
+    color: hsl(var(--brand-ink));
   }
 
-  /* DANGER — red fill, same gloss recipe */
-  .dark .pearl-danger {
+  /* DANGER — red fill, same soft-shadow recipe */
+  .pearl-danger {
     background: hsl(0 72% 51%);
     color: #fff;
-    box-shadow:
-      inset 0 0.19em 0.58em var(--pearl-hi),
-      inset 0 -0.06em 0.19em var(--pearl-lo);
+    box-shadow: var(--pearl-shadow-sm);
   }
 
   /* PILL — fully rounded electric/neon CTA (e.g. "Generate Manufacturer Link") */
-  .dark .pearl-pill {
+  .pearl-pill {
     border-radius: 999px;
     background: hsl(var(--brand-electric));
     color: #fff;
-    box-shadow:
-      inset 0 0.19em 0.58em var(--pearl-hi),
-      inset 0 -0.06em 0.19em var(--pearl-lo),
-      inset 0 -0.26em 0.58em rgba(255, 255, 255, 0.06);
+    box-shadow: var(--pearl-shadow-sm);
   }
-  .dark .pearl-pill.pearl-neon {
+  .pearl-pill.pearl-neon {
     background: hsl(var(--brand-neon));
     color: hsl(var(--brand-ink));
   }
 
-  .dark .pearl-wrap,
-  .dark .pearl-label {
+  .pearl-wrap,
+  .pearl-label {
     display: inline-flex;
     align-items: center;
     gap: 6px;
   }
-  .dark .pearl-spark-idle,
-  .dark .pearl-spark-hover {
+  .pearl-spark-idle,
+  .pearl-spark-hover {
     display: inline-block;
     line-height: 1;
   }
-  .dark .pearl-spark-hover { display: none; }
-  .dark .pearl-button:hover .pearl-spark-idle,
-  .dark .pearl-pill:hover .pearl-spark-idle { display: none; }
-  .dark .pearl-button:hover .pearl-spark-hover,
-  .dark .pearl-pill:hover .pearl-spark-hover { display: inline-block; }
+  .pearl-spark-hover { display: none; }
+  .pearl-button:hover .pearl-spark-idle,
+  .pearl-pill:hover .pearl-spark-idle { display: none; }
+  .pearl-button:hover .pearl-spark-hover,
+  .pearl-pill:hover .pearl-spark-hover { display: inline-block; }
 
   /* TABS — pearl-tab bar with active-pill state */
-  .dark .pearl-tab-lift {
+  .pearl-tab-lift {
     display: flex;
     gap: 2px;
-    background: hsl(var(--brand-panel));
-    border: 1px solid rgba(242, 242, 242, 0.09);
-    border-radius: 10px;
-    padding: 3px;
+    background: hsl(var(--brand-white));
+    border: 1px solid hsl(var(--brand-border));
+    border-radius: 999px;
+    padding: 4px;
+    box-shadow: var(--pearl-shadow-sm);
   }
-  .dark .pearl-tab {
+  .pearl-tab {
     flex: 1;
     text-align: center;
-    padding: 7px 10px;
-    border-radius: 8px;
+    padding: 8px 12px;
+    border-radius: 999px;
     font-size: 12px;
     font-weight: 600;
-    color: rgba(242, 242, 242, 0.52);
+    color: hsl(var(--brand-muted));
     white-space: nowrap;
     transition: background-color 150ms ease, color 150ms ease;
   }
-  .dark .pearl-tab[data-state='active'] {
-    background: hsl(var(--brand-electric));
-    color: #fff;
-    box-shadow:
-      inset 0 0.19em 0.4em var(--pearl-hi),
-      inset 0 -0.06em 0.19em var(--pearl-lo);
+  .pearl-tab[data-state='active'] {
+    background: hsl(var(--brand-ink));
+    color: hsl(var(--brand-neon));
+    box-shadow: var(--pearl-shadow-sm);
   }
 
-  /* IRIS/BRAND SURFACE — the card & modal shell. Simplified single radial
-     "orb" wash over the eerie-black panel, per-axis radii preserved as their
-     own longhand declarations (not collapsed to shorthand). */
-  .dark .brand-iris-surface {
-    background-color: hsl(var(--brand-panel));
+  /* IRIS/BRAND SURFACE — the card & modal shell. White panel with a subtle
+     electric-tinted wash, per-axis radii preserved as their own longhand
+     declarations (not collapsed to shorthand). */
+  .brand-iris-surface {
+    background-color: hsl(var(--brand-white));
     background-image: radial-gradient(
       ellipse var(--iris-orb-rx, 90%) var(--iris-orb-ry, 90%) at var(--iris-orb-x, 60%) var(--iris-orb-y, 60%),
-      hsl(var(--brand-ink)) var(--iris-orb-solid, 40%),
+      hsl(var(--brand-electric) / 0.04) var(--iris-orb-solid, 40%),
       transparent 100%
     );
     border-top-left-radius: var(--radius-lg);
     border-top-right-radius: var(--radius-lg);
     border-bottom-right-radius: var(--radius-lg);
     border-bottom-left-radius: var(--radius-lg);
-    border: 1px solid rgba(242, 242, 242, 0.15);
+    border: 1px solid hsl(var(--brand-border));
+    box-shadow: var(--pearl-shadow-sm);
   }
 
-  .dark .brand-glass {
-    background: rgba(29, 29, 29, 0.72);
+  .brand-glass {
+    background: hsl(var(--brand-white) / 0.72);
     -webkit-backdrop-filter: blur(14px);
     backdrop-filter: blur(14px);
-    border: 1px solid rgba(242, 242, 242, 0.09);
+    border: 1px solid hsl(var(--brand-border));
   }
 
-  .dark .pearl-rim-electric {
+  .pearl-rim-electric {
     border-color: hsl(var(--brand-electric) / 0.5);
   }
-  .dark .pearl-rim-neon {
-    border-color: hsl(var(--brand-neon) / 0.5);
+  .pearl-rim-neon {
+    border-color: hsl(var(--brand-neon-deep) / 0.5);
   }
 
   /* CHECKLIST ROWS — Data Audit tab, colored status dots */
-  .dark .check-item {
+  .check-item {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 7px 9px;
+    padding: 8px 10px;
     border-radius: var(--radius-md);
-    background: rgba(242, 242, 242, 0.02);
-    border: 1px solid rgba(242, 242, 242, 0.09);
+    background: hsl(var(--brand-bg));
+    border: 1px solid hsl(var(--brand-border));
     font-size: 11.5px;
   }
-  .dark .check-item .dot {
-    width: 7px;
-    height: 7px;
+  .check-item .dot {
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
     flex-shrink: 0;
-    background: rgba(242, 242, 242, 0.32);
+    background: hsl(var(--brand-muted-2));
   }
-  .dark .check-item.done .dot { background: #00ecff; }
-  .dark .check-item.warn .dot { background: hsl(var(--brand-neon)); }
+  .check-item.done .dot { background: hsl(var(--brand-electric)); }
+  .check-item.warn .dot { background: hsl(var(--brand-neon-deep)); }
 }
 
 /* BRAND LOADER — single pulsing/spinning pearl shape, replaces getnoodle's
@@ -481,7 +435,7 @@
   0% { background-position: -40% 0; }
   100% { background-position: 140% 0; }
 }
-.dark .brand-loader-shape {
+.brand-loader-shape {
   display: block;
   width: 100%;
   height: 100%;
@@ -494,9 +448,7 @@
     transparent 70%
   );
   background-size: 220% 100%;
-  box-shadow:
-    inset 0 0.19em 0.4em var(--pearl-hi, rgba(255, 255, 255, 0.1)),
-    inset 0 -0.06em 0.19em var(--pearl-lo, rgba(0, 0, 0, 0.35));
+  box-shadow: var(--pearl-shadow-sm);
   animation:
     brand-loader-spin 1.4s linear infinite,
     brand-loader-sheen 1.4s linear infinite;

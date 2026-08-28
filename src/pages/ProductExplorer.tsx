@@ -3,7 +3,6 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { Search, Filter, Download, Star, TrendingUp, Loader2, Eye, ChevronDown, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Beaker, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
 import { PearlButton } from "@/components/ui/pearl-button";
 import { Input } from "@/components/ui/input";
 import { CardContent, CardHeader } from "@/components/ui/card";
@@ -372,9 +371,8 @@ export default function ProductExplorer() {
         </div>
         <div className="flex gap-2">
           {(currentCategoryId || categoryFromName?.id) && lowConfidenceCount > 0 && (
-            <Button 
-              variant="outline" 
-              className="gap-2"
+            <button
+              className="pearl-secondary gap-2"
               onClick={handleBulkReanalyze}
               disabled={isBulkAnalyzing}
             >
@@ -390,7 +388,7 @@ export default function ProductExplorer() {
                   <Badge variant="secondary" className="ml-1">{lowConfidenceCount}</Badge>
                 </>
               )}
-            </Button>
+            </button>
           )}
           <PearlButton
                         withSparkle={false}
@@ -400,10 +398,10 @@ export default function ProductExplorer() {
             <Plus className="w-4 h-4" />
             Add Product
           </PearlButton>
-          <Button variant="outline" className="gap-2">
+          <button className="pearl-secondary gap-2">
             <Download className="w-4 h-4" />
             Export
-          </Button>
+          </button>
         </div>
       </div>
 
@@ -480,9 +478,8 @@ export default function ProductExplorer() {
               </Select>
               
               {(priceRange !== "all" || ratingFilter !== "all" || statusFilter !== "all") && (
-                <Button 
-                  variant="ghost" 
-                  size="sm"
+                <button
+                  className="pearl-quiet"
                   onClick={() => {
                     setPriceRange("all");
                     setRatingFilter("all");
@@ -490,7 +487,7 @@ export default function ProductExplorer() {
                   }}
                 >
                   Clear Filters
-                </Button>
+                </button>
               )}
             </div>
           </div>
@@ -574,10 +571,8 @@ export default function ProductExplorer() {
                         >
                           <TableCell onClick={(e) => e.stopPropagation()}>
                             <CollapsibleTrigger asChild>
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="p-0 h-6 w-6"
+                              <button
+                                className="pearl-quiet !p-0 h-6 w-6"
                                 disabled={!hasAnalysisData}
                               >
                                 {hasAnalysisData ? (
@@ -585,7 +580,7 @@ export default function ProductExplorer() {
                                 ) : (
                                   <span className="w-4 h-4" />
                                 )}
-                              </Button>
+                              </button>
                             </CollapsibleTrigger>
                           </TableCell>
                           <TableCell onClick={(e) => e.stopPropagation()}>
@@ -661,16 +656,15 @@ export default function ProductExplorer() {
                             </div>
                           </TableCell>
                           <TableCell className="text-center">
-                            <Button
-                              variant="ghost"
-                              size="sm"
+                            <button
+                              className="pearl-quiet !p-0 h-8 w-8"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleRowClick(product);
                               }}
                             >
                               <Eye className="w-4 h-4" />
-                            </Button>
+                            </button>
                           </TableCell>
                         </TableRow>
                         <CollapsibleContent asChild>
@@ -713,23 +707,21 @@ export default function ProductExplorer() {
             </div>
             
             <div className="flex items-center gap-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <button
+                className="pearl-secondary"
                 disabled={currentPage === 1}
                 onClick={() => setCurrentPage(1)}
               >
                 First
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
+              </button>
+              <button
+                className="pearl-secondary"
                 disabled={currentPage === 1}
                 onClick={() => setCurrentPage(prev => prev - 1)}
               >
                 Previous
-              </Button>
-              
+              </button>
+
               <div className="flex items-center gap-1">
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                   let pageNum: number;
@@ -742,37 +734,33 @@ export default function ProductExplorer() {
                   } else {
                     pageNum = currentPage - 2 + i;
                   }
-                  
+
                   return (
-                    <Button
+                    <button
                       key={pageNum}
-                      variant={currentPage === pageNum ? "default" : "outline"}
-                      size="sm"
-                      className="w-8 h-8 p-0"
+                      className={currentPage === pageNum ? "pearl-button w-8 h-8 !p-0" : "pearl-quiet w-8 h-8 !p-0"}
                       onClick={() => setCurrentPage(pageNum)}
                     >
                       {pageNum}
-                    </Button>
+                    </button>
                   );
                 })}
               </div>
-              
-              <Button 
-                variant="outline" 
-                size="sm" 
+
+              <button
+                className="pearl-secondary"
                 disabled={currentPage === totalPages}
                 onClick={() => setCurrentPage(prev => prev + 1)}
               >
                 Next
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
+              </button>
+              <button
+                className="pearl-secondary"
                 disabled={currentPage === totalPages}
                 onClick={() => setCurrentPage(totalPages)}
               >
                 Last
-              </Button>
+              </button>
             </div>
           </div>
         </CardContent>

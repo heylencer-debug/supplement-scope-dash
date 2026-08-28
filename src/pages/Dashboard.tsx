@@ -6,7 +6,6 @@ import { Progress } from "@/components/ui/progress";
 import { ScrollAnimate } from "@/components/ui/scroll-animate";
 import { Building2, ChevronsUpDown, Link2 } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Button } from "@/components/ui/button";
 import { PearlButton } from "@/components/ui/pearl-button";
 
 // Dashboard components
@@ -115,9 +114,9 @@ function PipelineCollapsible({ categoryId, categoryName }: { categoryId: string;
               </div>
             </div>
             <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 shrink-0">
+              <button className="pearl-quiet h-7 w-7 p-0 shrink-0">
                 <ChevronsUpDown className="h-4 w-4 text-muted-foreground" />
-              </Button>
+              </button>
             </CollapsibleTrigger>
           </div>
         </CardHeader>

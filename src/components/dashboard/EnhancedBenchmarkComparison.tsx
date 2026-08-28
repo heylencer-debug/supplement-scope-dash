@@ -4,7 +4,6 @@ import { CardContent, CardHeader, CardTitle, CardDescription } from "@/component
 import { Panel } from "@/components/ui/panel";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
 import { PearlButton } from "@/components/ui/pearl-button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -393,9 +392,9 @@ function PackagingComparisonSection({ ourPackaging, competitors, getCompetitorPa
               </div>
             </CollapsibleTrigger>
             <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-7 w-7 sm:h-8 sm:w-8 p-0">
+              <button className="pearl-quiet h-7 w-7 sm:h-8 sm:w-8 !p-0">
                 {isOpen ? <ChevronUp className="h-3 w-3 sm:h-4 sm:w-4" /> : <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4" />}
-              </Button>
+              </button>
             </CollapsibleTrigger>
           </div>
         </CardHeader>
@@ -1007,9 +1006,9 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
             </CollapsibleTrigger>
             <div className="flex items-center gap-2">
               <CollapsibleTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-7 w-7 sm:h-8 sm:w-8 p-0">
+                <button className="pearl-quiet h-7 w-7 sm:h-8 sm:w-8 !p-0">
                   {isOpen ? <ChevronUp className="h-3 w-3 sm:h-4 sm:w-4" /> : <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4" />}
-                </Button>
+                </button>
               </CollapsibleTrigger>
             </div>
           </div>
@@ -1031,12 +1030,10 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                   <UITooltip>
                     <TooltipTrigger asChild>
                       <span className="inline-block">
-                        <Button 
-                          variant="ghost"
-                          size="sm"
+                        <button
                           className={cn(
-                            "relative z-10 h-8 px-3 text-xs gap-1.5 rounded-md transition-all duration-200",
-                            activeTab === 'new_winners' 
+                            "relative z-10 h-8 px-3 text-xs gap-1.5 rounded-md transition-all duration-200 inline-flex items-center",
+                            activeTab === 'new_winners'
                               ? 'text-foreground font-medium' 
                               : 'text-muted-foreground hover:text-foreground',
                             !analysisAvailability.newWinners.available && 'opacity-50 cursor-not-allowed'
@@ -1067,7 +1064,7 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                           ) : newWinnersAnalysis.pollingStatus.isPolling ? (
                             <Loader2 className="w-3 h-3 animate-spin text-primary" />
                           ) : null}
-                        </Button>
+                        </button>
                       </span>
                     </TooltipTrigger>
                     {!analysisAvailability.newWinners.available && (
@@ -1083,12 +1080,10 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                   <UITooltip>
                     <TooltipTrigger asChild>
                       <span className="inline-block">
-                        <Button 
-                          variant="ghost"
-                          size="sm"
+                        <button
                           className={cn(
-                            "relative z-10 h-8 px-3 text-xs gap-1.5 rounded-md transition-all duration-200",
-                            activeTab === 'top_performers' 
+                            "relative z-10 h-8 px-3 text-xs gap-1.5 rounded-md transition-all duration-200 inline-flex items-center",
+                            activeTab === 'top_performers'
                               ? 'text-foreground font-medium' 
                               : 'text-muted-foreground hover:text-foreground',
                             // Only disabled if NW is available but hasn't been run yet
@@ -1122,7 +1117,7 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                           {topPerformersAnalysis.pollingStatus.isPolling && (
                             <Loader2 className="w-3 h-3 animate-spin text-primary" />
                           )}
-                        </Button>
+                        </button>
                       </span>
                     </TooltipTrigger>
                     {analysisAvailability.newWinners.available && !newWinnersAnalysis.hasAnalysis && !newWinnersAnalysis.isNotAvailable && (
@@ -1156,14 +1151,12 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                     {/* Manual ASIN Selection Popover */}
                     <Popover open={showAsinInput} onOpenChange={setShowAsinInput}>
                       <PopoverTrigger asChild>
-                        <Button 
-                          variant="outline"
-                          size="sm" 
-                          className="h-8 px-2 text-xs"
+                        <button
+                          className="pearl-secondary h-8 !px-2 text-xs"
                           disabled={activeAnalysisData.isLoading || !categoryId}
                         >
                           <Target className="w-3.5 h-3.5" />
-                        </Button>
+                        </button>
                       </PopoverTrigger>
                       <PopoverContent className="w-80" align="end">
                         <div className="space-y-3">
@@ -1185,22 +1178,20 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
                             </p>
                           </div>
                           <div className="flex gap-2">
-                            <Button 
-                              size="sm" 
-                              className="flex-1 text-xs"
+                            <button
+                              className="pearl-secondary flex-1 text-xs"
                               onClick={handleRunWithAsins}
                               disabled={parseAsins(asinInput).length === 0 || activeAnalysisData.isLoading}
                             >
                               <Brain className="w-3 h-3 mr-1" />
                               Analyze ({parseAsins(asinInput).length})
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              variant="outline"
+                            </button>
+                            <button
+                              className="pearl-quiet"
                               onClick={() => { setShowAsinInput(false); setAsinInput(''); }}
                             >
                               Cancel
-                            </Button>
+                            </button>
                           </div>
                         </div>
                       </PopoverContent>
@@ -2372,12 +2363,10 @@ export function EnhancedBenchmarkComparison({
             <div className="flex items-center gap-2 flex-wrap">
               {/* Analyze Competitors Button */}
               {competitiveAnalysis ? (
-                <Button
-                  variant="outline"
-                  size="sm"
+                <button
+                  className="pearl-secondary h-8 gap-1.5"
                   onClick={runCompetitiveAnalysis}
                   disabled={competitiveLoading || competitivePolling}
-                  className="h-8 gap-1.5"
                 >
                   {(competitiveLoading || competitivePolling) ? (
                     <>
@@ -2392,7 +2381,7 @@ export function EnhancedBenchmarkComparison({
                       <span className="hidden sm:inline">Re-Analyze</span>
                     </>
                   )}
-                </Button>
+                </button>
               ) : (
                 <PearlButton
                                     withSparkle={false}
@@ -2417,17 +2406,17 @@ export function EnhancedBenchmarkComparison({
               )}
               
               {competitiveAnalysis && (
-                <Button variant="ghost" size="sm" onClick={clearCompetitiveAnalysis} className="h-8 px-2 text-xs">
+                <button className="pearl-quiet h-8 !px-2 text-xs" onClick={clearCompetitiveAnalysis}>
                   <X className="w-3 h-3 mr-1" />
                   Clear Analysis
-                </Button>
+                </button>
               )}
 
               {selectedIds.length > 0 && (
-                <Button variant="ghost" size="sm" onClick={clearSelection} className="h-8 px-2 text-xs">
+                <button className="pearl-quiet h-8 !px-2 text-xs" onClick={clearSelection}>
                   <X className="w-3 h-3 mr-1" />
                   Clear Selection
-                </Button>
+                </button>
               )}
               
               {/* New Winners Filter Toggle */}
@@ -2435,19 +2424,17 @@ export function EnhancedBenchmarkComparison({
                 <TooltipProvider>
                   <UITooltip>
                     <TooltipTrigger asChild>
-                      <Button 
-                        variant={showOnlyNewWinners ? "default" : "outline"} 
-                        size="sm" 
-                        onClick={() => setShowOnlyNewWinners(!showOnlyNewWinners)}
+                      <button
                         className={cn(
                           "h-8 gap-1.5",
-                          showOnlyNewWinners && "border-primary text-primary"
+                          showOnlyNewWinners ? "pearl-secondary" : "pearl-quiet"
                         )}
+                        onClick={() => setShowOnlyNewWinners(!showOnlyNewWinners)}
                       >
                         <Zap className="w-3.5 h-3.5" />
                         <span className="hidden sm:inline">New Winners</span>
-                        <Badge 
-                          variant="secondary" 
+                        <Badge
+                          variant="secondary"
                           className={cn(
                             "ml-1 h-5 px-1.5 text-[10px]",
                             showOnlyNewWinners && "bg-muted text-foreground"
@@ -2455,7 +2442,7 @@ export function EnhancedBenchmarkComparison({
                         >
                           {formulaReferencesCount}
                         </Badge>
-                      </Button>
+                      </button>
                     </TooltipTrigger>
                     <TooltipContent side="bottom" className="max-w-xs text-center">
                       <p className="font-semibold">Formula Reference Products</p>
@@ -2502,7 +2489,7 @@ export function EnhancedBenchmarkComparison({
               </Select>
               <Popover open={filterOpen} onOpenChange={setFilterOpen}>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-8 gap-1.5">
+                  <button className="pearl-secondary h-8 gap-1.5">
                     <Filter className="w-3.5 h-3.5" />
                     <span className="hidden sm:inline">Select Competitors</span>
                     {selectedIds.length > 0 && (
@@ -2510,7 +2497,7 @@ export function EnhancedBenchmarkComparison({
                         {selectedIds.length}
                       </Badge>
                     )}
-                  </Button>
+                  </button>
                 </PopoverTrigger>
                 <PopoverContent className="w-80 p-0" align="end">
                   <div className="p-3 border-b">
@@ -3653,10 +3640,8 @@ export function EnhancedBenchmarkComparison({
                     {/* View Competitive Analysis Button - Outside card content at bottom */}
                     {competitiveAnalysis && (
                       <div className="px-2 pb-2 md:px-3 md:pb-3 border-t border-border bg-muted/30">
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          className="w-full h-8 text-xs gap-1.5 mt-2"
+                        <button
+                          className="pearl-secondary w-full h-8 text-xs gap-1.5 mt-2"
                           onClick={(e) => {
                             e.stopPropagation();
                             setSelectedCompetitorBrand(product.brand || null);
@@ -3665,7 +3650,7 @@ export function EnhancedBenchmarkComparison({
                         >
                           <Brain className="w-3 h-3" />
                           View AI Analysis
-                        </Button>
+                        </button>
                       </div>
                     )}
                   </div>

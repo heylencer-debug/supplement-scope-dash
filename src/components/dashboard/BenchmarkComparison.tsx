@@ -2,7 +2,6 @@ import { X, Trophy, DollarSign, FlaskConical, Megaphone, HeartCrack, Sparkles, C
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Panel } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import type { Product } from "@/hooks/useProducts";
 import type { CategoryAnalysis } from "@/hooks/useCategoryAnalyses";
@@ -138,9 +137,9 @@ export default function BenchmarkComparison({
             <CardTitle>Benchmark Comparison</CardTitle>
             <Badge variant="secondary">{selectedProducts.length} of 5 selected</Badge>
           </div>
-          <Button variant="ghost" size="sm" onClick={onClearAll}>
+          <button className="pearl-quiet" onClick={onClearAll}>
             Clear All
-          </Button>
+          </button>
         </div>
       </CardHeader>
       <CardContent>
@@ -251,14 +250,12 @@ export default function BenchmarkComparison({
               <div key={product.id} className="w-56 flex-shrink-0 border-r last:border-r-0">
                 {/* Header */}
                 <div className="bg-muted p-4 relative">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute top-2 right-2 h-6 w-6"
+                  <button
+                    className="pearl-quiet absolute top-2 right-2 h-6 w-6 !p-0"
                     onClick={() => onRemoveProduct(product.id)}
                   >
                     <X className="w-4 h-4" />
-                  </Button>
+                  </button>
                   <p className="font-medium text-sm truncate pr-6">{product.brand || "Unknown"}</p>
                   <p className="text-xs text-muted-foreground truncate">{product.title?.slice(0, 30)}...</p>
                 </div>

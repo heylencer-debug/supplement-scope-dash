@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronRight, ClipboardCopy, FileText, Loader2, Package, Trash2, Send, AlertCircle, CheckCircle2, XCircle, Clock } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { PearlButton } from "@/components/ui/pearl-button";
 import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Panel } from "@/components/ui/panel";
@@ -278,25 +277,21 @@ export default function NewAnalysis() {
                   >
                     {/* Action Buttons */}
                     <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button
-                        variant="secondary"
-                        size="icon"
-                        className="h-7 w-7 bg-background/80 backdrop-blur-sm hover:bg-primary hover:text-primary-foreground"
+                      <button
+                        className="pearl-quiet h-7 w-7 backdrop-blur-sm"
                         onClick={(e) => handleCopyAsins(e, cat.id)}
                         title="Copy ASINs"
                       >
                         <ClipboardCopy className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        size="icon"
-                        className="h-7 w-7 bg-background/80 backdrop-blur-sm hover:bg-destructive hover:text-destructive-foreground"
+                      </button>
+                      <button
+                        className="pearl-quiet h-7 w-7 backdrop-blur-sm hover:text-destructive"
                         onClick={(e) => handleDeleteClick(e, cat)}
                         disabled={deleteCategory.isPending}
                         title="Delete category"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                      </button>
                     </div>
 
                     {/* Product Images Grid */}
@@ -383,37 +378,33 @@ export default function NewAnalysis() {
                     Showing {startIndex + 1}-{Math.min(startIndex + itemsPerPage, uniqueCategories.length)} of {uniqueCategories.length} categories
                   </p>
                   <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
+                    <button
+                      className="pearl-secondary"
                       onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                       disabled={currentPage === 1}
                     >
                       <ChevronLeft className="h-4 w-4 mr-1" />
                       Previous
-                    </Button>
+                    </button>
                     <div className="flex items-center gap-1">
                       {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                        <Button
+                        <button
                           key={page}
-                          variant={currentPage === page ? "default" : "ghost"}
-                          size="sm"
-                          className="w-8 h-8 p-0"
+                          className={currentPage === page ? "pearl-button w-8 h-8 !p-0" : "pearl-quiet w-8 h-8 !p-0"}
                           onClick={() => setCurrentPage(page)}
                         >
                           {page}
-                        </Button>
+                        </button>
                       ))}
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
+                    <button
+                      className="pearl-secondary"
                       onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                       disabled={currentPage === totalPages}
                     >
                       Next
                       <ChevronRight className="h-4 w-4 ml-1" />
-                    </Button>
+                    </button>
                   </div>
                 </div>
               )}

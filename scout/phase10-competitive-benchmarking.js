@@ -140,7 +140,7 @@ async function callClaudeSonnetOnce(prompt, maxTokens) {
 // transience. finish_reason=length WITH substantial content is kept as-is
 // (logged); only genuinely empty/near-empty output gets one retry at the
 // same (already generous) budget.
-async function callClaudeSonnet(prompt, maxTokens = 32000) {
+async function callClaudeSonnet(prompt, maxTokens = 64000) {
   let { output, finishReason } = await callClaudeSonnetOnce(prompt, maxTokens);
   const len = (output || '').length;
   if (finishReason === 'length' && len > 500) {
@@ -221,7 +221,7 @@ async function callClaudeOpusOnce(prompt, maxTokens) {
 // No blind retry-on-length: cap itself caused truncation. finish_reason=length
 // WITH substantial content is kept as-is (logged); only near-empty output
 // gets one retry at the same (generous) budget.
-async function callClaudeOpus(prompt, maxTokens = 32000) {
+async function callClaudeOpus(prompt, maxTokens = 64000) {
   let { output, finishReason } = await callClaudeOpusOnce(prompt, maxTokens);
   const len = (output || '').length;
   if (finishReason === 'length' && len > 500) {

@@ -136,7 +136,7 @@ async function callClaudeSonnetQAOnce(prompt, maxTokens, model = ANALYSIS_MODEL)
 // transience. finish_reason=length WITH substantial content is kept as-is
 // (logged, not re-burned); only genuinely empty/near-empty output gets one
 // retry at the same (already generous) budget.
-async function callClaudeSonnetQA(prompt, maxTokens = 32000, model = ANALYSIS_MODEL) {
+async function callClaudeSonnetQA(prompt, maxTokens = 64000, model = ANALYSIS_MODEL) {
   let { content, finishReason } = await callClaudeSonnetQAOnce(prompt, maxTokens, model);
   const len = (content || '').length;
   if (finishReason === 'length' && len > 500) {
@@ -807,7 +807,7 @@ async function runCall2(keyword, grokBrief, claudeBrief, adjustedFormula, compet
   // both initial call and 24000-token retry) once reasoning tokens were the
   // culprit — raised to match the same 32000 safety-net budget used for
   // Call 1, well inside Sonnet 5/Opus 5's 128000 max_completion_tokens.
-  const CALL2_MAX_TOKENS = 32000;
+  const CALL2_MAX_TOKENS = 64000;
   const result = await callClaudeSonnetQA(prompt, CALL2_MAX_TOKENS);
   const call2Elapsed = Math.round((Date.now() - call2Start) / 1000);
   console.log(`  Call 2 done: ${Math.round((result || '').length / 1000)}k chars (${call2Elapsed}s)`);

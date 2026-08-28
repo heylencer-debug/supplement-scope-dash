@@ -78,7 +78,7 @@ async function callClaudeOnce(prompt, maxTokens) {
 // transience. finish_reason=length WITH substantial content is kept as-is
 // (logged); only genuinely empty/near-empty output gets one retry at the
 // same (already generous) budget.
-async function callClaude(prompt, maxTokens = 32000) {
+async function callClaude(prompt, maxTokens = 64000) {
   let { content, finishReason } = await callClaudeOnce(prompt, maxTokens);
   if (finishReason === 'length' && content.length > 500) {
     console.log(`  [NOTE: output reached token ceiling] — keeping truncated-but-substantial content`);

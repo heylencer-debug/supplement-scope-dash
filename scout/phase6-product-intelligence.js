@@ -126,7 +126,7 @@ async function callGrokOnce(prompt, maxTokens) {
 // No blind retry-on-length: caps caused the truncations, not transience.
 // finish_reason=length WITH substantial content is kept (logged, not retried);
 // only genuinely empty/near-empty output gets one retry at the same budget.
-async function callGrok(prompt, maxTokens = 32000) {
+async function callGrok(prompt, maxTokens = 64000) {
   let { content, finishReason } = await callGrokOnce(prompt, maxTokens);
   const len = (content || '').length;
   if (finishReason === 'length' && len > 500) {

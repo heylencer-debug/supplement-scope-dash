@@ -129,7 +129,7 @@ async function callGrokOnce(prompt, model, maxTokens) {
 // failures, so retrying at the SAME (now generous) budget only helps for
 // genuinely empty/near-empty output. A finish_reason=length WITH substantial
 // content is kept as-is (marked in logs only) rather than re-burning tokens.
-async function callGrok(prompt, { model = P5_FAST_MODEL, maxTokens = 32000 } = {}) {
+async function callGrok(prompt, { model = P5_FAST_MODEL, maxTokens = 64000 } = {}) {
   let { content, finishReason } = await callGrokOnce(prompt, model, maxTokens);
   const len = (content || '').length;
   if (finishReason === 'length' && len > 500) {
@@ -966,7 +966,7 @@ Page excerpt: ${scraped.raw_html_excerpt.substring(0, 15000)}`;
   // Uncapped to a generous 32000-token ceiling — with reasoning disabled, actual
   // output (~500-700 word brief) won't approach it; this just removes the cap
   // as a source of truncation. No per-mode split needed anymore.
-  const maxTokens = 32000;
+  const maxTokens = 64000;
 
   const prompt = buildGroundedPrompt(product, rank, pool, KEYWORD, groundingText, sourceBlock, memoryFallback);
   const rawOutput = await callGrok(prompt, { model, maxTokens });

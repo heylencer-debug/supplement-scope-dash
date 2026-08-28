@@ -8,7 +8,8 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent } from "@/components/ui/card";
+import { CardContent } from "@/components/ui/card";
+import { BrandCard } from "@/components/ui/brand-card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -147,7 +148,7 @@ function ExpandableCard({
 }) {
   const [open, setOpen] = useState(false);
   return (
-    <Card className={`border ${borderColor} transition-all duration-200`}>
+    <BrandCard className={`border ${borderColor} transition-all duration-200`}>
       <button
         className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-t-lg ${bgColor} hover:brightness-105 transition-all`}
         onClick={() => setOpen((o) => !o)}
@@ -165,7 +166,7 @@ function ExpandableCard({
         </div>
       </button>
       {open && <CardContent className="pt-4 pb-4">{children}</CardContent>}
-    </Card>
+    </BrandCard>
   );
 }
 
@@ -274,7 +275,7 @@ export function FormulaValidationTab({ categoryId, categoryName, activeVersionIn
       {/* Score banner */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {hasP11 && (
-          <Card className="border-blue-500/30 bg-blue-500/5">
+          <BrandCard className="border-blue-500/30 bg-blue-500/5">
             <CardContent className="py-4 px-5 flex items-center gap-4">
               <Scale className="h-6 w-6 text-blue-400 shrink-0" />
               <div className="flex-1 min-w-0">
@@ -285,11 +286,11 @@ export function FormulaValidationTab({ categoryId, categoryName, activeVersionIn
                 {p11Result && <p className="text-xs text-muted-foreground truncate">{p11Result} · {p11Date}</p>}
               </div>
             </CardContent>
-          </Card>
+          </BrandCard>
         )}
 
         {hasP12 && (
-          <Card className="border-green-500/30 bg-green-500/5">
+          <BrandCard className="border-green-500/30 bg-green-500/5">
             <CardContent className="py-4 px-5 flex items-center gap-4">
               <ShieldCheck className="h-6 w-6 text-green-400 shrink-0" />
               <div className="flex-1 min-w-0">
@@ -300,11 +301,11 @@ export function FormulaValidationTab({ categoryId, categoryName, activeVersionIn
                 {p12Status && <p className="text-xs text-muted-foreground truncate">{p12Status} · {p12Date}</p>}
               </div>
             </CardContent>
-          </Card>
+          </BrandCard>
         )}
 
         {/* Download card */}
-        <Card className="border-blue-500/30 bg-blue-500/5">
+        <BrandCard className="border-blue-500/30 bg-blue-500/5">
           <CardContent className="py-4 px-5 flex flex-col justify-center gap-2">
             <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Manufacturer Brief</p>
             <Button
@@ -318,7 +319,7 @@ export function FormulaValidationTab({ categoryId, categoryName, activeVersionIn
             </Button>
             <p className="text-[10px] text-muted-foreground text-center">Full brief · P11 · P12 · Print-ready</p>
           </CardContent>
-        </Card>
+        </BrandCard>
       </div>
 
       {/* P12 compliance status pill */}

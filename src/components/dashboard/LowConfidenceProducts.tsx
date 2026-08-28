@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { BrandCard } from "@/components/ui/brand-card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -38,7 +39,7 @@ export function LowConfidenceProducts({ products, categoryId, isLoading }: LowCo
 
   if (isLoading) {
     return (
-      <Card>
+      <BrandCard>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
             <AlertTriangle className="w-5 h-5 text-warning" />
@@ -48,7 +49,7 @@ export function LowConfidenceProducts({ products, categoryId, isLoading }: LowCo
         <CardContent>
           <Skeleton className="h-[200px] w-full" />
         </CardContent>
-      </Card>
+      </BrandCard>
     );
   }
 
@@ -61,7 +62,7 @@ export function LowConfidenceProducts({ products, categoryId, isLoading }: LowCo
     : 0;
 
   return (
-    <Card className="border-warning/30">
+    <BrandCard className="border-warning/30">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
@@ -205,6 +206,6 @@ export function LowConfidenceProducts({ products, categoryId, isLoading }: LowCo
           </p>
         )}
       </CardContent>
-    </Card>
+    </BrandCard>
   );
 }

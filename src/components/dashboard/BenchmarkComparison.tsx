@@ -1,5 +1,6 @@
 import { X, Trophy, DollarSign, FlaskConical, Megaphone, HeartCrack, Sparkles, Check, AlertTriangle } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BrandCard } from "@/components/ui/brand-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
@@ -129,7 +130,7 @@ export default function BenchmarkComparison({
   };
 
   return (
-    <Card className="mt-6">
+    <BrandCard className="mt-6">
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -340,6 +341,6 @@ export default function BenchmarkComparison({
           <ScrollBar orientation="horizontal" />
         </ScrollArea>
       </CardContent>
-    </Card>
+    </BrandCard>
   );
 }

@@ -2,7 +2,9 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronRight, ClipboardCopy, FileText, Loader2, Package, Trash2, Send, AlertCircle, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PearlButton } from "@/components/ui/pearl-button";
+import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { BrandCard } from "@/components/ui/brand-card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
@@ -158,7 +160,7 @@ export default function NewAnalysis() {
       </div>
 
       {/* New Keyword Submission -> Scout cloud queue */}
-      <Card className="border-primary/20 bg-primary/5">
+      <BrandCard className="border-primary/20 bg-primary/5">
         <CardContent className="p-6 space-y-4">
           <div className="flex items-start gap-4">
             <div className="p-2 rounded-full bg-primary/10 shrink-0">
@@ -181,14 +183,14 @@ export default function NewAnalysis() {
               disabled={submitScoutJob.isPending}
               className="bg-background"
             />
-            <Button type="submit" disabled={!keywordInput.trim() || submitScoutJob.isPending}>
+            <PearlButton type="submit" disabled={!keywordInput.trim() || submitScoutJob.isPending} className="inline-flex items-center">
               {submitScoutJob.isPending ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               ) : (
                 <Send className="w-4 h-4 mr-2" />
               )}
               Queue Analysis
-            </Button>
+            </PearlButton>
           </form>
 
           {/* Recent/active queue status */}
@@ -243,10 +245,10 @@ export default function NewAnalysis() {
             </div>
           )}
         </CardContent>
-      </Card>
+      </BrandCard>
 
       {/* Recently Analyzed Categories */}
-      <Card>
+      <BrandCard>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
             <FileText className="w-4 h-4 text-primary" />
@@ -420,7 +422,7 @@ export default function NewAnalysis() {
             </>
           )}
         </CardContent>
-      </Card>
+      </BrandCard>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!categoryToDelete} onOpenChange={(open) => !open && setCategoryToDelete(null)}>

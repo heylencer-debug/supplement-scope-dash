@@ -1,5 +1,6 @@
 import { ThumbsDown, Lightbulb } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { BrandCard } from "@/components/ui/brand-card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -37,7 +38,7 @@ export function CustomerVoice({
   }
 
   return (
-    <Card>
+    <BrandCard>
       <CardHeader>
         <CardTitle className="text-lg font-semibold text-foreground">
           Customer Voice
@@ -125,6 +126,6 @@ export function CustomerVoice({
           </div>
         )}
       </CardContent>
-    </Card>
+    </BrandCard>
   );
 }

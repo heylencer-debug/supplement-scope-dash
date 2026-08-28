@@ -3,7 +3,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BrandCard } from "@/components/ui/brand-card";
 import { Progress } from "@/components/ui/progress";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { 
@@ -341,7 +342,7 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {allImages.length > 0 && (
-                  <Card>
+                  <BrandCard>
                     <CardContent className="pt-4">
                       <div className="aspect-square rounded-lg overflow-hidden border bg-muted mb-3">
                         <img src={allImages[selectedImage]} alt={product.title ?? "Product"} className="w-full h-full object-contain" />
@@ -369,10 +370,10 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                         </div>
                       )}
                     </CardContent>
-                  </Card>
+                  </BrandCard>
                 )}
                 <div className="space-y-4">
-                  <Card>
+                  <BrandCard>
                     <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Award className="w-4 h-4" />Status & Badges</CardTitle></CardHeader>
                     <CardContent>
                       <div className="flex flex-wrap gap-2">
@@ -384,8 +385,8 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                         {product.has_a_plus_content && <Badge variant="secondary">A+ Content</Badge>}
                       </div>
                     </CardContent>
-                  </Card>
-                  <Card>
+                  </BrandCard>
+                  <BrandCard>
                     <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Truck className="w-4 h-4" />Seller & Manufacturer</CardTitle></CardHeader>
                     <CardContent className="space-y-2 text-sm">
                       <div className="grid grid-cols-2 gap-2">
@@ -395,8 +396,8 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                         <div><p className="text-xs text-muted-foreground">Seller Type</p><p className="font-medium">{product.seller_type ?? "-"}</p></div>
                       </div>
                     </CardContent>
-                  </Card>
-                  <Card>
+                  </BrandCard>
+                  <BrandCard>
                     <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Box className="w-4 h-4" />Physical Details</CardTitle></CardHeader>
                     <CardContent className="space-y-2 text-sm">
                       <div className="grid grid-cols-2 gap-2">
@@ -414,8 +415,8 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                         </div>
                       )}
                     </CardContent>
-                  </Card>
-                  <Card>
+                  </BrandCard>
+                  <BrandCard>
                     <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Calendar className="w-4 h-4" />Timeline</CardTitle></CardHeader>
                     <CardContent className="space-y-2 text-sm">
                       <div className="grid grid-cols-2 gap-2">
@@ -425,22 +426,22 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                         <div><p className="text-xs text-muted-foreground">Age</p><p className="font-medium">{product.age_months ? `${product.age_months} months` : "-"}</p></div>
                       </div>
                     </CardContent>
-                  </Card>
+                  </BrandCard>
                 </div>
               </div>
               {product.feature_bullets && product.feature_bullets.length > 0 && (
-                <Card>
+                <BrandCard>
                   <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><CheckCircle className="w-4 h-4 text-chart-4" />Feature Bullets ({product.bullets_count ?? product.feature_bullets.length})</CardTitle></CardHeader>
                   <CardContent>
                     <ul className="space-y-2">
                       {product.feature_bullets.map((bullet, idx) => <li key={idx} className="flex items-start gap-2 text-sm"><span className="text-primary mt-1">•</span><span>{bullet}</span></li>)}
                     </ul>
                   </CardContent>
-                </Card>
+                </BrandCard>
               )}
               {product.description_text && (
                 <Collapsible>
-                  <Card>
+                  <BrandCard>
                     <CardHeader className="pb-2">
                       <CollapsibleTrigger className="flex items-center justify-between w-full">
                         <CardTitle className="text-sm font-medium flex items-center gap-2"><FileText className="w-4 h-4" />Description ({product.description_length ?? product.description_text.length} chars)</CardTitle>
@@ -448,29 +449,29 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                       </CollapsibleTrigger>
                     </CardHeader>
                     <CollapsibleContent><CardContent><p className="text-sm text-muted-foreground whitespace-pre-wrap">{product.description_text}</p></CardContent></CollapsibleContent>
-                  </Card>
+                  </BrandCard>
                 </Collapsible>
               )}
               {(product.claims || (product.claims_on_label && product.claims_on_label.length > 0)) && (
-                <Card>
+                <BrandCard>
                   <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Product Claims</CardTitle></CardHeader>
                   <CardContent className="space-y-3">
                     {product.claims && <p className="text-sm text-muted-foreground">{product.claims}</p>}
                     {product.claims_on_label && product.claims_on_label.length > 0 && <div className="flex flex-wrap gap-2">{product.claims_on_label.map((claim, idx) => <Badge key={idx} variant="secondary">{claim}</Badge>)}</div>}
                   </CardContent>
-                </Card>
+                </BrandCard>
               )}
               {categoryTree && categoryTree.length > 0 && (
-                <Card>
+                <BrandCard>
                   <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Link2 className="w-4 h-4" />Category Path</CardTitle></CardHeader>
                   <CardContent>
                     <div className="flex flex-wrap items-center gap-1 text-sm">{categoryTree.map((cat, idx) => <span key={idx} className="flex items-center gap-1">{idx > 0 && <span className="text-muted-foreground">›</span>}<span className="text-muted-foreground">{cat.name}</span></span>)}</div>
                     {product.categories_flat && <p className="text-xs text-muted-foreground mt-2">{product.categories_flat}</p>}
                   </CardContent>
-                </Card>
+                </BrandCard>
               )}
               {product.product_url && (
-                <Card><CardContent className="py-3"><a href={product.product_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-primary hover:underline"><ExternalLink className="w-4 h-4" />View on Amazon</a></CardContent></Card>
+                <BrandCard><CardContent className="py-3"><a href={product.product_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-primary hover:underline"><ExternalLink className="w-4 h-4" />View on Amazon</a></CardContent></BrandCard>
               )}
             </div>
           </TabsContent>
@@ -479,12 +480,12 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
           <TabsContent value="sales" className={`mt-4 ${scrollableContentClass} ${maxContentHeight}`}>
             <div className="space-y-4">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Card><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Monthly Sales</p><p className="text-2xl font-bold">{product.monthly_sales?.toLocaleString() ?? "-"}</p>{product.estimated_monthly_sales && product.estimated_monthly_sales !== product.monthly_sales && <p className="text-xs text-muted-foreground">Est: {product.estimated_monthly_sales.toLocaleString()}</p>}</CardContent></Card>
-                <Card><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Monthly Revenue</p><p className="text-2xl font-bold text-chart-4">{formatCurrency(product.monthly_revenue)}</p>{product.estimated_revenue && product.estimated_revenue !== product.monthly_revenue && <p className="text-xs text-muted-foreground">Est: {formatCurrency(product.estimated_revenue)}</p>}</CardContent></Card>
-                <Card><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Recent Sales</p><p className="text-2xl font-bold">{product.recent_sales ?? "-"}</p></CardContent></Card>
-                <Card><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Rating Count</p><p className="text-2xl font-bold">{product.rating_count?.toLocaleString() ?? product.reviews?.toLocaleString() ?? "-"}</p></CardContent></Card>
+                <BrandCard><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Monthly Sales</p><p className="text-2xl font-bold">{product.monthly_sales?.toLocaleString() ?? "-"}</p>{product.estimated_monthly_sales && product.estimated_monthly_sales !== product.monthly_sales && <p className="text-xs text-muted-foreground">Est: {product.estimated_monthly_sales.toLocaleString()}</p>}</CardContent></BrandCard>
+                <BrandCard><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Monthly Revenue</p><p className="text-2xl font-bold text-chart-4">{formatCurrency(product.monthly_revenue)}</p>{product.estimated_revenue && product.estimated_revenue !== product.monthly_revenue && <p className="text-xs text-muted-foreground">Est: {formatCurrency(product.estimated_revenue)}</p>}</CardContent></BrandCard>
+                <BrandCard><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Recent Sales</p><p className="text-2xl font-bold">{product.recent_sales ?? "-"}</p></CardContent></BrandCard>
+                <BrandCard><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Rating Count</p><p className="text-2xl font-bold">{product.rating_count?.toLocaleString() ?? product.reviews?.toLocaleString() ?? "-"}</p></CardContent></BrandCard>
               </div>
-              <Card>
+              <BrandCard>
                 <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><TrendingUp className="w-4 h-4" />Best Seller Rank (BSR)</CardTitle></CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -518,9 +519,9 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                   )}
                   {product.bsr_category && <p className="text-xs text-muted-foreground">Category: {product.bsr_category}</p>}
                 </CardContent>
-              </Card>
+              </BrandCard>
               <HistoricalBSRSalesChart historicalData={product.historical_data as any} />
-              <Card>
+              <BrandCard>
                 <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><DollarSign className="w-4 h-4" />Price Metrics</CardTitle></CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -553,8 +554,8 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                     </div>
                   )}
                 </CardContent>
-              </Card>
-              <Card>
+              </BrandCard>
+              <BrandCard>
                 <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Profitability Estimates</CardTitle></CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-3 gap-4">
@@ -563,8 +564,8 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                     <div><p className="text-xs text-muted-foreground">PPC Bid Est.</p><p className="text-xl font-bold">{product.ppc_bid_estimate ? `$${product.ppc_bid_estimate.toFixed(2)}` : "-"}</p></div>
                   </div>
                 </CardContent>
-              </Card>
-              <Card>
+              </BrandCard>
+              <BrandCard>
                 <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Star className="w-4 h-4" />Listing Quality Score (LQS)</CardTitle></CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex items-center gap-4">
@@ -584,12 +585,12 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                     </div>
                   </div>
                 </CardContent>
-              </Card>
+              </BrandCard>
               {product.keyword_rank && Object.keys(product.keyword_rank).length > 0 && (
-                <Card>
+                <BrandCard>
                   <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Keyword Rankings</CardTitle></CardHeader>
                   <CardContent><div className="space-y-2">{Object.entries(product.keyword_rank as Record<string, number>).slice(0, 10).map(([keyword, rank]) => <div key={keyword} className="flex justify-between items-center text-sm"><span className="text-muted-foreground">{keyword}</span><Badge variant="outline">#{rank}</Badge></div>)}</div></CardContent>
-                </Card>
+                </BrandCard>
               )}
             </div>
           </TabsContent>
@@ -597,7 +598,7 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
           {/* Marketing Tab */}
           <TabsContent value="marketing" className={`mt-4 ${scrollableContentClass} ${maxContentHeight}`}>
             <div className="space-y-4">
-              <Card>
+              <BrandCard>
                 <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Overall Marketing Score</CardTitle></CardHeader>
                 <CardContent>
                   <div className="flex items-center gap-4">
@@ -637,39 +638,39 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                     </div>
                   </div>
                 </CardContent>
-              </Card>
+              </BrandCard>
               {marketingAnalysis?.competitive_analysis?.unique_selling_points && marketingAnalysis.competitive_analysis.unique_selling_points.length > 0 && (
-                <Card>
+                <BrandCard>
                   <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><CheckCircle className="w-4 h-4 text-chart-4" />Unique Selling Points</CardTitle></CardHeader>
                   <CardContent><ul className="space-y-2">{marketingAnalysis.competitive_analysis.unique_selling_points.map((point, idx) => <li key={idx} className="flex items-start gap-2 text-sm"><TrendingUp className="w-4 h-4 text-chart-4 mt-0.5 shrink-0" />{point}</li>)}</ul></CardContent>
-                </Card>
+                </BrandCard>
               )}
               {marketingAnalysis?.competitive_analysis?.weaknesses_vs_competitors && marketingAnalysis.competitive_analysis.weaknesses_vs_competitors.length > 0 && (
-                <Card>
+                <BrandCard>
                   <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><AlertCircle className="w-4 h-4 text-destructive" />Weaknesses vs Competitors</CardTitle></CardHeader>
                   <CardContent><ul className="space-y-2">{marketingAnalysis.competitive_analysis.weaknesses_vs_competitors.map((weakness, idx) => <li key={idx} className="flex items-start gap-2 text-sm"><TrendingDown className="w-4 h-4 text-destructive mt-0.5 shrink-0" />{weakness}</li>)}</ul></CardContent>
-                </Card>
+                </BrandCard>
               )}
               {marketingAnalysis?.competitive_analysis?.parity_features && marketingAnalysis.competitive_analysis.parity_features.length > 0 && (
-                <Card>
+                <BrandCard>
                   <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Parity Features</CardTitle></CardHeader>
                   <CardContent><div className="flex flex-wrap gap-2">{marketingAnalysis.competitive_analysis.parity_features.map((feature, idx) => <Badge key={idx} variant="secondary">{feature}</Badge>)}</div></CardContent>
-                </Card>
+                </BrandCard>
               )}
               {marketingAnalysis?.opportunities && marketingAnalysis.opportunities.length > 0 && (
-                <Card>
+                <BrandCard>
                   <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Lightbulb className="w-4 h-4 text-yellow-500" />Market Opportunities</CardTitle></CardHeader>
                   <CardContent><ul className="space-y-2">{marketingAnalysis.opportunities.map((opp, idx) => <li key={idx} className="flex items-start gap-2 text-sm"><span className="text-yellow-500 shrink-0">•</span>{opp}</li>)}</ul></CardContent>
-                </Card>
+                </BrandCard>
               )}
               {marketingAnalysis?.positioning_suggestions && marketingAnalysis.positioning_suggestions.length > 0 && (
-                <Card>
+                <BrandCard>
                   <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Target className="w-4 h-4 text-primary" />Positioning Suggestions</CardTitle></CardHeader>
                   <CardContent><ul className="space-y-2">{marketingAnalysis.positioning_suggestions.map((suggestion, idx) => <li key={idx} className="flex items-start gap-2 text-sm"><span className="text-primary shrink-0">→</span>{suggestion}</li>)}</ul></CardContent>
-                </Card>
+                </BrandCard>
               )}
               {marketingAnalysis?.copy_effectiveness && (
-                <Card>
+                <BrandCard>
                   <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Copy Effectiveness</CardTitle></CardHeader>
                   <CardContent className="space-y-3">
                     {marketingAnalysis.copy_effectiveness.title_analysis?.clarity_score !== undefined && (
@@ -682,12 +683,12 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                       </div>
                     )}
                   </CardContent>
-                </Card>
+                </BrandCard>
               )}
               
               {/* Image Analysis Section */}
               {marketingAnalysis?.image_analysis && (
-                <Card>
+                <BrandCard>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-medium flex items-center gap-2">
                       <Image className="w-4 h-4 text-primary" />
@@ -841,30 +842,30 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                       </div>
                     )}
                   </CardContent>
-                </Card>
+                </BrandCard>
               )}
 
-              {!marketingAnalysis && <Card><CardContent className="py-8 text-center text-muted-foreground">No marketing analysis data available for this product.</CardContent></Card>}
+              {!marketingAnalysis && <BrandCard><CardContent className="py-8 text-center text-muted-foreground">No marketing analysis data available for this product.</CardContent></BrandCard>}
             </div>
           </TabsContent>
 
           {/* Reviews Tab */}
           <TabsContent value="reviews" className={`mt-4 ${scrollableContentClass} ${maxContentHeight}`}>
             <div className="space-y-4">
-              {reviewAnalysis?.summary && <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Review Summary</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">{reviewAnalysis.summary}</p></CardContent></Card>}
+              {reviewAnalysis?.summary && <BrandCard><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Review Summary</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">{reviewAnalysis.summary}</p></CardContent></BrandCard>}
               
               {/* Analysis Metadata */}
               {reviewAnalysis?.analysis_metadata && (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <Card><CardContent className="pt-3 pb-3 text-center"><p className="text-lg font-bold">{reviewAnalysis.analysis_metadata.total_reviews_analyzed ?? "-"}</p><p className="text-xs text-muted-foreground">Reviews Analyzed</p></CardContent></Card>
-                  <Card><CardContent className="pt-3 pb-3 text-center"><p className="text-lg font-bold">{reviewAnalysis.analysis_metadata.verified_purchase_rate ? `${reviewAnalysis.analysis_metadata.verified_purchase_rate}%` : "-"}</p><p className="text-xs text-muted-foreground">Verified Rate</p></CardContent></Card>
-                  <Card><CardContent className="pt-3 pb-3 text-center"><p className="text-lg font-bold">{reviewAnalysis.analysis_metadata.average_helpful_votes?.toFixed(1) ?? "-"}</p><p className="text-xs text-muted-foreground">Avg Helpful Votes</p></CardContent></Card>
-                  <Card><CardContent className="pt-3 pb-3 text-center"><Badge variant={reviewAnalysis.analysis_metadata.analysis_quality === "high" ? "default" : "secondary"}>{reviewAnalysis.analysis_metadata.analysis_quality ?? "-"}</Badge><p className="text-xs text-muted-foreground mt-1">Analysis Quality</p></CardContent></Card>
+                  <BrandCard><CardContent className="pt-3 pb-3 text-center"><p className="text-lg font-bold">{reviewAnalysis.analysis_metadata.total_reviews_analyzed ?? "-"}</p><p className="text-xs text-muted-foreground">Reviews Analyzed</p></CardContent></BrandCard>
+                  <BrandCard><CardContent className="pt-3 pb-3 text-center"><p className="text-lg font-bold">{reviewAnalysis.analysis_metadata.verified_purchase_rate ? `${reviewAnalysis.analysis_metadata.verified_purchase_rate}%` : "-"}</p><p className="text-xs text-muted-foreground">Verified Rate</p></CardContent></BrandCard>
+                  <BrandCard><CardContent className="pt-3 pb-3 text-center"><p className="text-lg font-bold">{reviewAnalysis.analysis_metadata.average_helpful_votes?.toFixed(1) ?? "-"}</p><p className="text-xs text-muted-foreground">Avg Helpful Votes</p></CardContent></BrandCard>
+                  <BrandCard><CardContent className="pt-3 pb-3 text-center"><Badge variant={reviewAnalysis.analysis_metadata.analysis_quality === "high" ? "default" : "secondary"}>{reviewAnalysis.analysis_metadata.analysis_quality ?? "-"}</Badge><p className="text-xs text-muted-foreground mt-1">Analysis Quality</p></CardContent></BrandCard>
                 </div>
               )}
 
               {sentimentData.length > 0 && (
-                <Card>
+                <BrandCard>
                   <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Sentiment Distribution</CardTitle></CardHeader>
                   <CardContent>
                     <div className="h-48">
@@ -879,12 +880,12 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                       </ResponsiveContainer>
                     </div>
                   </CardContent>
-                </Card>
+                </BrandCard>
               )}
 
               {/* Product Experience Breakdown */}
               {reviewAnalysis?.product_experience_breakdown && (
-                <Card>
+                <BrandCard>
                   <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><BarChart3 className="w-4 h-4 text-primary" />Product Experience Breakdown</CardTitle></CardHeader>
                   <CardContent>
                     <div className="grid md:grid-cols-2 gap-4">
@@ -940,12 +941,12 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                       )}
                     </div>
                   </CardContent>
-                </Card>
+                </BrandCard>
               )}
 
               {/* Competitor Comparisons */}
               {reviewAnalysis?.competitor_comparisons && (reviewAnalysis.competitor_comparisons.brands_mentioned?.length || reviewAnalysis.competitor_comparisons.wins_against_competitors?.length || reviewAnalysis.competitor_comparisons.loses_against_competitors?.length) && (
-                <Card>
+                <BrandCard>
                   <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Target className="w-4 h-4 text-primary" />Competitor Comparisons</CardTitle></CardHeader>
                   <CardContent className="space-y-4">
                     {reviewAnalysis.competitor_comparisons.brands_mentioned && reviewAnalysis.competitor_comparisons.brands_mentioned.length > 0 && (
@@ -967,21 +968,21 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                       </div>
                     )}
                   </CardContent>
-                </Card>
+                </BrandCard>
               )}
 
               {reviewAnalysis?.demographics_insights && (
-                <Card>
+                <BrandCard>
                   <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><ShoppingCart className="w-4 h-4 text-primary" />Customer Demographics</CardTitle></CardHeader>
                   <CardContent className="space-y-4">
                     {reviewAnalysis.demographics_insights.age_groups_mentioned && reviewAnalysis.demographics_insights.age_groups_mentioned.length > 0 && <div><p className="text-xs font-medium text-muted-foreground mb-2">Age Groups</p><div className="flex flex-wrap gap-2">{reviewAnalysis.demographics_insights.age_groups_mentioned.map((age, idx) => <Badge key={idx} variant="outline">{age}</Badge>)}</div></div>}
                     {reviewAnalysis.demographics_insights.buyer_types && reviewAnalysis.demographics_insights.buyer_types.length > 0 && <div><p className="text-xs font-medium text-muted-foreground mb-2">Buyer Types</p><div className="flex flex-wrap gap-2">{reviewAnalysis.demographics_insights.buyer_types.map((type, idx) => <Badge key={idx} variant="secondary">{type}</Badge>)}</div></div>}
                     {reviewAnalysis.demographics_insights.use_cases && reviewAnalysis.demographics_insights.use_cases.length > 0 && <div><p className="text-xs font-medium text-muted-foreground mb-2">Common Use Cases</p><div className="flex flex-wrap gap-2">{reviewAnalysis.demographics_insights.use_cases.map((useCase, idx) => <Badge key={idx} variant="outline">{useCase}</Badge>)}</div></div>}
                   </CardContent>
-                </Card>
+                </BrandCard>
               )}
               {reviewAnalysis?.pain_points && reviewAnalysis.pain_points.length > 0 && (
-                <Card>
+                <BrandCard>
                   <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><AlertCircle className="w-4 h-4 text-destructive" />Pain Points</CardTitle></CardHeader>
                   <CardContent>
                     <div className="space-y-3">
@@ -1003,10 +1004,10 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                       ))}
                     </div>
                   </CardContent>
-                </Card>
+                </BrandCard>
               )}
               {reviewAnalysis?.positive_themes && reviewAnalysis.positive_themes.length > 0 && (
-                <Card>
+                <BrandCard>
                   <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><CheckCircle className="w-4 h-4 text-green-500" />Positive Themes</CardTitle></CardHeader>
                   <CardContent>
                     <div className="space-y-3">
@@ -1025,10 +1026,10 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                       ))}
                     </div>
                   </CardContent>
-                </Card>
+                </BrandCard>
               )}
               {reviewAnalysis?.feature_requests && reviewAnalysis.feature_requests.length > 0 && (
-                <Card>
+                <BrandCard>
                   <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Feature Requests</CardTitle></CardHeader>
                   <CardContent>
                     <div className="space-y-3">
@@ -1040,12 +1041,12 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                       ))}
                     </div>
                   </CardContent>
-                </Card>
+                </BrandCard>
               )}
 
               {/* Actionable Recommendations */}
               {reviewAnalysis?.actionable_recommendations && reviewAnalysis.actionable_recommendations.length > 0 && (
-                <Card>
+                <BrandCard>
                   <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Target className="w-4 h-4 text-primary" />Actionable Recommendations</CardTitle></CardHeader>
                   <CardContent>
                     <div className="space-y-3">
@@ -1063,16 +1064,16 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                       ))}
                     </div>
                   </CardContent>
-                </Card>
+                </BrandCard>
               )}
 
               {reviewAnalysis?.key_insights && reviewAnalysis.key_insights.length > 0 && (
-                <Card>
+                <BrandCard>
                   <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Lightbulb className="w-4 h-4 text-yellow-500" />Key Insights</CardTitle></CardHeader>
                   <CardContent><ul className="space-y-2">{reviewAnalysis.key_insights.map((insight, idx) => <li key={idx} className="text-sm text-muted-foreground flex items-start gap-2"><span className="text-yellow-500 shrink-0">•</span>{insight}</li>)}</ul></CardContent>
-                </Card>
+                </BrandCard>
               )}
-              {!reviewAnalysis && <Card><CardContent className="py-8 text-center text-muted-foreground">No review analysis data available for this product.</CardContent></Card>}
+              {!reviewAnalysis && <BrandCard><CardContent className="py-8 text-center text-muted-foreground">No review analysis data available for this product.</CardContent></BrandCard>}
             </div>
           </TabsContent>
 
@@ -1116,11 +1117,11 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                 
                 if (!hasData) {
                   return (
-                    <Card>
+                    <BrandCard>
                       <CardContent className="py-8 text-center text-muted-foreground">
                         No packaging audit data available for this product.
                       </CardContent>
-                    </Card>
+                    </BrandCard>
                   );
                 }
                 
@@ -1128,7 +1129,7 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                   <>
                     {/* Visual Style */}
                     {visualStyle && visualStyle !== "N/A" && (
-                      <Card>
+                      <BrandCard>
                         <CardHeader className="pb-2">
                           <CardTitle className="text-sm font-medium flex items-center gap-2">
                             <Image className="w-4 h-4 text-primary" />
@@ -1138,12 +1139,12 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                         <CardContent>
                           <p className="text-sm text-foreground">{visualStyle}</p>
                         </CardContent>
-                      </Card>
+                      </BrandCard>
                     )}
                     
                     {/* Visual Hierarchy */}
                     {visualHierarchy && visualHierarchy !== "N/A" && (
-                      <Card>
+                      <BrandCard>
                         <CardHeader className="pb-2">
                           <CardTitle className="text-sm font-medium flex items-center gap-2">
                             <BarChart3 className="w-4 h-4 text-chart-2" />
@@ -1153,12 +1154,12 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                         <CardContent>
                           <p className="text-sm text-foreground">{visualHierarchy}</p>
                         </CardContent>
-                      </Card>
+                      </BrandCard>
                     )}
                     
                     {/* Trust Signals */}
                     {trustSignals.length > 0 && (
-                      <Card>
+                      <BrandCard>
                         <CardHeader className="pb-2">
                           <CardTitle className="text-sm font-medium flex items-center gap-2">
                             <Award className="w-4 h-4 text-chart-4" />
@@ -1174,12 +1175,12 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                             ))}
                           </div>
                         </CardContent>
-                      </Card>
+                      </BrandCard>
                     )}
                     
                     {/* Front of Pack Claims */}
                     {(frontOfPackClaims.length > 0 || product.claims || (product.claims_on_label && product.claims_on_label.length > 0)) && (
-                      <Card>
+                      <BrandCard>
                         <CardHeader className="pb-2">
                           <CardTitle className="text-sm font-medium flex items-center gap-2">
                             <Tag className="w-4 h-4 text-chart-3" />
@@ -1212,12 +1213,12 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                             ) : null}
                           </ul>
                         </CardContent>
-                      </Card>
+                      </BrandCard>
                     )}
                     
                     {/* Color Strategy */}
                     {colorStrategy && colorStrategy !== "N/A" && (
-                      <Card>
+                      <BrandCard>
                         <CardHeader className="pb-2">
                           <CardTitle className="text-sm font-medium flex items-center gap-2">
                             <Palette className="w-4 h-4 text-chart-1" />
@@ -1227,12 +1228,12 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                         <CardContent>
                           <p className="text-sm text-foreground">{colorStrategy}</p>
                         </CardContent>
-                      </Card>
+                      </BrandCard>
                     )}
                     
                     {/* Typography Style */}
                     {typographyStyle && typographyStyle !== "N/A" && (
-                      <Card>
+                      <BrandCard>
                         <CardHeader className="pb-2">
                           <CardTitle className="text-sm font-medium flex items-center gap-2">
                             <Type className="w-4 h-4 text-chart-2" />
@@ -1242,12 +1243,12 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                         <CardContent>
                           <p className="text-sm text-foreground">{typographyStyle}</p>
                         </CardContent>
-                      </Card>
+                      </BrandCard>
                     )}
                     
                     {/* Layout Structure */}
                     {layoutStructure && layoutStructure !== "N/A" && (
-                      <Card>
+                      <BrandCard>
                         <CardHeader className="pb-2">
                           <CardTitle className="text-sm font-medium flex items-center gap-2">
                             <LayoutGrid className="w-4 h-4 text-chart-3" />
@@ -1257,12 +1258,12 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                         <CardContent>
                           <p className="text-sm text-foreground">{layoutStructure}</p>
                         </CardContent>
-                      </Card>
+                      </BrandCard>
                     )}
                     
                     {/* Conversion Triggers */}
                     {conversionTriggersList.length > 0 && (
-                      <Card className="border-primary/30 bg-primary/5">
+                      <BrandCard className="border-primary/30 bg-primary/5">
                         <CardHeader className="pb-2">
                           <CardTitle className="text-sm font-medium flex items-center gap-2">
                             <Lightbulb className="w-4 h-4 text-primary" />
@@ -1279,12 +1280,12 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                             ))}
                           </div>
                         </CardContent>
-                      </Card>
+                      </BrandCard>
                     )}
                     
                     {/* Differentiation Factor */}
                     {differentiationFactor && differentiationFactor !== "N/A" && (
-                      <Card className="border-chart-4/30 bg-chart-4/5">
+                      <BrandCard className="border-chart-4/30 bg-chart-4/5">
                         <CardHeader className="pb-2">
                           <CardTitle className="text-sm font-medium flex items-center gap-2">
                             <Sparkles className="w-4 h-4 text-chart-4" />
@@ -1295,7 +1296,7 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                         <CardContent>
                           <p className="text-sm text-foreground">{differentiationFactor}</p>
                         </CardContent>
-                      </Card>
+                      </BrandCard>
                     )}
                   </>
                 );
@@ -1307,15 +1308,15 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
           <TabsContent value="formula" className={`mt-4 ${scrollableContentClass} ${maxContentHeight}`}>
             <div className="space-y-4">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Card><CardContent className="pt-4 pb-4 text-center"><p className="text-2xl font-bold text-foreground">{product.servings_per_container ?? "-"}</p><p className="text-xs text-muted-foreground">Servings</p></CardContent></Card>
-                <Card><CardContent className="pt-4 pb-4 text-center"><p className="text-2xl font-bold text-foreground">{product.calories_per_serving ?? "-"}</p><p className="text-xs text-muted-foreground">Calories/Serving</p></CardContent></Card>
-                <Card><CardContent className="pt-4 pb-4 text-center"><p className="text-2xl font-bold text-foreground">{product.nutrients_count ?? "-"}</p><p className="text-xs text-muted-foreground">Nutrients</p></CardContent></Card>
-                <Card><CardContent className="pt-4 pb-4 text-center"><p className="text-2xl font-bold text-foreground">{product.has_proprietary_blends ? "Yes" : "No"}</p><p className="text-xs text-muted-foreground">Proprietary Blends</p></CardContent></Card>
+                <BrandCard><CardContent className="pt-4 pb-4 text-center"><p className="text-2xl font-bold text-foreground">{product.servings_per_container ?? "-"}</p><p className="text-xs text-muted-foreground">Servings</p></CardContent></BrandCard>
+                <BrandCard><CardContent className="pt-4 pb-4 text-center"><p className="text-2xl font-bold text-foreground">{product.calories_per_serving ?? "-"}</p><p className="text-xs text-muted-foreground">Calories/Serving</p></CardContent></BrandCard>
+                <BrandCard><CardContent className="pt-4 pb-4 text-center"><p className="text-2xl font-bold text-foreground">{product.nutrients_count ?? "-"}</p><p className="text-xs text-muted-foreground">Nutrients</p></CardContent></BrandCard>
+                <BrandCard><CardContent className="pt-4 pb-4 text-center"><p className="text-2xl font-bold text-foreground">{product.has_proprietary_blends ? "Yes" : "No"}</p><p className="text-xs text-muted-foreground">Proprietary Blends</p></CardContent></BrandCard>
               </div>
               
               {/* OCR Metadata */}
               {product.ocr_extracted && (
-                <Card className="border-primary/30 bg-primary/5">
+                <BrandCard className="border-primary/30 bg-primary/5">
                   <CardContent className="pt-3 pb-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -1334,12 +1335,12 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                       <p className="text-xs text-muted-foreground mt-2">{product.extraction_notes}</p>
                     )}
                   </CardContent>
-                </Card>
+                </BrandCard>
               )}
 
-              {product.serving_size && <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Serving Size</CardTitle></CardHeader><CardContent><p className="text-sm">{product.serving_size}</p></CardContent></Card>}
+              {product.serving_size && <BrandCard><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Serving Size</CardTitle></CardHeader><CardContent><p className="text-sm">{product.serving_size}</p></CardContent></BrandCard>}
               {/* OCR Analysis Card - always show re-analyze button */}
-              <Card className={needsReanalysis ? "border-yellow-500/30 bg-yellow-500/10" : ""}>
+              <BrandCard className={needsReanalysis ? "border-yellow-500/30 bg-yellow-500/10" : ""}>
                 <CardContent className="pt-3 pb-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -1377,12 +1378,12 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                     </Button>
                   </div>
                 </CardContent>
-              </Card>
+              </BrandCard>
 
               {allNutrients && allNutrients.length > 0 && (() => {
                 const isGuaranteedAnalysis = supplementFacts?.panel_type === 'guaranteed_analysis';
                 return (
-                  <Card>
+                  <BrandCard>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm font-medium">
                         {isGuaranteedAnalysis ? 'Guaranteed Analysis' : 'Supplement Facts'}
@@ -1424,11 +1425,11 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                         </table>
                       </div>
                     </CardContent>
-                  </Card>
+                  </BrandCard>
                 );
               })()}
               {proprietaryBlends && proprietaryBlends.length > 0 && (
-                <Card>
+                <BrandCard>
                   <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><AlertCircle className="w-4 h-4 text-yellow-500" />Proprietary Blends</CardTitle></CardHeader>
                   <CardContent className="space-y-4">
                     {proprietaryBlends.map((blend, idx) => (
@@ -1438,16 +1439,16 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                       </div>
                     ))}
                   </CardContent>
-                </Card>
+                </BrandCard>
               )}
-              {product.ingredients && <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Ingredients</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground whitespace-pre-wrap">{product.ingredients}</p></CardContent></Card>}
-              {product.other_ingredients && <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Other Ingredients</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">{product.other_ingredients}</p></CardContent></Card>}
-              {product.allergen_info && <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><AlertCircle className="w-4 h-4 text-yellow-500" />Allergen Information</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">{product.allergen_info}</p></CardContent></Card>}
-              {product.warnings && <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><AlertCircle className="w-4 h-4 text-destructive" />Warnings</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">{product.warnings}</p></CardContent></Card>}
-              {product.directions && <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Directions</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">{product.directions}</p></CardContent></Card>}
+              {product.ingredients && <BrandCard><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Ingredients</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground whitespace-pre-wrap">{product.ingredients}</p></CardContent></BrandCard>}
+              {product.other_ingredients && <BrandCard><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Other Ingredients</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">{product.other_ingredients}</p></CardContent></BrandCard>}
+              {product.allergen_info && <BrandCard><CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><AlertCircle className="w-4 h-4 text-yellow-500" />Allergen Information</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">{product.allergen_info}</p></CardContent></BrandCard>}
+              {product.warnings && <BrandCard><CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><AlertCircle className="w-4 h-4 text-destructive" />Warnings</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">{product.warnings}</p></CardContent></BrandCard>}
+              {product.directions && <BrandCard><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Directions</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">{product.directions}</p></CardContent></BrandCard>}
               {/* Supplement Facts Complete - Enhanced Display */}
               {supplementFacts && (
-                <Card className="border-chart-4/30">
+                <BrandCard className="border-chart-4/30">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-medium flex items-center gap-2">
                       <FileText className="w-4 h-4 text-chart-4" />
@@ -1500,10 +1501,10 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                       </div>
                     )}
                   </CardContent>
-                </Card>
+                </BrandCard>
               )}
               {specificationsArray && specificationsArray.length > 0 && (
-                <Card>
+                <BrandCard>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-medium flex items-center gap-2">
                       <Info className="w-4 h-4" />
@@ -1520,10 +1521,10 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                       ))}
                     </div>
                   </CardContent>
-                </Card>
+                </BrandCard>
               )}
               {importantInfo?.sections && importantInfo.sections.length > 0 && (
-                <Card>
+                <BrandCard>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-medium flex items-center gap-2">
                       <AlertCircle className="w-4 h-4 text-yellow-500" />
@@ -1538,9 +1539,9 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                       </div>
                     ))}
                   </CardContent>
-                </Card>
+                </BrandCard>
               )}
-              {!product.ingredients && !product.serving_size && !allNutrients && <Card><CardContent className="py-8 text-center text-muted-foreground">No formula data available for this product.</CardContent></Card>}
+              {!product.ingredients && !product.serving_size && !allNutrients && <BrandCard><CardContent className="py-8 text-center text-muted-foreground">No formula data available for this product.</CardContent></BrandCard>}
             </div>
           </TabsContent>
 
@@ -1549,26 +1550,26 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
             <div className="space-y-4">
               {/* Key Stats Grid */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <Card><CardContent className="pt-4 pb-4 text-center">
+                <BrandCard><CardContent className="pt-4 pb-4 text-center">
                   <p className="text-xl font-bold text-foreground">${(product.price ?? 0).toFixed(2)}</p>
                   <p className="text-xs text-muted-foreground">Price</p>
-                </CardContent></Card>
-                <Card><CardContent className="pt-4 pb-4 text-center">
+                </CardContent></BrandCard>
+                <BrandCard><CardContent className="pt-4 pb-4 text-center">
                   <p className="text-xl font-bold text-foreground">{product.bsr_current ? `#${product.bsr_current.toLocaleString()}` : "-"}</p>
                   <p className="text-xs text-muted-foreground">BSR</p>
-                </CardContent></Card>
-                <Card><CardContent className="pt-4 pb-4 text-center">
+                </CardContent></BrandCard>
+                <BrandCard><CardContent className="pt-4 pb-4 text-center">
                   <p className="text-xl font-bold text-foreground">{(product.rating ?? 0).toFixed(1)}★</p>
                   <p className="text-xs text-muted-foreground">Rating</p>
-                </CardContent></Card>
-                <Card><CardContent className="pt-4 pb-4 text-center">
+                </CardContent></BrandCard>
+                <BrandCard><CardContent className="pt-4 pb-4 text-center">
                   <p className="text-xl font-bold text-foreground">{(product.reviews ?? 0).toLocaleString()}</p>
                   <p className="text-xs text-muted-foreground">Reviews</p>
-                </CardContent></Card>
+                </CardContent></BrandCard>
               </div>
 
               {/* Identity */}
-              <Card>
+              <BrandCard>
                 <CardContent className="pt-4 space-y-3">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">ASIN</span>
@@ -1594,7 +1595,7 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                     </div>
                   )}
                 </CardContent>
-              </Card>
+              </BrandCard>
 
               {/* Badges */}
               {(product.bestseller || product.amazon_choice) && (
@@ -1606,7 +1607,7 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
 
               {/* Image Gallery */}
               {allImages.length > 0 && (
-                <Card>
+                <BrandCard>
                   <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Image Gallery ({allImages.length})</CardTitle></CardHeader>
                   <CardContent>
                     <div className="aspect-square rounded-lg overflow-hidden border bg-muted mb-3 max-h-48">
@@ -1622,16 +1623,16 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                       </div>
                     )}
                   </CardContent>
-                </Card>
+                </BrandCard>
               )}
 
               {/* Title */}
-              <Card>
+              <BrandCard>
                 <CardContent className="pt-4">
                   <p className="text-sm text-muted-foreground mb-1">Title</p>
                   <p className="text-sm font-medium leading-snug">{product.title ?? "-"}</p>
                 </CardContent>
-              </Card>
+              </BrandCard>
             </div>
           </TabsContent>
 
@@ -1652,33 +1653,33 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
               {(product.serving_size || product.servings_per_container) && (
                 <div className="grid grid-cols-2 gap-3">
                   {product.serving_size && (
-                    <Card><CardContent className="pt-4 pb-4 text-center">
+                    <BrandCard><CardContent className="pt-4 pb-4 text-center">
                       <p className="text-base font-bold">{product.serving_size}</p>
                       <p className="text-xs text-muted-foreground">Serving Size</p>
-                    </CardContent></Card>
+                    </CardContent></BrandCard>
                   )}
                   {product.servings_per_container && (
-                    <Card><CardContent className="pt-4 pb-4 text-center">
+                    <BrandCard><CardContent className="pt-4 pb-4 text-center">
                       <p className="text-base font-bold">{product.servings_per_container}</p>
                       <p className="text-xs text-muted-foreground">Servings / Container</p>
-                    </CardContent></Card>
+                    </CardContent></BrandCard>
                   )}
                 </div>
               )}
 
               {/* Supplement Facts Raw */}
               {product.supplement_facts_raw && (
-                <Card>
+                <BrandCard>
                   <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Supplement Facts (Raw)</CardTitle></CardHeader>
                   <CardContent>
                     <pre className="text-xs bg-muted p-3 rounded-lg overflow-x-auto whitespace-pre-wrap leading-relaxed">{product.supplement_facts_raw}</pre>
                   </CardContent>
-                </Card>
+                </BrandCard>
               )}
 
               {/* Nutrients Table */}
               {allNutrients && allNutrients.length > 0 && (
-                <Card>
+                <BrandCard>
                   <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Nutrients ({allNutrients.length})</CardTitle></CardHeader>
                   <CardContent>
                     <div className="overflow-x-auto">
@@ -1706,12 +1707,12 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                       </table>
                     </div>
                   </CardContent>
-                </Card>
+                </BrandCard>
               )}
 
               {/* Feature Bullets */}
               {product.feature_bullets_text && (
-                <Card>
+                <BrandCard>
                   <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Feature Bullets</CardTitle></CardHeader>
                   <CardContent>
                     <ul className="space-y-1.5">
@@ -1723,11 +1724,11 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                       ))}
                     </ul>
                   </CardContent>
-                </Card>
+                </BrandCard>
               )}
 
               {!product.supplement_facts_raw && !allNutrients && (
-                <Card><CardContent className="py-8 text-center text-muted-foreground">No formula data extracted for this product.</CardContent></Card>
+                <BrandCard><CardContent className="py-8 text-center text-muted-foreground">No formula data extracted for this product.</CardContent></BrandCard>
               )}
             </div>
           </TabsContent>
@@ -1737,34 +1738,34 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
             <div className="space-y-4">
               {/* BSR Stats */}
               <div className="grid grid-cols-3 gap-3">
-                <Card><CardContent className="pt-4 pb-4 text-center">
+                <BrandCard><CardContent className="pt-4 pb-4 text-center">
                   <p className="text-xl font-bold">{product.bsr_current ? `#${product.bsr_current.toLocaleString()}` : "-"}</p>
                   <p className="text-xs text-muted-foreground">Current BSR</p>
-                </CardContent></Card>
-                <Card><CardContent className="pt-4 pb-4 text-center">
+                </CardContent></BrandCard>
+                <BrandCard><CardContent className="pt-4 pb-4 text-center">
                   <p className="text-xl font-bold">{product.bsr_30_days_avg ? `#${Math.round(product.bsr_30_days_avg).toLocaleString()}` : "-"}</p>
                   <p className="text-xs text-muted-foreground">30-Day Avg BSR</p>
-                </CardContent></Card>
-                <Card><CardContent className="pt-4 pb-4 text-center">
+                </CardContent></BrandCard>
+                <BrandCard><CardContent className="pt-4 pb-4 text-center">
                   <p className="text-xl font-bold">{product.bsr_90_days_avg ? `#${Math.round(product.bsr_90_days_avg).toLocaleString()}` : "-"}</p>
                   <p className="text-xs text-muted-foreground">90-Day Avg BSR</p>
-                </CardContent></Card>
+                </CardContent></BrandCard>
               </div>
 
               {/* Sales Stats */}
               <div className="grid grid-cols-2 gap-3">
-                <Card><CardContent className="pt-4 pb-4 text-center">
+                <BrandCard><CardContent className="pt-4 pb-4 text-center">
                   <p className="text-xl font-bold">{product.monthly_sales ? product.monthly_sales.toLocaleString() : "-"}</p>
                   <p className="text-xs text-muted-foreground">Monthly Sales</p>
-                </CardContent></Card>
-                <Card><CardContent className="pt-4 pb-4 text-center">
+                </CardContent></BrandCard>
+                <BrandCard><CardContent className="pt-4 pb-4 text-center">
                   <p className="text-xl font-bold">{product.monthly_revenue ? `$${Math.round(product.monthly_revenue).toLocaleString()}` : "-"}</p>
                   <p className="text-xs text-muted-foreground">Monthly Revenue</p>
-                </CardContent></Card>
+                </CardContent></BrandCard>
               </div>
 
               {/* Listing info */}
-              <Card>
+              <BrandCard>
                 <CardContent className="pt-4 space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Listing Since</span>
@@ -1775,23 +1776,23 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                     <span className="font-mono text-xs">{product.parent_asin ?? "-"}</span>
                   </div>
                 </CardContent>
-              </Card>
+              </BrandCard>
 
               {/* Historical BSR Chart */}
               {(() => {
                 const histData = product.historical_data as { bsr_history?: unknown[] } | null;
                 if (histData?.bsr_history && histData.bsr_history.length > 0) {
                   return (
-                    <Card>
+                    <BrandCard>
                       <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">BSR / Sales History</CardTitle></CardHeader>
                       <CardContent>
                         <HistoricalBSRSalesChart historicalData={product.historical_data as { monthly_bsr_history?: Record<string, number | null>; monthly_sales_history?: Record<string, number | null> } | null} />
                       </CardContent>
-                    </Card>
+                    </BrandCard>
                   );
                 }
                 return (
-                  <Card><CardContent className="py-6 text-center text-sm text-muted-foreground">No historical BSR data available.</CardContent></Card>
+                  <BrandCard><CardContent className="py-6 text-center text-sm text-muted-foreground">No historical BSR data available.</CardContent></BrandCard>
                 );
               })()}
             </div>
@@ -1811,13 +1812,13 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                 }) | null;
                 if (!ra) {
                   return (
-                    <Card><CardContent className="py-12 text-center text-muted-foreground">No Phase 5 research data yet</CardContent></Card>
+                    <BrandCard><CardContent className="py-12 text-center text-muted-foreground">No Phase 5 research data yet</CardContent></BrandCard>
                   );
                 }
                 return (
                   <>
                     {ra.key_strengths && ra.key_strengths.length > 0 && (
-                      <Card>
+                      <BrandCard>
                         <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-green-600">Key Strengths</CardTitle></CardHeader>
                         <CardContent>
                           <div className="flex flex-wrap gap-2">
@@ -1826,10 +1827,10 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                             ))}
                           </div>
                         </CardContent>
-                      </Card>
+                      </BrandCard>
                     )}
                     {ra.key_weaknesses && ra.key_weaknesses.length > 0 && (
-                      <Card>
+                      <BrandCard>
                         <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-destructive">Key Weaknesses</CardTitle></CardHeader>
                         <CardContent>
                           <div className="flex flex-wrap gap-2">
@@ -1838,10 +1839,10 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                             ))}
                           </div>
                         </CardContent>
-                      </Card>
+                      </BrandCard>
                     )}
                     {ra.benefits && ra.benefits.length > 0 && (
-                      <Card>
+                      <BrandCard>
                         <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Benefits</CardTitle></CardHeader>
                         <CardContent>
                           <ul className="space-y-1.5">
@@ -1853,10 +1854,10 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                             ))}
                           </ul>
                         </CardContent>
-                      </Card>
+                      </BrandCard>
                     )}
                     {(ra.reddit_sentiment || ra.reddit_notes) && (
-                      <Card>
+                      <BrandCard>
                         <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Reddit Sentiment</CardTitle></CardHeader>
                         <CardContent className="space-y-2">
                           {ra.reddit_sentiment && (
@@ -1866,18 +1867,18 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                           )}
                           {ra.reddit_notes && <p className="text-sm text-muted-foreground">{ra.reddit_notes}</p>}
                         </CardContent>
-                      </Card>
+                      </BrandCard>
                     )}
                     {ra.external_reviews && (
-                      <Card>
+                      <BrandCard>
                         <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">External Reviews</CardTitle></CardHeader>
                         <CardContent>
                           <p className="text-sm text-muted-foreground">{ra.external_reviews}</p>
                         </CardContent>
-                      </Card>
+                      </BrandCard>
                     )}
                     {!ra.key_strengths && !ra.key_weaknesses && !ra.benefits && !ra.reddit_sentiment && !ra.external_reviews && (
-                      <Card><CardContent className="py-12 text-center text-muted-foreground">No Phase 5 research data yet</CardContent></Card>
+                      <BrandCard><CardContent className="py-12 text-center text-muted-foreground">No Phase 5 research data yet</CardContent></BrandCard>
                     )}
                   </>
                 );

@@ -6,7 +6,8 @@
 
 import { useRef, useCallback } from "react";
 import { useFormulaQA } from "@/hooks/useFormulaQA";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { BrandCard } from "@/components/ui/brand-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -250,7 +251,7 @@ export function FormulaQATab({ categoryId, categoryName, activeVersionInfo }: Pr
           { icon: FlaskConical, label: "QA Adjudicator", value: "Claude Sonnet 4.6", color: "text-foreground" },
           { icon: Target,     label: "Category", value: categoryName || "—", color: "text-foreground" },
         ].map(({ icon: Icon, label, value, color }) => (
-          <Card key={label}>
+          <BrandCard key={label}>
             <CardContent className="py-3 px-4 flex items-center gap-3">
               <Icon className="h-5 w-5 text-muted-foreground shrink-0" />
               <div>
@@ -258,13 +259,13 @@ export function FormulaQATab({ categoryId, categoryName, activeVersionInfo }: Pr
                 <p className={cn("text-sm font-semibold", color)}>{value}</p>
               </div>
             </CardContent>
-          </Card>
+          </BrandCard>
         ))}
       </div>
 
       {/* Comprehensive Comparison — full width */}
       {qa.comprehensive_comparison && (
-        <Card className="border-chart-1/30">
+        <BrandCard className="border-chart-1/30">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-sm">
               <Scale className="h-4 w-4 text-chart-1" />Comprehensive Ingredient Comparison — DOVIVE vs Competitors
@@ -278,12 +279,12 @@ export function FormulaQATab({ categoryId, categoryName, activeVersionInfo }: Pr
               {renderMarkdownSection(qa.comprehensive_comparison)}
             </div>
           </CardContent>
-        </Card>
+        </BrandCard>
       )}
 
       {/* Flavor & Taste QA — full width */}
       {qa.flavor_qa && (
-        <Card className="border-chart-2/30">
+        <BrandCard className="border-chart-2/30">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-sm">
               <Star className="h-4 w-4 text-chart-2" />Flavor & Taste QA
@@ -297,14 +298,14 @@ export function FormulaQATab({ categoryId, categoryName, activeVersionInfo }: Pr
               {renderMarkdownSection(qa.flavor_qa)}
             </div>
           </CardContent>
-        </Card>
+        </BrandCard>
       )}
 
       {/* Two-panel layout: full report + adjusted formula */}
       <div className="grid grid-cols-1 xl:grid-cols-5 gap-5">
 
         {/* Full QA report (3/5 width) */}
-        <Card className="xl:col-span-3">
+        <BrandCard className="xl:col-span-3">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-sm">
               <Beaker className="h-4 w-4 text-primary" />Full QA Report
@@ -318,10 +319,10 @@ export function FormulaQATab({ categoryId, categoryName, activeVersionInfo }: Pr
               {renderMarkdownSection(qa.qa_report)}
             </div>
           </CardContent>
-        </Card>
+        </BrandCard>
 
         {/* Adjusted formula (2/5 width) */}
-        <Card className="xl:col-span-2 border-primary/20">
+        <BrandCard className="xl:col-span-2 border-primary/20">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-sm">
               <Wrench className="h-4 w-4 text-primary" />Adjusted Formula
@@ -347,13 +348,13 @@ export function FormulaQATab({ categoryId, categoryName, activeVersionInfo }: Pr
               );
             })()}
           </CardContent>
-        </Card>
+        </BrandCard>
 
       </div>
 
       {/* Adjustments table (if separate) */}
       {qa.adjustments_table && (
-        <Card className="border-chart-2/20">
+        <BrandCard className="border-chart-2/20">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm">
               <Wrench className="h-4 w-4 text-chart-2" />What Changed & Why
@@ -362,7 +363,7 @@ export function FormulaQATab({ categoryId, categoryName, activeVersionInfo }: Pr
           <CardContent>
             {renderMarkdownSection(qa.adjustments_table)}
           </CardContent>
-        </Card>
+        </BrandCard>
       )}
 
     </div>

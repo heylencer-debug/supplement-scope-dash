@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BrandCard } from "@/components/ui/brand-card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { AlertTriangle, CheckCircle2, Lightbulb, Zap, Image as ImageIcon, Users, MessageSquare, Target, TrendingUp, XCircle, Star, ThumbsUp, ThumbsDown, Sparkles, FileText, ChevronDown, ChevronUp, Quote, Crown, UserCircle, Gift, List, Palette, Sun, Layout, Heart } from "lucide-react";
@@ -159,7 +160,7 @@ function TitleAnalysisCard({
   const clarityScore = titleAnalysis.clarity_score;
   const issues = titleAnalysis.issues || [];
   if (clarityScore === undefined && issues.length === 0) return null;
-  return <Card>
+  return <BrandCard>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm flex items-center gap-2">
@@ -184,7 +185,7 @@ function TitleAnalysisCard({
             No title issues identified
           </p>}
       </CardContent>
-    </Card>;
+    </BrandCard>;
 }
 
 // NEW: Bullet Analysis Card Component
@@ -198,7 +199,7 @@ function BulletAnalysisCard({
   const strengths = bulletAnalysis.strengths || [];
   const weaknesses = bulletAnalysis.weaknesses || [];
   if (strengths.length === 0 && weaknesses.length === 0 && benefitFocused === undefined) return null;
-  return <Card>
+  return <BrandCard>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm flex items-center gap-2">
@@ -236,7 +237,7 @@ function BulletAnalysisCard({
             </div>
           </div>}
       </CardContent>
-    </Card>;
+    </BrandCard>;
 }
 
 // NEW: Visual Style Guide Card Component
@@ -251,7 +252,7 @@ function VisualStyleGuideCard({
   const lightingStyle = visualStyleGuide.lighting_style || '';
   const compositionStyle = visualStyleGuide.composition_style || '';
   if (!colorPalette && moodKeywords.length === 0 && !lightingStyle && !compositionStyle) return null;
-  return <Card>
+  return <BrandCard>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm flex items-center gap-2">
           <Palette className="w-4 h-4 text-chart-5" /> Visual Style Guide
@@ -298,7 +299,7 @@ function VisualStyleGuideCard({
             <p className="text-sm">{compositionStyle}</p>
           </div>}
       </CardContent>
-    </Card>;
+    </BrandCard>;
 }
 
 // Creative Strategy Card Component - Enhanced
@@ -314,7 +315,7 @@ function CreativeStrategyCard({
   const uniqueSellingProps = creativeBrief.unique_selling_props || [];
   const hasData = brandIdentity.archetype || targetPersona.demographic || winningOffers.analysis || uniqueSellingProps.length > 0;
   if (!hasData) return null;
-  return <Card>
+  return <BrandCard>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm flex items-center gap-2">
@@ -388,7 +389,7 @@ function CreativeStrategyCard({
             </div>}
         </div>
       </CardContent>
-    </Card>;
+    </BrandCard>;
 }
 
 // Copy Assets / Swipe File Component
@@ -400,7 +401,7 @@ function CopyAssetsCard({
   const bestHooks = copyAssets?.best_hooks || [];
   const clarityScore = copyAssets?.clarity_score;
   const benefitsFocus = copyAssets?.benefits_focus;
-  return <Card>
+  return <BrandCard>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm flex items-center gap-2">
@@ -433,7 +434,7 @@ function CopyAssetsCard({
             <p className="text-xs mt-1">This section shows ALL-CAPS phrases from the listing.</p>
           </div>}
       </CardContent>
-    </Card>;
+    </BrandCard>;
 }
 export default function ProductAnalysisPanel({
   marketingAnalysis,
@@ -578,7 +579,7 @@ export default function ProductAnalysisPanel({
           <VisualStyleGuideCard visualStyleGuide={visualStyleGuide} />
           
           {/* Score Card Summary */}
-          {(overallGrade || metrics.length > 0) && <Card>
+          {(overallGrade || metrics.length > 0) && <BrandCard>
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm flex items-center gap-2">
@@ -608,10 +609,10 @@ export default function ProductAnalysisPanel({
               })}
                   </div>}
               </CardContent>
-            </Card>}
+            </BrandCard>}
           
           {/* Key Insights from Reviews */}
-          {keyInsights.length > 0 && <Card>
+          {keyInsights.length > 0 && <BrandCard>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
                   <Lightbulb className="w-4 h-4 text-primary" /> Key Insights
@@ -625,14 +626,14 @@ export default function ProductAnalysisPanel({
                     </div>)}
                 </div>
               </CardContent>
-            </Card>}
+            </BrandCard>}
           
-          {!Object.keys(creativeBrief).length && !overallGrade && !metrics.length && !keyInsights.length && <Card>
+          {!Object.keys(creativeBrief).length && !overallGrade && !metrics.length && !keyInsights.length && <BrandCard>
               <CardContent className="py-8 text-center text-muted-foreground">
                 <Sparkles className="w-8 h-8 mx-auto mb-2 opacity-50" />
                 <p>No creative strategy data available yet.</p>
               </CardContent>
-            </Card>}
+            </BrandCard>}
         </TabsContent>
 
         {/* TAB 2: COPY ANALYSIS & SWIPE FILE */}
@@ -647,7 +648,7 @@ export default function ProductAnalysisPanel({
           <CopyAssetsCard copyAssets={copyAssets} />
           
           {/* Clarity Score (legacy) */}
-          {copyClarity !== undefined && !copyAssets.clarity_score && !titleAnalysis.clarity_score && <Card>
+          {copyClarity !== undefined && !copyAssets.clarity_score && !titleAnalysis.clarity_score && <BrandCard>
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm flex items-center gap-2">
@@ -656,10 +657,10 @@ export default function ProductAnalysisPanel({
                   <ScoreBadge score={copyClarity} />
                 </div>
               </CardHeader>
-            </Card>}
+            </BrandCard>}
 
           {/* Copy Hooks (legacy) */}
-          {copyHooks.length > 0 && <Card>
+          {copyHooks.length > 0 && <BrandCard>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
                   <Lightbulb className="w-4 h-4" /> What the Copy Does Well
@@ -674,20 +675,20 @@ export default function ProductAnalysisPanel({
                     </div>)}
                 </div>
               </CardContent>
-            </Card>}
+            </BrandCard>}
           
-          {!copyAssets.best_hooks?.length && copyHooks.length === 0 && copyClarity === undefined && !titleAnalysis.issues?.length && !bulletAnalysis.strengths?.length && !bulletAnalysis.weaknesses?.length && <Card>
+          {!copyAssets.best_hooks?.length && copyHooks.length === 0 && copyClarity === undefined && !titleAnalysis.issues?.length && !bulletAnalysis.strengths?.length && !bulletAnalysis.weaknesses?.length && <BrandCard>
               <CardContent className="py-8 text-center text-muted-foreground">
                 <FileText className="w-8 h-8 mx-auto mb-2 opacity-50" />
                 <p>No copy analysis data available yet.</p>
               </CardContent>
-            </Card>}
+            </BrandCard>}
         </TabsContent>
 
         {/* TAB 3: GAP ANALYSIS & SENTIMENT */}
         <TabsContent value="sentiment" className="mt-0 space-y-4">
           {/* Gap Analysis - Full Text Warning Box */}
-          {gapAnalysis && <Card className="border-chart-2/30">
+          {gapAnalysis && <BrandCard className="border-chart-2/30">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 text-chart-2" /> Gap Analysis
@@ -704,12 +705,12 @@ export default function ProductAnalysisPanel({
                   </div>
                 </div>
               </CardContent>
-            </Card>}
+            </BrandCard>}
           
           {/* Praises & Complaints */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Primary Praises */}
-            <Card>
+            <BrandCard>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
                   <ThumbsUp className="w-4 h-4 text-chart-4" /> What Customers Love
@@ -728,10 +729,10 @@ export default function ProductAnalysisPanel({
                     No praises identified
                   </p>}
               </CardContent>
-            </Card>
+            </BrandCard>
 
             {/* Primary Complaints */}
-            <Card>
+            <BrandCard>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
                   <ThumbsDown className="w-4 h-4 text-chart-2" /> Customer Complaints
@@ -750,12 +751,12 @@ export default function ProductAnalysisPanel({
                     No complaints identified
                   </p>}
               </CardContent>
-            </Card>
+            </BrandCard>
           </div>
           
           {/* Pain Points & Positive Themes from Reviews */}
           {(painPoints.length > 0 || positiveThemes.length > 0) && <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {painPoints.length > 0 && <Card>
+              {painPoints.length > 0 && <BrandCard>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm flex items-center gap-2">
                       <AlertTriangle className="w-4 h-4 text-destructive" /> Review Pain Points
@@ -772,9 +773,9 @@ export default function ProductAnalysisPanel({
                         </div>)}
                     </div>
                   </CardContent>
-                </Card>}
+                </BrandCard>}
 
-              {positiveThemes.length > 0 && <Card>
+              {positiveThemes.length > 0 && <BrandCard>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm flex items-center gap-2">
                       <Star className="w-4 h-4 text-chart-4" /> Positive Themes
@@ -791,14 +792,14 @@ export default function ProductAnalysisPanel({
                         </div>)}
                     </div>
                   </CardContent>
-                </Card>}
+                </BrandCard>}
             </div>}
         </TabsContent>
 
         {/* TAB 4: SMART VISUAL GALLERY */}
         <TabsContent value="visuals" className="mt-0 space-y-4">
           {/* Target Audience / Vibe */}
-          {(vibe || demographics.primary_audience) && <Card>
+          {(vibe || demographics.primary_audience) && <BrandCard>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
                   <Users className="w-4 h-4" /> Visual Strategy & Demographics
@@ -818,10 +819,10 @@ export default function ProductAnalysisPanel({
                     <ScoreBadge score={demographics.relatability_score} />
                   </div>}
               </CardContent>
-            </Card>}
+            </BrandCard>}
 
           {/* Smart Image Gallery with Hover Analysis */}
-          <Card>
+          <BrandCard>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2">
                 <ImageIcon className="w-4 h-4" /> Smart Gallery
@@ -838,12 +839,12 @@ export default function ProductAnalysisPanel({
                   No image analysis available
                 </p>}
             </CardContent>
-          </Card>
+          </BrandCard>
         </TabsContent>
 
         {/* TAB 5: ACTION PLAN */}
         <TabsContent value="actions" className="mt-0 space-y-4">
-          <Card>
+          <BrandCard>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2">
                 <Zap className="w-4 h-4 text-chart-2" /> Action Plan
@@ -859,10 +860,10 @@ export default function ProductAnalysisPanel({
                   No action items available
                 </p>}
             </CardContent>
-          </Card>
+          </BrandCard>
           
           {/* Actionable Recommendations from Reviews */}
-          {actionableRecommendations.length > 0 && <Card>
+          {actionableRecommendations.length > 0 && <BrandCard>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
                   <Target className="w-4 h-4 text-primary" /> Review-Based Recommendations
@@ -882,7 +883,7 @@ export default function ProductAnalysisPanel({
                     </div>)}
                 </div>
               </CardContent>
-            </Card>}
+            </BrandCard>}
         </TabsContent>
       </Tabs>
     </div>;

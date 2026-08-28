@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BrandCard } from "@/components/ui/brand-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { 
@@ -86,7 +87,7 @@ function StrategyCard({
   };
 
   return (
-    <Card className={cn(
+    <BrandCard className={cn(
       "relative overflow-hidden transition-all duration-300",
       isRecommended && "ring-2 ring-primary shadow-lg"
     )}>
@@ -262,7 +263,7 @@ function StrategyCard({
           </Button>
         )}
       </CardContent>
-    </Card>
+    </BrandCard>
   );
 }
 

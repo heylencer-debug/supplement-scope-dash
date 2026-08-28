@@ -1,4 +1,5 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { BrandCard } from "@/components/ui/brand-card";
 import { TrendingUp, Sparkles, BarChart, Flame, Zap, Star } from "lucide-react";
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer, BarChart as RechartsBarChart, Bar, XAxis, YAxis, Tooltip, Cell } from "recharts";
 import { TrendHeatIndicator } from "./TrendHeatIndicator";
@@ -50,7 +51,7 @@ export function KeyTrendsSection({ data }: KeyTrendsSectionProps) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Radar Chart */}
         <ScrollAnimate variant="scale-up">
-          <Card>
+          <BrandCard>
             <CardHeader>
               <div className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-chart-4" />
@@ -79,12 +80,12 @@ export function KeyTrendsSection({ data }: KeyTrendsSectionProps) {
                 </ResponsiveContainer>
               </div>
             </CardContent>
-          </Card>
+          </BrandCard>
         </ScrollAnimate>
 
         {/* Bar Chart */}
         <ScrollAnimate variant="scale-up" delay={100}>
-          <Card>
+          <BrandCard>
             <CardHeader>
               <div className="flex items-center gap-2">
                 <BarChart className="h-5 w-5 text-primary" />
@@ -119,13 +120,13 @@ export function KeyTrendsSection({ data }: KeyTrendsSectionProps) {
                 </ResponsiveContainer>
               </div>
             </CardContent>
-          </Card>
+          </BrandCard>
         </ScrollAnimate>
       </div>
 
       {/* Trend Cards with Visual Enhancements */}
       <ScrollAnimate variant="fade-up" delay={200}>
-        <Card>
+        <BrandCard>
           <CardHeader>
             <div className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-chart-2" />
@@ -178,7 +179,7 @@ export function KeyTrendsSection({ data }: KeyTrendsSectionProps) {
               })}
             </div>
           </CardContent>
-        </Card>
+        </BrandCard>
       </ScrollAnimate>
     </div>
   );

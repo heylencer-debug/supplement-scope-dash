@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect, Fragment } from "react";
 import { cn } from "@/lib/utils";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { BrandCard } from "@/components/ui/brand-card";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -376,7 +377,7 @@ function PackagingComparisonSection({ ourPackaging, competitors, getCompetitorPa
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <Card className="mt-4">
+      <BrandCard className="mt-4">
         <CardHeader className="pb-2 p-3 sm:p-4 md:p-6">
           <div className="flex items-center justify-between">
             <CollapsibleTrigger asChild>
@@ -557,7 +558,7 @@ function PackagingComparisonSection({ ourPackaging, competitors, getCompetitorPa
             </div>
           </CardContent>
         </CollapsibleContent>
-      </Card>
+      </BrandCard>
     </Collapsible>
   );
 }
@@ -980,7 +981,7 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <Card className="mt-4">
+      <BrandCard className="mt-4">
         <CardHeader className="pb-2 p-3 sm:p-4 md:p-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <CollapsibleTrigger asChild>
@@ -1342,7 +1343,7 @@ function IngredientComparisonSection({ ourDosages, competitors, getCompetitorNut
             </div>
           </CardContent>
         </CollapsibleContent>
-      </Card>
+      </BrandCard>
     </Collapsible>
   );
 }
@@ -2330,7 +2331,7 @@ export function EnhancedBenchmarkComparison({
   // Loading check - placed AFTER all hooks to avoid hooks rules violation
   if (loading) {
     return (
-      <Card>
+      <BrandCard>
         <CardHeader className="pb-2">
           <Skeleton className="h-5 w-48" />
           <Skeleton className="h-4 w-64" />
@@ -2342,13 +2343,13 @@ export function EnhancedBenchmarkComparison({
             ))}
           </div>
         </CardContent>
-      </Card>
+      </BrandCard>
     );
   }
 
   return (
     <>
-      <Card>
+      <BrandCard>
         <CardHeader className="pb-2 p-3 sm:p-4 md:p-6">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -3700,7 +3701,7 @@ export function EnhancedBenchmarkComparison({
             </ScrollArea>
           </div>
         </CardContent>
-      </Card>
+      </BrandCard>
 
       {/* UNIFIED INGREDIENT & DOSAGE COMPARISON */}
       <IngredientComparisonSection 

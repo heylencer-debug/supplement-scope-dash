@@ -1,4 +1,5 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BrandCard } from "@/components/ui/brand-card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Rocket, Quote, Megaphone, CheckCircle2, Target, Zap } from "lucide-react";
@@ -29,7 +30,7 @@ export function LaunchStrategyCard({
 }: LaunchStrategyCardProps) {
   if (isLoading) {
     return (
-      <Card>
+      <BrandCard>
         <CardHeader>
           <Skeleton className="h-6 w-48" />
         </CardHeader>
@@ -38,13 +39,13 @@ export function LaunchStrategyCard({
           <Skeleton className="h-32 w-full" />
           <Skeleton className="h-24 w-full" />
         </CardContent>
-      </Card>
+      </BrandCard>
     );
   }
 
   if (!goToMarket) {
     return (
-      <Card>
+      <BrandCard>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
             <Rocket className="h-5 w-5 text-primary" />
@@ -56,7 +57,7 @@ export function LaunchStrategyCard({
             No launch strategy data available yet.
           </p>
         </CardContent>
-      </Card>
+      </BrandCard>
     );
   }
 
@@ -79,7 +80,7 @@ export function LaunchStrategyCard({
   ].filter(t => t.value);
 
   return (
-    <Card>
+    <BrandCard>
       <CardHeader className="pb-4">
         <CardTitle className="flex items-center gap-2 text-lg">
           <Rocket className="h-5 w-5 text-primary" />
@@ -193,6 +194,6 @@ export function LaunchStrategyCard({
           </div>
         )}
       </CardContent>
-    </Card>
+    </BrandCard>
   );
 }

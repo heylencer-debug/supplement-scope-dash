@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { BrandCard } from "@/components/ui/brand-card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -109,7 +110,7 @@ export function FormulaFitSection({ categoryId }: FormulaFitSectionProps) {
     };
     
     return (
-      <Card className="overflow-hidden">
+      <BrandCard className="overflow-hidden">
         <CardContent className="flex flex-col items-center justify-center py-12 text-center">
           <div className="relative mb-6">
             <div className="absolute inset-0 rounded-full bg-primary/20 animate-ping" style={{ animationDuration: '2s' }} />
@@ -163,14 +164,14 @@ export function FormulaFitSection({ categoryId }: FormulaFitSectionProps) {
             )}
           </div>
         </CardContent>
-      </Card>
+      </BrandCard>
     );
   }
 
   // Error state
   if (error) {
     return (
-      <Card className="border-destructive/50">
+      <BrandCard className="border-destructive/50">
         <CardContent className="flex flex-col items-center justify-center py-16 text-center">
           <div className="h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
             <AlertTriangle className="h-6 w-6 text-destructive" />
@@ -182,14 +183,14 @@ export function FormulaFitSection({ categoryId }: FormulaFitSectionProps) {
             Retry Analysis
           </Button>
         </CardContent>
-      </Card>
+      </BrandCard>
     );
   }
 
   // No analysis yet
   if (!hasAnalysis) {
     return (
-      <Card className="border-dashed">
+      <BrandCard className="border-dashed">
         <CardContent className="flex flex-col items-center justify-center py-16 text-center">
           <Target className="h-12 w-12 text-muted-foreground mb-4" />
           <h3 className="text-xl font-semibold mb-2">Formula Fit Analysis</h3>
@@ -203,7 +204,7 @@ export function FormulaFitSection({ categoryId }: FormulaFitSectionProps) {
             Run Analysis
           </Button>
         </CardContent>
-      </Card>
+      </BrandCard>
     );
   }
 
@@ -285,7 +286,7 @@ function BrandsAnalyzedCard({
   };
 
   return (
-    <Card className="border-primary/20 bg-primary/5">
+    <BrandCard className="border-primary/20 bg-primary/5">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div>
@@ -415,7 +416,7 @@ function BrandsAnalyzedCard({
           </Collapsible>
         ))}
       </CardContent>
-    </Card>
+    </BrandCard>
   );
 }
 
@@ -545,7 +546,7 @@ function FormulaFitScoreCard({
   };
 
   return (
-    <Card>
+    <BrandCard>
       <CardHeader className="flex flex-row items-start justify-between">
         <div>
           <CardTitle className="text-xl">Market Fit Score</CardTitle>
@@ -582,7 +583,7 @@ function FormulaFitScoreCard({
           </div>
         </div>
       </CardContent>
-    </Card>
+    </BrandCard>
   );
 }
 
@@ -592,7 +593,7 @@ function StrengthsCard({
   strengths: FormulaFitAnalysis["strengths"];
 }) {
   return (
-    <Card className="h-full">
+    <BrandCard className="h-full">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-green-600">
           <CheckCircle2 className="h-5 w-5" />
@@ -615,7 +616,7 @@ function StrengthsCard({
           </div>
         ))}
       </CardContent>
-    </Card>
+    </BrandCard>
   );
 }
 
@@ -636,7 +637,7 @@ function WeaknessesCard({
   };
 
   return (
-    <Card className="h-full">
+    <BrandCard className="h-full">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-red-600">
           <XCircle className="h-5 w-5" />
@@ -659,7 +660,7 @@ function WeaknessesCard({
           </div>
         ))}
       </CardContent>
-    </Card>
+    </BrandCard>
   );
 }
 
@@ -682,7 +683,7 @@ function TrendAlignmentChart({
   };
 
   return (
-    <Card>
+    <BrandCard>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <TrendingUp className="h-5 w-5 text-primary" />
@@ -717,7 +718,7 @@ function TrendAlignmentChart({
           </BarChart>
         </ResponsiveContainer>
       </CardContent>
-    </Card>
+    </BrandCard>
   );
 }
 
@@ -731,7 +732,7 @@ function PainPointCoverage({
   const percentage = Math.round((addressed / total) * 100);
 
   return (
-    <Card>
+    <BrandCard>
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
@@ -778,7 +779,7 @@ function PainPointCoverage({
           ))}
         </div>
       </CardContent>
-    </Card>
+    </BrandCard>
   );
 }
 
@@ -788,7 +789,7 @@ function CompetitivePositionCard({
   position: FormulaFitAnalysis["competitive_position"];
 }) {
   return (
-    <Card className="h-full">
+    <BrandCard className="h-full">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Target className="h-5 w-5 text-primary" />
@@ -808,13 +809,13 @@ function CompetitivePositionCard({
         </div>
         <p className="text-muted-foreground">{position.summary}</p>
       </CardContent>
-    </Card>
+    </BrandCard>
   );
 }
 
 function GapsCard({ gaps }: { gaps: FormulaFitAnalysis["gaps"] }) {
   return (
-    <Card className="h-full">
+    <BrandCard className="h-full">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-amber-600">
           <AlertTriangle className="h-5 w-5" />
@@ -834,7 +835,7 @@ function GapsCard({ gaps }: { gaps: FormulaFitAnalysis["gaps"] }) {
           </div>
         ))}
       </CardContent>
-    </Card>
+    </BrandCard>
   );
 }
 
@@ -859,7 +860,7 @@ function RecommendationsCard({
   };
 
   return (
-    <Card>
+    <BrandCard>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Lightbulb className="h-5 w-5 text-primary" />
@@ -891,6 +892,6 @@ function RecommendationsCard({
           ))}
         </div>
       </CardContent>
-    </Card>
+    </BrandCard>
   );
 }

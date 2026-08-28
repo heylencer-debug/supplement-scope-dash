@@ -1,5 +1,6 @@
 import { CheckCircle2, Circle, AlertCircle } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { BrandCard } from "@/components/ui/brand-card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -81,7 +82,7 @@ export function ActionPlanTimeline({
   ];
 
   return (
-    <Card>
+    <BrandCard>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg font-semibold text-foreground">
@@ -195,6 +196,6 @@ export function ActionPlanTimeline({
           </div>
         )}
       </CardContent>
-    </Card>
+    </BrandCard>
   );
 }

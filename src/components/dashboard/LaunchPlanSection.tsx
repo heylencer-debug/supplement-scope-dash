@@ -1,4 +1,5 @@
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { BrandCard } from "@/components/ui/brand-card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { 
@@ -45,7 +46,7 @@ export function LaunchPlanSection({
 }: LaunchPlanSectionProps) {
   if (isLoading) {
     return (
-      <Card>
+      <BrandCard>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
             <Rocket className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
@@ -106,7 +107,7 @@ export function LaunchPlanSection({
             </div>
           </div>
         </CardContent>
-      </Card>
+      </BrandCard>
     );
   }
 
@@ -166,7 +167,7 @@ export function LaunchPlanSection({
   }
 
   return (
-    <Card className="animate-enter [animation-duration:400ms]">
+    <BrandCard className="animate-enter [animation-duration:400ms]">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
           <Rocket className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
@@ -373,6 +374,6 @@ export function LaunchPlanSection({
           </div>
         )}
       </CardContent>
-    </Card>
+    </BrandCard>
   );
 }

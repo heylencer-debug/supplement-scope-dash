@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { Info, Filter, Loader2 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { BrandCard } from "@/components/ui/brand-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { CriteriaCard } from "./CriteriaCard";
@@ -118,7 +119,7 @@ export function DeepDiveSection({
   });
 
   return (
-    <Card className="animate-enter [animation-duration:400ms]">
+    <BrandCard className="animate-enter [animation-duration:400ms]">
       <CardHeader>
         <CardTitle className="text-base sm:text-lg font-semibold text-foreground">
           18-Point Analysis
@@ -227,7 +228,7 @@ export function DeepDiveSection({
           />
         )}
       </CardContent>
-    </Card>
+    </BrandCard>
   );
 }
 

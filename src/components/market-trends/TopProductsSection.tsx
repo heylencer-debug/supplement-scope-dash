@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { BrandCard } from "@/components/ui/brand-card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Package, Star, ArrowUpDown, MessageSquare, Award, Crown, Medal, Trophy, DollarSign } from "lucide-react";
@@ -99,7 +100,7 @@ export function TopProductsSection({ data }: TopProductsSectionProps) {
     <div className="space-y-6">
       {/* Summary Insights */}
       <ScrollAnimate variant="fade-up">
-        <Card className="overflow-hidden">
+        <BrandCard className="overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-chart-4/5 via-transparent to-chart-2/5 pointer-events-none" />
           <CardHeader className="relative">
             <div className="flex items-center gap-2">
@@ -115,14 +116,14 @@ export function TopProductsSection({ data }: TopProductsSectionProps) {
           <CardContent className="relative">
             <p className="text-foreground leading-relaxed">{data.summaryInsights}</p>
           </CardContent>
-        </Card>
+        </BrandCard>
       </ScrollAnimate>
 
       {/* Visual Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Price Distribution */}
         <ScrollAnimate variant="scale-up" delay={100}>
-          <Card>
+          <BrandCard>
             <CardHeader>
               <div className="flex items-center gap-2">
                 <DollarSign className="h-5 w-5 text-chart-2" />
@@ -165,12 +166,12 @@ export function TopProductsSection({ data }: TopProductsSectionProps) {
                 </ResponsiveContainer>
               </div>
             </CardContent>
-          </Card>
+          </BrandCard>
         </ScrollAnimate>
 
         {/* Review Count */}
         <ScrollAnimate variant="scale-up" delay={200}>
-          <Card>
+          <BrandCard>
             <CardHeader>
               <div className="flex items-center gap-2">
                 <MessageSquare className="h-5 w-5 text-chart-1" />
@@ -207,13 +208,13 @@ export function TopProductsSection({ data }: TopProductsSectionProps) {
                 </ResponsiveContainer>
               </div>
             </CardContent>
-          </Card>
+          </BrandCard>
         </ScrollAnimate>
       </div>
 
       {/* Products Table with Visual Enhancements */}
       <ScrollAnimate variant="fade-up" delay={300}>
-        <Card>
+        <BrandCard>
           <CardHeader>
             <div className="flex items-center gap-2">
               <Package className="h-5 w-5 text-primary" />
@@ -312,7 +313,7 @@ export function TopProductsSection({ data }: TopProductsSectionProps) {
               </Table>
             </div>
           </CardContent>
-        </Card>
+        </BrandCard>
       </ScrollAnimate>
     </div>
   );

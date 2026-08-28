@@ -1,4 +1,5 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BrandCard } from "@/components/ui/brand-card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { 
@@ -51,7 +52,7 @@ export function CompetitiveAnalysisResults({ analysis }: CompetitiveAnalysisResu
   return (
     <div className="space-y-6 animate-enter">
       {/* Overall Position Summary */}
-      <Card className="border-primary/20">
+      <BrandCard className="border-primary/20">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg flex items-center gap-2">
@@ -109,7 +110,7 @@ export function CompetitiveAnalysisResults({ analysis }: CompetitiveAnalysisResu
             </div>
           </div>
         </CardContent>
-      </Card>
+      </BrandCard>
 
       {/* Per-Competitor Comparisons */}
       <div className="space-y-4">
@@ -120,7 +121,7 @@ export function CompetitiveAnalysisResults({ analysis }: CompetitiveAnalysisResu
         
         <div className="grid gap-4">
           {analysis.competitor_comparisons.slice(0, 5).map((comp, i) => (
-            <Card key={i} className="overflow-hidden">
+            <BrandCard key={i} className="overflow-hidden">
               <CardHeader className="pb-3 bg-muted/30">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div>
@@ -192,13 +193,13 @@ export function CompetitiveAnalysisResults({ analysis }: CompetitiveAnalysisResu
                   </p>
                 </div>
               </CardContent>
-            </Card>
+            </BrandCard>
           ))}
         </div>
       </div>
 
       {/* Priority Improvements */}
-      <Card>
+      <BrandCard>
         <CardHeader className="pb-3">
           <CardTitle className="text-lg flex items-center gap-2">
             <Shield className="h-5 w-5 text-primary" />
@@ -230,10 +231,10 @@ export function CompetitiveAnalysisResults({ analysis }: CompetitiveAnalysisResu
             ))}
           </div>
         </CardContent>
-      </Card>
+      </BrandCard>
 
       {/* Strategic Recommendations */}
-      <Card>
+      <BrandCard>
         <CardHeader className="pb-3">
           <CardTitle className="text-lg flex items-center gap-2">
             <Lightbulb className="h-5 w-5 text-primary" />
@@ -291,7 +292,7 @@ export function CompetitiveAnalysisResults({ analysis }: CompetitiveAnalysisResu
             </div>
           </div>
         </CardContent>
-      </Card>
+      </BrandCard>
     </div>
   );
 }

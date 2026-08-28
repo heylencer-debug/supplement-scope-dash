@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { BrandCard } from "@/components/ui/brand-card";
 import { Badge } from "@/components/ui/badge";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from "recharts";
 import { TrendingUp, Target, FlaskConical, Leaf, Zap, Hash, MessageSquare } from "lucide-react";
@@ -158,7 +159,7 @@ export function ClaimPatternChart({ analyses }: ClaimPatternChartProps) {
   }));
 
   return (
-    <Card className="bg-gradient-to-br from-primary/5 to-transparent border-primary/20">
+    <BrandCard className="bg-gradient-to-br from-primary/5 to-transparent border-primary/20">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-sm font-medium">
           <TrendingUp className="w-4 h-4 text-primary" />
@@ -265,6 +266,6 @@ export function ClaimPatternChart({ analyses }: ClaimPatternChartProps) {
           )}
         </div>
       </CardContent>
-    </Card>
+    </BrandCard>
   );
 }

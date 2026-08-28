@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BrandCard } from "@/components/ui/brand-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -517,24 +518,24 @@ export default function ManufacturerPortal() {
                     ))}
                   </div>
                 ) : publishedLabel === null ? (
-                  <Card className="border border-gray-200">
+                  <BrandCard className="border border-gray-200">
                     <CardContent className="py-8 text-center text-gray-400 text-sm">
                       No formula version has been shared yet. Check back soon.
                     </CardContent>
-                  </Card>
+                  </BrandCard>
                 ) : !publishedVersion ? (
-                  <Card className="border border-gray-200">
+                  <BrandCard className="border border-gray-200">
                     <CardContent className="py-8 text-center text-gray-400 text-sm">
                       Loading shared formula…
                     </CardContent>
-                  </Card>
+                  </BrandCard>
                 ) : (() => {
                   const v = publishedVersion;
                   const isExpanded = expandedVersionId === v.id;
                   const isCommentActive = activeCommentVersion === v.label;
                   return (
                     <div className="space-y-3">
-                      <Card
+                      <BrandCard
                         className={[
                           "border transition-shadow",
                           isCommentActive ? "border-blue-200 shadow-sm" : "border-gray-200",
@@ -617,7 +618,7 @@ export default function ManufacturerPortal() {
                             </div>
                           )}
                         </CardContent>
-                      </Card>
+                      </BrandCard>
                     </div>
                   );
                 })()}

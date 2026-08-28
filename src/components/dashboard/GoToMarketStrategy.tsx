@@ -1,4 +1,5 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { BrandCard } from "@/components/ui/brand-card";
 import { Badge } from "@/components/ui/badge";
 import { Rocket, MessageSquare, Sparkles, ListChecks, Target, Image, FileText, List } from "lucide-react";
 
@@ -20,7 +21,7 @@ export function GoToMarketStrategy({ goToMarket }: GoToMarketStrategyProps) {
   if (!hasData) return null;
 
   return (
-    <Card className="border-chart-3/20">
+    <BrandCard className="border-chart-3/20">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Rocket className="w-5 h-5 text-chart-3" />
@@ -160,6 +161,6 @@ export function GoToMarketStrategy({ goToMarket }: GoToMarketStrategyProps) {
           )}
         </div>
       </CardContent>
-    </Card>
+    </BrandCard>
   );
 }

@@ -5,7 +5,8 @@ import { Search, Filter, Download, Star, TrendingUp, Loader2, Eye, ChevronDown, 
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { CardContent, CardHeader } from "@/components/ui/card";
+import { BrandCard } from "@/components/ui/brand-card";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -405,7 +406,7 @@ export default function ProductExplorer() {
         </div>
       </div>
 
-      <Card>
+      <BrandCard>
         <CardHeader>
           <div className="flex flex-col gap-4">
             <div className="flex flex-col sm:flex-row gap-4">
@@ -774,7 +775,7 @@ export default function ProductExplorer() {
             </div>
           </div>
         </CardContent>
-      </Card>
+      </BrandCard>
 
       <BenchmarkComparison
         selectedProducts={selectedProducts}

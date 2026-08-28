@@ -50,7 +50,7 @@ export const BrandModal = ({
       />
       <DialogPrimitive.Content
         className={cn(
-          "dark brand-iris-surface fixed left-1/2 top-1/2 z-[1210] -translate-x-1/2 -translate-y-1/2",
+          "brand-iris-surface fixed left-1/2 top-1/2 z-[1210] -translate-x-1/2 -translate-y-1/2",
           "flex flex-col overflow-hidden rounded-2xl pointer-events-auto",
           "w-[calc(100vw-1rem)] max-h-[calc(100dvh-2rem)] sm:w-full sm:max-h-[min(85dvh,52rem)]",
           SIZE_CLASS[size],

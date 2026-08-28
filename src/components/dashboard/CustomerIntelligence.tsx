@@ -1,5 +1,6 @@
 import { Users, AlertTriangle, Heart, Target, Lightbulb } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BrandCard } from "@/components/ui/brand-card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -39,7 +40,7 @@ export default function CustomerIntelligence({
 }: CustomerIntelligenceProps) {
   if (isLoading) {
     return (
-      <Card>
+      <BrandCard>
         <CardHeader>
           <div className="flex items-center gap-2">
             <Users className="w-5 h-5 text-primary" />
@@ -91,7 +92,7 @@ export default function CustomerIntelligence({
             </div>
           </div>
         </CardContent>
-      </Card>
+      </BrandCard>
     );
   }
 
@@ -102,7 +103,7 @@ export default function CustomerIntelligence({
   const { buyer_profile, primary_pain_points, unmet_needs, love_most, decision_drivers } = customerInsights;
 
   return (
-    <Card className="animate-enter [animation-duration:400ms]">
+    <BrandCard className="animate-enter [animation-duration:400ms]">
       <CardHeader>
         <div className="flex items-center gap-2">
           <Users className="w-5 h-5 text-primary" />
@@ -239,6 +240,6 @@ export default function CustomerIntelligence({
           </div>
         )}
       </CardContent>
-    </Card>
+    </BrandCard>
   );
 }

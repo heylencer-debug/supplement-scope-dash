@@ -1,4 +1,5 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { BrandCard } from "@/components/ui/brand-card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { DollarSign, TrendingUp, PiggyBank, Target, Calendar } from "lucide-react";
@@ -23,7 +24,7 @@ export function FinancialProjections({ financials, isLoading }: FinancialProject
   // Show loading skeleton
   if (isLoading) {
     return (
-      <Card className="border-chart-4/20">
+      <BrandCard className="border-chart-4/20">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <DollarSign className="w-5 h-5 text-chart-4" />
@@ -49,7 +50,7 @@ export function FinancialProjections({ financials, isLoading }: FinancialProject
             <Skeleton className="h-20 rounded-lg" />
           </div>
         </CardContent>
-      </Card>
+      </BrandCard>
     );
   }
 
@@ -86,7 +87,7 @@ export function FinancialProjections({ financials, isLoading }: FinancialProject
   if (!hasData) return null;
 
   return (
-    <Card className="border-chart-4/20 animate-enter [animation-duration:400ms]">
+    <BrandCard className="border-chart-4/20 animate-enter [animation-duration:400ms]">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <DollarSign className="w-5 h-5 text-chart-4" />
@@ -252,6 +253,6 @@ export function FinancialProjections({ financials, isLoading }: FinancialProject
           </div>
         )}
       </CardContent>
-    </Card>
+    </BrandCard>
   );
 }

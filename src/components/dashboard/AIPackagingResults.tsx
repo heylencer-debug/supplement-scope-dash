@@ -1,7 +1,8 @@
 import { cn } from "@/lib/utils";
 import { handleApiError } from "@/lib/handleApiError";
 import { PackagingDesignAnalysis } from "@/hooks/usePackagingAnalysis";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BrandCard } from "@/components/ui/brand-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { 
@@ -572,7 +573,7 @@ export function AIPackagingResults({ analysis, mockupImageUrl, onSaveMockup, onR
 
       {/* Section 0: Visual Mockup Preview - Hidden when hideMockupSection is true */}
       {!hideMockupSection && (
-        <Card className="border-chart-2/20 bg-gradient-to-br from-muted/30 to-muted/10">
+        <BrandCard className="border-chart-2/20 bg-gradient-to-br from-muted/30 to-muted/10">
           <CardHeader className="pb-4">
             <div className="flex flex-col gap-4">
               <div className="flex items-center justify-between">
@@ -724,11 +725,11 @@ export function AIPackagingResults({ analysis, mockupImageUrl, onSaveMockup, onR
               </div>
             </DialogContent>
           </Dialog>
-        </Card>
+        </BrandCard>
       )}
 
       {/* Section 1: Design Brief Card */}
-      <Card className="border-primary/20">
+      <BrandCard className="border-primary/20">
         <CardHeader className="pb-4">
           <CardTitle className="text-lg flex items-center gap-2">
             <Palette className="w-5 h-5 text-primary" />
@@ -833,10 +834,10 @@ export function AIPackagingResults({ analysis, mockupImageUrl, onSaveMockup, onR
             </Collapsible>
           )}
         </CardContent>
-      </Card>
+      </BrandCard>
 
       {/* Section 2: Elements Checklist */}
-      <Card>
+      <BrandCard>
         <CardHeader className="pb-4">
           <CardTitle className="text-lg flex items-center gap-2">
             <CheckCircle2 className="w-5 h-5 text-chart-4" />
@@ -909,10 +910,10 @@ export function AIPackagingResults({ analysis, mockupImageUrl, onSaveMockup, onR
             </div>
           )}
         </CardContent>
-      </Card>
+      </BrandCard>
 
       {/* Section 3: Mock Content */}
-      <Card>
+      <BrandCard>
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg flex items-center gap-2">
@@ -990,7 +991,7 @@ export function AIPackagingResults({ analysis, mockupImageUrl, onSaveMockup, onR
             </div>
           )}
         </CardContent>
-      </Card>
+      </BrandCard>
     </div>
   );
 }

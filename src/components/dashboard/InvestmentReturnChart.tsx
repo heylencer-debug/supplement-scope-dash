@@ -1,4 +1,5 @@
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { BrandCard } from "@/components/ui/brand-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   ResponsiveContainer,
@@ -81,7 +82,7 @@ export function InvestmentReturnChart({
   }
 
   return (
-    <Card>
+    <BrandCard>
       <CardHeader>
         <CardTitle className="text-lg font-semibold text-[#1e3a5f]">
           Investment vs. Return
@@ -178,6 +179,6 @@ export function InvestmentReturnChart({
           </div>
         )}
       </CardContent>
-    </Card>
+    </BrandCard>
   );
 }

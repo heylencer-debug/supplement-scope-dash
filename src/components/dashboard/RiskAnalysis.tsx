@@ -1,4 +1,5 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { BrandCard } from "@/components/ui/brand-card";
 import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, XCircle, FileWarning, Truck, AlertCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,7 +13,7 @@ export function RiskAnalysis({ risks, isLoading }: RiskAnalysisProps) {
   // Show loading skeleton
   if (isLoading) {
     return (
-      <Card className="border-destructive/20">
+      <BrandCard className="border-destructive/20">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <AlertTriangle className="w-5 h-5 text-destructive" />
@@ -34,7 +35,7 @@ export function RiskAnalysis({ risks, isLoading }: RiskAnalysisProps) {
             </div>
           </div>
         </CardContent>
-      </Card>
+      </BrandCard>
     );
   }
 
@@ -50,7 +51,7 @@ export function RiskAnalysis({ risks, isLoading }: RiskAnalysisProps) {
   if (!hasData) return null;
 
   return (
-    <Card className="border-destructive/20 animate-enter [animation-duration:400ms]">
+    <BrandCard className="border-destructive/20 animate-enter [animation-duration:400ms]">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
           <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-destructive" />
@@ -135,6 +136,6 @@ export function RiskAnalysis({ risks, isLoading }: RiskAnalysisProps) {
           )}
         </div>
       </CardContent>
-    </Card>
+    </BrandCard>
   );
 }

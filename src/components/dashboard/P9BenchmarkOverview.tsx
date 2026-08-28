@@ -5,7 +5,8 @@
  */
 
 import { Trophy, CheckCircle2, FlaskConical, AlertCircle, Loader2 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { BrandCard } from "@/components/ui/brand-card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { useFormulaBrief } from "@/hooks/useFormulaBrief";
@@ -149,7 +150,7 @@ export function P9BenchmarkOverview({ categoryId, activeVersionContent, activeVe
     return (
       <div className="space-y-4">
         {/* Active Version Indicator */}
-        <Card className="border-primary/30 bg-primary/5">
+        <BrandCard className="border-primary/30 bg-primary/5">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm text-primary">
               <CheckCircle2 className="h-4 w-4" />
@@ -192,7 +193,7 @@ export function P9BenchmarkOverview({ categoryId, activeVersionContent, activeVe
               </div>
             )}
           </CardContent>
-        </Card>
+        </BrandCard>
       </div>
     );
   }
@@ -219,7 +220,7 @@ export function P9BenchmarkOverview({ categoryId, activeVersionContent, activeVe
 
       {/* QA Verdict Banner */}
       {qaVerdict && (
-        <Card className="border-chart-4/30 bg-chart-4/5">
+        <BrandCard className="border-chart-4/30 bg-chart-4/5">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm text-chart-4">
               <Trophy className="h-4 w-4" />
@@ -232,12 +233,12 @@ export function P9BenchmarkOverview({ categoryId, activeVersionContent, activeVe
               <Badge className="mt-2" variant="outline">Score: {qaVerdict.score}/10</Badge>
             )}
           </CardContent>
-        </Card>
+        </BrandCard>
       )}
 
       {/* Competitor Comparison Table */}
       {comparison && (
-        <Card>
+        <BrandCard>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm">
               <FlaskConical className="h-4 w-4 text-primary" />
@@ -252,12 +253,12 @@ export function P9BenchmarkOverview({ categoryId, activeVersionContent, activeVe
               <ComparisonTable markdown={comparison} />
             </div>
           </CardContent>
-        </Card>
+        </BrandCard>
       )}
 
       {/* Adjusted Formula */}
       {adjustedFormula && (
-        <Card className="border-primary/20 bg-primary/5">
+        <BrandCard className="border-primary/20 bg-primary/5">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm text-primary">
               <CheckCircle2 className="h-4 w-4" />
@@ -292,12 +293,12 @@ export function P9BenchmarkOverview({ categoryId, activeVersionContent, activeVe
               )}
             </div>
           </CardContent>
-        </Card>
+        </BrandCard>
       )}
 
       {/* Full AI Brief (collapsed) */}
       {finalBrief && !adjustedFormula && (
-        <Card>
+        <BrandCard>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm">
               <FlaskConical className="h-4 w-4 text-primary" />
@@ -309,7 +310,7 @@ export function P9BenchmarkOverview({ categoryId, activeVersionContent, activeVe
               <ComparisonTable markdown={typeof finalBrief === 'string' ? finalBrief.slice(0, 5000) : ''} />
             </div>
           </CardContent>
-        </Card>
+        </BrandCard>
       )}
     </div>
   );

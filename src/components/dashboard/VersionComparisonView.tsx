@@ -1,7 +1,8 @@
 import { useState, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BrandCard } from "@/components/ui/brand-card";
 import { 
   Select, 
   SelectContent, 
@@ -172,7 +173,7 @@ export function VersionComparisonView({
   };
 
   return (
-    <Card className="border-primary/20">
+    <BrandCard className="border-primary/20">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-base">
@@ -311,7 +312,7 @@ export function VersionComparisonView({
           </TabsContent>
         </Tabs>
       </CardContent>
-    </Card>
+    </BrandCard>
   );
 }
 

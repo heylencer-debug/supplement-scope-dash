@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import { useMemo, useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { BrandCard } from "@/components/ui/brand-card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -385,7 +386,7 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
 
   if (isLoading) {
     return (
-      <Card>
+      <BrandCard>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
             <Package className="w-5 h-5 text-primary" />
@@ -396,7 +397,7 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
           <Skeleton className="h-20 w-full" />
           <Skeleton className="h-32 w-full" />
         </CardContent>
-      </Card>
+      </BrandCard>
     );
   }
 
@@ -405,7 +406,7 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
   // even if no analysis data exists yet
 
   return (
-    <Card>
+    <BrandCard>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
           <Package className="w-5 h-5 text-primary" />
@@ -1020,6 +1021,6 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
         )}
 
       </CardContent>
-    </Card>
+    </BrandCard>
   );
 }

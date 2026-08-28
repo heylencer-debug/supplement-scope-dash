@@ -52,7 +52,7 @@ export function AppSidebar() {
   };
 
   return (
-    <aside className="dark brand-iris-surface w-[300px] shrink-0 text-foreground hidden md:flex flex-col p-3.5 gap-3">
+    <aside className="dark brand-iris-surface brand-iris-rail w-[300px] shrink-0 text-foreground hidden md:flex flex-col p-3.5 gap-3">
       {/* BRAND PLATE — opaque ink tile on a bg-black/45 scrim, same
           construction as the shell's railBody brand row. */}
       <div className="shrink-0 flex items-center gap-3 rounded-xl bg-black/45 px-3 py-2.5">

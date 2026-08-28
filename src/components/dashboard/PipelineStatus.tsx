@@ -6,7 +6,12 @@
 
 import { usePipelineStatus } from "@/hooks/usePipelineStatus";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CheckCircle2, Circle, Clock, AlertCircle, RefreshCw } from "lucide-react";
+import {
+  CheckCircle2, Circle, Clock, AlertCircle, RefreshCw,
+  ShoppingCart, BarChart3, MessageSquare, ScanText, Search,
+  Dna, TrendingUp, Package, ClipboardList, CheckSquare, BarChart, Shield,
+  type LucideIcon,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface PipelineStatusProps {
@@ -14,19 +19,19 @@ interface PipelineStatusProps {
   keyword: string;
 }
 
-const PHASE_META: Record<number, { icon: string; shortLabel: string }> = {
-  1:  { icon: "🛒", shortLabel: "Scrape"        },
-  2:  { icon: "📊", shortLabel: "Keepa"         },
-  3:  { icon: "💬", shortLabel: "Reviews"       },
-  4:  { icon: "🔬", shortLabel: "OCR"           },
-  5:  { icon: "🔎", shortLabel: "Research"      },
-  6:  { icon: "🧬", shortLabel: "Product AI"    },
-  7:  { icon: "📈", shortLabel: "Market Intel"  },
-  8:  { icon: "📦", shortLabel: "Packaging"     },
-  9:  { icon: "📋", shortLabel: "Formula Brief" },
-  10: { icon: "✅", shortLabel: "Formula QA"    },
-  11: { icon: "📊", shortLabel: "Benchmark"     },
-  12: { icon: "🛡️", shortLabel: "FDA"           },
+export const PHASE_META: Record<number, { icon: LucideIcon; shortLabel: string }> = {
+  1:  { icon: ShoppingCart,   shortLabel: "Scrape"        },
+  2:  { icon: BarChart3,      shortLabel: "Keepa"         },
+  3:  { icon: MessageSquare,  shortLabel: "Reviews"       },
+  4:  { icon: ScanText,       shortLabel: "OCR"           },
+  5:  { icon: Search,         shortLabel: "Research"      },
+  6:  { icon: Dna,            shortLabel: "Product AI"    },
+  7:  { icon: TrendingUp,     shortLabel: "Market Intel"  },
+  8:  { icon: Package,        shortLabel: "Packaging"     },
+  9:  { icon: ClipboardList,  shortLabel: "Formula Brief" },
+  10: { icon: CheckSquare,    shortLabel: "Formula QA"    },
+  11: { icon: BarChart,       shortLabel: "Benchmark"     },
+  12: { icon: Shield,         shortLabel: "FDA"           },
 };
 
 type StatusKey = "complete" | "partial" | "not_started" | "pending";
@@ -135,7 +140,12 @@ export function PipelineStatus({ categoryId, keyword }: PipelineStatusProps) {
               {/* Top row: phase num + icon + status icon */}
               <div className="flex items-center justify-between gap-1">
                 <div className="flex items-center gap-1">
-                  <span className="text-sm leading-none">{meta.icon}</span>
+                  <meta.icon
+                    className={cn(
+                      "h-3.5 w-3.5 shrink-0",
+                      isDone ? "text-primary" : "text-muted-foreground/50"
+                    )}
+                  />
                   <span className="text-[10px] font-bold text-muted-foreground tracking-wide">P{phase.phase}</span>
                 </div>
                 {isDone    && <CheckCircle2 className="h-3.5 w-3.5 text-chart-4 shrink-0" />}

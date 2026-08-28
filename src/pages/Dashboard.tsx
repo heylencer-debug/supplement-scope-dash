@@ -4,7 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { ScrollAnimate } from "@/components/ui/scroll-animate";
-import { Building2, ChevronsUpDown, Link2 } from "lucide-react";
+import { Building2, ChevronsUpDown, Link2, Package, TrendingUp, FlaskConical, Scale, Factory, ScanSearch, Search } from "lucide-react";
+import { PHASE_META } from "@/components/dashboard/PipelineStatus";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 // Dashboard components
@@ -65,25 +66,25 @@ function PipelineCollapsible({ categoryId, categoryName }: { categoryId: string;
           <div className="flex items-center justify-between gap-3">
             <div className="flex-1 min-w-0">
               <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
-                <span>🔍</span> Scout Pipeline
+                <Search className="h-3.5 w-3.5 text-muted-foreground" /> Scout Pipeline
               </CardTitle>
               {/* Compact summary visible when collapsed */}
               <div className="flex items-center gap-3 mt-2">
-                {/* Phase emoji icons */}
+                {/* Phase icons */}
                 {phases && phases.length > 0 && (
-                  <div className="flex items-center gap-0.5">
+                  <div className="flex items-center gap-1">
                     {phases.map(phase => {
-                      const emoji = ({ 1: "🛒", 2: "📊", 3: "💬", 4: "🔬", 5: "🔎", 6: "🧬", 7: "📈", 8: "📦", 9: "📋", 10: "✅", 11: "📊", 12: "⚖️" } as Record<number, string>)[phase.phase] ?? "·";
+                      const meta = PHASE_META[phase.phase];
                       const isDone = phase.status === "complete";
                       const isRunning = phase.status === "partial";
+                      if (!meta) return null;
+                      const PhaseIcon = meta.icon;
                       return (
-                        <span
+                        <PhaseIcon
                           key={phase.phase}
-                          className={`text-xs leading-none transition-opacity duration-300 ${isDone ? "opacity-100" : isRunning ? "opacity-80 animate-pulse" : "opacity-25 grayscale"}`}
-                          title={`P${phase.phase}: ${isDone ? "Done" : isRunning ? "Running" : "Pending"}`}
-                        >
-                          {emoji}
-                        </span>
+                          className={`h-3 w-3 shrink-0 transition-opacity duration-300 ${isDone ? "text-primary opacity-100" : isRunning ? "text-chart-2 opacity-90 animate-pulse" : "text-muted-foreground/40 opacity-60"}`}
+                          aria-label={`P${phase.phase}: ${isDone ? "Done" : isRunning ? "Running" : "Pending"}`}
+                        />
                       );
                     })}
                   </div>
@@ -557,12 +558,12 @@ export default function Dashboard() {
             gutter so this bar reads flush with the header above it. */}
         <div className="dark -mx-3 sm:-mx-4 md:-mx-6 lg:-mx-0 px-3 sm:px-4 md:px-6 lg:px-0 bg-background border-b border-border/60">
           <TabsList className="flex w-full items-center gap-1 h-auto py-2 bg-transparent overflow-x-auto scrollbar-hide">
-            <TabsTrigger className="takeout-pipeline-tab" value="products">📦 Products</TabsTrigger>
-            <TabsTrigger className="takeout-pipeline-tab" value="market">📈 Market</TabsTrigger>
-            <TabsTrigger className="takeout-pipeline-tab" value="qa">🔬 QA Review</TabsTrigger>
-            <TabsTrigger className="takeout-pipeline-tab" value="validation">⚖️ Compliance</TabsTrigger>
-            <TabsTrigger className="takeout-pipeline-tab" value="manufacturer">🏭 Manufacturer</TabsTrigger>
-            <TabsTrigger className="takeout-pipeline-tab" value="data-audit">🔍 Data Audit</TabsTrigger>
+            <TabsTrigger className="takeout-pipeline-tab" value="products"><Package className="h-3.5 w-3.5" /> Products</TabsTrigger>
+            <TabsTrigger className="takeout-pipeline-tab" value="market"><TrendingUp className="h-3.5 w-3.5" /> Market</TabsTrigger>
+            <TabsTrigger className="takeout-pipeline-tab" value="qa"><FlaskConical className="h-3.5 w-3.5" /> QA Review</TabsTrigger>
+            <TabsTrigger className="takeout-pipeline-tab" value="validation"><Scale className="h-3.5 w-3.5" /> Compliance</TabsTrigger>
+            <TabsTrigger className="takeout-pipeline-tab" value="manufacturer"><Factory className="h-3.5 w-3.5" /> Manufacturer</TabsTrigger>
+            <TabsTrigger className="takeout-pipeline-tab" value="data-audit"><ScanSearch className="h-3.5 w-3.5" /> Data Audit</TabsTrigger>
           </TabsList>
         </div>
 

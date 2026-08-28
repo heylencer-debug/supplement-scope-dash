@@ -11,7 +11,7 @@ import {
   Star, TrendingUp, TrendingDown, AlertCircle, CheckCircle, Target, Users, Beaker, 
   Lightbulb, ShoppingCart, Package, Image, BarChart3, DollarSign, Calendar, 
   ExternalLink, Play, Award, Info, ChevronDown, Truck, FileText, Box, Link2, Tag,
-  Palette, Type, LayoutGrid, Sparkles, RefreshCw, Loader2
+  Palette, Type, LayoutGrid, Sparkles, RefreshCw, Loader2, MessageSquare
 } from "lucide-react";
 import { useSupplementFactsAnalysis } from "@/hooks/useSupplementFactsAnalysis";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis } from "recharts";
@@ -20,6 +20,14 @@ import type { Product } from "@/hooks/useProducts";
 import { useP5SourcesForProduct } from "@/hooks/useP5Sources";
 import { useCategoryContext } from "@/contexts/CategoryContext";
 import { Globe } from "lucide-react";
+
+// Single clean active treatment (smoke pill, no border-b + focus-ring
+// double outline) for the product-detail tab strip. Kept as one shared
+// class string so every TabsTrigger below renders identically.
+const productTabCls =
+  "gap-1 text-xs py-1.5 px-3 rounded-md shrink-0 whitespace-nowrap " +
+  "data-[state=active]:!bg-primary/10 data-[state=active]:!border-transparent data-[state=active]:!text-primary " +
+  "focus-visible:!ring-0 focus-visible:!ring-offset-0";
 
 interface ProductDetailModalProps {
   product: Product | null;
@@ -315,32 +323,44 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
         </div>
 
         <Tabs defaultValue="scout-overview" className="flex flex-col">
-          <TabsList className="grid w-full grid-cols-5 shrink-0 h-auto">
-            <TabsTrigger value="scout-overview" className="gap-1 text-xs py-1.5">📊 Overview</TabsTrigger>
-            <TabsTrigger value="scout-formula" className="gap-1 text-xs py-1.5">🧪 Formula</TabsTrigger>
-            <TabsTrigger value="keepa" className="gap-1 text-xs py-1.5">📈 Keepa</TabsTrigger>
-            <TabsTrigger value="scout-reviews" className="gap-1 text-xs py-1.5">💬 Reviews</TabsTrigger>
-            <TabsTrigger value="overview" className="gap-1 text-xs py-1.5">
+          <TabsList className="flex w-full items-center gap-1 shrink-0 h-auto overflow-x-auto scrollbar-hide justify-start">
+            <TabsTrigger value="scout-overview" className={productTabCls}>
+              <LayoutGrid className="w-3 h-3" />
+              Overview
+            </TabsTrigger>
+            <TabsTrigger value="scout-formula" className={productTabCls}>
+              <Beaker className="w-3 h-3" />
+              Formula
+            </TabsTrigger>
+            <TabsTrigger value="keepa" className={productTabCls}>
+              <BarChart3 className="w-3 h-3" />
+              Keepa
+            </TabsTrigger>
+            <TabsTrigger value="scout-reviews" className={productTabCls}>
+              <MessageSquare className="w-3 h-3" />
+              Reviews
+            </TabsTrigger>
+            <TabsTrigger value="overview" className={productTabCls}>
               <Image className="w-3 h-3" />
               Detail
             </TabsTrigger>
-            <TabsTrigger value="sales" className="gap-1 text-xs py-1.5">
+            <TabsTrigger value="sales" className={productTabCls}>
               <BarChart3 className="w-3 h-3" />
               Sales
             </TabsTrigger>
-            <TabsTrigger value="marketing" className="gap-1 text-xs py-1.5">
+            <TabsTrigger value="marketing" className={productTabCls}>
               <Target className="w-3 h-3" />
               Marketing
             </TabsTrigger>
-            <TabsTrigger value="reviews" className="gap-1 text-xs py-1.5">
+            <TabsTrigger value="reviews" className={productTabCls}>
               <Users className="w-3 h-3" />
               Reviews
             </TabsTrigger>
-            <TabsTrigger value="packaging" className="gap-1 text-xs py-1.5">
+            <TabsTrigger value="packaging" className={productTabCls}>
               <Package className="w-3 h-3" />
               Packaging
             </TabsTrigger>
-            <TabsTrigger value="formula" className="gap-1 text-xs py-1.5">
+            <TabsTrigger value="formula" className={productTabCls}>
               <Beaker className="w-3 h-3" />
               Formula
             </TabsTrigger>

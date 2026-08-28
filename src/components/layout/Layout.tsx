@@ -24,6 +24,10 @@ export function Layout({ children }: LayoutProps) {
   const rawCurrentCategory = searchParams.get("category");
   const currentCategory = rawCurrentCategory ? rawCurrentCategory.replace(/^=+/, "").trim() : null;
   const isNewAnalysisActive = location.pathname === "/" && !currentCategory;
+  // Some category_name rows carry a stray leading "=" (spreadsheet-import
+  // artifact) — strip it for display only; navigation/lookup keys are left
+  // untouched since the rest of the app already normalizes on read.
+  const stripLabel = (name: string) => name.replace(/^=+/, "").trim();
 
   const [dismissedTabs, setDismissedTabs] = useState<string[]>([]);
   const [pendingAnalyses, setPendingAnalyses] = useState<PendingAnalysis[]>([]);
@@ -273,7 +277,7 @@ export function Layout({ children }: LayoutProps) {
                                                   )} 
                                                 />
                                               )}
-                                              <span className="max-w-[100px] sm:max-w-[140px] truncate">{tab.category_name}</span>
+                                              <span className="max-w-[100px] sm:max-w-[140px] truncate">{stripLabel(tab.category_name)}</span>
                                             </button>
                             <button
                               onClick={(e) => handleDismissTab(e, tab.category_name)}

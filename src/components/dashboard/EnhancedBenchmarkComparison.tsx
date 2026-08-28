@@ -25,7 +25,7 @@ import { useIngredientAnalysis, IngredientAnalysis } from "@/hooks/useIngredient
 import AIAnalysisResults from "@/components/dashboard/AIAnalysisResults";
 import { useCompetitiveAnalysis } from "@/hooks/useCompetitiveAnalysis";
 import { BrandCard } from "@/components/ui/brand-card";
-import { SidePanelShell } from "@/components/ui/side-panel-shell";
+import { BrandModal } from "@/components/ui/brand-modal";
 import { CompetitiveAnalysisResults } from "@/components/dashboard/CompetitiveAnalysisResults";
 import { useP5SourcesForKeyword } from "@/hooks/useP5Sources";
 interface VersionInfo {
@@ -1555,14 +1555,38 @@ export function EnhancedBenchmarkComparison({
     return profile;
   };
 
+  // Coerce a value that SHOULD be numeric but may arrive as a string (e.g. "$24.99"),
+  // a range ("21.90-24.99"), or an unusable shape (object/NaN) into a finite number
+  // or null — never lets a bad value reach `.toFixed()`/NaN downstream.
+  const toFiniteNumber = (value: unknown): number | null => {
+    if (value == null) return null;
+    if (typeof value === "number") return Number.isFinite(value) ? value : null;
+    if (typeof value === "string") {
+      const match = value.replace(/,/g, "").match(/-?\d+(\.\d+)?/);
+      if (!match) return null;
+      const n = parseFloat(match[0]);
+      return Number.isFinite(n) ? n : null;
+    }
+    return null;
+  };
+
   // NEW: Get Pricing Strategy
   const getOurPricing = (): { price: number | null; tier: string | null; justification: string | null } => {
     const pricing = analysisData?.analysis_1_category_scores?.product_development?.pricing;
     const formulaBriefPrice = analysisData?.formula_brief?.target_price;
     const topLevelPrice = analysisData?.recommended_price;
-    
+
+    // Try each candidate in priority order; a truthy-but-unparseable value
+    // (e.g. a price range string) falls through to the next candidate
+    // instead of producing NaN.
+    const price =
+      toFiniteNumber(pricing?.recommended_price) ??
+      toFiniteNumber(formulaBriefPrice) ??
+      toFiniteNumber(topLevelPrice) ??
+      null;
+
     return {
-      price: pricing?.recommended_price || formulaBriefPrice || topLevelPrice || null,
+      price,
       tier: pricing?.pricing_tier || null,
       justification: pricing?.justification || null
     };
@@ -1625,13 +1649,35 @@ export function EnhancedBenchmarkComparison({
     return [];
   };
 
+  // Safely stringify a field typed as string|number but that may arrive at
+  // runtime as an object (e.g. {min, max}) or another unusable shape — never
+  // renders "[object Object]"; returns null (row gets omitted) if it can't
+  // be turned into readable text.
+  const formatDisplayValue = (value: unknown): string | null => {
+    if (value == null) return null;
+    if (typeof value === "number") return Number.isFinite(value) ? String(value) : null;
+    if (typeof value === "string") return value.trim() || null;
+    if (typeof value === "object") {
+      const obj = value as Record<string, unknown>;
+      const min = toFiniteNumber(obj.min ?? obj.low ?? obj.from);
+      const max = toFiniteNumber(obj.max ?? obj.high ?? obj.to);
+      if (min != null && max != null) return `${min}–${max}`;
+      if (min != null) return String(min);
+      if (max != null) return String(max);
+      const amount = toFiniteNumber(obj.amount ?? obj.value);
+      if (amount != null) return String(amount);
+      return null;
+    }
+    return null;
+  };
+
   // NEW: Get Financial Highlights
   const getFinancialHighlights = (): { investment: string | null; margin: string | null; breakeven: string | null } => {
     const financials = analysisData?.key_insights?.financials;
     return {
-      investment: financials?.startup_investment ? String(financials.startup_investment) : null,
-      margin: financials?.target_margin ? String(financials.target_margin) : null,
-      breakeven: financials?.breakeven_timeline || null
+      investment: formatDisplayValue(financials?.startup_investment),
+      margin: formatDisplayValue(financials?.target_margin),
+      breakeven: typeof financials?.breakeven_timeline === "string" ? financials.breakeven_timeline : null
     };
   };
 
@@ -2602,7 +2648,7 @@ export function EnhancedBenchmarkComparison({
           {/* Mobile: Vertical stack, Desktop: Horizontal scroll */}
           <div className="flex flex-col lg:flex-row lg:items-stretch gap-3 lg:gap-2 md:gap-3 overflow-x-hidden">
             {/* Our Concept Column - the hero iris tile. Full height, structured icon-headed blocks (no prose walls).
-                Verbatim/unabridged text lives in the SidePanelShell click-through. */}
+                Verbatim/unabridged text lives in the BrandModal click-through. */}
             {(() => {
               const pricing = getOurPricing();
               const oppScore = getOurOpportunityScore();
@@ -2750,14 +2796,15 @@ export function EnhancedBenchmarkComparison({
               );
             })()}
 
-            {conceptPanelOpen && (
-              <SidePanelShell
-                title="Our Concept — Full Strategy"
-                icon={<Sparkles className="w-4 h-4" />}
-                width={480}
-                onClose={() => setConceptPanelOpen(false)}
-              >
-              <div className="p-3 space-y-3">
+            <BrandModal
+              open={conceptPanelOpen}
+              onOpenChange={setConceptPanelOpen}
+              size="lg"
+              icon={<Sparkles className="w-4 h-4" />}
+              title="Our Concept — Full Strategy"
+              description="Full positioning, pricing, and competitive strategy for this category."
+            >
+              <div className="space-y-6">
                 {/* COMPETITIVE ADVANTAGE SUMMARY BADGE */}
                 {(() => {
                   const advantages = getCompetitiveAdvantages();
@@ -3232,8 +3279,7 @@ export function EnhancedBenchmarkComparison({
                   </div>
                 )}
               </div>
-              </SidePanelShell>
-            )}
+            </BrandModal>
 
             {/* Competitor Columns - Stack on mobile, Scrollable on desktop */}
             <ScrollArea className="w-full lg:flex-1 overflow-x-hidden h-full">

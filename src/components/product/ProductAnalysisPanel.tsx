@@ -336,7 +336,7 @@ function CreativeStrategyCard({
                 <Crown className="w-4 h-4 text-primary" />
                 <span className="text-xs font-semibold text-muted-foreground">Brand Archetype</span>
               </div>
-              {brandIdentity.archetype && <Badge className="text-primary mb-2 rounded-none opacity-100 border-muted bg-white/0">
+              {brandIdentity.archetype && <Badge className="text-primary mb-2 rounded-none opacity-100 border-muted bg-transparent">
                   {brandIdentity.archetype}
                 </Badge>}
               {brandIdentity.tone && <p className="text-sm text-muted-foreground">{brandIdentity.tone}</p>}

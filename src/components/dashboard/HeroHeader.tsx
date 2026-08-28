@@ -98,7 +98,7 @@ export function HeroHeader({
                     {topProducts.slice(0, 5).map((product, index) => <Tooltip key={index}>
                         <TooltipTrigger asChild>
                           <div className="relative transition-transform hover:scale-110 hover:z-10">
-                            <div className="w-12 h-12 md:w-14 md:h-14 rounded-lg ring-1 ring-border bg-white overflow-hidden">
+                            <div className="w-12 h-12 md:w-14 md:h-14 rounded-lg ring-1 ring-border bg-card overflow-hidden">
                               {product.main_image_url ? <img src={product.main_image_url} alt={product.brand || 'Product'} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-muted flex items-center justify-center text-slate-600 text-xs md:text-sm font-medium">
                                   {(product.brand || 'P').slice(0, 2).toUpperCase()}
                                 </div>}

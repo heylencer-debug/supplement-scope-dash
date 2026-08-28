@@ -461,7 +461,7 @@ function PackagingComparisonSection({ ourPackaging, competitors, getCompetitorPa
                           <TableCell className="py-2">
                             <div className="flex items-center gap-2">
                               {product.main_image_url ? (
-                                <img src={product.main_image_url} alt="" className="w-8 h-8 rounded object-contain bg-white border" />
+                                <img src={product.main_image_url} alt="" className="w-8 h-8 rounded object-contain bg-card border" />
                               ) : (
                                 <div className="w-8 h-8 rounded bg-muted flex items-center justify-center">
                                   <Package className="w-4 h-4 text-muted-foreground/30" />

@@ -305,9 +305,9 @@ export function LaunchPlanSection({
                         )}
                       </div>
                       <div className="flex items-center gap-1.5 mt-1">
-                        <div className="flex-1 h-1 bg-white/20 rounded-full overflow-hidden">
+                        <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden">
                           <div
-                            className="h-full bg-white/70 rounded-full"
+                            className="h-full bg-primary/70 rounded-full"
                             style={{
                               width: `${items.length > 0 ? (completedCount / items.length) * 100 : 0}%`,
                             }}

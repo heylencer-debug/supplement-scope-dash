@@ -11,7 +11,7 @@ interface DocumentContainerProps {
 export function DocumentContainer({ content, isLoading, title }: DocumentContainerProps) {
   if (isLoading) {
     return (
-      <div className="bg-white dark:bg-card max-w-[800px] mx-auto shadow-lg rounded-lg p-8 md:p-12 space-y-8">
+      <div className="bg-card max-w-[800px] mx-auto shadow-lg rounded-lg p-8 md:p-12 space-y-8">
         {/* Document Title */}
         <div className="border-b border-border pb-6">
           <Skeleton className="h-10 w-4/5 mb-3" />
@@ -123,7 +123,7 @@ export function DocumentContainer({ content, isLoading, title }: DocumentContain
 
   if (!content) {
     return (
-      <div className="bg-white dark:bg-card max-w-[800px] mx-auto shadow-lg rounded-lg p-8 md:p-12">
+      <div className="bg-card max-w-[800px] mx-auto shadow-lg rounded-lg p-8 md:p-12">
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
             <svg className="w-8 h-8 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">

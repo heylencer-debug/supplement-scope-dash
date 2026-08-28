@@ -100,7 +100,7 @@ Return ONLY valid JSON, no markdown.`;
   // Plain OpenAI-shape chat request works for Gemini on OpenRouter. Vision
   // content parts: {type:'text'} + {type:'image_url', image_url:{url}} —
   // the OpenAI `detail` hint is dropped (Gemini ignores/doesn't use it).
-  const MAX_TOKENS = 4000;
+  const MAX_TOKENS = parseInt(process.env.OCR_MAX_TOKENS || '16000');
 
   const doCall = async () => {
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {

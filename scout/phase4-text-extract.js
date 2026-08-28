@@ -79,7 +79,7 @@ Do not include any ingredient not explicitly named in the bullet points above â€
 Return ONLY valid JSON, no markdown.`;
 
   // Small utility extraction â€” 4000 tokens is sensible for bullet-point text (not a heavy analysis call)
-  const MAX_TOKENS = 4000;
+  const MAX_TOKENS = parseInt(process.env.P4_MAX_TOKENS || '16000');
 
   async function callOnce() {
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {

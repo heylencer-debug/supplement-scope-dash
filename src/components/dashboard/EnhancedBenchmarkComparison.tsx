@@ -24,6 +24,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/
 import { useIngredientAnalysis, IngredientAnalysis } from "@/hooks/useIngredientAnalysis";
 import AIAnalysisResults from "@/components/dashboard/AIAnalysisResults";
 import { useCompetitiveAnalysis } from "@/hooks/useCompetitiveAnalysis";
+import { BrandCard } from "@/components/ui/brand-card";
 import { CompetitiveAnalysisResults } from "@/components/dashboard/CompetitiveAnalysisResults";
 interface VersionInfo {
   versionNumber: number;
@@ -2569,9 +2570,12 @@ export function EnhancedBenchmarkComparison({
         <CardContent className="px-3 sm:px-4 md:px-6 overflow-hidden">
           {/* Mobile: Vertical stack, Desktop: Horizontal scroll */}
           <div className="flex flex-col lg:flex-row lg:items-stretch gap-3 lg:gap-2 md:gap-3 overflow-x-hidden">
-            {/* Our Concept Column - Full width on mobile, fixed on desktop */}
-            <div className="w-full lg:w-[280px] xl:w-[320px] lg:shrink-0 lg:max-h-[750px] rounded-xl border border-border/60 border-l-2 border-l-primary bg-card overflow-hidden flex flex-col">
-              <div className="px-3 py-2.5 shrink-0 border-b border-border/60">
+            {/* Our Concept Column - the single branded highlight on the page. Flat white everywhere else; this is the one BrandCard iris surface. */}
+            <BrandCard
+              even
+              className="w-full lg:w-[280px] xl:w-[320px] lg:shrink-0 lg:max-h-[750px] border-l-2 border-l-primary flex flex-col"
+            >
+              <div className="px-3 py-2.5 shrink-0 border-b border-white/10">
                 <div className="flex items-center gap-2 min-w-0">
                   <Target className="w-3.5 h-3.5 text-primary shrink-0" />
                   <p className="text-[13px] font-semibold tracking-tight text-foreground truncate">Our Concept</p>
@@ -3025,7 +3029,7 @@ export function EnhancedBenchmarkComparison({
                   </div>
                 </div>
               </div>
-            </div>
+            </BrandCard>
 
             {/* Competitor Columns - Stack on mobile, Scrollable on desktop */}
             <ScrollArea className="w-full lg:flex-1 overflow-x-hidden h-full">

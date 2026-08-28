@@ -66,7 +66,23 @@ async function callClaudeSonnetQAOnce(prompt, maxTokens, model = ANALYSIS_MODEL)
       method: 'POST',
       signal: controller.signal,
       headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://dovive.com', 'X-Title': 'DOVIVE Scout P10 QA' },
-      body: JSON.stringify({ model, max_tokens: maxTokens, stream: true, messages: [{ role: 'user', content: prompt }] }),
+      body: JSON.stringify({
+        model, max_tokens: maxTokens, stream: true,
+        // 2026-08-28 FIX: same disease already fixed in P10/P11 — a live
+        // sea-moss-gummies run showed Call 1 (VALIDATION_MODEL=Opus 5, the
+        // QA adjudicator) hitting finish_reason=length with the FULL
+        // 16000/24000 budget consumed on BOTH the initial call and the
+        // retry, and Call 2 (ANALYSIS_MODEL=Sonnet 5) doing the same at
+        // 16000/24000 — the signature of a model spending its entire
+        // completion budget on hidden reasoning/thinking tokens before
+        // emitting visible answer text. Disabling reasoning for these
+        // deterministic, data-driven QA/comparison tasks (no benefit from
+        // chain-of-thought — every fact must come from the provided P8
+        // drafts + competitor OCR data) routes the full budget to visible
+        // output instead.
+        reasoning: { enabled: false },
+        messages: [{ role: 'user', content: prompt }],
+      }),
     });
     if (!res.ok) {
       const errText = await res.text();
@@ -74,6 +90,7 @@ async function callClaudeSonnetQAOnce(prompt, maxTokens, model = ANALYSIS_MODEL)
     }
     // Collect streaming SSE chunks
     let content = '';
+    let reasoningChars = '';
     let promptTokens = 0, completionTokens = 0, finishReason = null;
     const text = await res.text();
     for (const line of text.split('\n')) {
@@ -85,6 +102,12 @@ async function callClaudeSonnetQAOnce(prompt, maxTokens, model = ANALYSIS_MODEL)
         if (j.error) throw new Error(`Claude Sonnet QA error: ${j.error.message || JSON.stringify(j.error)}`);
         const delta = j.choices?.[0]?.delta?.content;
         if (delta) content += delta;
+        // Diagnostic only — reasoning/thinking deltas (if the provider
+        // still emits them despite reasoning:{enabled:false}) are NOT
+        // counted as real output but logged so a future empty-output case
+        // is immediately diagnosable instead of a silent mystery.
+        const reasoningDelta = j.choices?.[0]?.delta?.reasoning || j.choices?.[0]?.delta?.reasoning_content;
+        if (reasoningDelta) reasoningChars += reasoningDelta;
         if (j.choices?.[0]?.finish_reason) finishReason = j.choices[0].finish_reason;
         if (j.usage) { promptTokens = j.usage.prompt_tokens || 0; completionTokens = j.usage.completion_tokens || 0; }
       } catch (e) {
@@ -92,7 +115,7 @@ async function callClaudeSonnetQAOnce(prompt, maxTokens, model = ANALYSIS_MODEL)
       }
     }
     if (promptTokens || completionTokens) {
-      console.log(`  Tokens: ${promptTokens}→${completionTokens} (total: ${promptTokens + completionTokens})${finishReason ? ` (finish_reason: ${finishReason})` : ''}`);
+      console.log(`  Tokens: ${promptTokens}→${completionTokens} (total: ${promptTokens + completionTokens})${finishReason ? ` (finish_reason: ${finishReason})` : ''}${reasoningChars.length ? ` (reasoning_chars: ${reasoningChars.length})` : ''}`);
       tokenLog.push({ call: tokenLog.length + 1, prompt_tokens: promptTokens, completion_tokens: completionTokens, total_tokens: promptTokens + completionTokens, ts: new Date().toISOString() });
     } else {
       console.log(`  finish_reason: ${finishReason || 'unknown'}`);
@@ -103,7 +126,7 @@ async function callClaudeSonnetQAOnce(prompt, maxTokens, model = ANALYSIS_MODEL)
   }
 }
 
-async function callClaudeSonnetQA(prompt, maxTokens = 16000, model = ANALYSIS_MODEL) {
+async function callClaudeSonnetQA(prompt, maxTokens = 32000, model = ANALYSIS_MODEL) {
   let { content, finishReason } = await callClaudeSonnetQAOnce(prompt, maxTokens, model);
   if (!content || finishReason === 'length') {
     console.warn(`  ⚠ Claude Sonnet QA (${model}) truncated/empty (finish_reason=${finishReason || 'unknown'}) — retrying once at ${Math.round(maxTokens * 1.5)} tokens...`);
@@ -451,6 +474,9 @@ No other text. Pure JSON only.`;
       body: JSON.stringify({
         model: ANALYSIS_MODEL,
         max_tokens: 2000,
+        // 2026-08-28 FIX: same reasoning-tokens disease applied for
+        // consistency/safety across every OpenRouter call in this file.
+        reasoning: { enabled: false },
         messages: [{ role: 'user', content: prompt }]
       })
     });
@@ -740,7 +766,11 @@ async function runCall2(keyword, grokBrief, claudeBrief, adjustedFormula, compet
   // every downstream parse failed as a direct consequence, not because of
   // a parsing bug. Raised to match Call 1's budget (16000), which handles a
   // comparably sized/structured deliverable successfully.
-  const CALL2_MAX_TOKENS = 16000;
+  // 2026-08-28 FIX: 16000 was consistently exhausted (finish_reason=length,
+  // both initial call and 24000-token retry) once reasoning tokens were the
+  // culprit — raised to match the same 32000 safety-net budget used for
+  // Call 1, well inside Sonnet 5/Opus 5's 128000 max_completion_tokens.
+  const CALL2_MAX_TOKENS = 32000;
   const result = await callClaudeSonnetQA(prompt, CALL2_MAX_TOKENS);
   const call2Elapsed = Math.round((Date.now() - call2Start) / 1000);
   console.log(`  Call 2 done: ${Math.round((result || '').length / 1000)}k chars (${call2Elapsed}s)`);
@@ -865,6 +895,9 @@ Replace each "one sentence" with your comparison. Focus on the most important di
       body: JSON.stringify({
         model: ANALYSIS_MODEL,
         max_tokens: 1500,
+        // 2026-08-28 FIX: same reasoning-tokens disease applied for
+        // consistency/safety across every OpenRouter call in this file.
+        reasoning: { enabled: false },
         messages: [{ role: 'user', content: prompt }]
       })
     });
@@ -989,7 +1022,11 @@ async function run() {
   // â"€â"€ Call Grok â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
   console.log(`Calling ${VALIDATION_MODEL} via OpenRouter (QA adjudicator — independent validation model)...`);
   const startTime = Date.now();
-  const qaReport = await callClaudeSonnetQA(prompt, 16000, VALIDATION_MODEL);
+  // 2026-08-28 FIX: 16000 was consistently exhausted by the QA adjudicator
+  // (finish_reason=length on both the initial call and the 24000-token
+  // retry, reasoning-tokens disease) — raised to 32000 as the base budget,
+  // matching P10/P11's confirmed-safe safety net.
+  const qaReport = await callClaudeSonnetQA(prompt, 32000, VALIDATION_MODEL);
   const elapsed = Math.round((Date.now() - startTime) / 1000);
   console.log(`  âœ… Done (${elapsed}s, ${Math.round(qaReport.length / 1000)}k chars)\n`);
 

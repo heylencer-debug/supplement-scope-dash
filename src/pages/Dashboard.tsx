@@ -45,6 +45,7 @@ import { useCategoryContext } from "@/contexts/CategoryContext";
 import { useCategoryScores } from "@/hooks/useCategoryScores";
 import { useCategorySales } from "@/hooks/useCategorySales";
 import { useFormulaBriefVersions } from "@/hooks/useFormulaBriefVersions";
+import { useFormulaBrief } from "@/hooks/useFormulaBrief";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -185,6 +186,7 @@ export default function Dashboard() {
   const { data: categoryScores } = useCategoryScores(category?.id);
   const { data: categorySales } = useCategorySales(categoryName || undefined);
   const { versions, activeVersion } = useFormulaBriefVersions(category?.id);
+  const { data: formulaBrief } = useFormulaBrief(category?.id);
   useEffect(() => {
     if (activeVersion && !selectedVersionId) setSelectedVersionId(activeVersion.id);
   }, [activeVersion, selectedVersionId]);
@@ -201,15 +203,65 @@ export default function Dashboard() {
     const keyInsights = analysis?.key_insights as Record<string, unknown> | null;
     const formulaBriefContent = (analysis3?.formula_brief_content as string) || null;
 
+    // formula_briefs (real, category-specific data written by the P8/P9 pipeline)
+    // fills the "OUR CONCEPT" card fields — key_insights/analysis_1_category_scores
+    // above come from the older category_analyses table and are frequently empty.
+    let marketSummaryParsed: Record<string, unknown> | null = null;
+    if (formulaBrief?.market_summary) {
+      try {
+        marketSummaryParsed = JSON.parse(formulaBrief.market_summary) as Record<string, unknown>;
+      } catch {
+        marketSummaryParsed = null;
+      }
+    }
+
+    const fbPositioning = formulaBrief?.positioning || undefined;
+    const fbTargetCustomer = formulaBrief?.target_customer || undefined;
+    const fbOpportunityInsights = formulaBrief?.opportunity_insights || undefined;
+    const fbKeyDifferentiators = formulaBrief?.key_differentiators?.length ? formulaBrief.key_differentiators : undefined;
+    const fbRiskFactors = formulaBrief?.risk_factors?.length ? formulaBrief.risk_factors : undefined;
+
+    const existingGoToMarket = (keyInsights as { go_to_market?: { positioning?: string; messaging?: string[] } } | null)?.go_to_market;
+
+    // Fallback ingredient list for the "Key Ingredients" row, sourced from
+    // formula_briefs.ingredients.formula_validation when analysis_1 has none.
+    const existingFormulation = (analysis1 as { product_development?: { formulation?: { recommended_ingredients?: unknown[] } } } | null)?.product_development?.formulation;
+    const fbValidationIngredients = formulaBrief?.ingredients?.formula_validation?.ingredients;
+    const fallbackIngredients = (!existingFormulation?.recommended_ingredients?.length && fbValidationIngredients?.length)
+      ? fbValidationIngredients.map(i => ({ ingredient: i.name, dosage: i.raw }))
+      : undefined;
+
     return {
       benchmarkData: {
-        key_insights: keyInsights as {
+        key_insights: {
+          ...(keyInsights || {}),
+          go_to_market: {
+            ...(existingGoToMarket || {}),
+            positioning: fbPositioning || existingGoToMarket?.positioning,
+            messaging: fbOpportunityInsights ? [fbOpportunityInsights] : existingGoToMarket?.messaging,
+            key_differentiators: fbKeyDifferentiators,
+          },
+        } as {
           go_to_market?: {
             positioning?: string;
             messaging?: string[];
+            key_differentiators?: string[];
           };
         } | null,
-        analysis_1_category_scores: analysis1 as {
+        analysis_1_category_scores: {
+          ...(analysis1 || {}),
+          product_development: fallbackIngredients ? {
+            ...((analysis1 as Record<string, unknown> | null)?.product_development as Record<string, unknown> | undefined || {}),
+            formulation: {
+              ...existingFormulation,
+              recommended_ingredients: fallbackIngredients,
+            },
+          } : (analysis1 as { product_development?: unknown } | null)?.product_development,
+          customer_insights: {
+            ...((analysis1 as Record<string, unknown> | null)?.customer_insights as Record<string, unknown> | undefined || {}),
+            buyer_profile: fbTargetCustomer || (analysis1 as { customer_insights?: { buyer_profile?: string } } | null)?.customer_insights?.buyer_profile,
+          },
+        } as {
           product_development?: {
             formulation?: {
               recommended_ingredients?: Array<string | { ingredient?: string; name?: string }>;
@@ -223,6 +275,15 @@ export default function Dashboard() {
           };
         } | null,
         formula_brief_content: formulaBriefContent,
+        formula_brief: formulaBrief ? {
+          key_differentiators: fbKeyDifferentiators,
+          risk_factors: fbRiskFactors,
+          target_price: formulaBrief.target_price ?? undefined,
+          servings_per_container: formulaBrief.servings_per_container ?? undefined,
+        } : undefined,
+        top_strengths: fbKeyDifferentiators?.map(d => ({ strength: d })),
+        top_weaknesses: fbRiskFactors?.map(r => ({ weakness: r })),
+        market_summary: marketSummaryParsed,
         products_snapshot: analysis?.products_snapshot as {
           formula_references?: Array<{
             asin: string;
@@ -240,7 +301,7 @@ export default function Dashboard() {
         } | null,
       },
     };
-  }, [analysis]);
+  }, [analysis, formulaBrief]);
 
   // KPI calculations
   const totalRevenue = categorySales?.total_monthly_revenue ?? 

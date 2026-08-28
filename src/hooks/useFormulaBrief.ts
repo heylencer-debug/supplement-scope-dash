@@ -21,6 +21,10 @@ export interface FormulaBriefData {
   target_price: number | null;
   certifications: string[] | null;
   key_differentiators: string[] | null;
+  risk_factors: string[] | null;
+  opportunity_insights: string | null;
+  market_summary: string | null;
+  consumer_pain_points: string[] | null;
   ingredients: {
     ai_generated_brief?: string;
     ai_generated_brief_grok?: string;
@@ -57,7 +61,7 @@ export interface FormulaBriefData {
 async function fetchFormulaBrief(categoryId: string): Promise<FormulaBriefData | null> {
   const { data, error } = await supabase
     .from("formula_briefs")
-    .select("category_id, positioning, target_customer, form_type, flavor_profile, servings_per_container, target_price, ingredients")
+    .select("category_id, positioning, target_customer, form_type, flavor_profile, servings_per_container, target_price, key_differentiators, risk_factors, opportunity_insights, market_summary, consumer_pain_points, ingredients")
     .eq("category_id", categoryId)
     .maybeSingle();
 

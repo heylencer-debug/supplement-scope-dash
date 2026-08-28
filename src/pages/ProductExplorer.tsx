@@ -371,8 +371,9 @@ export default function ProductExplorer() {
         </div>
         <div className="flex gap-2">
           {(currentCategoryId || categoryFromName?.id) && lowConfidenceCount > 0 && (
-            <button
-              className="pearl-secondary gap-2"
+            <Button
+              variant="secondary"
+              className="gap-2"
               onClick={handleBulkReanalyze}
               disabled={isBulkAnalyzing}
             >
@@ -388,7 +389,7 @@ export default function ProductExplorer() {
                   <Badge variant="secondary" className="ml-1">{lowConfidenceCount}</Badge>
                 </>
               )}
-            </button>
+            </Button>
           )}
           <Button
             className="gap-2"
@@ -397,10 +398,10 @@ export default function ProductExplorer() {
             <Plus className="w-4 h-4" />
             Add Product
           </Button>
-          <button className="pearl-secondary gap-2">
+          <Button variant="secondary" className="gap-2">
             <Download className="w-4 h-4" />
             Export
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -477,8 +478,8 @@ export default function ProductExplorer() {
               </Select>
               
               {(priceRange !== "all" || ratingFilter !== "all" || statusFilter !== "all") && (
-                <button
-                  className="pearl-quiet"
+                <Button
+                  variant="ghost"
                   onClick={() => {
                     setPriceRange("all");
                     setRatingFilter("all");
@@ -486,7 +487,7 @@ export default function ProductExplorer() {
                   }}
                 >
                   Clear Filters
-                </button>
+                </Button>
               )}
             </div>
           </div>
@@ -570,8 +571,10 @@ export default function ProductExplorer() {
                         >
                           <TableCell onClick={(e) => e.stopPropagation()}>
                             <CollapsibleTrigger asChild>
-                              <button
-                                className="pearl-quiet !p-0 h-6 w-6"
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6"
                                 disabled={!hasAnalysisData}
                               >
                                 {hasAnalysisData ? (
@@ -579,7 +582,7 @@ export default function ProductExplorer() {
                                 ) : (
                                   <span className="w-4 h-4" />
                                 )}
-                              </button>
+                              </Button>
                             </CollapsibleTrigger>
                           </TableCell>
                           <TableCell onClick={(e) => e.stopPropagation()}>
@@ -655,15 +658,17 @@ export default function ProductExplorer() {
                             </div>
                           </TableCell>
                           <TableCell className="text-center">
-                            <button
-                              className="pearl-quiet !p-0 h-8 w-8"
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleRowClick(product);
                               }}
                             >
                               <Eye className="w-4 h-4" />
-                            </button>
+                            </Button>
                           </TableCell>
                         </TableRow>
                         <CollapsibleContent asChild>
@@ -706,20 +711,20 @@ export default function ProductExplorer() {
             </div>
             
             <div className="flex items-center gap-2">
-              <button
-                className="pearl-secondary"
+              <Button
+                variant="secondary"
                 disabled={currentPage === 1}
                 onClick={() => setCurrentPage(1)}
               >
                 First
-              </button>
-              <button
-                className="pearl-secondary"
+              </Button>
+              <Button
+                variant="secondary"
                 disabled={currentPage === 1}
                 onClick={() => setCurrentPage(prev => prev - 1)}
               >
                 Previous
-              </button>
+              </Button>
 
               <div className="flex items-center gap-1">
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
@@ -735,31 +740,33 @@ export default function ProductExplorer() {
                   }
 
                   return (
-                    <button
+                    <Button
                       key={pageNum}
-                      className={currentPage === pageNum ? "pearl-button w-8 h-8 !p-0" : "pearl-quiet w-8 h-8 !p-0"}
+                      variant={currentPage === pageNum ? "default" : "ghost"}
+                      size="icon"
+                      className="w-8 h-8"
                       onClick={() => setCurrentPage(pageNum)}
                     >
                       {pageNum}
-                    </button>
+                    </Button>
                   );
                 })}
               </div>
 
-              <button
-                className="pearl-secondary"
+              <Button
+                variant="secondary"
                 disabled={currentPage === totalPages}
                 onClick={() => setCurrentPage(prev => prev + 1)}
               >
                 Next
-              </button>
-              <button
-                className="pearl-secondary"
+              </Button>
+              <Button
+                variant="secondary"
                 disabled={currentPage === totalPages}
                 onClick={() => setCurrentPage(totalPages)}
               >
                 Last
-              </button>
+              </Button>
             </div>
           </div>
         </CardContent>

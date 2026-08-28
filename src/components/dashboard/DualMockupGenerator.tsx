@@ -1960,10 +1960,10 @@ function MockupCard({
         title={`${title} Product Mockup`}
         footer={
           generatedMockup && (
-            <button className="pearl-secondary" onClick={downloadMockup}>
+            <Button variant="secondary" onClick={downloadMockup}>
               <Download className="w-4 h-4 mr-2" />
               Download
-            </button>
+            </Button>
           )
         }
       >
@@ -2286,11 +2286,11 @@ export function DualMockupGenerator({ analysis, mockupImages, onSaveMockup, cate
             <span className="text-sm text-emerald-700">
               {isUploadingLogo ? 'Processing...' : 'Upload your brand logo (PNG, JPG, SVG)'}
             </span>
-            <input 
-              type="file" 
-              accept="image/png,image/jpeg,image/svg+xml,image/webp" 
+            <Input
+              type="file"
+              accept="image/png,image/jpeg,image/svg+xml,image/webp"
               onChange={handleLogoUpload}
-              className="hidden" 
+              className="hidden"
               disabled={isUploadingLogo}
             />
           </label>

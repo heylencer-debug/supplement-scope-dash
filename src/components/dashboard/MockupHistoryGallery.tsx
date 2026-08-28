@@ -214,8 +214,8 @@ export function MockupHistoryGallery({
         footer={
           previewItem && (
             <>
-              <button
-                className="pearl-secondary"
+              <Button
+                variant="secondary"
                 onClick={() => {
                   onDelete(previewItem.id);
                   setPreviewItem(null);
@@ -223,9 +223,9 @@ export function MockupHistoryGallery({
               >
                 <Trash2 className="h-4 w-4 mr-2" />
                 Delete
-              </button>
-              <button
-                className="pearl-secondary"
+              </Button>
+              <Button
+                variant="secondary"
                 onClick={() => {
                   onRestore(previewItem.image_url);
                   setPreviewItem(null);
@@ -233,7 +233,7 @@ export function MockupHistoryGallery({
               >
                 <RotateCcw className="h-4 w-4 mr-2" />
                 Use This Mockup
-              </button>
+              </Button>
             </>
           )
         }

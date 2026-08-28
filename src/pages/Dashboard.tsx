@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { ScrollAnimate } from "@/components/ui/scroll-animate";
 import { Building2, ChevronsUpDown, Link2, Package, TrendingUp, FlaskConical, Scale, Factory, ScanSearch, Search } from "lucide-react";
@@ -115,9 +116,9 @@ function PipelineCollapsible({ categoryId, categoryName }: { categoryId: string;
               </div>
             </div>
             <CollapsibleTrigger asChild>
-              <button className="pearl-quiet h-7 w-7 p-0 shrink-0">
+              <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
                 <ChevronsUpDown className="h-4 w-4 text-muted-foreground" />
-              </button>
+              </Button>
             </CollapsibleTrigger>
           </div>
         </CardHeader>
@@ -964,6 +965,14 @@ export default function Dashboard() {
         {/* TAB 7: Manufacturer Feedback — living formula brief */}
         <TabsContent value="manufacturer" className="space-y-4 mt-3">
           <div className="flex justify-end">
+            {/* pearl-pill + pearl-neon is the project's own documented "one
+                deliberate accent exception" tier (index.css PILL(neon)) —
+                the shadcn Button's cva always injects a base pearl-button/
+                pearl-quiet/pearl-secondary class alongside whatever className
+                is passed, which collides with the `:not(.pearl-neon)`
+                exclusions that keep this pill flat, so it stays a native
+                button wearing the pearl-pill/pearl-neon component classes
+                rather than being force-fit into the shadcn wrapper. */}
             <button
               type="button"
               className="pearl-pill pearl-neon"

@@ -3,6 +3,7 @@ import { Factory, Upload, Send, CheckCircle, XCircle, HelpCircle, AlertCircle, C
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
@@ -743,22 +744,22 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
       {/* Header */}
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50 rounded-lg transition-colors"
+        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-secondary/50 rounded-lg transition-colors"
       >
         <div className="flex items-center gap-2">
-          <Factory className="w-4 h-4 text-gray-500" />
-          <span className="font-medium text-sm text-gray-800">Manufacturer Feedback</span>
+          <Factory className="w-4 h-4 text-muted-foreground" />
+          <span className="font-medium text-sm text-foreground">Manufacturer Feedback</span>
           {pendingCount > 0 && (
             <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-700">
               {pendingCount} pending
             </Badge>
           )}
         </div>
-        {expanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+        {expanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
       </button>
 
       {expanded && (
-        <div className="px-4 pb-4 space-y-4 border-t border-gray-100 pt-4">
+        <div className="px-4 pb-4 space-y-4 border-t border-border pt-4">
           {/* Portal Comments — import from manufacturer portal */}
           {portalComments.length > 0 && (
             <div className="border border-purple-100 rounded-lg overflow-hidden">
@@ -768,21 +769,21 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
               >
                 <div className="flex items-center gap-2">
                   <MessageSquare className="w-3.5 h-3.5 text-purple-500" />
-                  <span className="text-xs font-medium text-gray-700">Portal Comments</span>
+                  <span className="text-xs font-medium text-foreground">Portal Comments</span>
                   <span className="text-[10px] px-1.5 py-0 bg-purple-100 text-purple-700 rounded-full">
                     {portalComments.length}
                   </span>
                 </div>
                 {portalCommentsOpen
-                  ? <ChevronUp className="w-3.5 h-3.5 text-gray-400" />
-                  : <ChevronDown className="w-3.5 h-3.5 text-gray-400" />}
+                  ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" />
+                  : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />}
               </button>
 
               {portalCommentsOpen && (
                 <div className="border-t border-purple-100">
-                  <div className="divide-y divide-gray-50 max-h-64 overflow-y-auto">
+                  <div className="divide-y divide-border/50 max-h-64 overflow-y-auto">
                     {portalComments.map((c) => (
-                      <label key={c.id} className="flex items-start gap-2.5 px-3 py-2.5 hover:bg-gray-50 cursor-pointer">
+                      <label key={c.id} className="flex items-start gap-2.5 px-3 py-2.5 hover:bg-secondary/50 cursor-pointer">
                         <Checkbox
                           checked={selectedCommentIds.has(c.id)}
                           onCheckedChange={(checked) =>
@@ -796,12 +797,12 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
                         />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
-                            <span className="text-xs font-medium text-gray-700">{c.author_name}</span>
-                            <span className="text-[10px] px-1.5 py-0 bg-gray-100 text-gray-500 rounded-full">{c.version_label}</span>
-                            <span className="text-[10px] text-gray-400 ml-auto">{format(new Date(c.created_at), "MMM d, h:mm a")}</span>
+                            <span className="text-xs font-medium text-foreground">{c.author_name}</span>
+                            <span className="text-[10px] px-1.5 py-0 bg-muted text-muted-foreground rounded-full">{c.version_label}</span>
+                            <span className="text-[10px] text-muted-foreground ml-auto">{format(new Date(c.created_at), "MMM d, h:mm a")}</span>
                           </div>
                           {c.comment && (
-                            <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed">{c.comment}</p>
+                            <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{c.comment}</p>
                           )}
                           {c.attachment_url && (
                             <span className="inline-flex items-center gap-1 text-[10px] text-blue-500 mt-0.5">
@@ -837,7 +838,7 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
 
           {/* Submit form */}
           <div className="space-y-3">
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-muted-foreground">
               Submit feedback from your manufacturer. Scout will evaluate each point and update the formula brief or push back with evidence.
             </p>
             <Textarea
@@ -852,25 +853,25 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
             <div className="flex flex-wrap gap-2">
               {uploadedImages.map((img, i) => (
                 <div key={i} className="relative group">
-                  <img src={img.url} alt="" className="w-16 h-16 object-cover rounded border border-gray-200" />
+                  <img src={img.url} alt="" className="w-16 h-16 object-cover rounded border border-border" />
                   <button
                     onClick={() => setUploadedImages((prev) => prev.filter((_, idx) => idx !== i))}
-                    className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full w-4 h-4 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                   >
                     <X className="w-2.5 h-2.5" />
                   </button>
                 </div>
               ))}
-              <label className="w-16 h-16 border-2 border-dashed border-gray-300 rounded flex flex-col items-center justify-center cursor-pointer hover:border-gray-400 transition-colors">
+              <label className="w-16 h-16 border-2 border-dashed border-border rounded flex flex-col items-center justify-center cursor-pointer hover:border-muted-foreground/50 transition-colors">
                 {uploading ? (
-                  <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <>
-                    <Image className="w-4 h-4 text-gray-400" />
-                    <span className="text-xs text-gray-400 mt-0.5">Add</span>
+                    <Image className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground mt-0.5">Add</span>
                   </>
                 )}
-                <input type="file" accept="image/*" multiple className="hidden" onChange={handleImageUpload} />
+                <Input type="file" accept="image/*" multiple className="hidden" onChange={handleImageUpload} />
               </label>
             </div>
 
@@ -897,7 +898,7 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
           {/* Feedback history — NO scroll area, full display */}
           {feedbackList.length > 0 && (
             <div className="space-y-2">
-              <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">History</p>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">History</p>
               <div className="space-y-2">
                 {feedbackList.map((fb) => {
                   const verdict = fb.claude_verdict ? VERDICT_CONFIG[fb.claude_verdict] : null;
@@ -947,18 +948,18 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
                       </button>
 
                       {isOpen && (
-                        <div className="px-3 pb-3 space-y-3 border-t border-gray-200">
+                        <div className="px-3 pb-3 space-y-3 border-t border-border">
                           {fb.feedback_text && (
                             <div>
-                              <p className="text-xs font-medium text-gray-500 mb-1 mt-2">Feedback</p>
-                              <p className="text-xs text-gray-700 whitespace-pre-wrap">{fb.feedback_text}</p>
+                              <p className="text-xs font-medium text-muted-foreground mb-1 mt-2">Feedback</p>
+                              <p className="text-xs text-foreground/90 whitespace-pre-wrap">{fb.feedback_text}</p>
                             </div>
                           )}
                           {fb.image_urls?.length > 0 && (
                             <div className="flex flex-wrap gap-1">
                               {fb.image_urls.map((url, i) => (
                                 <a key={i} href={url} target="_blank" rel="noopener noreferrer">
-                                  <img src={url} alt="" className="w-12 h-12 object-cover rounded border border-gray-200 hover:opacity-80 transition-opacity" />
+                                  <img src={url} alt="" className="w-12 h-12 object-cover rounded border border-border hover:opacity-80 transition-opacity" />
                                 </a>
                               ))}
                             </div>
@@ -1079,8 +1080,8 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
                                       key={i}
                                       className={`flex items-start gap-3 cursor-pointer rounded-lg border p-3 transition-colors ${
                                         isChecked
-                                          ? "bg-white border-primary/30 shadow-sm"
-                                          : "bg-white/50 border-border/50 hover:border-border"
+                                          ? "bg-card border-primary/30 shadow-sm"
+                                          : "bg-card/50 border-border/50 hover:border-border"
                                       }`}
                                     >
                                       <Checkbox

@@ -103,4 +103,30 @@ async function launchBrowserContext({ label = 'browser', blockMedia = true, useP
   return { browser, context, viaBrightData: false, close: async () => { try { await browser.close(); } catch (_) {} } };
 }
 
-module.exports = { launchBrowserContext, getBrightDataBrowserWSS, getBrightDataProxy };
+/**
+ * Force-connect via the Browser API (CDP/WSS) specifically, skipping the ISP
+ * proxy. Used as an explicit retry path (e.g. P5's raw citation-page fetch:
+ * ISP proxy fetch returned empty/blocked, retry the SAME url via the more
+ * robust Scraping Browser before giving up). Returns null if
+ * BRIGHTDATA_BROWSER_WSS isn't set or the connect fails — callers should
+ * treat null as "no retry path available".
+ */
+async function launchBrowserAPIOnly({ label = 'browser', blockMedia = true, localContextOptions = {} } = {}) {
+  const wss = getBrightDataBrowserWSS();
+  if (!wss) return null;
+  try {
+    console.log(`  [${label}] retry: connecting via Bright Data Browser API (CDP)...`);
+    const browser = await chromium.connectOverCDP(wss, { timeout: 60000 });
+    const context = browser.contexts()[0] || await browser.newContext(localContextOptions);
+    context.setDefaultTimeout(45000);
+    context.setDefaultNavigationTimeout(45000);
+    if (blockMedia) await applyBlockMedia(context);
+    console.log(`  [${label}] retry connected via Bright Data Browser API ✓`);
+    return { browser, context, viaBrightData: true, close: async () => { try { await browser.close(); } catch (_) {} } };
+  } catch (err) {
+    console.log(`  [${label}] retry Browser API connect FAILED (${err.message})`);
+    return null;
+  }
+}
+
+module.exports = { launchBrowserContext, launchBrowserAPIOnly, getBrightDataBrowserWSS, getBrightDataProxy };

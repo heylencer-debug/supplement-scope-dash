@@ -1,5 +1,96 @@
 # Scout pipeline — Cloud Run Job deploy notes
 
+## 2026-08-28 follow-up 5: P5 off-Amazon rebuild — Perplexity discovery + Bright Data raw-fetch retry
+
+Confirmed the Bright Data ISP proxy fix from follow-up 4 did NOT solve P5
+off-Amazon discovery: the proxy connects fine (`viaBrightData: true`, other
+page loads through it work), but DuckDuckGo/Google SERP still return 0
+usable links THROUGH the proxy — a SERP-scraping problem, not an IP-block
+problem. Rebuilt the discovery step entirely around Perplexity's Sonar API,
+which does live web research directly (no SERP scrape needed) and returns
+synthesized findings + real citation URLs in one call.
+
+**New `scout/utils/perplexity.js`** — `researchBrand(brand, productTitle,
+keyword)`: POSTs to `https://api.perplexity.ai/chat/completions`
+(OpenAI-compatible), `model = process.env.PERPLEXITY_MODEL || 'sonar-pro'`,
+`Authorization: Bearer ${PERPLEXITY_API_KEY}`, `max_tokens: 2000`. Prompt asks
+for exact ingredients/doses, standardized/bioavailable forms, certifications,
+clinical claims, and off-Amazon retail price, grounded on the brand's
+official site + major retailers. Returns `{ content, citations }` — citations
+are read from both the top-level `citations` array (list of URL strings) and
+any `message.annotations[].url`/`url_citation.url` shape, deduped. Never
+throws: returns `null` on missing key, HTTP error, non-JSON response, API
+`error` field, or empty content — every failure path logs a reason first.
+Logs `finish_reason` + `usage` on every successful call.
+
+**`phase5-deep-research.js` — `findAndScrapeSource()` rewritten as a
+dispatcher:**
+1. If `PERPLEXITY_API_KEY` is set (`findAndScrapeSourceViaPerplexity()`):
+   call `perplexityResearchBrand()` → get findings + citations. Filter
+   citations to the top 1-2 that look like the brand's official site or a
+   known major retailer (`pickConfidentUrls()`, same domain-matching logic
+   as the legacy `pickConfidentResult()`, falls back to the first 1-2 raw
+   citations if none pass the domain filter — Perplexity already vetted
+   them). Fetch each candidate's raw page text through the existing
+   `launchBrowserContext({ useProxy: true })` chain
+   (`fetchRawPageWithRetry()`): if the primary fetch (ISP proxy, or whatever
+   the shared browserContext resolved to) comes back empty/blocked (<40
+   chars), retries the SAME url via a fresh forced Browser-API connect
+   (new `launchBrowserAPIOnly()` export in `utils/bright-data-browser.js`,
+   skips the ISP proxy entirely) before giving up. Perplexity's findings
+   alone are enough to return `skipped:false`/count as a source even if
+   every raw-fetch attempt fails — the citation URL is still recorded for
+   provenance.
+2. If Perplexity is unset, or returns nothing usable, falls back to the
+   **unchanged legacy path** (`findAndScrapeSourceLegacy()` — the same
+   DuckDuckGo-via-Playwright + Bright Data SERP REST scrape from follow-up
+   4), so nothing breaks before the key is provisioned. Every call logs
+   which discovery path ran (`[P5 search/<asin>] discovery path: Perplexity`
+   / `...legacy DuckDuckGo/Bright-Data-SERP`).
+3. `dovive_p5_sources` row: `source_url`/`source_type` = the fetched (or
+   best-candidate) citation, `raw_html_excerpt` = the fetched page text (if
+   any), `extracted = { perplexity_findings, citations, signals }` where
+   `signals` is the existing cheap regex extraction
+   (`extractSignalsFromText()`) run on the raw excerpt when one was fetched,
+   else `null`. `source_url` is NOT NULL on this table — if Perplexity
+   returned findings with zero usable citations, the row is skipped (findings
+   still feed the prompt, just no per-URL row to persist).
+4. `researchOneProduct()` now builds the P8/Sonnet prompt's off-Amazon
+   grounding block from BOTH Perplexity's synthesized findings and any raw
+   page excerpt (labeled separately in the prompt). `memoryFallback` is now
+   `!hasRealData && !sourceUrl && !hadPerplexityFindings` — Perplexity
+   findings alone keep a product out of the low-confidence memory-fallback
+   tier. Per-product logging:
+   `[P5 source/<asin>] perplexity=<bool> citations=<n> rawPageFetched=<bool> source=<bool>`
+   — no more silent `source=false`.
+5. `certifications`/`third_party_tested` extraction (`parseResearchOutput`)
+   now checks both the legacy flat `extracted.certifications` shape and the
+   new nested `extracted.signals.certifications` shape via
+   `certificationsFromExtracted()`.
+6. `data_grounding` gained `had_perplexity_findings` and
+   `perplexity_citation_count` fields.
+
+**Env/secret**: **User must provide `PERPLEXITY_API_KEY`** → coordinator
+sets GCP Secret Manager secret `scout-perplexity-key` and binds env
+`PERPLEXITY_API_KEY` on the `dovive-scout` Cloud Run Job (same pattern as
+`scout-openrouter-key`/`scout-brightdata-key`). `PERPLEXITY_MODEL` (default
+`sonar-pro`) is a plain env var, no secret needed. Until the secret is bound,
+P5 logs `[P5 search/<asin>] discovery path: legacy DuckDuckGo/Bright-Data-SERP
+(PERPLEXITY_API_KEY not set)` and behaves exactly as it did in follow-up 4 —
+XAI/OpenRouter/Bright-Data-proxy/Bright-Data-Browser-API env vars are all
+untouched.
+
+New export: `launchBrowserAPIOnly({ label, blockMedia, localContextOptions })`
+in `scout/utils/bright-data-browser.js` — forces a Browser-API/WSS-only
+connect (skips the ISP proxy), used only as P5's raw-fetch retry path.
+Returns `null` if `BRIGHTDATA_BROWSER_WSS` is unset or the connect fails.
+
+Image rebuilt, `dovive-scout` Cloud Run Job updated to `:latest`. Job
+intentionally NOT triggered — user runs their own validation once
+`PERPLEXITY_API_KEY` is set.
+
+---
+
 ## 2026-08-28 follow-up 4: P5 off-Amazon fix, dead-handoff repairs, independent validation model, missing UI fields
 
 **GOAL A — P5 off-Amazon search fix.** Root cause confirmed: P5's search step

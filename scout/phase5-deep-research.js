@@ -60,7 +60,8 @@
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const { resolveCategory } = require('./utils/category-resolver');
-const { launchBrowserContext } = require('./utils/bright-data-browser');
+const { launchBrowserContext, launchBrowserAPIOnly } = require('./utils/bright-data-browser');
+const { researchBrand: perplexityResearchBrand, getPerplexityKey } = require('./utils/perplexity');
 
 const DASH   = createClient(process.env.DASH_URL || process.env.SUPABASE_URL, process.env.DASH_KEY || process.env.SUPABASE_KEY);
 const DOVIVE = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
@@ -218,23 +219,29 @@ BSR drops (30d/90d — proxy for sales velocity): ${keepa.bsr_drops_30d ?? 'N/A'
 }
 
 // ─── Off-Amazon source discovery ────────────────────────────────────────────
-// 2026-08-28 FIX: the SEARCH step was going straight from the Cloud Run
-// container to DuckDuckGo's HTML endpoint (duckduckgo.com/html/) via
-// Playwright. That endpoint returns an empty/challenge page to datacenter
-// IPs, so `links` was empty on every single product and
-// dovive_p5_sources stayed at 0 rows on every run — confirmed root cause
-// (every P5 product logged researched_by with no source, 100% of the time).
-// The DESTINATION brand/retailer page scrape works fine from Cloud Run
-// (plain Playwright, no residential IP needed) — only the SEARCH step was
-// blocked. Fix: route the search through Bright Data (residential IPs),
-// same BRIGHTDATA_API_KEY/BRIGHTDATA env var already used by P1/reviews
-// (bright-data-amazon.js). Uses Bright Data's unified Web Unlocker/SERP
-// endpoint (POST https://api.brightdata.com/request with a SERP-enabled
-// zone) requesting Google's structured JSON output (`&brd_json=1`). Falls
-// back to the old DDG-via-Playwright path (now with loud per-product
-// logging) if BRIGHTDATA_API_KEY/BRIGHTDATA is unset or the SERP zone
-// isn't available on the account — so the failure is always visible in
-// logs instead of a silent 100%-skip.
+// 2026-08-28 FIX #2: even the Bright Data ISP proxy fix (below, kept as the
+// legacy fallback path) didn't solve discovery — CONFIRMED the ISP proxy
+// itself connects fine (viaBrightData:true, other page loads through it
+// work), but DuckDuckGo/Google SERP simply return 0 usable links THROUGH
+// the proxy too (challenge page or empty result set — not an IP-block
+// problem, a SERP-scraping problem). Replaced the discovery mechanism
+// entirely: Perplexity Sonar (scout/utils/perplexity.js) does live web
+// research directly and returns synthesized findings + real citation URLs
+// in one call — no SERP scrape needed. The citation URLs are then
+// (optionally) re-fetched raw via the same Bright Data browser chain
+// (ISP proxy → Browser API retry) for a raw-text excerpt, but Perplexity's
+// findings alone already count as a real off-Amazon source even if that
+// raw fetch fails or is blocked.
+//
+// ENV-GATED: if PERPLEXITY_API_KEY is unset, Perplexity discovery is
+// skipped entirely and P5 falls back to the OLD DuckDuckGo/Bright-Data-SERP
+// scrape path below (unchanged, kept only as a pre-Perplexity fallback so
+// nothing breaks before the key is provisioned).
+// 2026-08-28 FIX #1 (kept as legacy fallback, no longer primary): the SEARCH
+// step was going straight from the Cloud Run container to DuckDuckGo's HTML
+// endpoint via Playwright, which returns an empty/challenge page to
+// datacenter IPs. Routed through Bright Data's SERP REST endpoint as a
+// secondary fallback. Both are now subordinate to the Perplexity path above.
 
 function getBrightDataKey() {
   const key = process.env.BRIGHTDATA_API_KEY || process.env.BRIGHTDATA || null;
@@ -300,24 +307,48 @@ function slugify(s) {
   return (s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
 }
 
+function classifyUrl(href, brandSlug) {
+  let host;
+  try { host = new URL(href).hostname.replace(/^www\./, ''); } catch { return null; }
+  const hostSlug = slugify(host.split('.')[0]);
+  // Confident match #1: official brand site — the brand name is the domain
+  if (brandSlug && ((hostSlug && brandSlug.includes(hostSlug)) || hostSlug.includes(brandSlug)) && hostSlug.length >= 4) {
+    return { url: href, type: 'brand_site' };
+  }
+  // Confident match #2: a known major retailer product page
+  for (const r of RETAILER_DOMAINS) {
+    if (r.match.test(host)) return { url: href, type: r.type };
+  }
+  return null;
+}
+
 function pickConfidentResult(links, brand) {
   const brandSlug = slugify(brand);
   if (!brandSlug || brandSlug.length < 3) return null;
-
   for (const { href } of links) {
-    let host;
-    try { host = new URL(href).hostname.replace(/^www\./, ''); } catch { continue; }
-    const hostSlug = slugify(host.split('.')[0]);
-    // Confident match #1: official brand site — the brand name is the domain
-    if (hostSlug && brandSlug.includes(hostSlug) || hostSlug.includes(brandSlug)) {
-      if (hostSlug.length >= 4) return { url: href, type: 'brand_site' };
-    }
-    // Confident match #2: a known major retailer product page
-    for (const r of RETAILER_DOMAINS) {
-      if (r.match.test(host)) return { url: href, type: r.type };
-    }
+    const hit = classifyUrl(href, brandSlug);
+    if (hit) return hit;
   }
   return null;
+}
+
+// Same brand/retailer confidence filter as pickConfidentResult, but applied
+// to a Perplexity citations array (plain URL strings) and returning up to
+// `max` confident matches instead of just the first. If NOTHING passes the
+// brand/retailer filter, falls back to the first `max` raw citations anyway
+// — Perplexity has already vetted these as sources for its own findings, so
+// they're still worth a raw-fetch attempt even if the domain doesn't look
+// like an obvious brand/retailer site.
+function pickConfidentUrls(citations, brand, max = 2) {
+  const brandSlug = slugify(brand);
+  const confident = [];
+  for (const href of citations || []) {
+    const hit = brandSlug && brandSlug.length >= 3 ? classifyUrl(href, brandSlug) : null;
+    if (hit) confident.push(hit);
+    if (confident.length >= max) return confident;
+  }
+  if (confident.length) return confident;
+  return (citations || []).slice(0, max).map(href => ({ url: href, type: 'perplexity_citation' }));
 }
 
 async function searchViaDuckDuckGo(browserContext, query, asin) {
@@ -347,7 +378,115 @@ async function searchViaDuckDuckGo(browserContext, query, asin) {
   }
 }
 
-async function findAndScrapeSource(browserContext, product, keyword) {
+// Raw-fetch a single page's body text through the P5 browser chain, with an
+// explicit retry: if the primary context (which may be the ISP proxy) comes
+// back empty/blocked, force a fresh connect via the Browser API (WSS) and
+// retry the SAME url once before giving up. Never throws — returns '' on
+// total failure so callers can still use Perplexity's findings alone.
+async function fetchRawPageWithRetry(browserContext, url, asin) {
+  const tryOnce = async (ctx) => {
+    const page = await ctx.newPage();
+    try {
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
+      await page.waitForTimeout(500);
+      const bodyText = await page.locator('body').innerText({ timeout: 5000 }).catch(() => '');
+      return bodyText.replace(/\s+/g, ' ').trim().substring(0, 15000);
+    } finally {
+      await page.close();
+    }
+  };
+
+  let excerpt = '';
+  try {
+    excerpt = await tryOnce(browserContext);
+  } catch (err) {
+    console.log(`  [P5 fetch/${asin}] primary raw-page fetch errored for ${url}: ${err.message}`);
+  }
+
+  if (!excerpt || excerpt.length < 40) {
+    console.log(`  [P5 fetch/${asin}] primary raw-page fetch empty/blocked for ${url} — retrying via Bright Data Browser API`);
+    const retry = await launchBrowserAPIOnly({ label: `P5 raw-fetch retry ${asin}` });
+    if (retry) {
+      try {
+        excerpt = await tryOnce(retry.context);
+      } catch (err) {
+        console.log(`  [P5 fetch/${asin}] Browser API retry fetch errored for ${url}: ${err.message}`);
+      } finally {
+        await retry.close();
+      }
+    } else {
+      console.log(`  [P5 fetch/${asin}] no Browser API retry path available (BRIGHTDATA_BROWSER_WSS unset) — giving up on raw fetch for ${url}`);
+    }
+  }
+  return excerpt;
+}
+
+/**
+ * Perplexity-first off-Amazon discovery. Returns:
+ *   { skipped: false, perplexity_findings, citations, source_url, source_type,
+ *     raw_html_excerpt, extracted }
+ *   — perplexity_findings alone is enough to count as source=true even if
+ *   raw_html_excerpt ends up empty (raw fetch failed/blocked).
+ *   { skipped: true, reason } if Perplexity itself returned nothing usable.
+ */
+async function findAndScrapeSourceViaPerplexity(browserContext, product, keyword) {
+  const brand = product.brand || '';
+  const title = product.title || '';
+  const asin = product.asin;
+
+  const result = await perplexityResearchBrand(brand, title, keyword);
+  if (!result || !result.content) {
+    console.log(`  [P5 search/${asin}] Perplexity returned no usable findings — will fall back to legacy search path`);
+    return { skipped: true, reason: 'Perplexity returned no usable findings' };
+  }
+
+  const nCitations = (result.citations || []).length;
+  console.log(`  [P5 search/${asin}] Perplexity returned findings (${result.content.length} chars) + ${nCitations} citation(s)`);
+
+  const candidates = pickConfidentUrls(result.citations, brand, 2);
+  let sourceUrl = null, sourceType = null, excerpt = '';
+
+  for (const cand of candidates) {
+    console.log(`  [P5 search/${asin}] attempting raw-page fetch of citation: ${cand.url} (${cand.type})`);
+    const fetched = await fetchRawPageWithRetry(browserContext, cand.url, asin);
+    if (fetched && fetched.length >= 40) {
+      sourceUrl = cand.url;
+      sourceType = cand.type;
+      excerpt = fetched;
+      console.log(`  [P5 search/${asin}] raw-page fetch succeeded for ${cand.url} (${excerpt.length} chars)`);
+      break;
+    }
+    console.log(`  [P5 search/${asin}] raw-page fetch failed/empty for ${cand.url}`);
+  }
+
+  if (!sourceUrl && candidates.length) {
+    // Raw fetch failed for every candidate, but Perplexity's findings still
+    // stand on their own — surface the top citation as the recorded source
+    // URL (for provenance) even though we have no raw excerpt for it.
+    sourceUrl = candidates[0].url;
+    sourceType = candidates[0].type;
+    console.log(`  [P5 search/${asin}] no raw page fetched — using Perplexity findings alone as the source (citation recorded for provenance)`);
+  }
+
+  const extracted = {
+    perplexity_findings: result.content,
+    citations: result.citations || [],
+    signals: excerpt ? extractSignalsFromText(excerpt) : null,
+  };
+
+  return {
+    skipped: false,
+    engine: 'perplexity',
+    source_url: sourceUrl,
+    source_type: sourceType || 'perplexity_synthesis',
+    raw_html_excerpt: excerpt || null,
+    extracted,
+    perplexity_findings: result.content,
+    citations: result.citations || [],
+  };
+}
+
+async function findAndScrapeSourceLegacy(browserContext, product, keyword) {
   const brand = product.brand || '';
   const title = product.title || '';
   const asin = product.asin;
@@ -423,6 +562,32 @@ async function findAndScrapeSource(browserContext, product, keyword) {
   }
 }
 
+/**
+ * Top-level off-Amazon discovery dispatcher: Perplexity (primary, if
+ * PERPLEXITY_API_KEY is set) → legacy DuckDuckGo/Bright-Data-SERP scrape
+ * (fallback). Logs which path ran on every call so this is never silent.
+ */
+async function findAndScrapeSource(browserContext, product, keyword) {
+  const brand = product.brand || '';
+  const title = product.title || '';
+  const asin = product.asin;
+  if (!brand && !title) {
+    console.log(`  [P5 search/${asin}] skipped — no brand/title to search`);
+    return null;
+  }
+
+  if (getPerplexityKey()) {
+    console.log(`  [P5 search/${asin}] discovery path: Perplexity`);
+    const result = await findAndScrapeSourceViaPerplexity(browserContext, product, keyword);
+    if (result && !result.skipped) return result;
+    console.log(`  [P5 search/${asin}] Perplexity path yielded nothing — falling back to legacy DuckDuckGo/Bright-Data-SERP search`);
+  } else {
+    console.log(`  [P5 search/${asin}] discovery path: legacy DuckDuckGo/Bright-Data-SERP (PERPLEXITY_API_KEY not set)`);
+  }
+
+  return findAndScrapeSourceLegacy(browserContext, product, keyword);
+}
+
 // Cheap regex-based signal extraction from the scraped page text — no LLM
 // call needed for this step, keeps the pipeline fast.
 function extractSignalsFromText(text) {
@@ -440,6 +605,14 @@ function extractSignalsFromText(text) {
 }
 
 async function saveSource(asin, keyword, scraped) {
+  // dovive_p5_sources.source_url is NOT NULL — if Perplexity returned
+  // findings but had zero citations to attach a URL to, there's nothing to
+  // persist here (the findings still fed the P8/prompt grounding via
+  // sourceBlock — this table just tracks per-URL scraped provenance).
+  if (!scraped.source_url) {
+    console.log(`  [P5 source/${asin}] no source_url to persist to dovive_p5_sources (Perplexity findings had no usable citation) — findings still used in the prompt`);
+    return;
+  }
   const { error } = await DOVIVE.from('dovive_p5_sources').insert({
     asin,
     keyword,
@@ -518,6 +691,12 @@ function matchNamedSection(text, name, nextNames) {
   return text.match(re)?.[1]?.trim() || '';
 }
 
+// sourceExtracted can be the legacy flat shape ({certifications, ...}) or
+// the Perplexity shape ({perplexity_findings, citations, signals:{certifications,...}}).
+function certificationsFromExtracted(sourceExtracted) {
+  return sourceExtracted?.certifications || sourceExtracted?.signals?.certifications || [];
+}
+
 function parseResearchOutput(rawText, product, pool, meta) {
   const threatMatch = rawText.match(/\*\*Threat Level:?\*\*\s*([^\n\-–]+)/i)
     || rawText.match(/Threat Level:?\s*([^\n\-–]+)/i);
@@ -564,10 +743,10 @@ function parseResearchOutput(rawText, product, pool, meta) {
     benefits: keyBullets.slice(0, 3),
     features: [],
     formula_notes: formulaSection.substring(0, 800),
-    certifications: meta.sourceExtracted?.certifications || [],
+    certifications: certificationsFromExtracted(meta.sourceExtracted),
     awards: [],
-    third_party_tested: (meta.sourceExtracted?.certifications || []).length > 0,
-    transparency_flag: !(meta.sourceExtracted?.certifications || []).length,
+    third_party_tested: certificationsFromExtracted(meta.sourceExtracted).length > 0,
+    transparency_flag: !certificationsFromExtracted(meta.sourceExtracted).length,
     reddit_sentiment: 'unknown',
     reddit_notes: '',
     reddit_sources: [],
@@ -584,6 +763,8 @@ function parseResearchOutput(rawText, product, pool, meta) {
       had_real_amazon_data: meta.hasRealData,
       had_source_scrape: !!meta.sourceUrl,
       source_url: meta.sourceUrl || null,
+      had_perplexity_findings: !!meta.hadPerplexityFindings,
+      perplexity_citation_count: meta.citationCount || 0,
       memory_fallback: meta.memoryFallback,
       parse_fallback: !anyStructuredContent,
     },
@@ -710,22 +891,38 @@ async function researchOneProduct({ product, rank, pool }, browserContext) {
   const groundingText = formatGroundingForPrompt(grounding);
 
   const scraped = await findAndScrapeSource(browserContext, product, KEYWORD);
-  let sourceBlock = '**Off-Amazon source (Playwright scrape):** Not attempted or no confident match found — relying on Amazon DB data only.';
-  let sourceUrl = null, sourceExtracted = null;
+  let sourceBlock = '**Off-Amazon source:** Not attempted or no confident match found — relying on Amazon DB data only.';
+  let sourceUrl = null, sourceExtracted = null, hadPerplexityFindings = false, citationCount = 0;
 
   if (scraped && !scraped.skipped) {
     sourceUrl = scraped.source_url;
     sourceExtracted = scraped.extracted;
-    sourceBlock = `**Off-Amazon source (${scraped.source_type}, Playwright-scraped just now):**
+    hadPerplexityFindings = !!scraped.perplexity_findings;
+    citationCount = (scraped.citations || []).length;
+
+    if (scraped.perplexity_findings) {
+      // Perplexity path: feed BOTH the synthesized findings and any raw
+      // fetched page excerpt into the prompt as off-Amazon grounding.
+      const rawBlock = scraped.raw_html_excerpt
+        ? `\n\n**Raw page excerpt (${scraped.source_type}, fetched just now from a Perplexity citation):**\nURL: ${scraped.source_url}\n${scraped.raw_html_excerpt.substring(0, 15000)}`
+        : `\n\n**Raw page fetch:** not available (citation page could not be fetched — relying on Perplexity's synthesis only).`;
+      sourceBlock = `**Off-Amazon source (Perplexity live web research, ${citationCount} citation(s)):**
+${scraped.perplexity_findings}${rawBlock}`;
+    } else {
+      sourceBlock = `**Off-Amazon source (${scraped.source_type}, Playwright-scraped just now):**
 URL: ${scraped.source_url}
 Extracted: ${JSON.stringify(scraped.extracted)}
 Page excerpt: ${scraped.raw_html_excerpt.substring(0, 15000)}`;
+    }
     await saveSource(product.asin, KEYWORD, scraped);
   } else if (scraped?.skipped) {
-    sourceBlock = `**Off-Amazon source (Playwright scrape):** SKIPPED — ${scraped.reason}. Do not assume brand-site facts; note as unknown.`;
+    sourceBlock = `**Off-Amazon source:** SKIPPED — ${scraped.reason}. Do not assume brand-site facts; note as unknown.`;
   }
 
-  const memoryFallback = !grounding.hasRealData && !sourceUrl;
+  // Perplexity findings alone (even with no raw page fetch) count as a real
+  // off-Amazon source — only fall back to pure model-memory if there's
+  // neither real Amazon DB data NOR any Perplexity/scrape source at all.
+  const memoryFallback = !grounding.hasRealData && !sourceUrl && !hadPerplexityFindings;
   const model = memoryFallback ? P5_REASONING_MODEL : P5_FAST_MODEL;
   // Grounded brief target is ~500-700 words (~2500-4000 output tokens incl. markdown structure);
   // memory-fallback case gets a bit more headroom since it has no real data to lean on.
@@ -737,12 +934,18 @@ Page excerpt: ${scraped.raw_html_excerpt.substring(0, 15000)}`;
 
   const record = parseResearchOutput(rawOutput, product, pool, {
     model, hasRealData: grounding.hasRealData, sourceUrl, sourceExtracted, memoryFallback,
+    hadPerplexityFindings, citationCount,
   });
 
   await saveToSupabase(record);
   await saveToDashProduct(product.asin, record);
 
-  return { rawLen: rawOutput.length, model, memoryFallback, hadSource: !!sourceUrl, hadRealData: grounding.hasRealData };
+  console.log(`  [P5 source/${product.asin}] perplexity=${hadPerplexityFindings} citations=${citationCount} rawPageFetched=${!!scraped?.raw_html_excerpt} source=${!!sourceUrl || hadPerplexityFindings}`);
+
+  return {
+    rawLen: rawOutput.length, model, memoryFallback, hadSource: !!sourceUrl || hadPerplexityFindings,
+    hadRealData: grounding.hasRealData, hadPerplexityFindings, citationCount,
+  };
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────

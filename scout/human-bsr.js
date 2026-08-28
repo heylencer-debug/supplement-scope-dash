@@ -513,7 +513,15 @@ async function attemptPlaywrightGather(attemptNum, alreadyScraped) {
       console.log(`\n→ Scanning page ${pageNum}...`);
       await humanScroll(page);
 
-      const pageItems = await page.evaluate((pNum) => {
+      // Keyword-aware relevance filter (2026-08-28): the collector previously
+      // hardcoded /gumm/i — a leftover from the pipeline's gummies-only origin
+      // that silently discarded EVERY product for non-gummy keywords (e.g.
+      // "hydration powder" → 0 gathered → phases starved). Now: keep a result
+      // if its title contains ANY significant word (>3 chars) of the keyword.
+      // For "ashwagandha gummies" this behaves like before; for any other
+      // category it generalizes. Amazon's own relevance ranking does the rest.
+      const keywordTokens = KEYWORD_LABEL.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+      const pageItems = await page.evaluate(({ pNum, tokens }) => {
         const results = [];
         const cards = document.querySelectorAll('[data-component-type="s-search-result"]');
         cards.forEach((card, i) => {
@@ -522,12 +530,13 @@ async function attemptPlaywrightGather(attemptNum, alreadyScraped) {
           if (!asin) return;
           const titleEl = card.querySelector('h2 span, h2 a span');
           const title = titleEl?.textContent?.trim() || '';
-          if (/gumm/i.test(title)) {
+          const t = title.toLowerCase();
+          if (tokens.length === 0 || tokens.some(w => t.includes(w))) {
             results.push({ asin, title, rank: (pNum - 1) * 48 + i + 1 });
           }
         });
         return results;
-      }, pageNum);
+      }, { pNum: pageNum, tokens: keywordTokens });
 
       console.log(`  Found ${pageItems.length} gummies on page ${pageNum}`);
       pageItems.forEach(p => console.log(`    [${p.asin}] ${p.title.slice(0, 70)}`));
@@ -575,7 +584,20 @@ async function attemptPlaywrightGather(attemptNum, alreadyScraped) {
     const toScrape = uniqueGummies.filter(p => !alreadyScraped.has(p.asin));
     const skipped  = uniqueGummies.length - toScrape.length;
 
-    console.log(`\nTotal gummies: ${uniqueGummies.length} unique | ${skipped} already in DB | ${toScrape.length} to scrape`);
+    console.log(`\nTotal products: ${uniqueGummies.length} unique | ${skipped} already in DB | ${toScrape.length} to scrape`);
+
+    // Zero-gathered guard (2026-08-28): if the search "succeeded" but yielded
+    // NOTHING new and NOTHING was already in the DB, treat it as a FAILED
+    // attempt — a real search for any live category never returns zero
+    // products, so this is a filter/markup/soft-block problem. Throwing here
+    // sends the run into the retry loop and ultimately the Bright Data
+    // dataset fallback, instead of silently declaring "nothing to do" and
+    // starving every downstream phase.
+    if (toScrape.length === 0 && skipped === 0) {
+      await captureFailureArtifact(page, `p1-attempt${attemptNum}-zero-results`);
+      try { await browser.close(); } catch (_) {}
+      throw new Error('P1 gathered 0 products with 0 already in DB — treating as failed attempt (triggers Bright Data fallback)');
+    }
 
     return { browser, context, toScrape, skipped };
   } catch (err) {

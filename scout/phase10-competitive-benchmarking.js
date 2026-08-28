@@ -55,7 +55,9 @@ function getOpenRouterKey()   { return process.env.OPENROUTER_API_KEY || null; }
 const ANALYSIS_MODEL = process.env.ANALYSIS_MODEL || 'anthropic/claude-sonnet-5';
 const VALIDATION_MODEL = process.env.VALIDATION_MODEL || 'anthropic/claude-opus-5';
 
-async function callClaudeSonnet(prompt, maxTokens = 32000) {
+// Internal single-shot call; callClaudeSonnet() below wraps it with the
+// uniform near-empty-only retry policy (no blind retry on finish_reason=length).
+async function callClaudeSonnetOnce(prompt, maxTokens) {
   const key = getOpenRouterKey();
   if (!key) throw new Error('OPENROUTER_API_KEY not set');
   const start = Date.now();
@@ -88,6 +90,10 @@ async function callClaudeSonnet(prompt, maxTokens = 32000) {
         messages: [{ role: 'user', content: prompt }],
       }),
     });
+    if (res.status === 402) {
+      console.error(`  ❌ P10 Claude Sonnet OpenRouter credits exhausted — top up at openrouter.ai`);
+      throw new Error('[ERROR: credits] OpenRouter credits exhausted (402)');
+    }
     if (!res.ok) {
       const errText = await res.text();
       throw new Error(`Claude Sonnet error ${res.status}: ${errText.slice(0, 200)}`);
@@ -118,19 +124,36 @@ async function callClaudeSonnet(prompt, maxTokens = 32000) {
       }
     }
     if (promptTokens || completionTokens) console.log(`  Tokens: ${promptTokens}→${completionTokens}${finishReason ? ` (finish_reason: ${finishReason})` : ''}`);
-    console.log(`  ✅ Claude Sonnet done (${Math.round((Date.now()-start)/1000)}s, ${Math.round(output.length/1000)}k chars)`);
+    console.log(`  ✅ Claude Sonnet done (${Math.round((Date.now()-start)/1000)}s, ${output.length} chars, finish_reason: ${finishReason || 'unknown'})`);
     if (!output) {
       console.warn(`  ⚠ Claude Sonnet returned EMPTY output (finish_reason: ${finishReason || 'unknown'}, completion_tokens: ${completionTokens}, reasoning_chars: ${reasoning.length}) — likely max_tokens too low or all budget consumed before content. NOT coercing to null silently.`);
     }
     // Never silently coerce empty-but-real responses to null — an empty string is diagnosable,
     // null looks identical to "never called". Caller decides how to handle empties.
-    return output;
+    return { output, finishReason };
   } finally {
     clearTimeout(timeout);
   }
 }
 
-async function callClaudeOpus(prompt, maxTokens = 16000) {
+// No blind retry-on-length: the cap itself was the truncation cause, not
+// transience. finish_reason=length WITH substantial content is kept as-is
+// (logged); only genuinely empty/near-empty output gets one retry at the
+// same (already generous) budget.
+async function callClaudeSonnet(prompt, maxTokens = 32000) {
+  let { output, finishReason } = await callClaudeSonnetOnce(prompt, maxTokens);
+  const len = (output || '').length;
+  if (finishReason === 'length' && len > 500) {
+    console.log(`  [NOTE: output reached token ceiling] — keeping truncated-but-substantial content`);
+  } else if (len < 500) {
+    console.warn(`  ⚠ Claude Sonnet near-empty output — retrying once at same budget...`);
+    const retry = await callClaudeSonnetOnce(prompt, maxTokens);
+    if (retry.output) output = retry.output;
+  }
+  return output;
+}
+
+async function callClaudeOpusOnce(prompt, maxTokens) {
   const key = getOpenRouterKey();
   if (!key) throw new Error('OPENROUTER_API_KEY not set');
   const start = Date.now();
@@ -155,6 +178,10 @@ async function callClaudeOpus(prompt, maxTokens = 16000) {
         messages: [{ role: 'user', content: prompt }],
       }),
     });
+    if (res.status === 402) {
+      console.error(`  ❌ P10 Claude Opus OpenRouter credits exhausted — top up at openrouter.ai`);
+      throw new Error('[ERROR: credits] OpenRouter credits exhausted (402)');
+    }
     if (!res.ok) {
       const errText = await res.text();
       throw new Error(`Claude Opus error ${res.status}: ${errText.slice(0, 200)}`);
@@ -181,14 +208,30 @@ async function callClaudeOpus(prompt, maxTokens = 16000) {
       }
     }
     if (promptTokens || completionTokens) console.log(`  Tokens: ${promptTokens}→${completionTokens}${finishReason ? ` (finish_reason: ${finishReason})` : ''}`);
-    console.log(`  ✅ Claude Opus done (${Math.round((Date.now()-start)/1000)}s, ${Math.round(output.length/1000)}k chars)`);
+    console.log(`  ✅ Claude Opus done (${Math.round((Date.now()-start)/1000)}s, ${output.length} chars, finish_reason: ${finishReason || 'unknown'})`);
     if (!output) {
       console.warn(`  ⚠ Claude Opus returned EMPTY output (finish_reason: ${finishReason || 'unknown'}, completion_tokens: ${completionTokens}, reasoning_chars: ${reasoning.length})`);
     }
-    return output;
+    return { output, finishReason };
   } finally {
     clearTimeout(timeout);
   }
+}
+
+// No blind retry-on-length: cap itself caused truncation. finish_reason=length
+// WITH substantial content is kept as-is (logged); only near-empty output
+// gets one retry at the same (generous) budget.
+async function callClaudeOpus(prompt, maxTokens = 32000) {
+  let { output, finishReason } = await callClaudeOpusOnce(prompt, maxTokens);
+  const len = (output || '').length;
+  if (finishReason === 'length' && len > 500) {
+    console.log(`  [NOTE: output reached token ceiling] — keeping truncated-but-substantial content`);
+  } else if (len < 500) {
+    console.warn(`  ⚠ Claude Opus near-empty output — retrying once at same budget...`);
+    const retry = await callClaudeOpusOnce(prompt, maxTokens);
+    if (retry.output) output = retry.output;
+  }
+  return output;
 }
 
 // 2026-08-28 FIX (audit item #2): P10 never surfaced P5's off-Amazon research
@@ -536,32 +579,22 @@ async function run() {
   console.log(`\nCall 1: Claude (via OpenRouter) drafting ingredient comparison (${withFormula.length} competitors with OCR data)...`);
   const sonnetPrompt = buildSonnetDraftPrompt(adjustedFormula, withFormula, KEYWORD, p5Data);
   console.log(`  Prompt: ${Math.round(sonnetPrompt.length / 1000)}k chars`);
-  // 2026-08-28 FIX: 16000/20000 both failed with the FULL budget consumed
-  // and ZERO visible output chars (see callClaudeSonnet's reasoning:false
-  // fix above) — raised to 32000/48000, well inside Sonnet 5's confirmed
-  // 128000 max_completion_tokens, as a belt-and-suspenders safety net on
-  // top of disabling reasoning tokens.
-  let sonnetDraft = await callClaudeSonnet(sonnetPrompt, 32000);
+  // Uncapped to a generous 64000-token ceiling — callClaudeSonnet() now handles
+  // its own near-empty-only retry internally (same budget, no escalation);
+  // caps were the truncation cause, not transient failures.
+  let sonnetDraft = await callClaudeSonnet(sonnetPrompt, 64000);
   if (!sonnetDraft) {
-    console.warn(`  ⚠ Sonnet draft came back empty — retrying once with a larger token budget (48000)...`);
-    sonnetDraft = await callClaudeSonnet(sonnetPrompt, 48000);
-  }
-  if (!sonnetDraft) {
-    console.error(`  ❌ Sonnet draft still empty after retry — persisting explicit error marker instead of null so this is diagnosable, not silently lost.`);
-    sonnetDraft = '[ERROR: Claude Sonnet returned empty output for the competitive benchmarking draft after 2 attempts — check OpenRouter logs / token budget / finish_reason above.]';
+    console.error(`  ❌ Sonnet draft still empty after internal retry — persisting explicit error marker instead of null so this is diagnosable, not silently lost.`);
+    sonnetDraft = '[ERROR: Claude Sonnet returned empty output for the competitive benchmarking draft — check OpenRouter logs / token budget / finish_reason above.]';
   }
 
   // ── Call 2: Claude Opus validates ─────────────────────────────────────────
   console.log(`\nCall 2: Claude (via OpenRouter) validating Sonnet's analysis...`);
   const opusPrompt = buildOpusValidationPrompt(adjustedFormula, withFormula, sonnetDraft, KEYWORD);
   console.log(`  Prompt: ${Math.round(opusPrompt.length / 1000)}k chars`);
-  let opusValidation = await callClaudeOpus(opusPrompt, 12000);
+  let opusValidation = await callClaudeOpus(opusPrompt, 32000);
   if (!opusValidation) {
-    console.warn(`  ⚠ Opus validation came back empty — retrying once with a larger token budget (16000)...`);
-    opusValidation = await callClaudeOpus(opusPrompt, 16000);
-  }
-  if (!opusValidation) {
-    opusValidation = '[ERROR: Claude Opus returned empty output for the competitive benchmarking validation after 2 attempts — check OpenRouter logs / token budget / finish_reason above.]';
+    opusValidation = '[ERROR: Claude Opus returned empty output for the competitive benchmarking validation — check OpenRouter logs / token budget / finish_reason above.]';
   }
 
   // ── Parse scores ──────────────────────────────────────────────────────────

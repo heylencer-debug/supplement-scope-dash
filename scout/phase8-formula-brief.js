@@ -55,7 +55,11 @@ const VALIDATION_MODEL = process.env.VALIDATION_MODEL || 'anthropic/claude-opus-
 // adjudicate between). RESTORED per explicit follow-up instruction: Draft A
 // now uses VALIDATION_MODEL (Opus 5) and Draft B uses ANALYSIS_MODEL
 // (Sonnet 5) — two genuinely different models drafting independently again.
-async function callGrok42(prompt, maxTokens = 16000) {
+// Uncapped to 64000 (generous ceiling near model limits). No blind retry on
+// finish_reason=length anymore — the cap itself was the cause of truncation,
+// not transience. Substantial truncated content is kept as-is (logged);
+// only genuinely empty/near-empty output gets one retry at the same budget.
+async function callGrok42(prompt, maxTokens = 64000) {
   const key = getOpenRouterKey();
   if (!key) throw new Error('OPENROUTER_API_KEY not found');
   const start = Date.now();
@@ -74,18 +78,32 @@ async function callGrok42(prompt, maxTokens = 16000) {
         messages: [{ role: 'user', content: prompt }],
       }),
     });
+    if (res.status === 402) {
+      console.error(`  ❌ Claude (Draft A) OpenRouter credits exhausted — top up at openrouter.ai`);
+      throw new Error('[ERROR: credits] OpenRouter credits exhausted (402)');
+    }
     const j = await res.json();
     if (j.error) throw new Error(`Claude (Draft A) error: ${j.error.message}`);
     const choice = j.choices?.[0];
-    return { content: choice?.message?.content || null, finishReason: choice?.finish_reason || 'unknown' };
+    const content = choice?.message?.content || null;
+    const finishReason = choice?.finish_reason || 'unknown';
+    const reasoningTokens = j.usage?.completion_tokens_details?.reasoning_tokens;
+    console.log(`  finish_reason: ${finishReason} | output_chars: ${(content || '').length}${reasoningTokens != null ? ` | reasoning_tokens: ${reasoningTokens}` : ''}`);
+    return { content, finishReason };
   };
   let { content, finishReason } = await doCall(maxTokens);
-  console.log(`  finish_reason: ${finishReason}`);
-  if (!content || finishReason === 'length') {
-    console.log(`  ⚠️  Truncated/empty — retrying once at ${Math.round(maxTokens * 1.25)} tokens...`);
-    const retry = await doCall(Math.round(maxTokens * 1.25));
-    console.log(`  finish_reason (retry): ${retry.finishReason}`);
-    content = retry.content || content;
+  const len = (content || '').length;
+  if (finishReason === 'length' && len > 500) {
+    console.log(`  [NOTE: output reached token ceiling] — keeping truncated-but-substantial content`);
+  } else if (len < 500) {
+    console.log(`  ⚠️  Near-empty output — retrying once at same budget...`);
+    try {
+      const retry = await doCall(maxTokens);
+      content = retry.content || content;
+    } catch (e) {
+      if (e.message.includes('[ERROR: credits]')) throw e;
+      console.warn(`  ⚠️ Retry failed: ${e.message}`);
+    }
   }
   if (!content) content = '[ERROR: truncated/empty]';
   console.log(`  ✅ Claude (Draft A) done (${Math.round((Date.now()-start)/1000)}s, ${Math.round((content?.length||0)/1000)}k chars)`);
@@ -115,12 +133,17 @@ async function callClaudeSonnetOnce(prompt, maxTokens) {
         messages: [{ role: 'user', content: prompt }],
       }),
     });
+    if (res.status === 402) {
+      console.error(`  ❌ Claude (Draft B) OpenRouter credits exhausted — top up at openrouter.ai`);
+      throw new Error('[ERROR: credits] OpenRouter credits exhausted (402)');
+    }
     if (!res.ok) {
       const errText = await res.text();
       throw new Error(`Claude (Draft B) error ${res.status}: ${errText.slice(0, 200)}`);
     }
     let output = '';
     let finishReason = null;
+    let reasoningTokens = null;
     const text = await res.text();
     for (const line of text.split('\n')) {
       if (!line.startsWith('data: ')) continue;
@@ -132,11 +155,12 @@ async function callClaudeSonnetOnce(prompt, maxTokens) {
         const delta = j.choices?.[0]?.delta?.content;
         if (delta) output += delta;
         if (j.choices?.[0]?.finish_reason) finishReason = j.choices[0].finish_reason;
+        if (j.usage?.completion_tokens_details?.reasoning_tokens != null) reasoningTokens = j.usage.completion_tokens_details.reasoning_tokens;
       } catch (e) {
         if (e.message.startsWith('Claude (Draft B) error')) throw e;
       }
     }
-    console.log(`  finish_reason: ${finishReason || 'unknown'}`);
+    console.log(`  finish_reason: ${finishReason || 'unknown'} | output_chars: ${output.length}${reasoningTokens != null ? ` | reasoning_tokens: ${reasoningTokens}` : ''}`);
     console.log(`  ✅ Claude (Draft B) call done (${Math.round((Date.now()-start)/1000)}s, ${Math.round(output.length/1000)}k chars)`);
     return { output, finishReason };
   } finally {
@@ -144,12 +168,24 @@ async function callClaudeSonnetOnce(prompt, maxTokens) {
   }
 }
 
+// Uncapped to 64000. No blind retry on finish_reason=length — cap itself was
+// the truncation cause. Substantial truncated content is kept as-is
+// (logged); only genuinely empty/near-empty output gets one retry at the
+// same budget.
 async function callClaudeSonnet(prompt) {
-  let { output, finishReason } = await callClaudeSonnetOnce(prompt, 16000);
-  if (!output || finishReason === 'length') {
-    console.warn(`  ⚠ Claude (Draft B) truncated/empty (finish_reason=${finishReason}) — retrying once at 20000 tokens...`);
-    const retry = await callClaudeSonnetOnce(prompt, 20000);
-    output = retry.output || output;
+  let { output, finishReason } = await callClaudeSonnetOnce(prompt, 64000);
+  const len = (output || '').length;
+  if (finishReason === 'length' && len > 500) {
+    console.log(`  [NOTE: output reached token ceiling] — keeping truncated-but-substantial content`);
+  } else if (len < 500) {
+    console.warn(`  ⚠ Claude (Draft B) near-empty (finish_reason=${finishReason}) — retrying once at same budget...`);
+    try {
+      const retry = await callClaudeSonnetOnce(prompt, 64000);
+      output = retry.output || output;
+    } catch (e) {
+      if (e.message.includes('[ERROR: credits]')) throw e;
+      console.warn(`  ⚠️ Retry failed: ${e.message}`);
+    }
   }
   if (!output) {
     console.error(`  ❌ Claude (Draft B) still empty after retry — persisting explicit error marker instead of throwing/nulling.`);
@@ -209,16 +245,25 @@ If the text above genuinely does not contain enough information for a field, use
         messages: [{ role: 'user', content: prompt }],
       }),
     });
+    if (res.status === 402) {
+      console.error(`  ❌ P8 positioning-extract OpenRouter credits exhausted — top up at openrouter.ai`);
+      throw new Error('[ERROR: credits] OpenRouter credits exhausted (402)');
+    }
     const j = await res.json();
     if (j.error) throw new Error(`Positioning extract error: ${j.error.message}`);
     const choice = j.choices?.[0];
-    return { content: choice?.message?.content || null, finishReason: choice?.finish_reason || 'unknown' };
+    const content = choice?.message?.content || null;
+    const finishReason = choice?.finish_reason || 'unknown';
+    console.log(`  [P8 positioning] finish_reason: ${finishReason} | output_chars: ${(content || '').length}`);
+    return { content, finishReason };
   };
 
   try {
-    let { content, finishReason } = await doCall(600);
-    if (!content || finishReason === 'length') {
-      const retry = await doCall(900);
+    // Small utility extraction (1-2 sentences) — 2000 tokens is sensible, not a
+    // heavy analysis call. No blind retry-on-length; only near-empty retries.
+    let { content, finishReason } = await doCall(2000);
+    if (!content || content.length < 100) {
+      const retry = await doCall(2000);
       content = retry.content || content;
     }
     if (!content) return { positioning: null, target_customer: null };

@@ -60,19 +60,31 @@ async function callClaudeOnce(prompt, maxTokens) {
       messages: [{ role: 'user', content: prompt }],
     }),
   });
+  if (res.status === 402) {
+    console.error(`  ❌ Living Brief OpenRouter credits exhausted — top up at openrouter.ai`);
+    throw new Error('[ERROR: credits] OpenRouter credits exhausted (402)');
+  }
   const j = await res.json();
   if (j.error) throw new Error(`Claude error: ${j.error.message}`);
   const choice = j.choices?.[0];
-  return { content: choice?.message?.content || '', finishReason: choice?.finish_reason || 'unknown' };
+  const content = choice?.message?.content || '';
+  const finishReason = choice?.finish_reason || 'unknown';
+  const reasoningTokens = j.usage?.completion_tokens_details?.reasoning_tokens;
+  console.log(`  finish_reason: ${finishReason} | output_chars: ${content.length}${reasoningTokens != null ? ` | reasoning_tokens: ${reasoningTokens}` : ''}`);
+  return { content, finishReason };
 }
 
-async function callClaude(prompt, maxTokens = 8000) {
+// No blind retry-on-length: the cap itself was the truncation cause, not
+// transience. finish_reason=length WITH substantial content is kept as-is
+// (logged); only genuinely empty/near-empty output gets one retry at the
+// same (already generous) budget.
+async function callClaude(prompt, maxTokens = 32000) {
   let { content, finishReason } = await callClaudeOnce(prompt, maxTokens);
-  console.log(`  finish_reason: ${finishReason}`);
-  if (!content || finishReason === 'length') {
-    console.log(`  ⚠️  Truncated/empty — retrying once at ${Math.round(maxTokens * 1.5)} tokens...`);
-    const retry = await callClaudeOnce(prompt, Math.round(maxTokens * 1.5));
-    console.log(`  finish_reason (retry): ${retry.finishReason}`);
+  if (finishReason === 'length' && content.length > 500) {
+    console.log(`  [NOTE: output reached token ceiling] — keeping truncated-but-substantial content`);
+  } else if (content.length < 500) {
+    console.log(`  ⚠️  Near-empty output — retrying once at same budget...`);
+    const retry = await callClaudeOnce(prompt, maxTokens);
     content = retry.content || content;
   }
   if (!content) return '[ERROR: truncated/empty]';
@@ -84,7 +96,7 @@ async function callClaudeWithImagesOnce(textPrompt, imageUrls, maxTokens) {
   const key = getOpenRouterKey();
   if (!key) throw new Error('OPENROUTER_API_KEY not set');
 
-  const content = [
+  const messageContent = [
     { type: 'text', text: textPrompt },
     ...imageUrls.map(url => ({
       type: 'image_url',
@@ -102,22 +114,31 @@ async function callClaudeWithImagesOnce(textPrompt, imageUrls, maxTokens) {
     body: JSON.stringify({
       model: ANALYSIS_MODEL,
       max_tokens: maxTokens,
-      messages: [{ role: 'user', content }],
+      messages: [{ role: 'user', content: messageContent }],
     }),
   });
+  if (res.status === 402) {
+    console.error(`  ❌ Living Brief Vision OpenRouter credits exhausted — top up at openrouter.ai`);
+    throw new Error('[ERROR: credits] OpenRouter credits exhausted (402)');
+  }
   const j = await res.json();
   if (j.error) throw new Error(`Claude Vision error: ${j.error.message}`);
   const choice = j.choices?.[0];
-  return { content: choice?.message?.content || '', finishReason: choice?.finish_reason || 'unknown' };
+  const content = choice?.message?.content || '';
+  const finishReason = choice?.finish_reason || 'unknown';
+  console.log(`  finish_reason: ${finishReason} | output_chars: ${content.length}`);
+  return { content, finishReason };
 }
 
+// Vision extraction from feedback images — small-to-medium utility, not a
+// heavy analysis call, but same no-blind-retry-on-length policy applies.
 async function callClaudeWithImages(textPrompt, imageUrls, maxTokens = 8000) {
   let { content, finishReason } = await callClaudeWithImagesOnce(textPrompt, imageUrls, maxTokens);
-  console.log(`  finish_reason: ${finishReason}`);
-  if (!content || finishReason === 'length') {
-    console.log(`  ⚠️  Truncated/empty — retrying once at ${Math.round(maxTokens * 1.5)} tokens...`);
-    const retry = await callClaudeWithImagesOnce(textPrompt, imageUrls, Math.round(maxTokens * 1.5));
-    console.log(`  finish_reason (retry): ${retry.finishReason}`);
+  if (finishReason === 'length' && content.length > 500) {
+    console.log(`  [NOTE: output reached token ceiling] — keeping truncated-but-substantial content`);
+  } else if (content.length < 500) {
+    console.log(`  ⚠️  Near-empty output — retrying once at same budget...`);
+    const retry = await callClaudeWithImagesOnce(textPrompt, imageUrls, maxTokens);
     content = retry.content || content;
   }
   if (!content) return '[ERROR: truncated/empty]';
@@ -269,7 +290,7 @@ Format clearly with each distinct point on a new line.`;
     // 5. Evaluate feedback with Claude
     console.log(`     🤖 Evaluating feedback with Claude...`);
     const prompt = buildEvaluationPrompt(KEYWORD, currentFormula, fullFeedbackText);
-    const evaluation = await callClaude(prompt, 10000);
+    const evaluation = await callClaude(prompt, 32000);
 
     // Parse verdict
     const verdictMatch = evaluation.match(/##\s*OVERALL VERDICT\s*\n+\[?(ACCEPTED|PARTIALLY ACCEPTED|QUESTIONED|REJECTED)\]?/i);

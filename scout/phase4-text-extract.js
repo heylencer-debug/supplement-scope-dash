@@ -70,64 +70,65 @@ Extract every ingredient and dose mentioned. If no specific doses are mentioned,
 Do not include any ingredient not explicitly named in the bullet points above — never invent or infer an ingredient from general supplement-category knowledge.
 Return ONLY valid JSON, no markdown.`;
 
+  // Small utility extraction — 4000 tokens is sensible for bullet-point text (not a heavy analysis call)
+  const MAX_TOKENS = 4000;
+
+  async function callOnce() {
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${OPENROUTER_KEY}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://dovive.com',
+        'X-Title': 'Dovive Scout P4'
+      },
+      body: JSON.stringify({
+        model: ANALYSIS_MODEL,
+        max_tokens: MAX_TOKENS,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    if (res.status === 402) {
+      console.error(`  ❌ OpenRouter credits exhausted — top up at openrouter.ai`);
+      throw new Error('[ERROR: credits] OpenRouter credits exhausted (402)');
+    }
+
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`OpenRouter error ${res.status}: ${err.slice(0, 200)}`);
+    }
+
+    const data = await res.json();
+    const choice = data.choices?.[0];
+    const content = choice?.message?.content || '';
+    const finishReason = choice?.finish_reason || 'unknown';
+    const reasoningTokens = data.usage?.completion_tokens_details?.reasoning_tokens;
+    console.log(`  finish_reason: ${finishReason} | output_chars: ${content.length}${reasoningTokens != null ? ` | reasoning_tokens: ${reasoningTokens}` : ''}`);
+    return { content, finishReason };
+  }
+
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${OPENROUTER_KEY}`,
-          'Content-Type': 'application/json',
-          'HTTP-Referer': 'https://dovive.com',
-          'X-Title': 'Dovive Scout P4'
-        },
-        body: JSON.stringify({
-          model: ANALYSIS_MODEL,
-          max_tokens: 2000,
-          messages: [{ role: 'user', content: prompt }]
-        })
-      });
+      let { content, finishReason } = await callOnce();
 
-      if (!res.ok) {
-        const err = await res.text();
-        throw new Error(`OpenRouter error ${res.status}: ${err.slice(0, 200)}`);
-      }
-
-      const data = await res.json();
-      const choice = data.choices?.[0];
-      const content = choice?.message?.content || '';
-      const finishReason = choice?.finish_reason || 'unknown';
-      console.log(`  finish_reason: ${finishReason}`);
-      if (finishReason === 'length' || !content) {
-        console.log(`  ⚠️  Truncated/empty (finish_reason=${finishReason}) — retrying once at higher max_tokens...`);
-        const retryRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${OPENROUTER_KEY}`,
-            'Content-Type': 'application/json',
-            'HTTP-Referer': 'https://dovive.com',
-            'X-Title': 'Dovive Scout P4'
-          },
-          body: JSON.stringify({
-            model: ANALYSIS_MODEL,
-            max_tokens: 4000,
-            messages: [{ role: 'user', content: prompt }]
-          })
-        });
-        const retryData = await retryRes.json();
-        const retryChoice = retryData.choices?.[0];
-        const retryContent = retryChoice?.message?.content || '';
-        console.log(`  finish_reason (retry): ${retryChoice?.finish_reason || 'unknown'}`);
-        if (!retryContent) {
+      if (finishReason === 'length' && content.length > 500) {
+        // Substantial content despite hitting the ceiling — keep it, don't burn tokens retrying.
+        console.log(`  [NOTE: output reached token ceiling] — keeping truncated-but-substantial content`);
+      } else if (content.length < 500) {
+        console.log(`  ⚠️  Near-empty output (finish_reason=${finishReason}) — retrying once at same budget...`);
+        const retry = await callOnce();
+        if (retry.content.length < 500) {
           throw new Error('[ERROR: truncated/empty] — retry still produced no content');
         }
-        const retryParsed = parseModelJson(retryContent);
-        if (!retryParsed.parsed) throw new Error(`Could not parse retry response (${retryParsed.method})`);
-        return retryParsed.parsed;
+        content = retry.content;
       }
+
       const parsed = parseModelJson(content);
       if (!parsed.parsed) throw new Error(`Could not parse GPT response (${parsed.method})`);
       return parsed.parsed;
     } catch (err) {
+      if (err.message.includes('[ERROR: credits]')) throw err;
       const isRateLimit = err.message.includes('429') || err.message.toLowerCase().includes('rate limit');
       if (isRateLimit && attempt < retries) {
         const wait = attempt * 15000;

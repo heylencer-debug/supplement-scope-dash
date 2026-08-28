@@ -86,6 +86,10 @@ async function callClaudeSonnetQAOnce(prompt, maxTokens, model = ANALYSIS_MODEL)
         messages: [{ role: 'user', content: prompt }],
       }),
     });
+    if (res.status === 402) {
+      console.error(`  ❌ P9 OpenRouter credits exhausted — top up at openrouter.ai`);
+      throw new Error('[ERROR: credits] OpenRouter credits exhausted (402)');
+    }
     if (!res.ok) {
       const errText = await res.text();
       throw new Error(`OpenRouter HTTP ${res.status}: ${errText.slice(0, 200)}`);
@@ -128,13 +132,19 @@ async function callClaudeSonnetQAOnce(prompt, maxTokens, model = ANALYSIS_MODEL)
   }
 }
 
+// No blind retry-on-length: the cap itself was the truncation cause, not
+// transience. finish_reason=length WITH substantial content is kept as-is
+// (logged, not re-burned); only genuinely empty/near-empty output gets one
+// retry at the same (already generous) budget.
 async function callClaudeSonnetQA(prompt, maxTokens = 32000, model = ANALYSIS_MODEL) {
   let { content, finishReason } = await callClaudeSonnetQAOnce(prompt, maxTokens, model);
-  if (!content || finishReason === 'length') {
-    console.warn(`  ⚠ Claude Sonnet QA (${model}) truncated/empty (finish_reason=${finishReason || 'unknown'}) — retrying once at ${Math.round(maxTokens * 1.5)} tokens...`);
-    const retry = await callClaudeSonnetQAOnce(prompt, Math.round(maxTokens * 1.5), model);
-    if (retry.content && retry.finishReason !== 'length') return retry.content;
-    if (retry.content) content = retry.content; // still 'length' but longer than nothing — keep the longer draft
+  const len = (content || '').length;
+  if (finishReason === 'length' && len > 500) {
+    console.log(`  [NOTE: output reached token ceiling] — keeping truncated-but-substantial content (${len} chars)`);
+  } else if (len < 500) {
+    console.warn(`  ⚠ Claude Sonnet QA (${model}) near-empty (finish_reason=${finishReason || 'unknown'}) — retrying once at same budget...`);
+    const retry = await callClaudeSonnetQAOnce(prompt, maxTokens, model);
+    if (retry.content) content = retry.content;
   }
   if (!content) console.error(`  ❌ Claude Sonnet QA still empty after retry — caller must guard against null (never coerce/persist silently).`);
   return content || null;
@@ -501,9 +511,15 @@ No other text. Pure JSON only.`;
         messages: [{ role: 'user', content: prompt }]
       })
     });
+    if (res.status === 402) {
+      console.error(`  ❌ P9 competitor-notes OpenRouter credits exhausted — top up at openrouter.ai`);
+      return {};
+    }
     const text = await res.text();
     const json = JSON.parse(text);
-    const raw = json.choices?.[0]?.message?.content || '';
+    const choice = json.choices?.[0];
+    const raw = choice?.message?.content || '';
+    console.log(`  [P9 competitor-notes] finish_reason: ${choice?.finish_reason || 'unknown'} | output_chars: ${raw.length}`);
     const obj = raw.match(/\{[\s\S]*\}/)?.[0];
     return obj ? JSON.parse(obj) : {};
   } catch (e) {
@@ -915,19 +931,26 @@ Replace each "one sentence" with your comparison. Focus on the most important di
       headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: ANALYSIS_MODEL,
-        max_tokens: 1500,
+        // Small utility (one sentence per competitor, up to 25) — 4000 is
+        // sensible headroom without treating this as a heavy analysis call.
+        max_tokens: 4000,
         // 2026-08-28 FIX: same reasoning-tokens disease applied for
         // consistency/safety across every OpenRouter call in this file.
         reasoning: { enabled: false },
         messages: [{ role: 'user', content: prompt }]
       })
     });
+    if (res.status === 402) {
+      console.error(`  ❌ P9 Call 3 OpenRouter credits exhausted — top up at openrouter.ai`);
+      return {};
+    }
     const text = await res.text();
     const parsed = JSON.parse(text);
     if (parsed.usage) {
       console.log(`  Call 3 tokens: ${parsed.usage.prompt_tokens}→${parsed.usage.completion_tokens}`);
       tokenLog.push({ call: tokenLog.length + 1, prompt_tokens: parsed.usage.prompt_tokens, completion_tokens: parsed.usage.completion_tokens, total_tokens: parsed.usage.total_tokens, ts: new Date().toISOString() });
     }
+    console.log(`  [P9 Call 3] finish_reason: ${parsed.choices?.[0]?.finish_reason || 'unknown'}`);
     const raw = parsed.choices?.[0]?.message?.content?.trim() || '';
     // Try to extract JSON - handle if Claude adds any wrapping text
     const jsonMatch = raw.match(/\{[\s\S]*\}/);

@@ -65,28 +65,37 @@ async function callGrokOnce(prompt, maxTokens) {
       messages: [{ role: 'user', content: prompt }],
     }),
   });
+  if (res.status === 402) {
+    console.error(`  ❌ P6 market-analysis OpenRouter credits exhausted — top up at openrouter.ai`);
+    throw new Error('[ERROR: credits] OpenRouter credits exhausted (402)');
+  }
   const j = await res.json();
   if (j.error) throw new Error(`OpenRouter: ${j.error.message || JSON.stringify(j.error)}`);
   const choice = j.choices?.[0];
   const content = choice?.message?.content || null;
   const finishReason = choice?.finish_reason || 'unknown';
+  const reasoningTokens = j.usage?.completion_tokens_details?.reasoning_tokens;
+  console.log(`  finish_reason: ${finishReason} | output_chars: ${(content || '').length}${reasoningTokens != null ? ` | reasoning_tokens: ${reasoningTokens}` : ''}`);
   return { content, finishReason };
 }
 
-async function callGrok(prompt, maxTokens = 16000) {
+// No blind retry-on-length: the cap itself caused truncation, not transience.
+// finish_reason=length WITH substantial content is kept as-is (logged, not
+// re-burned); only genuinely empty/near-empty output gets one retry at the
+// same (already generous) budget.
+async function callGrok(prompt, maxTokens = 64000) {
   let { content, finishReason } = await callGrokOnce(prompt, maxTokens);
-  console.log(`  finish_reason: ${finishReason}`);
-  const truncatedOrEmpty = !content || finishReason === 'length';
-  if (truncatedOrEmpty) {
-    console.log(`  ⚠️  Truncated/empty response (finish_reason=${finishReason}) — retrying once at ${maxTokens * 1.5} tokens...`);
-    const retry = await callGrokOnce(prompt, Math.round(maxTokens * 1.5));
-    console.log(`  finish_reason (retry): ${retry.finishReason}`);
-    if (retry.content && retry.finishReason !== 'length') {
-      return retry.content;
-    }
+  const len = (content || '').length;
+  if (finishReason === 'length' && len > 500) {
+    console.log(`  [NOTE: output reached token ceiling] — keeping truncated-but-substantial content (${len} chars)`);
+    return content;
+  }
+  if (len < 500) {
+    console.log(`  ⚠️  Near-empty response (finish_reason=${finishReason}) — retrying once at same budget...`);
+    const retry = await callGrokOnce(prompt, maxTokens);
+    if (retry.content && retry.content.length >= 500) return retry.content;
     if (retry.content) {
-      // Still marked truncated but has content — keep it, better than nothing, but flag.
-      console.log(`  ⚠️  Retry still truncated — keeping partial content, flagging in report.`);
+      console.log(`  ⚠️  Retry still near-empty — keeping whatever content there is, flagging in report.`);
       return retry.content;
     }
     console.log(`  ❌ Retry produced empty content — persisting explicit error marker (never silently null).`);
@@ -517,7 +526,7 @@ async function run() {
   const prompt = buildPrompt(ctx, KEYWORD, rawReviews);
   console.log(`Calling ${ANALYSIS_MODEL} via OpenRouter... prompt: ${Math.round(prompt.length / 1000)}k chars`);
   const startTime = Date.now();
-  const report = await callGrok(prompt, 16000);
+  const report = await callGrok(prompt, 64000);
   const elapsed = Math.round((Date.now() - startTime) / 1000);
   console.log(`  âœ… Done (${elapsed}s, ${Math.round(report.length / 1000)}k chars output)\n`);
 

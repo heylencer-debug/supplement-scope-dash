@@ -72,7 +72,11 @@ const POOL_ARG = process.argv.includes('--pool')     ? process.argv[process.argv
 
 const P5_TOP_COUNT   = parseInt(process.env.P5_TOP_COUNT   || '5', 10);
 const P5_NEW_COUNT   = parseInt(process.env.P5_NEW_COUNT   || '3', 10);
-const P5_CONCURRENCY = parseInt(process.env.P5_CONCURRENCY || '5', 10);
+// Default lowered 5 -> 2: with max_tokens uncapped to 32000, running 5 heavy
+// LLM calls concurrently stacks OpenRouter credit reservations and can trip
+// 402s mid-run. 2 in-flight keeps data-fetch parallelism elsewhere in the
+// pool while bounding heavy-call concurrency. Override via env if needed.
+const P5_CONCURRENCY = parseInt(process.env.P5_CONCURRENCY || '2', 10);
 
 // Analysis model — configurable without a rebuild. Default: Claude Sonnet 5 via OpenRouter.
 // P5_FAST_MODEL / P5_REASONING_MODEL are honored as legacy per-tier overrides if explicitly
@@ -107,17 +111,32 @@ async function callGrokOnce(prompt, model, maxTokens) {
       messages: [{ role: 'user', content: prompt }],
     }),
   });
+  if (res.status === 402) {
+    console.error(`  ❌ P5 OpenRouter credits exhausted — top up at openrouter.ai`);
+    throw new Error('[ERROR: credits] OpenRouter credits exhausted (402)');
+  }
   const j = await res.json();
   if (j.error) throw new Error(`OpenRouter error (${model}): ${j.error.message || JSON.stringify(j.error)}`);
   const choice = j.choices?.[0];
-  return { content: choice?.message?.content || null, finishReason: choice?.finish_reason || 'unknown' };
+  const content = choice?.message?.content || null;
+  const finishReason = choice?.finish_reason || 'unknown';
+  const reasoningTokens = j.usage?.completion_tokens_details?.reasoning_tokens;
+  console.log(`  [P5] finish_reason: ${finishReason} | output_chars: ${(content || '').length}${reasoningTokens != null ? ` | reasoning_tokens: ${reasoningTokens}` : ''}`);
+  return { content, finishReason };
 }
 
-async function callGrok(prompt, { model = P5_FAST_MODEL, maxTokens = 1600 } = {}) {
+// No blind retry-on-length: caps were the cause of truncation, not transient
+// failures, so retrying at the SAME (now generous) budget only helps for
+// genuinely empty/near-empty output. A finish_reason=length WITH substantial
+// content is kept as-is (marked in logs only) rather than re-burning tokens.
+async function callGrok(prompt, { model = P5_FAST_MODEL, maxTokens = 32000 } = {}) {
   let { content, finishReason } = await callGrokOnce(prompt, model, maxTokens);
-  if (!content || finishReason === 'length') {
-    console.log(`  ⚠️  P5 truncated/empty (finish_reason=${finishReason}) — retrying once at ${Math.round(maxTokens * 1.5)} tokens...`);
-    const retry = await callGrokOnce(prompt, model, Math.round(maxTokens * 1.5));
+  const len = (content || '').length;
+  if (finishReason === 'length' && len > 500) {
+    console.log(`  [NOTE: output reached token ceiling] — keeping truncated-but-substantial content (${len} chars)`);
+  } else if (len < 500) {
+    console.log(`  ⚠️  P5 near-empty output (finish_reason=${finishReason}) — retrying once at same budget...`);
+    const retry = await callGrokOnce(prompt, model, maxTokens);
     if (retry.content) content = retry.content;
   }
   // Never silently coerce to null; caller (researchOneProduct) already throws on empty,
@@ -944,9 +963,10 @@ Page excerpt: ${scraped.raw_html_excerpt.substring(0, 15000)}`;
   // neither real Amazon DB data NOR any Perplexity/scrape source at all.
   const memoryFallback = !grounding.hasRealData && !sourceUrl && !hadPerplexityFindings;
   const model = memoryFallback ? P5_REASONING_MODEL : P5_FAST_MODEL;
-  // Grounded brief target is ~500-700 words (~2500-4000 output tokens incl. markdown structure);
-  // memory-fallback case gets a bit more headroom since it has no real data to lean on.
-  const maxTokens = memoryFallback ? 4000 : 2800;
+  // Uncapped to a generous 32000-token ceiling — with reasoning disabled, actual
+  // output (~500-700 word brief) won't approach it; this just removes the cap
+  // as a source of truncation. No per-mode split needed anymore.
+  const maxTokens = 32000;
 
   const prompt = buildGroundedPrompt(product, rank, pool, KEYWORD, groundingText, sourceBlock, memoryFallback);
   const rawOutput = await callGrok(prompt, { model, maxTokens });

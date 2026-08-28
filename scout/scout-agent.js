@@ -1578,21 +1578,33 @@ Be specific. Use the actual data. Plain English — no jargon.`;
         max_tokens: maxTokens
       })
     });
+    if (res.status === 402) {
+      log('❌ P0 AI summary OpenRouter credits exhausted — top up at openrouter.ai', 'error');
+      throw new Error('[ERROR: credits] OpenRouter credits exhausted (402)');
+    }
     if (!res.ok) {
       const text = await res.text();
       throw new Error(`OpenRouter error: ${text}`);
     }
     const data = await res.json();
     const choice = data.choices?.[0];
-    return { content: choice?.message?.content || '', finishReason: choice?.finish_reason || 'unknown' };
+    const content = choice?.message?.content || '';
+    const finishReason = choice?.finish_reason || 'unknown';
+    const reasoningTokens = data.usage?.completion_tokens_details?.reasoning_tokens;
+    log(`AI summary finish_reason: ${finishReason} | output_chars: ${content.length}${reasoningTokens != null ? ` | reasoning_tokens: ${reasoningTokens}` : ''}`, 'info');
+    return { content, finishReason };
   };
 
   try {
-    let { content, finishReason } = await doCall(2000);
-    log(`AI summary finish_reason: ${finishReason}`, 'info');
-    if (!content || finishReason === 'length') {
-      log('AI summary truncated/empty — retrying once at 3000 tokens...', 'warn');
-      const retry = await doCall(3000);
+    // Uncapped to 32000 — no blind retry-on-length; the cap itself was the
+    // truncation cause. Substantial truncated content is kept as-is
+    // (logged); only genuinely empty/near-empty output gets one retry.
+    let { content, finishReason } = await doCall(32000);
+    if (finishReason === 'length' && content.length > 500) {
+      log('[NOTE: output reached token ceiling] — keeping truncated-but-substantial content', 'info');
+    } else if (content.length < 500) {
+      log('AI summary near-empty — retrying once at same budget...', 'warn');
+      const retry = await doCall(32000);
       if (retry.content) content = retry.content;
     }
     if (!content) {

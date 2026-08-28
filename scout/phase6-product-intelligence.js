@@ -109,19 +109,31 @@ async function callGrokOnce(prompt, maxTokens) {
       messages: [{ role: 'user', content: prompt }],
     }),
   });
+  if (res.status === 402) {
+    console.error(`  ❌ P6 OpenRouter credits exhausted — top up at openrouter.ai`);
+    throw new Error('[ERROR: credits] OpenRouter credits exhausted (402)');
+  }
   const j = await res.json();
   if (j.error) throw new Error(`OpenRouter: ${j.error.message || JSON.stringify(j.error)}`);
   const choice = j.choices?.[0];
-  return { content: choice?.message?.content || null, finishReason: choice?.finish_reason || 'unknown' };
+  const content = choice?.message?.content || null;
+  const finishReason = choice?.finish_reason || 'unknown';
+  const reasoningTokens = j.usage?.completion_tokens_details?.reasoning_tokens;
+  console.log(`  finish_reason: ${finishReason} | output_chars: ${(content || '').length}${reasoningTokens != null ? ` | reasoning_tokens: ${reasoningTokens}` : ''}`);
+  return { content, finishReason };
 }
 
-async function callGrok(prompt, maxTokens = 6000) {
+// No blind retry-on-length: caps caused the truncations, not transience.
+// finish_reason=length WITH substantial content is kept (logged, not retried);
+// only genuinely empty/near-empty output gets one retry at the same budget.
+async function callGrok(prompt, maxTokens = 32000) {
   let { content, finishReason } = await callGrokOnce(prompt, maxTokens);
-  console.log(`  finish_reason: ${finishReason}`);
-  if (!content || finishReason === 'length') {
-    console.log(`  ⚠️  Truncated/empty (finish_reason=${finishReason}) — retrying once at ${Math.round(maxTokens * 1.5)} tokens...`);
-    const retry = await callGrokOnce(prompt, Math.round(maxTokens * 1.5));
-    console.log(`  finish_reason (retry): ${retry.finishReason}`);
+  const len = (content || '').length;
+  if (finishReason === 'length' && len > 500) {
+    console.log(`  [NOTE: output reached token ceiling] — keeping truncated-but-substantial content (${len} chars)`);
+  } else if (len < 500) {
+    console.log(`  ⚠️  Near-empty output (finish_reason=${finishReason}) — retrying once at same budget...`);
+    const retry = await callGrokOnce(prompt, maxTokens);
     if (retry.content) content = retry.content;
   }
   // Never silently coerce to null; caller throws on empty ('Empty AI response'), which
@@ -443,7 +455,7 @@ Scoring guidance (generic - applies to ANY supplement category; use judgment, no
 - market_opportunity_gap: be specific to this category and, where the review sentiment reveals an unmet need or recurring complaint, name it directly — what formula gap can DOVIVE exploit?
 - Return ONLY the JSON array. No other text.`;
 
-  const response = await callGrok(prompt, 6000);
+  const response = await callGrok(prompt, 32000);
   if (!response) throw new Error('Empty AI response');
   const jsonMatch = response.match(/\[[\s\S]*\]/);
   if (!jsonMatch) throw new Error('No JSON array in AI response');

@@ -112,7 +112,7 @@ function getOpenRouterKey()  { return process.env.OPENROUTER_API_KEY || null; }
 const ANALYSIS_MODEL = process.env.ANALYSIS_MODEL || 'anthropic/claude-sonnet-5';
 const VALIDATION_MODEL = process.env.VALIDATION_MODEL || 'anthropic/claude-opus-5';
 
-async function callClaudeOpus(prompt, maxTokens = 12000) {
+async function callClaudeOpusOnce(prompt, maxTokens) {
   const key = getOpenRouterKey();
   if (!key) throw new Error('OPENROUTER_API_KEY not set');
   const start = Date.now();
@@ -134,12 +134,16 @@ async function callClaudeOpus(prompt, maxTokens = 12000) {
         messages: [{ role: 'user', content: prompt }],
       }),
     });
+    if (res.status === 402) {
+      console.error(`  ❌ P11 Claude Opus OpenRouter credits exhausted — top up at openrouter.ai`);
+      throw new Error('[ERROR: credits] OpenRouter credits exhausted (402)');
+    }
     if (!res.ok) {
       const errText = await res.text();
       throw new Error(`Claude Opus error ${res.status}: ${errText.slice(0, 200)}`);
     }
     let output = '';
-    let promptTokens = 0, completionTokens = 0;
+    let promptTokens = 0, completionTokens = 0, finishReason = null;
     const text = await res.text();
     for (const line of text.split('\n')) {
       if (!line.startsWith('data: ')) continue;
@@ -150,21 +154,38 @@ async function callClaudeOpus(prompt, maxTokens = 12000) {
         if (j.error) throw new Error(`Claude Opus error: ${j.error.message || JSON.stringify(j.error)}`);
         const delta = j.choices?.[0]?.delta?.content;
         if (delta) output += delta;
+        if (j.choices?.[0]?.finish_reason) finishReason = j.choices[0].finish_reason;
         if (j.usage) { promptTokens = j.usage.prompt_tokens || 0; completionTokens = j.usage.completion_tokens || 0; }
       } catch (e) {
         if (e.message.startsWith('Claude Opus error')) throw e;
       }
     }
     if (promptTokens || completionTokens) console.log(`  Tokens: ${promptTokens}→${completionTokens}`);
-    console.log(`  ✅ Claude Opus done (${Math.round((Date.now()-start)/1000)}s, ${Math.round(output.length/1000)}k chars)`);
+    console.log(`  ✅ Claude Opus done (${Math.round((Date.now()-start)/1000)}s, ${output.length} chars, finish_reason: ${finishReason || 'unknown'})`);
     if (!output) console.warn(`  ⚠ Claude Opus returned EMPTY output — likely max_tokens too low or budget consumed before content.`);
-    return output;
+    return { output, finishReason };
   } finally {
     clearTimeout(timeout);
   }
 }
 
-async function callClaudeSonnet(prompt, maxTokens = 16000) {
+// No blind retry-on-length: cap itself caused truncation. finish_reason=length
+// WITH substantial content is kept as-is (logged); only near-empty output
+// gets one retry at the same (generous) budget.
+async function callClaudeOpus(prompt, maxTokens = 32000) {
+  let { output, finishReason } = await callClaudeOpusOnce(prompt, maxTokens);
+  const len = (output || '').length;
+  if (finishReason === 'length' && len > 500) {
+    console.log(`  [NOTE: output reached token ceiling] — keeping truncated-but-substantial content`);
+  } else if (len < 500) {
+    console.warn(`  ⚠ Claude Opus near-empty output — retrying once at same budget...`);
+    const retry = await callClaudeOpusOnce(prompt, maxTokens);
+    if (retry.output) output = retry.output;
+  }
+  return output;
+}
+
+async function callClaudeSonnetOnce(prompt, maxTokens) {
   const key = getOpenRouterKey();
   if (!key) throw new Error('OPENROUTER_API_KEY not set');
   const start = Date.now();
@@ -186,12 +207,16 @@ async function callClaudeSonnet(prompt, maxTokens = 16000) {
         messages: [{ role: 'user', content: prompt }],
       }),
     });
+    if (res.status === 402) {
+      console.error(`  ❌ P11 Claude Sonnet OpenRouter credits exhausted — top up at openrouter.ai`);
+      throw new Error('[ERROR: credits] OpenRouter credits exhausted (402)');
+    }
     if (!res.ok) {
       const errText = await res.text();
       throw new Error(`Claude Sonnet error ${res.status}: ${errText.slice(0, 200)}`);
     }
     let output = '';
-    let promptTokens = 0, completionTokens = 0;
+    let promptTokens = 0, completionTokens = 0, finishReason = null;
     const text = await res.text();
     for (const line of text.split('\n')) {
       if (!line.startsWith('data: ')) continue;
@@ -202,18 +227,35 @@ async function callClaudeSonnet(prompt, maxTokens = 16000) {
         if (j.error) throw new Error(`Claude Sonnet error: ${j.error.message || JSON.stringify(j.error)}`);
         const delta = j.choices?.[0]?.delta?.content;
         if (delta) output += delta;
+        if (j.choices?.[0]?.finish_reason) finishReason = j.choices[0].finish_reason;
         if (j.usage) { promptTokens = j.usage.prompt_tokens || 0; completionTokens = j.usage.completion_tokens || 0; }
       } catch (e) {
         if (e.message.startsWith('Claude Sonnet error')) throw e;
       }
     }
     if (promptTokens || completionTokens) console.log(`  Tokens: ${promptTokens}→${completionTokens}`);
-    console.log(`  ✅ Claude Sonnet done (${Math.round((Date.now()-start)/1000)}s, ${Math.round(output.length/1000)}k chars)`);
+    console.log(`  ✅ Claude Sonnet done (${Math.round((Date.now()-start)/1000)}s, ${output.length} chars, finish_reason: ${finishReason || 'unknown'})`);
     if (!output) console.warn(`  ⚠ Claude Sonnet returned EMPTY output — likely max_tokens too low or budget consumed before content.`);
-    return output;
+    return { output, finishReason };
   } finally {
     clearTimeout(timeout);
   }
+}
+
+// No blind retry-on-length: cap itself caused truncation. finish_reason=length
+// WITH substantial content is kept as-is (logged); only near-empty output
+// gets one retry at the same (generous) budget.
+async function callClaudeSonnet(prompt, maxTokens = 32000) {
+  let { output, finishReason } = await callClaudeSonnetOnce(prompt, maxTokens);
+  const len = (output || '').length;
+  if (finishReason === 'length' && len > 500) {
+    console.log(`  [NOTE: output reached token ceiling] — keeping truncated-but-substantial content`);
+  } else if (len < 500) {
+    console.warn(`  ⚠ Claude Sonnet near-empty output — retrying once at same budget...`);
+    const retry = await callClaudeSonnetOnce(prompt, maxTokens);
+    if (retry.output) output = retry.output;
+  }
+  return output;
 }
 
 // ─── NIH ODS Fetcher ──────────────────────────────────────────────────────────
@@ -601,26 +643,20 @@ async function run() {
   console.log(`\nCall 1: Claude (via OpenRouter) primary compliance analysis...`);
   const opusPrompt = buildOpusPrimaryPrompt(adjustedFormula, nihData, KEYWORD);
   console.log(`  Prompt: ${Math.round(opusPrompt.length / 1000)}k chars`);
-  let opusAnalysis = await callClaudeOpus(opusPrompt, 16000);
+  // Uncapped to 64000 — callClaudeOpus/callClaudeSonnet now handle their own
+  // near-empty-only retry internally (same budget, no escalation).
+  let opusAnalysis = await callClaudeOpus(opusPrompt, 64000);
   if (!opusAnalysis) {
-    console.warn(`  ⚠ Opus primary analysis came back empty — retrying once with a larger token budget (20000)...`);
-    opusAnalysis = await callClaudeOpus(opusPrompt, 20000);
-  }
-  if (!opusAnalysis) {
-    opusAnalysis = '[ERROR: Claude Opus returned empty output for the FDA compliance primary analysis after 2 attempts — check OpenRouter logs / token budget / finish_reason above.]';
+    opusAnalysis = '[ERROR: Claude Opus returned empty output for the FDA compliance primary analysis — check OpenRouter logs / token budget / finish_reason above.]';
   }
 
   // ── Call 2: Claude Sonnet validation ──────────────────────────────────────
   console.log(`\nCall 2: Claude (via OpenRouter) validating Claude Opus findings...`);
   const sonnetPrompt = buildSonnetValidationPrompt(adjustedFormula, nihData, opusAnalysis, KEYWORD);
   console.log(`  Prompt: ${Math.round(sonnetPrompt.length / 1000)}k chars`);
-  let sonnetValidation = await callClaudeSonnet(sonnetPrompt, 12000);
+  let sonnetValidation = await callClaudeSonnet(sonnetPrompt, 32000);
   if (!sonnetValidation) {
-    console.warn(`  ⚠ Sonnet validation came back empty — retrying once with a larger token budget (16000)...`);
-    sonnetValidation = await callClaudeSonnet(sonnetPrompt, 16000);
-  }
-  if (!sonnetValidation) {
-    sonnetValidation = '[ERROR: Claude Sonnet returned empty output for the FDA compliance validation after 2 attempts — check OpenRouter logs / token budget / finish_reason above.]';
+    sonnetValidation = '[ERROR: Claude Sonnet returned empty output for the FDA compliance validation — check OpenRouter logs / token budget / finish_reason above.]';
   }
 
   // ── Parse results ──────────────────────────────────────────────────────────

@@ -61,7 +61,7 @@ Use the brand's official website and major retailers as your primary sources. Be
       },
       body: JSON.stringify({
         model: PERPLEXITY_MODEL,
-        max_tokens: 2000,
+        max_tokens: 4000,
         messages: [
           { role: 'system', content: 'You are a precise supplement-industry research assistant. Only report facts you can verify from live web sources; never fabricate ingredient doses or certifications.' },
           { role: 'user', content: prompt },
@@ -70,6 +70,10 @@ Use the brand's official website and major retailers as your primary sources. Be
     });
 
     const text = await res.text();
+    if (res.status === 402) {
+      console.log(`  [Perplexity] ❌ credits exhausted for "${label}" — top up at perplexity.ai`);
+      return null;
+    }
     if (!res.ok) {
       console.log(`  [Perplexity] API call failed [${res.status}] for "${label}": ${text.slice(0, 300)}`);
       return null;
@@ -88,9 +92,11 @@ Use the brand's official website and major retailers as your primary sources. Be
 
     const choice = j.choices?.[0];
     const finishReason = choice?.finish_reason || 'unknown';
-    console.log(`  [Perplexity] finish_reason=${finishReason} usage=${JSON.stringify(j.usage || {})} for "${label}"`);
-
     const content = choice?.message?.content || null;
+    console.log(`  [Perplexity] finish_reason=${finishReason} output_chars=${(content || '').length} usage=${JSON.stringify(j.usage || {})} for "${label}"`);
+    if (finishReason === 'length' && content && content.length > 500) {
+      console.log(`  [Perplexity] [NOTE: output reached token ceiling] — keeping truncated-but-substantial content for "${label}"`);
+    }
     if (!content) {
       console.log(`  [Perplexity] empty content for "${label}"`);
       return null;

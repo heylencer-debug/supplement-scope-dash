@@ -7,6 +7,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { parseBenchmarkAndCompliance } from "@/lib/formulaScores";
 
 export interface PhaseStatus {
   phase: number;
@@ -141,18 +142,16 @@ async function fetchPipelineStatus(categoryId: string): Promise<PhaseStatus[]> {
   const p10HasQA = !!(p10Ingredients?.qa_report as string)?.length;
   const p10Complete = p10HasQA ? 1 : 0;
 
-  // P11: Competitive Benchmarking - check for sonnet_draft (or legacy grok_draft)
-  const p11Benchmarking = p10Ingredients?.competitive_benchmarking as Record<string, unknown> | null;
-  const p11HasBenchmarking = !!((p11Benchmarking?.sonnet_draft as string)?.length > 100 ||
-    (p11Benchmarking?.grok_draft as string)?.length > 100);
+  // P11/P12: Competitive Benchmarking + FDA Compliance — shared parser, see
+  // src/lib/formulaScores.ts (identical logic to what previously lived here).
+  const {
+    p11Score,
+    p11Complete: p11HasBenchmarking,
+    p12Score,
+    p12Complete: p12HasCompliance,
+  } = parseBenchmarkAndCompliance(p10Ingredients);
   const p11Complete = p11HasBenchmarking ? 1 : 0;
-  const p11Score = (p11Benchmarking?.formula_score as number) ?? null;
-
-  // P12: FDA Compliance - check for opus_analysis
-  const p12Compliance = p10Ingredients?.fda_compliance as Record<string, unknown> | null;
-  const p12HasCompliance = !!((p12Compliance?.opus_analysis as string)?.length > 100);
   const p12Complete = p12HasCompliance ? 1 : 0;
-  const p12Score = (p12Compliance?.compliance_score as number) ?? null;
 
   return [
     {

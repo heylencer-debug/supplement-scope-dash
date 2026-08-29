@@ -43,9 +43,9 @@ const STATUS_CFG: Record<StatusKey, {
   badge: string;
   label: string;
 }> = {
-  complete:    { bar: "bg-chart-4",              card: "border-chart-4/20 bg-chart-4/5",           badge: "bg-chart-4/10 text-chart-4 border-chart-4/30",         label: "Done"    },
-  partial:     { bar: "bg-chart-2",              card: "border-chart-2/30 bg-chart-2/5",           badge: "bg-chart-2/10 text-chart-2 border-chart-2/30",         label: "Running" },
-  not_started: { bar: "bg-muted-foreground/25",  card: "border-border bg-muted/20",                badge: "bg-muted text-muted-foreground border-border",         label: "Pending" },
+  complete:    { bar: "bg-chart-4",              card: "border-border bg-card",                    badge: "bg-chart-4/10 text-chart-4 border-chart-4/30",         label: "Done"    },
+  partial:     { bar: "bg-chart-2",              card: "border-border bg-card",                    badge: "bg-chart-2/10 text-chart-2 border-chart-2/30",         label: "Running" },
+  not_started: { bar: "bg-muted-foreground/25",  card: "border-border bg-card",                     badge: "bg-muted text-muted-foreground border-border",         label: "Pending" },
   pending:     { bar: "bg-transparent",          card: "border-dashed border-border/40 opacity-45", badge: "bg-transparent text-muted-foreground/50 border-border/30", label: "TBD"  },
 };
 

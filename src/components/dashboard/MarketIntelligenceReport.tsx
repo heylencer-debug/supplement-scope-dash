@@ -83,10 +83,17 @@ function extractLabeledParagraphs(text: string): Array<{ label: string; content:
 // splits the text into table / bullet-list / paragraph blocks and renders
 // each with real markup instead of dumping raw markdown into the DOM.
 function renderInlineBold(text: string) {
-  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  // Bold alternative is tried first at each split position, so "**x**" is
+  // never mistaken for a single-star italic run — only bare "*x*" (e.g. the
+  // AI's occasional "out-*trusting*" emphasis) falls through to the italic
+  // branch, which was previously left as literal, unrendered asterisks.
+  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
   return parts.map((part, i) => {
-    const m = part.match(/^\*\*([^*]+)\*\*$/);
-    return m ? <strong key={i} className="text-foreground">{m[1]}</strong> : <span key={i}>{part}</span>;
+    const bold = part.match(/^\*\*([^*]+)\*\*$/);
+    if (bold) return <strong key={i} className="text-foreground">{bold[1]}</strong>;
+    const italic = part.match(/^\*([^*]+)\*$/);
+    if (italic) return <em key={i}>{italic[1]}</em>;
+    return <span key={i}>{part}</span>;
   });
 }
 

@@ -38,6 +38,17 @@ export function extractFlavorsFromFormulaBrief(content: string | null | undefine
       'supply', 'count', 'pack', 'bottle', 'pouch',
     ];
     if (skipWords.some(w => f.toLowerCase() === w || f.toLowerCase().startsWith(w + ' '))) return;
+    // Powder/stick-pack format tables (pricing, variant lineup, overage
+    // tables) share the same pipe-delimited shape as the flavor tables these
+    // regexes were built for, so plain column headers like "Target Audience"
+    // and packaging nouns like "carton"/"stick" were getting misread as
+    // flavor names for non-flavored categories (e.g. Electrolyte Powder) —
+    // see cardverify-dashboard-manufacturer.png. These substrings never
+    // appear inside a real flavor name, so a broader `includes` check is safe.
+    const skipSubstrings = ['target audience', 'rationale', 'carton', 'stick '];
+    if (skipSubstrings.some(w => f.toLowerCase().includes(w))) return;
+    // Skip pure/leading percentage values (overage tables: "+8%", "-3%")
+    if (/^[+-]?\d+(\.\d+)?%$/.test(f)) return;
     // Skip if it looks like a section header, price, pipe artifact, or pure number/size
     if (f.startsWith('#') || f.startsWith('---') || f.startsWith('|') || f.startsWith('$')) return;
     // Skip pure numbers or size/count strings like "30", "60", "90", "120ct", "2-Month Supply"

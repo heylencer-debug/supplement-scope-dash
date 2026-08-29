@@ -228,7 +228,21 @@ export function P9BenchmarkOverview({ categoryId, activeVersionContent, activeVe
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-foreground leading-relaxed">{qaVerdict.summary}</p>
+            {/* qaVerdict.summary is AI-generated markdown text (uses **bold**
+                emphasis) — render it through ReactMarkdown instead of a plain
+                <p> so the literal asterisks don't leak into the UI. */}
+            <div className="text-sm text-foreground leading-relaxed [&_p]:mb-2 last:[&_p]:mb-0">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  p: ({ children }) => <p>{children}</p>,
+                  strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                  em: ({ children }) => <em className="italic">{children}</em>,
+                }}
+              >
+                {qaVerdict.summary}
+              </ReactMarkdown>
+            </div>
             {qaVerdict.score && (
               <Badge className="mt-2" variant="outline">Score: {qaVerdict.score}/10</Badge>
             )}

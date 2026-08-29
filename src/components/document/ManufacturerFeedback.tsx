@@ -165,7 +165,11 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
         briefs.push({ id: "compliance", label: "⚖️ Compliance", emoji: "⚖️", subtitle: "Initial formula brief from market analysis pipeline", content: complianceContent, created_at: data.created_at });
       }
       if (ing?.final_formula_brief) {
-        briefs.push({ id: "qa-final", label: "✅ QA Approved Final", emoji: "✅", subtitle: `${ing?.qa_verdict?.verdict || 'Reviewed'} · Score: ${ing?.qa_verdict?.score || '—'}/10`, content: ing.final_formula_brief, created_at: data.created_at });
+        // qa_verdict.verdict is AI-generated text that sometimes self-wraps in
+        // markdown bold ("**APPROVED WITH ADJUSTMENTS**") — this subtitle is
+        // plain text (no markdown renderer), so strip the literal ** marks.
+        const verdictText = (ing?.qa_verdict?.verdict || 'Reviewed').replace(/\*\*/g, '');
+        briefs.push({ id: "qa-final", label: "✅ QA Approved Final", emoji: "✅", subtitle: `${verdictText} · Score: ${ing?.qa_verdict?.score || '—'}/10`, content: ing.final_formula_brief, created_at: data.created_at });
       }
       return briefs.length > 0 ? briefs : null;
     },
@@ -567,7 +571,7 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
                       return flavors.length > 0 ? (
                         <div className="flex flex-wrap gap-1 max-w-[200px]">
                           {flavors.map((f, i) => (
-                            <Badge key={i} variant="outline" className="text-[10px] bg-orange-50 border-orange-200 text-orange-700">
+                            <Badge key={i} variant="outline" className="text-[10px]">
                               🍊 {f}
                             </Badge>
                           ))}
@@ -579,7 +583,10 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
                   </td>
                   <td className="py-2.5 px-4 max-w-[300px]">
                     <p className="text-xs text-muted-foreground line-clamp-2">
-                      {v.change_summary?.replace('[USER OVERRIDE] ', '') || 'Initial formula brief'}
+                      {/* change_summary is sometimes AI-generated text that self-wraps in
+                          markdown bold ("**APPROVED WITH ADJUSTMENTS**") — this cell is
+                          plain text (no markdown renderer), so strip the literal ** marks. */}
+                      {v.change_summary?.replace('[USER OVERRIDE] ', '').replace(/\*\*/g, '') || 'Initial formula brief'}
                     </p>
                   </td>
                   <td className="py-2.5 px-4 whitespace-nowrap">
@@ -657,7 +664,7 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
                       return flavors.length > 0 ? (
                         <div className="flex flex-wrap gap-1 max-w-[200px]">
                           {flavors.map((f, i) => (
-                            <Badge key={i} variant="outline" className="text-[10px] bg-orange-50 border-orange-200 text-orange-700">
+                            <Badge key={i} variant="outline" className="text-[10px]">
                               🍊 {f}
                             </Badge>
                           ))}

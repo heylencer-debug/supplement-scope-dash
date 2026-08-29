@@ -5,23 +5,17 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { ScrollAnimate } from "@/components/ui/scroll-animate";
-import { Building2, ChevronsUpDown, Link2, Package, TrendingUp, FlaskConical, Factory, ScanSearch, Search } from "lucide-react";
-import { PHASE_META } from "@/components/dashboard/PipelineStatus";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Building2, Link2, Package, TrendingUp, FlaskConical, Factory, ScanSearch } from "lucide-react";
 
 // Dashboard components
-import { HeroHeader } from "@/components/dashboard/HeroHeader";
+import { CockpitHero } from "@/components/dashboard/CockpitHero";
 import { KPIMetricsGrid } from "@/components/dashboard/KPIMetricsGrid";
 import { EnhancedBenchmarkComparison } from "@/components/dashboard/EnhancedBenchmarkComparison";
 import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
 import { LowConfidenceProducts } from "@/components/dashboard/LowConfidenceProducts";
-import { PipelineStatus } from "@/components/dashboard/PipelineStatus";
-import { usePipelineStatus } from "@/hooks/usePipelineStatus";
-import { useActiveScoutJobs } from "@/hooks/useScoutJobs";
 import { ProductFormulaIntelligence } from "@/components/dashboard/ProductFormulaIntelligence";
 import { FormulaJourneyTab } from "@/components/dashboard/FormulaJourneyTab";
 import { FormulaPassport } from "@/components/dashboard/FormulaPassport";
-import { OcrCoveragePanel } from "@/components/dashboard/OcrCoveragePanel";
 import { P9BenchmarkOverview } from "@/components/dashboard/P9BenchmarkOverview";
 import { MarketIntelligenceReport } from "@/components/dashboard/MarketIntelligenceReport";
 import { ManufacturerFeedback } from "@/components/document/ManufacturerFeedback";
@@ -52,95 +46,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { Target } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-
-function PipelineCollapsible({ categoryId, categoryName }: { categoryId: string; categoryName: string }) {
-  const { data: phases } = usePipelineStatus(categoryId, categoryName);
-  // "Running" = a REAL in-flight scout job for this keyword (same honesty
-  // rule as PipelineStatus.tsx) — partial data is a coverage state, not
-  // activity, and used to pulse "N running" forever on finished categories.
-  const { data: activeJobs } = useActiveScoutJobs();
-  const normKw = (s: string | null | undefined) => (s || "").replace(/^[=\s]+/, "").trim().toLowerCase();
-  const activeJob = (activeJobs ?? []).find(
-    (j) => normKw(j.keyword) === normKw(categoryName) && (j.status === "running" || j.status === "claimed")
-  );
-  const runningPhaseNum = activeJob?.current_phase ?? null;
-  const completedCount = phases?.filter(p => p.status === "complete").length ?? 0;
-  const runningCount = activeJob ? 1 : 0;
-  const totalCount = phases?.length ?? 0;
-  const overallPct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
-
-  return (
-    <Collapsible>
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex-1 min-w-0">
-              <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
-                <Search className="h-3.5 w-3.5 text-muted-foreground" /> Scout Pipeline
-              </CardTitle>
-              {/* Compact summary visible when collapsed */}
-              <div className="flex items-center gap-3 mt-2">
-                {/* Phase icons */}
-                {phases && phases.length > 0 && (
-                  <div className="flex items-center gap-1">
-                    {phases.map(phase => {
-                      const meta = PHASE_META[phase.phase];
-                      const isDone = phase.status === "complete";
-                      const isRunning = runningPhaseNum === phase.phase;
-                      if (!meta) return null;
-                      const PhaseIcon = meta.icon;
-                      return (
-                        <PhaseIcon
-                          key={phase.phase}
-                          className={`h-3 w-3 shrink-0 transition-opacity duration-300 ${isDone ? "text-primary opacity-100" : isRunning ? "text-chart-2 opacity-90 animate-pulse" : "text-muted-foreground/40 opacity-60"}`}
-                          aria-label={`P${phase.phase}: ${isDone ? "Done" : isRunning ? "Running" : "Pending"}`}
-                        />
-                      );
-                    })}
-                  </div>
-                )}
-                <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden max-w-[120px]">
-                  <div
-                    className="h-full bg-primary rounded-full transition-all duration-700"
-                    style={{ width: `${overallPct}%` }}
-                  />
-                </div>
-                <span className="text-xs font-medium text-muted-foreground tabular-nums whitespace-nowrap">
-                  {completedCount}/{totalCount}
-                </span>
-                {runningCount > 0 && (
-                  <span className="flex items-center gap-1 text-[10px] font-medium text-chart-2">
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-chart-2 opacity-75" />
-                      <span className="relative inline-flex h-2 w-2 rounded-full bg-chart-2" />
-                    </span>
-                    Running{activeJob?.current_phase_name ? `: ${activeJob.current_phase_name}` : ""}
-                  </span>
-                )}
-                {completedCount === totalCount && totalCount > 0 && (
-                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 border-chart-4/30 text-chart-4 bg-chart-4/10">
-                    ✓ Complete
-                  </Badge>
-                )}
-              </div>
-            </div>
-            <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
-                <ChevronsUpDown className="h-4 w-4 text-muted-foreground" />
-              </Button>
-            </CollapsibleTrigger>
-          </div>
-        </CardHeader>
-        <CollapsibleContent>
-          <CardContent className="space-y-2">
-            <PipelineStatus categoryId={categoryId} keyword={categoryName} />
-            <OcrCoveragePanel categoryId={categoryId} keyword={categoryName} />
-          </CardContent>
-        </CollapsibleContent>
-      </Card>
-    </Collapsible>
-  );
-}
 
 
 export default function Dashboard() {
@@ -534,50 +439,37 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-3 md:space-y-4 pb-10 overflow-x-hidden bg-background text-foreground text-[13px]">
-      {/* SECTION 1: Hero Header with Executive Summary */}
-      <div className="animate-fade-in">
-        <HeroHeader
-        categoryName={categoryName}
-        recommendation={analysis?.recommendation || null}
-        opportunityIndex={analysis?.opportunity_index || 0}
-        opportunityTier={analysis?.opportunity_tier || null}
-        opportunityTierLabel={analysis?.opportunity_tier_label || null}
-        // Primary source: formula_briefs.positioning (current pipeline data).
-        // Falls back to the legacy category_analyses.executive_summary column,
-        // which is "frequently empty" per the dashboardData memo's own note.
-        // recommendation/opportunityIndex/opportunityTier have no formula_briefs
-        // equivalent field today, so they remain category_analyses-sourced.
-        executiveSummary={formulaBrief?.positioning || analysis?.executive_summary || null}
-        topProducts={products?.slice(0, 5).map(p => ({
-          main_image_url: p.main_image_url,
-          brand: p.brand,
-          title: p.title
-        }))}
-        isLoading={analysisLoading && !hasAnalysis}
-        />
-      </div>
-
-      {/* SCOUT PIPELINE STATUS — live phase completion from Supabase */}
+      {/* SECTION 1: Cockpit Split — BrandCard identity panel (left) +
+          Scout Pipeline micro-grid/meters (right). Replaces HeroHeader +
+          the standalone Pipeline collapsible card. */}
       {category?.id && (
-        <ScrollAnimate delay={50} variant="fade-up" duration={400}>
-          <PipelineCollapsible categoryId={category.id} categoryName={categoryName || ""} />
-        </ScrollAnimate>
+        <div className="animate-fade-in">
+          <CockpitHero
+            categoryId={category.id}
+            categoryName={categoryName || ""}
+            analysis={analysis}
+            analysisLoading={analysisLoading && !hasAnalysis}
+            formulaBrief={formulaBrief}
+            topProducts={products?.slice(0, 5).map(p => ({
+              main_image_url: p.main_image_url,
+              brand: p.brand,
+              title: p.title
+            }))}
+          />
+        </div>
       )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        {/* Pipeline tab strip — dark chrome extension of the app header,
-            gliding smoke pill on the active tab (never yellow/accent), per
-            takeout-design-spec.md §1 "The header". -mx cancels Layout's page
-            gutter so this bar reads flush with the header above it. */}
-        <div className="dark -mx-3 sm:-mx-4 md:-mx-6 lg:-mx-0 px-3 sm:px-4 md:px-6 lg:px-0 bg-background border-b border-border/60">
-          <TabsList className="flex w-full items-center gap-1 h-auto py-2 bg-transparent overflow-x-auto scrollbar-hide">
-            <TabsTrigger className="takeout-pipeline-tab" value="products"><Package className="h-3.5 w-3.5" /> Products</TabsTrigger>
-            <TabsTrigger className="takeout-pipeline-tab" value="market"><TrendingUp className="h-3.5 w-3.5" /> Market</TabsTrigger>
-            <TabsTrigger className="takeout-pipeline-tab" value="formula"><FlaskConical className="h-3.5 w-3.5" /> Formula</TabsTrigger>
-            <TabsTrigger className="takeout-pipeline-tab" value="manufacturer"><Factory className="h-3.5 w-3.5" /> Manufacturer</TabsTrigger>
-            <TabsTrigger className="takeout-pipeline-tab" value="data-audit"><ScanSearch className="h-3.5 w-3.5" /> Data Audit</TabsTrigger>
-          </TabsList>
-        </div>
+        {/* T3 segmented control — smoke track, active trigger wears the
+            real `.pearl-button` gloss treatment (see `.pearl-seg-tab` in
+            index.css). Replaces the dark floating pill bar. */}
+        <TabsList className="flex w-full items-center gap-1 h-auto p-1 rounded-xl bg-[hsl(var(--brand-smoke))] overflow-x-auto scrollbar-hide">
+          <TabsTrigger className="pearl-seg-tab" value="products"><Package className="h-3.5 w-3.5" /> Products</TabsTrigger>
+          <TabsTrigger className="pearl-seg-tab" value="market"><TrendingUp className="h-3.5 w-3.5" /> Market</TabsTrigger>
+          <TabsTrigger className="pearl-seg-tab" value="formula"><FlaskConical className="h-3.5 w-3.5" /> Formula</TabsTrigger>
+          <TabsTrigger className="pearl-seg-tab" value="manufacturer"><Factory className="h-3.5 w-3.5" /> Manufacturer</TabsTrigger>
+          <TabsTrigger className="pearl-seg-tab" value="data-audit"><ScanSearch className="h-3.5 w-3.5" /> Data Audit</TabsTrigger>
+        </TabsList>
 
         <TabsContent value="products" className="space-y-4 mt-3">
       {/* FORMULA PASSPORT — Option C: compact status card at the top of

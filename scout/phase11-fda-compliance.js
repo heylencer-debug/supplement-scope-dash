@@ -112,7 +112,7 @@ function getOpenRouterKey()  { return process.env.OPENROUTER_API_KEY || null; }
 const ANALYSIS_MODEL = process.env.ANALYSIS_MODEL || 'anthropic/claude-sonnet-5';
 const VALIDATION_MODEL = process.env.VALIDATION_MODEL || 'anthropic/claude-opus-5';
 
-async function callClaudeOpusOnce(prompt, maxTokens) {
+async function callClaudeOpusOnce(prompt, maxTokens, messagesOverride = null) {
   const key = getOpenRouterKey();
   if (!key) throw new Error('OPENROUTER_API_KEY not set');
   const start = Date.now();
@@ -131,7 +131,7 @@ async function callClaudeOpusOnce(prompt, maxTokens) {
         model: ANALYSIS_MODEL,
         max_tokens: maxTokens,
         stream: true,
-        messages: [{ role: 'user', content: prompt }],
+        messages: messagesOverride || [{ role: 'user', content: prompt }],
       }),
     });
     if (res.status === 402) {
@@ -173,7 +173,7 @@ async function callClaudeOpusOnce(prompt, maxTokens) {
 // WITH substantial content is kept as-is (logged); only near-empty output
 // gets one retry at the same (generous) budget.
 async function callClaudeOpus(prompt, maxTokens = 64000) {
-  let { output, finishReason } = await callClaudeOpusOnce(prompt, maxTokens);
+  let { output, finishReason } = await continueTruncated(callClaudeOpusOnce, prompt, maxTokens);
   const len = (output || '').length;
   if (finishReason === 'length' && len > 500) {
     console.log(`  [NOTE: output reached token ceiling] — keeping truncated-but-substantial content`);
@@ -185,7 +185,7 @@ async function callClaudeOpus(prompt, maxTokens = 64000) {
   return output;
 }
 
-async function callClaudeSonnetOnce(prompt, maxTokens) {
+async function callClaudeSonnetOnce(prompt, maxTokens, messagesOverride = null) {
   const key = getOpenRouterKey();
   if (!key) throw new Error('OPENROUTER_API_KEY not set');
   const start = Date.now();
@@ -204,7 +204,7 @@ async function callClaudeSonnetOnce(prompt, maxTokens) {
         model: VALIDATION_MODEL,
         max_tokens: maxTokens,
         stream: true,
-        messages: [{ role: 'user', content: prompt }],
+        messages: messagesOverride || [{ role: 'user', content: prompt }],
       }),
     });
     if (res.status === 402) {
@@ -246,7 +246,7 @@ async function callClaudeSonnetOnce(prompt, maxTokens) {
 // WITH substantial content is kept as-is (logged); only near-empty output
 // gets one retry at the same (generous) budget.
 async function callClaudeSonnet(prompt, maxTokens = 64000) {
-  let { output, finishReason } = await callClaudeSonnetOnce(prompt, maxTokens);
+  let { output, finishReason } = await continueTruncated(callClaudeSonnetOnce, prompt, maxTokens);
   const len = (output || '').length;
   if (finishReason === 'length' && len > 500) {
     console.log(`  [NOTE: output reached token ceiling] — keeping truncated-but-substantial content`);
@@ -776,3 +776,29 @@ run()
     console.error(e.message);
     setTimeout(() => process.exit(1), 500);
   });
+
+// ─── AUTO-CONTINUATION (2026-08-29) ─────────────────────────────────────────
+// 64k is the MODEL's output ceiling — a big report can hit
+// finish_reason=length with real content (seen live: electrolyte QA
+// adjudicator at exactly 64,000 tok). This is NOT a retry: nothing is
+// discarded or re-generated; the partial answer becomes assistant context
+// and the model continues exactly where it stopped (max 2 extra segments).
+// Function declaration → hoisted, callable from the wrappers above.
+async function continueTruncated(onceFn, prompt, maxTokens) {
+  let { output, finishReason } = await onceFn(prompt, maxTokens);
+  let segments = 0;
+  while (finishReason === 'length' && (output || '').length > 500 && segments < 2) {
+    segments++;
+    console.log(`  ↪ output hit the model's token ceiling at ${output.length} chars — continuing generation (segment ${segments + 1})...`);
+    const msgs = [
+      { role: 'user', content: prompt },
+      { role: 'assistant', content: output },
+      { role: 'user', content: 'Continue EXACTLY from where your previous message stopped, mid-sentence if necessary. Do not repeat anything, do not summarize what came before, no preamble — output only the next characters of the document.' },
+    ];
+    const next = await onceFn(null, maxTokens, msgs);
+    if (!next.output) { console.warn('  ⚠ continuation returned empty — keeping accumulated content'); break; }
+    output += next.output;
+    finishReason = next.finishReason;
+  }
+  return { output, finishReason };
+}

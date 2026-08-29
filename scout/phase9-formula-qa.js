@@ -57,7 +57,7 @@ const ANALYSIS_MODEL = process.env.ANALYSIS_MODEL || 'anthropic/claude-sonnet-5'
 // the same model checking itself. Default: Claude Opus 5 via OpenRouter.
 const VALIDATION_MODEL = process.env.VALIDATION_MODEL || 'anthropic/claude-opus-5';
 
-async function callClaudeSonnetQAOnce(prompt, maxTokens, model = ANALYSIS_MODEL) {
+async function callClaudeSonnetQAOnce(prompt, maxTokens, model = ANALYSIS_MODEL, messagesOverride = null) {
   const key = getOpenRouterKey();
   if (!key) throw new Error('No OpenRouter key');
   const controller = new AbortController();
@@ -83,7 +83,7 @@ async function callClaudeSonnetQAOnce(prompt, maxTokens, model = ANALYSIS_MODEL)
         // drafts + competitor OCR data) routes the full budget to visible
         // output instead.
         reasoning: { enabled: false },
-        messages: [{ role: 'user', content: prompt }],
+        messages: messagesOverride || [{ role: 'user', content: prompt }],
       }),
     });
     if (res.status === 402) {
@@ -138,7 +138,27 @@ async function callClaudeSonnetQAOnce(prompt, maxTokens, model = ANALYSIS_MODEL)
 // retry at the same (already generous) budget.
 async function callClaudeSonnetQA(prompt, maxTokens = 64000, model = ANALYSIS_MODEL) {
   let { content, finishReason } = await callClaudeSonnetQAOnce(prompt, maxTokens, model);
-  const len = (content || '').length;
+  let len = (content || '').length;
+  // AUTO-CONTINUATION (2026-08-29): 64k is the MODEL's output ceiling, so a
+  // big report can hit finish_reason=length with real content (seen live:
+  // electrolyte QA adjudicator at exactly 64,000 tok). This is NOT a retry —
+  // nothing is discarded or re-generated; the partial answer becomes context
+  // and the model continues exactly where it stopped (max 2 extra segments).
+  let segments = 0;
+  while (finishReason === 'length' && len > 500 && segments < 2) {
+    segments++;
+    console.log(`  ↪ output hit the model's token ceiling at ${len} chars — continuing generation (segment ${segments + 1})...`);
+    const contMsgs = [
+      { role: 'user', content: prompt },
+      { role: 'assistant', content },
+      { role: 'user', content: 'Continue EXACTLY from where your previous message stopped, mid-sentence if necessary. Do not repeat anything, do not summarize what came before, no preamble — output only the next characters of the document.' },
+    ];
+    const next = await callClaudeSonnetQAOnce(null, maxTokens, model, contMsgs);
+    if (!next.content) { console.warn('  ⚠ continuation returned empty — keeping what we have'); break; }
+    content += next.content;
+    finishReason = next.finishReason;
+    len = content.length;
+  }
   if (finishReason === 'length' && len > 500) {
     console.log(`  [NOTE: output reached token ceiling] — keeping truncated-but-substantial content (${len} chars)`);
   } else if (len < 500) {

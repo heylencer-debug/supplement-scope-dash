@@ -57,7 +57,7 @@ const VALIDATION_MODEL = process.env.VALIDATION_MODEL || 'anthropic/claude-opus-
 
 // Internal single-shot call; callClaudeSonnet() below wraps it with the
 // uniform near-empty-only retry policy (no blind retry on finish_reason=length).
-async function callClaudeSonnetOnce(prompt, maxTokens) {
+async function callClaudeSonnetOnce(prompt, maxTokens, messagesOverride = null) {
   const key = getOpenRouterKey();
   if (!key) throw new Error('OPENROUTER_API_KEY not set');
   const start = Date.now();
@@ -87,7 +87,7 @@ async function callClaudeSonnetOnce(prompt, maxTokens) {
         // every fact must come from the provided OCR data verbatim) so the
         // full token budget goes to visible output.
         reasoning: { enabled: false },
-        messages: [{ role: 'user', content: prompt }],
+        messages: messagesOverride || [{ role: 'user', content: prompt }],
       }),
     });
     if (res.status === 402) {
@@ -141,7 +141,7 @@ async function callClaudeSonnetOnce(prompt, maxTokens) {
 // (logged); only genuinely empty/near-empty output gets one retry at the
 // same (already generous) budget.
 async function callClaudeSonnet(prompt, maxTokens = 64000) {
-  let { output, finishReason } = await callClaudeSonnetOnce(prompt, maxTokens);
+  let { output, finishReason } = await continueTruncated(callClaudeSonnetOnce, prompt, maxTokens);
   const len = (output || '').length;
   if (finishReason === 'length' && len > 500) {
     console.log(`  [NOTE: output reached token ceiling] — keeping truncated-but-substantial content`);
@@ -153,7 +153,7 @@ async function callClaudeSonnet(prompt, maxTokens = 64000) {
   return output;
 }
 
-async function callClaudeOpusOnce(prompt, maxTokens) {
+async function callClaudeOpusOnce(prompt, maxTokens, messagesOverride = null) {
   const key = getOpenRouterKey();
   if (!key) throw new Error('OPENROUTER_API_KEY not set');
   const start = Date.now();
@@ -175,7 +175,7 @@ async function callClaudeOpusOnce(prompt, maxTokens) {
         // 2026-08-28: same fix applied here for consistency/safety — see
         // callClaudeSonnet's comment above for the observed root cause.
         reasoning: { enabled: false },
-        messages: [{ role: 'user', content: prompt }],
+        messages: messagesOverride || [{ role: 'user', content: prompt }],
       }),
     });
     if (res.status === 402) {
@@ -222,7 +222,7 @@ async function callClaudeOpusOnce(prompt, maxTokens) {
 // WITH substantial content is kept as-is (logged); only near-empty output
 // gets one retry at the same (generous) budget.
 async function callClaudeOpus(prompt, maxTokens = 64000) {
-  let { output, finishReason } = await callClaudeOpusOnce(prompt, maxTokens);
+  let { output, finishReason } = await continueTruncated(callClaudeOpusOnce, prompt, maxTokens);
   const len = (output || '').length;
   if (finishReason === 'length' && len > 500) {
     console.log(`  [NOTE: output reached token ceiling] — keeping truncated-but-substantial content`);
@@ -693,3 +693,29 @@ run()
     console.error(e.message);
     setTimeout(() => process.exit(1), 500);
   });
+
+// ─── AUTO-CONTINUATION (2026-08-29) ─────────────────────────────────────────
+// 64k is the MODEL's output ceiling — a big report can hit
+// finish_reason=length with real content (seen live: electrolyte QA
+// adjudicator at exactly 64,000 tok). This is NOT a retry: nothing is
+// discarded or re-generated; the partial answer becomes assistant context
+// and the model continues exactly where it stopped (max 2 extra segments).
+// Function declaration → hoisted, callable from the wrappers above.
+async function continueTruncated(onceFn, prompt, maxTokens) {
+  let { output, finishReason } = await onceFn(prompt, maxTokens);
+  let segments = 0;
+  while (finishReason === 'length' && (output || '').length > 500 && segments < 2) {
+    segments++;
+    console.log(`  ↪ output hit the model's token ceiling at ${output.length} chars — continuing generation (segment ${segments + 1})...`);
+    const msgs = [
+      { role: 'user', content: prompt },
+      { role: 'assistant', content: output },
+      { role: 'user', content: 'Continue EXACTLY from where your previous message stopped, mid-sentence if necessary. Do not repeat anything, do not summarize what came before, no preamble — output only the next characters of the document.' },
+    ];
+    const next = await onceFn(null, maxTokens, msgs);
+    if (!next.output) { console.warn('  ⚠ continuation returned empty — keeping accumulated content'); break; }
+    output += next.output;
+    finishReason = next.finishReason;
+  }
+  return { output, finishReason };
+}

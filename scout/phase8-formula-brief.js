@@ -63,7 +63,7 @@ async function callGrok42(prompt, maxTokens = 64000) {
   const key = getOpenRouterKey();
   if (!key) throw new Error('OPENROUTER_API_KEY not found');
   const start = Date.now();
-  const doCall = async (mt) => {
+  const doCall = async (mt, messagesOverride = null) => {
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -75,7 +75,7 @@ async function callGrok42(prompt, maxTokens = 64000) {
       body: JSON.stringify({
         model: VALIDATION_MODEL,
         max_tokens: mt,
-        messages: [{ role: 'user', content: prompt }],
+        messages: messagesOverride || [{ role: 'user', content: prompt }],
       }),
     });
     if (res.status === 402) {
@@ -92,6 +92,21 @@ async function callGrok42(prompt, maxTokens = 64000) {
     return { content, finishReason };
   };
   let { content, finishReason } = await doCall(maxTokens);
+  // Auto-continuation on model output ceiling (see continueTruncated below —
+  // doCall's shape differs, so the same stitch loop is inlined here).
+  let segments = 0;
+  while (finishReason === 'length' && (content || '').length > 500 && segments < 2) {
+    segments++;
+    console.log(`  ↪ Draft A hit the model's token ceiling at ${content.length} chars — continuing generation (segment ${segments + 1})...`);
+    const next = await doCall(maxTokens, [
+      { role: 'user', content: prompt },
+      { role: 'assistant', content },
+      { role: 'user', content: 'Continue EXACTLY from where your previous message stopped, mid-sentence if necessary. Do not repeat anything, do not summarize what came before, no preamble — output only the next characters of the document.' },
+    ]);
+    if (!next.content) break;
+    content += next.content;
+    finishReason = next.finishReason;
+  }
   const len = (content || '').length;
   if (finishReason === 'length' && len > 500) {
     console.log(`  [NOTE: output reached token ceiling] — keeping truncated-but-substantial content`);
@@ -110,7 +125,7 @@ async function callGrok42(prompt, maxTokens = 64000) {
   return content;
 }
 
-async function callClaudeSonnetOnce(prompt, maxTokens) {
+async function callClaudeSonnetOnce(prompt, maxTokens, messagesOverride = null) {
   const key = getOpenRouterKey();
   if (!key) throw new Error('OPENROUTER_API_KEY not found in sterling/.env');
   const start = Date.now();
@@ -130,7 +145,7 @@ async function callClaudeSonnetOnce(prompt, maxTokens) {
         model: ANALYSIS_MODEL,
         max_tokens: maxTokens,
         stream: true,
-        messages: [{ role: 'user', content: prompt }],
+        messages: messagesOverride || [{ role: 'user', content: prompt }],
       }),
     });
     if (res.status === 402) {
@@ -173,7 +188,7 @@ async function callClaudeSonnetOnce(prompt, maxTokens) {
 // (logged); only genuinely empty/near-empty output gets one retry at the
 // same budget.
 async function callClaudeSonnet(prompt) {
-  let { output, finishReason } = await callClaudeSonnetOnce(prompt, 64000);
+  let { output, finishReason } = await continueTruncated(callClaudeSonnetOnce, prompt, 64000);
   const len = (output || '').length;
   if (finishReason === 'length' && len > 500) {
     console.log(`  [NOTE: output reached token ceiling] — keeping truncated-but-substantial content`);
@@ -1662,3 +1677,29 @@ run().catch(e => {
   console.error('\nFAILED:', e.message);
   process.exit(1);
 });
+
+// ─── AUTO-CONTINUATION (2026-08-29) ─────────────────────────────────────────
+// 64k is the MODEL's output ceiling — a big report can hit
+// finish_reason=length with real content (seen live: electrolyte QA
+// adjudicator at exactly 64,000 tok). This is NOT a retry: nothing is
+// discarded or re-generated; the partial answer becomes assistant context
+// and the model continues exactly where it stopped (max 2 extra segments).
+// Function declaration → hoisted, callable from the wrappers above.
+async function continueTruncated(onceFn, prompt, maxTokens) {
+  let { output, finishReason } = await onceFn(prompt, maxTokens);
+  let segments = 0;
+  while (finishReason === 'length' && (output || '').length > 500 && segments < 2) {
+    segments++;
+    console.log(`  ↪ output hit the model's token ceiling at ${output.length} chars — continuing generation (segment ${segments + 1})...`);
+    const msgs = [
+      { role: 'user', content: prompt },
+      { role: 'assistant', content: output },
+      { role: 'user', content: 'Continue EXACTLY from where your previous message stopped, mid-sentence if necessary. Do not repeat anything, do not summarize what came before, no preamble — output only the next characters of the document.' },
+    ];
+    const next = await onceFn(null, maxTokens, msgs);
+    if (!next.output) { console.warn('  ⚠ continuation returned empty — keeping accumulated content'); break; }
+    output += next.output;
+    finishReason = next.finishReason;
+  }
+  return { output, finishReason };
+}

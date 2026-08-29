@@ -85,14 +85,23 @@ function IdentityPanel({ categoryName, analysis, analysisLoading, formulaBrief, 
         </>
       ) : (
         <>
-          {/* Score dial */}
-          <div
-            className="relative h-20 w-20 shrink-0 rounded-full mx-auto"
-            style={{
-              background: `conic-gradient(hsl(var(--brand-neon)) ${dialPct * 3.6}deg, hsl(var(--brand-smoke) / 0.15) 0deg)`,
-            }}
-          >
-            <div className="absolute inset-[6px] rounded-full bg-black/55 flex flex-col items-center justify-center">
+          {/* Score dial — SVG donut stroke. The previous conic-gradient +
+              semi-transparent overlay let the neon wedge bleed through the
+              center, reading as an ugly "pie chart" (user report). An SVG
+              ring keeps the center transparent so the BrandCard gradient
+              shows through, with a crisp 5px neon arc. */}
+          <div className="relative h-20 w-20 shrink-0 mx-auto">
+            <svg viewBox="0 0 80 80" className="h-20 w-20 -rotate-90">
+              <circle cx="40" cy="40" r="35" fill="none" stroke="rgba(255,255,255,0.14)" strokeWidth="5" />
+              {dialPct > 0 && (
+                <circle
+                  cx="40" cy="40" r="35" fill="none"
+                  stroke="hsl(var(--brand-neon))" strokeWidth="5" strokeLinecap="round"
+                  strokeDasharray={`${(dialPct / 100) * 2 * Math.PI * 35} ${2 * Math.PI * 35}`}
+                />
+              )}
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
               <span className="text-lg font-bold tabular-nums text-white leading-none">{displayScore}</span>
               <span className="text-[8px] uppercase tracking-wide text-white/50 mt-1">
                 {hasRealScore ? "Opportunity" : "Pending refresh"}

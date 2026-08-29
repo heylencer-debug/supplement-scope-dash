@@ -243,8 +243,11 @@ export function Layout({ children }: LayoutProps) {
                     onTouchEnd={handleTouchEnd}
                     className="overflow-x-auto scrollbar-hide touch-pan-x"
                     style={{
-                      WebkitMaskImage: "linear-gradient(90deg, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%)",
-                      maskImage: "linear-gradient(90deg, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%)",
+                      // Right-edge fade ONLY — a symmetric mask also faded the
+                      // FIRST/active chip at rest, which read as a broken
+                      // half-transparent pill (user: "what's with the fade?").
+                      WebkitMaskImage: "linear-gradient(90deg, #000 0, #000 calc(100% - 28px), transparent 100%)",
+                      maskImage: "linear-gradient(90deg, #000 0, #000 calc(100% - 28px), transparent 100%)",
                     }}
                   >
                     <div className="flex items-center gap-1.5 w-max px-1">
@@ -269,7 +272,12 @@ export function Layout({ children }: LayoutProps) {
                               className="flex items-center gap-1.5 sm:gap-2 whitespace-nowrap min-w-[64px]"
                             >
                               {tab.isPending ? (
-                                <Loader2 className="w-3 h-3 text-chart-2 animate-spin flex-shrink-0" />
+                                // pulsing amber dot, not a spinner — the spinner
+                                // read as a broken loading state inside the chip
+                                <span className="relative flex h-[7px] w-[7px] shrink-0">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-chart-2 opacity-75" />
+                                  <span className="relative inline-flex h-[7px] w-[7px] rounded-full bg-chart-2" />
+                                </span>
                               ) : hasActiveJob ? (
                                 <span className="relative flex h-[7px] w-[7px] shrink-0">
                                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-chart-2 opacity-75" />

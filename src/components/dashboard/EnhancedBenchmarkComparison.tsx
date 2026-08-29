@@ -24,7 +24,6 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/
 import { useIngredientAnalysis, IngredientAnalysis } from "@/hooks/useIngredientAnalysis";
 import AIAnalysisResults from "@/components/dashboard/AIAnalysisResults";
 import { useCompetitiveAnalysis } from "@/hooks/useCompetitiveAnalysis";
-import { BrandCard } from "@/components/ui/brand-card";
 import { BrandModal } from "@/components/ui/brand-modal";
 import { CompetitiveAnalysisResults } from "@/components/dashboard/CompetitiveAnalysisResults";
 import { useP5SourcesForKeyword } from "@/hooks/useP5Sources";
@@ -2661,141 +2660,144 @@ export function EnhancedBenchmarkComparison({
               const messaging = getOurMessaging().filter(m => m !== 'Pending analysis');
               const risks = getOurWeaknesses();
               return (
-                <BrandCard
-                  even
-                  // rounded-xl overrides BrandCard's default rounded-2xl: this
-                  // card is a SIBLING of the white competitor Panels in the
-                  // same row, and a card is a card whatever surface it wears —
-                  // at 2xl it was the only 20px corner in a row of 16px ones.
-                  className="w-full lg:w-[300px] xl:w-[320px] lg:shrink-0 rounded-xl ring-1 ring-primary/25 flex flex-col"
-                >
-                  {/* Header: icon chip + label + score chip */}
-                  <div className="px-3 py-2.5 shrink-0 border-b border-white/10 flex items-center gap-2 min-w-0">
-                    <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                      <Sparkles className="w-3.5 h-3.5 text-primary" />
-                    </div>
-                    <p className="text-[13px] font-semibold tracking-tight text-foreground truncate">Our Concept</p>
-                    <Badge variant="secondary" className="ml-auto text-[10px] h-5 px-1.5 shrink-0 tabular-nums">
-                      {oppScore.overall != null ? `${oppScore.overall}/10` : '—'}
-                    </Badge>
-                  </div>
-
-                  <div className="p-3 space-y-3 flex-1 overflow-y-auto">
-                    {/* 2-stat header row */}
-                    <div className="grid grid-cols-2 border-y border-border/40">
-                      <div className="py-2 pr-3 border-r border-border/40">
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground flex items-center gap-1">
-                          <Target className="w-2.5 h-2.5" /> Target Price
-                        </p>
-                        <p className="mt-0.5 text-[16px] font-semibold tabular-nums leading-none text-foreground">
-                          {pricing.price != null ? `$${Number(pricing.price).toFixed(2)}` : '—'}
-                        </p>
+                // GRADIENT-BORDER CARD — branded via a ~2px iris-gradient rim
+                // (`.pearl-gradient-border`, index.css), not a full dark
+                // iris fill: the prior BrandCard version packed 5 dense
+                // sections onto eerie-black and read as "too much" — the
+                // structure survives here, but the interior is a plain
+                // light `bg-card` with normal ink tokens throughout.
+                <div className="pearl-gradient-border w-full lg:w-[300px] xl:w-[320px] lg:shrink-0">
+                  <div className="pearl-gradient-border-inner flex flex-col h-full">
+                    {/* Header: icon chip + label + score chip */}
+                    <div className="px-4 py-3 shrink-0 border-b border-border flex items-center gap-2 min-w-0">
+                      <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        <Sparkles className="w-3.5 h-3.5 text-primary" />
                       </div>
-                      <div className="py-2 pl-3">
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground flex items-center gap-1">
-                          <TrendingUp className="w-2.5 h-2.5" /> Opportunity
-                        </p>
-                        <p className="mt-0.5 text-[16px] font-semibold tabular-nums leading-none text-foreground">
-                          {oppScore.overall != null ? `${oppScore.overall}/10` : '—'}
-                        </p>
-                      </div>
+                      <p className="text-[13px] font-semibold tracking-tight text-foreground truncate">Our Concept</p>
+                      <Badge variant="secondary" className="ml-auto text-[10px] h-5 px-1.5 shrink-0 tabular-nums">
+                        {oppScore.overall != null ? `${oppScore.overall}/10` : '—'}
+                      </Badge>
                     </div>
 
-                    {/* Positioning — distilled bullets, not the paragraph */}
-                    {positioningBullets.length > 0 && (
-                      <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-wide mb-1 flex items-center gap-1.5 text-muted-foreground">
-                          <Compass className="w-3 h-3" />
-                          Positioning
-                        </p>
-                        <div className="space-y-0.5">
-                          {positioningBullets.map((b, i) => (
-                            <div key={i} className="flex items-start gap-1.5 text-[12px] leading-snug text-foreground py-0.5">
-                              <span className="w-1 h-1 rounded-full bg-primary/70 mt-1.5 shrink-0" />
-                              <span>{b}</span>
-                            </div>
-                          ))}
+                    <div className="p-4 space-y-4 flex-1 overflow-y-auto">
+                      {/* 2-stat header row */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <p className="text-[10px] uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+                            <Target className="w-2.5 h-2.5" /> Target Price
+                          </p>
+                          <p className="mt-1 text-[17px] font-semibold tabular-nums leading-none text-foreground">
+                            {pricing.price != null ? `$${Number(pricing.price).toFixed(2)}` : '—'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+                            <TrendingUp className="w-2.5 h-2.5" /> Opportunity
+                          </p>
+                          <p className="mt-1 text-[17px] font-semibold tabular-nums leading-none text-foreground">
+                            {oppScore.overall != null ? `${oppScore.overall}/10` : '—'}
+                          </p>
                         </div>
                       </div>
-                    )}
 
-                    {/* Key Differentiators — checklist, all of them */}
-                    {differentiators.length > 0 && (
-                      <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-wide mb-1 flex items-center gap-1.5 text-muted-foreground">
-                          <Trophy className="w-3 h-3" />
-                          Key Differentiators
-                        </p>
-                        <div className="space-y-0.5">
-                          {differentiators.map((d, i) => (
-                            <div key={i} className="flex items-start gap-1.5 text-[12px] leading-snug text-foreground py-1 border-b border-border/40 last:border-b-0">
-                              <CheckCircle className="w-3 h-3 text-primary mt-0.5 shrink-0" />
-                              <span>{d}</span>
-                            </div>
-                          ))}
+                      {/* Positioning — distilled bullets, not the paragraph */}
+                      {positioningBullets.length > 0 && (
+                        <div className="space-y-1.5">
+                          <p className="text-[10px] font-semibold uppercase tracking-wide flex items-center gap-1.5 text-muted-foreground">
+                            <Compass className="w-3 h-3" />
+                            Positioning
+                          </p>
+                          <div className="space-y-1.5">
+                            {positioningBullets.map((b, i) => (
+                              <div key={i} className="flex items-start gap-1.5 text-[12px] leading-snug text-foreground">
+                                <span className="w-1 h-1 rounded-full bg-primary/70 mt-1.5 shrink-0" />
+                                <span>{b}</span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {/* Target Audience — short lines */}
-                    <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-wide mb-1 flex items-center gap-1.5 text-muted-foreground">
-                        <Users className="w-3 h-3" />
-                        Target Audience
-                      </p>
-                      <p className="text-[12px] leading-snug text-foreground line-clamp-2">
-                        {audience}
-                      </p>
+                      {/* Key Differentiators — checklist, all of them */}
+                      {differentiators.length > 0 && (
+                        <div className="space-y-1.5">
+                          <p className="text-[10px] font-semibold uppercase tracking-wide flex items-center gap-1.5 text-muted-foreground">
+                            <Trophy className="w-3 h-3" />
+                            Key Differentiators
+                          </p>
+                          <div className="space-y-1.5">
+                            {differentiators.map((d, i) => (
+                              <div key={i} className="flex items-start gap-1.5 text-[12px] leading-snug text-foreground">
+                                <CheckCircle className="w-3 h-3 text-primary mt-0.5 shrink-0" />
+                                <span>{d}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Target Audience — short lines */}
+                      <div className="space-y-1.5">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide flex items-center gap-1.5 text-muted-foreground">
+                          <Users className="w-3 h-3" />
+                          Target Audience
+                        </p>
+                        <p className="text-[12px] leading-snug text-foreground line-clamp-2">
+                          {audience}
+                        </p>
+                      </div>
+
+                      {/* Go-to-Market — bullets/chips */}
+                      {messaging.length > 0 && (
+                        <div className="space-y-1.5">
+                          <p className="text-[10px] font-semibold uppercase tracking-wide flex items-center gap-1.5 text-muted-foreground">
+                            <Megaphone className="w-3 h-3" />
+                            Go-to-Market
+                          </p>
+                          <div className="space-y-1.5">
+                            {messaging.slice(0, 5).map((msg, i) => (
+                              <div key={i} className="flex items-start gap-1.5 text-[12px] leading-snug text-foreground">
+                                <span className="w-1 h-1 rounded-full bg-muted-foreground/50 mt-1.5 shrink-0" />
+                                <span>{msg}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Risks & Challenges */}
+                      {risks.length > 0 && (
+                        <div className="space-y-1.5">
+                          <p className="text-[10px] font-semibold uppercase tracking-wide flex items-center gap-1.5 text-muted-foreground">
+                            <AlertTriangle className="w-3 h-3" />
+                            Risks &amp; Challenges
+                          </p>
+                          <div className="space-y-1.5">
+                            {risks.map((r, i) => (
+                              <div key={i} className="flex items-start gap-1.5 text-[12px] leading-snug text-foreground">
+                                <AlertTriangle className="w-3 h-3 text-muted-foreground mt-0.5 shrink-0" />
+                                <span>{r}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
 
-                    {/* Go-to-Market — bullets/chips */}
-                    {messaging.length > 0 && (
-                      <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-wide mb-1 flex items-center gap-1.5 text-muted-foreground">
-                          <Megaphone className="w-3 h-3" />
-                          Go-to-Market
-                        </p>
-                        <div className="space-y-0.5">
-                          {messaging.slice(0, 5).map((msg, i) => (
-                            <div key={i} className="flex items-start gap-1.5 text-[12px] leading-snug text-foreground py-1 border-b border-border/40 last:border-b-0">
-                              <span className="w-1 h-1 rounded-full bg-muted-foreground/50 mt-1.5 shrink-0" />
-                              <span>{msg}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Risks & Challenges */}
-                    {risks.length > 0 && (
-                      <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-wide mb-1 flex items-center gap-1.5 text-muted-foreground">
-                          <AlertTriangle className="w-3 h-3" />
-                          Risks &amp; Challenges
-                        </p>
-                        <div className="space-y-0.5">
-                          {risks.map((r, i) => (
-                            <div key={i} className="flex items-start gap-1.5 text-[12px] leading-snug text-foreground py-1 border-b border-border/40 last:border-b-0">
-                              <AlertTriangle className="w-3 h-3 text-muted-foreground mt-0.5 shrink-0" />
-                              <span>{r}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                    {/* Footer affordance — unabridged text lives in the side panel */}
+                    <div className="px-4 py-2.5 border-t border-border shrink-0">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="w-full h-7 text-[11px] justify-center"
+                        onClick={() => setConceptPanelOpen(true)}
+                      >
+                        View full strategy
+                        <ArrowRight className="w-3 h-3 ml-1" />
+                      </Button>
+                    </div>
                   </div>
-
-                  {/* Footer affordance — unabridged text lives in the side panel */}
-                  <div className="px-3 py-2 border-t border-white/10 shrink-0">
-                    <button
-                      className="pearl-quiet w-full h-7 text-[11px] justify-center"
-                      onClick={() => setConceptPanelOpen(true)}
-                    >
-                      View full strategy
-                      <ArrowRight className="w-3 h-3 ml-1" />
-                    </button>
-                  </div>
-                </BrandCard>
+                </div>
               );
             })()}
 

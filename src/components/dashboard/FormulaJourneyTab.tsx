@@ -123,12 +123,19 @@ export function FormulaJourneyTab({ categoryId, categoryName, activeVersionInfo,
 
                 <Panel
                   ref={stage.id === "compliance" ? complianceRef : undefined}
-                  className={cn("flex-1 min-w-0", stage.state === "current" && "border-primary/30")}
+                  className="flex-1 min-w-0"
                 >
                   <Collapsible open={isOpen} onOpenChange={(o) => setOpenStage(o ? stage.id : null)}>
                     <div className="flex items-start justify-between gap-3 px-4 py-3 flex-wrap">
                       <div className="flex items-start gap-2.5 min-w-0">
-                        <Icon className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                        <Icon
+                          className={cn(
+                            "h-4 w-4 shrink-0 mt-0.5",
+                            stage.state === "done" && "text-chart-4",
+                            stage.state === "current" && "text-primary",
+                            stage.state === "pending" && "text-muted-foreground/50"
+                          )}
+                        />
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <p className="text-sm font-semibold text-foreground">{stage.label}</p>

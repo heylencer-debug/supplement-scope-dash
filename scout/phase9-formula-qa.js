@@ -39,6 +39,31 @@ const KEYWORD = process.argv.includes('--keyword')
   : 'ashwagandha gummies';
 const FORCE   = process.argv.includes('--force');
 
+// Form-aware serving language (2026-08-29): the QA prompt used to hardcode
+// "Per Serving (2 gummies)" + gummy manufacturability limits into EVERY
+// category's formula spec — electrolyte POWDER briefs literally said
+// "2 gummies" while describing a stick pack. Derive from the keyword.
+const FORM = (() => {
+  const k = KEYWORD.toLowerCase();
+  if (/gumm/.test(k)) return 'gummy';
+  if (/powder/.test(k)) return 'powder';
+  if (/capsule/.test(k)) return 'capsule';
+  if (/tablet/.test(k)) return 'tablet';
+  if (/chewable|chew\b/.test(k)) return 'chewable';
+  if (/liquid|drops/.test(k)) return 'liquid';
+  if (/softgel/.test(k)) return 'softgel';
+  return null;
+})();
+const SERVING_LABEL = {
+  gummy: '2 gummies', powder: '1 stick pack / scoop', capsule: '2 capsules',
+  tablet: '2 tablets', chewable: '2 chewables', liquid: '1 dropper / serving', softgel: '2 softgels',
+}[FORM] || '1 serving';
+const FORM_CONSTRAINT = FORM === 'gummy'
+  ? 'Actives only - must stay within 250-350mg actives per gummy max for real manufacturability'
+  : FORM === 'powder'
+    ? 'Actives only - total actives + excipients must physically fit the stated stick/scoop fill weight; state the fill weight explicitly'
+    : 'Actives only - doses must be physically manufacturable in the stated format; state the per-serving fill/size explicitly';
+
 // Token usage log — populated by every API call in this run
 const tokenLog = [];
 
@@ -319,12 +344,12 @@ For each active ingredient in the FINAL FORMULA BRIEF:
 (Write this FIRST - complete, production-ready manufacturing spec synthesizing Formula A + Formula B + QA corrections. This is what goes to the CMO. Full detail required - match the depth of the input briefs.)
 
 ### Executive Summary
-[2-3 sentences: market opportunity, who it is for, key differentiator vs Goli/competitors]
+[2-3 sentences: market opportunity, who it is for, key differentiator vs the category top competitors]
 
-### Recommended Formula - Per Serving (2 gummies)
+### Recommended Formula - Per Serving (${SERVING_LABEL})
 | Ingredient | Amount | Form / Grade | Role | Why This Dose |
 |---|---|---|---|---|
-[Actives only - must stay within 250-350mg actives per gummy max for real manufacturability]
+[${FORM_CONSTRAINT}]
 
 ### Excipients & Manufacturing Notes
 [Pectin, sweeteners, acids, flavors, colors - with specific CMO instructions]
@@ -455,7 +480,7 @@ After the table:
 ## ADJUSTED FORMULA SPECIFICATION
 (Complete revised formula â€" production ready)
 
-### Per Serving (2 gummies)
+### Per Serving (${SERVING_LABEL})
 | Ingredient | Amount | Form/Grade | Justification |
 |---|---|---|---|
 

@@ -127,7 +127,7 @@ function IdentityPanel({ categoryName, analysis, analysisLoading, formulaBrief, 
             <div className="pt-1 border-t border-white/10 space-y-1.5">
               <p className="text-[10px] font-medium text-white/50 uppercase tracking-wide">Top Brands</p>
               <div className="flex -space-x-3">
-                {topProducts.slice(0, 5).map((p, i) => (
+                {topProducts.slice(0, 4).map((p, i) => (
                   <div
                     key={i}
                     title={p.brand || "Product"}
@@ -142,6 +142,11 @@ function IdentityPanel({ categoryName, analysis, analysisLoading, formulaBrief, 
                     )}
                   </div>
                 ))}
+                {topProducts.length > 4 && (
+                  <div className="w-9 h-9 rounded-lg ring-1 ring-white/20 bg-white/10 shrink-0 flex items-center justify-center text-white/70 text-[10px] font-bold">
+                    +{topProducts.length - 4}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -193,8 +198,11 @@ function PipelineMicroGrid({ categoryId, categoryName, open, onExpand }: { categ
   const doneCount = phases.filter((p) => p.status === "complete").length;
 
   return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-2 lg:grid-cols-6 gap-1.5">
+    // h-full + auto-rows-fr: the phase tiles stretch to fill the panel's
+    // height (matching the BrandCard next to it) and the meters sit at the
+    // bottom — no dead whitespace when the identity panel is taller.
+    <div className="h-full flex flex-col gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-1.5 flex-1 auto-rows-fr">
         {phases.map((phase) => {
           const meta = PHASE_META[phase.phase];
           const isRunning = runningPhaseNum === phase.phase;
@@ -223,7 +231,7 @@ function PipelineMicroGrid({ categoryId, categoryName, open, onExpand }: { categ
               key={phase.phase}
               type="button"
               onClick={onExpand}
-              className="text-left bg-card border border-border rounded-lg p-2 flex flex-col gap-1 min-w-0 transition-colors hover:bg-muted/40"
+              className="text-left bg-card border border-border rounded-lg p-2 flex flex-col gap-1 justify-center min-w-0 h-full transition-colors hover:bg-muted/40"
             >
               <div className="flex items-center gap-1 min-w-0">
                 <span className="text-[10px] font-bold text-muted-foreground tracking-wide shrink-0">P{phase.phase}</span>
@@ -321,12 +329,14 @@ export function CockpitHero({ categoryId, categoryName, analysis, analysisLoadin
           </span>
         </button>
 
-        <PipelineMicroGrid
-          categoryId={categoryId}
-          categoryName={categoryName}
-          open={detailOpen}
-          onExpand={() => setDetailOpen(true)}
-        />
+        <div className="flex-1 min-h-0">
+          <PipelineMicroGrid
+            categoryId={categoryId}
+            categoryName={categoryName}
+            open={detailOpen}
+            onExpand={() => setDetailOpen(true)}
+          />
+        </div>
 
         <Collapsible open={detailOpen} onOpenChange={setDetailOpen}>
           <CollapsibleContent className="pt-1 space-y-2 border-t border-border/60 mt-1">

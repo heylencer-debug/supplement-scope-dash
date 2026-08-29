@@ -260,7 +260,7 @@ export function Layout({ children }: LayoutProps) {
                             className={cn(
                               "flex items-center gap-1.5 sm:gap-2 pl-2.5 pr-1.5 sm:pl-3 sm:pr-2 py-1.5 rounded-full text-xs sm:text-sm transition-colors duration-200 group flex-shrink-0",
                               isActive
-                                ? "bg-white text-brand-ink font-semibold"
+                                ? "bg-white text-[hsl(var(--brand-ink))] font-bold"
                                 : "bg-white/10 text-white/80 hover:bg-white/[0.15] hover:text-white"
                             )}
                           >

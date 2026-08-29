@@ -50,9 +50,13 @@ const hasContent = (v: unknown): boolean => {
 };
 
 async function countRows(table: string, keyword: string): Promise<number> {
+  // `keyword` is stored lowercase by the pipeline (e.g. "electrolyte powder")
+  // while the UI passes the display-cased category name ("Electrolyte
+  // Powder") — `.eq()` is case-sensitive, so this always matched 0 rows.
+  // `.ilike()` with no wildcards is an exact case-insensitive match.
   const { count, error } = await rawTable(table)
     .select("*", { count: "exact", head: true })
-    .eq("keyword", keyword);
+    .ilike("keyword", keyword);
   if (error) {
     // Table not present / not migrated yet -> treat as 0, not a hard failure.
     return 0;
@@ -92,9 +96,11 @@ async function fetchDataCompleteness(keyword: string): Promise<DataCompletenessR
   const kw = keyword.trim();
 
   // P1 — Amazon scrape: products with title+brand and images
+  // (`.ilike()` not `.eq()` — `keyword` is stored lowercase by the pipeline,
+  // the UI passes the display-cased category name; `.eq()` always matched 0.)
   const { data: p1Rows } = await rawTable("dovive_research")
     .select("asin,title,brand,bsr,images")
-    .eq("keyword", kw);
+    .ilike("keyword", kw);
   const p1: DoviveResearchRow[] = p1Rows ?? [];
   const p1Total = p1.length;
   const p1Titled = p1.filter((r) => r.title && r.brand).length;
@@ -106,7 +112,7 @@ async function fetchDataCompleteness(keyword: string): Promise<DataCompletenessR
   const p2Complete = p1Total > 0 && p2Count >= p1Total * 0.8;
 
   // P3 — Reviews (count + distinct ASINs)
-  const { data: p3Rows } = await rawTable("dovive_reviews").select("asin").eq("keyword", kw);
+  const { data: p3Rows } = await rawTable("dovive_reviews").select("asin").ilike("keyword", kw);
   const p3List: { asin: string }[] = p3Rows ?? [];
   const p3Asins = new Set(p3List.map((r) => r.asin)).size;
   const p3Complete = p3List.length >= 200;
@@ -118,7 +124,7 @@ async function fetchDataCompleteness(keyword: string): Promise<DataCompletenessR
   // P5 — Deep research: rows WITH non-null full_research and structured fields
   const { data: p5Rows } = await rawTable("dovive_phase5_research")
     .select("asin,full_research,key_strengths,benefits,competitor_angle,researched_by")
-    .eq("keyword", kw);
+    .ilike("keyword", kw);
   const p5: DovivePhase5ResearchRow[] = p5Rows ?? [];
   const p5Full = p5.filter((r) => r.full_research && r.full_research.length > 50).length;
   const p5Struct = p5.filter(

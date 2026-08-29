@@ -1454,6 +1454,14 @@ async function saveToDB(categoryId, grokBrief, claudeBrief, marketData, position
   // Preserve market_intelligence before delete (it gets wiped otherwise)
   const { data: existingFB } = await DASH.from('formula_briefs').select('ingredients').eq('category_id', categoryId).limit(1).maybeSingle();
   const preservedMarketIntel = existingFB?.ingredients?.market_intelligence || null;
+  // 2026-08-29: preserve ALL downstream phase outputs, not just P7's —
+  // regenerating a brief (only_phases=[9,10]) used to silently WIPE the
+  // P11 benchmarking + P12 FDA results stored in the same ingredients JSON
+  // (caught by the post-batch regression audit: 6 categories lost P11/P12).
+  // A brief regen invalidates none of these less than it invalidates
+  // market_intelligence — and when P11/P12 DO rerun, they overwrite anyway.
+  const preservedBenchmarking = existingFB?.ingredients?.competitive_benchmarking || null;
+  const preservedFda = existingFB?.ingredients?.fda_compliance || null;
 
   // Delete existing brief for this category
   await DASH.from('formula_briefs').delete().eq('category_id', categoryId);
@@ -1553,6 +1561,8 @@ async function saveToDB(categoryId, grokBrief, claudeBrief, marketData, position
       generated_at: new Date().toISOString(),
       keyword: KEYWORD,
       market_intelligence: preservedMarketIntel, // Preserved from pre-delete
+      competitive_benchmarking: preservedBenchmarking, // Preserved — P11 overwrites when it reruns
+      fda_compliance: preservedFda, // Preserved — P12 overwrites when it reruns
       data_sources: {
         top5_used: marketData.category_summary.top_performers.length,
         new_winners_used: marketData.formula_references.length,

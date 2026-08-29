@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { ScrollAnimate } from "@/components/ui/scroll-animate";
-import { Building2, ChevronsUpDown, Link2, Package, TrendingUp, FlaskConical, Scale, Factory, ScanSearch, Search } from "lucide-react";
+import { Building2, ChevronsUpDown, Link2, Package, TrendingUp, FlaskConical, Factory, ScanSearch, Search } from "lucide-react";
 import { PHASE_META } from "@/components/dashboard/PipelineStatus";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
@@ -18,9 +18,8 @@ import { LowConfidenceProducts } from "@/components/dashboard/LowConfidenceProdu
 import { PipelineStatus } from "@/components/dashboard/PipelineStatus";
 import { usePipelineStatus } from "@/hooks/usePipelineStatus";
 import { ProductFormulaIntelligence } from "@/components/dashboard/ProductFormulaIntelligence";
-import { FormulaBriefTab } from "@/components/dashboard/FormulaBriefTab";
-import { FormulaQATab } from "@/components/dashboard/FormulaQATab";
-import { FormulaValidationTab } from "@/components/dashboard/FormulaValidationTab";
+import { FormulaJourneyTab } from "@/components/dashboard/FormulaJourneyTab";
+import { FormulaPassport } from "@/components/dashboard/FormulaPassport";
 import { OcrCoveragePanel } from "@/components/dashboard/OcrCoveragePanel";
 import { P9BenchmarkOverview } from "@/components/dashboard/P9BenchmarkOverview";
 import { MarketIntelligenceReport } from "@/components/dashboard/MarketIntelligenceReport";
@@ -561,14 +560,27 @@ export default function Dashboard() {
           <TabsList className="flex w-full items-center gap-1 h-auto py-2 bg-transparent overflow-x-auto scrollbar-hide">
             <TabsTrigger className="takeout-pipeline-tab" value="products"><Package className="h-3.5 w-3.5" /> Products</TabsTrigger>
             <TabsTrigger className="takeout-pipeline-tab" value="market"><TrendingUp className="h-3.5 w-3.5" /> Market</TabsTrigger>
-            <TabsTrigger className="takeout-pipeline-tab" value="qa"><FlaskConical className="h-3.5 w-3.5" /> QA Review</TabsTrigger>
-            <TabsTrigger className="takeout-pipeline-tab" value="validation"><Scale className="h-3.5 w-3.5" /> Compliance</TabsTrigger>
+            <TabsTrigger className="takeout-pipeline-tab" value="formula"><FlaskConical className="h-3.5 w-3.5" /> Formula</TabsTrigger>
             <TabsTrigger className="takeout-pipeline-tab" value="manufacturer"><Factory className="h-3.5 w-3.5" /> Manufacturer</TabsTrigger>
             <TabsTrigger className="takeout-pipeline-tab" value="data-audit"><ScanSearch className="h-3.5 w-3.5" /> Data Audit</TabsTrigger>
           </TabsList>
         </div>
 
         <TabsContent value="products" className="space-y-4 mt-3">
+      {/* FORMULA PASSPORT — Option C: compact status card at the top of
+          Products, same useFormulaJourney state machine as the Formula tab.
+          Renders nothing when the category has no formula data yet. */}
+      {category?.id && (
+        <ScrollAnimate delay={50} variant="fade-up" duration={400}>
+          <FormulaPassport
+            categoryId={category.id}
+            categoryName={categoryName || undefined}
+            activeVersionNumber={activeVersion?.version_number}
+            setActiveTab={setActiveTab}
+          />
+        </ScrollAnimate>
+      )}
+
       {/* SECTION 2: KPI Metrics Grid (Scoreboards) */}
       <ScrollAnimate delay={100} variant="fade-up" duration={500}>
         <KPIMetricsGrid
@@ -942,23 +954,23 @@ export default function Dashboard() {
           )}
         </TabsContent>
 
-        {/* Formula Brief tab removed — versions now shown in Manufacturer tab */}
-
-        {/* TAB 5: QA Review (P9 Scout) */}
-        <TabsContent value="qa" className="space-y-4 mt-3">
+        {/* TAB: Formula Journey — one linear timeline through Formulation (P8) →
+            QA Review (P9) → Competitive Benchmark (P11) → FDA/DSHEA Compliance
+            (P12) → Factory Handoff. Replaces the old separate "QA Review" and
+            "Compliance" tabs; each stage's expander reuses the same
+            FormulaBriefTab/FormulaQATab/FormulaValidationTab components as-is. */}
+        <TabsContent value="formula" className="space-y-4 mt-3">
           {category?.id ? (
-            <FormulaQATab categoryId={category.id} categoryName={categoryName} activeVersionInfo={activeVersion ? { versionNumber: activeVersion.version_number, changeSummary: activeVersion.change_summary } : null} />
+            <FormulaJourneyTab
+              categoryId={category.id}
+              categoryName={categoryName || undefined}
+              activeVersionInfo={activeVersion ? { versionNumber: activeVersion.version_number, changeSummary: activeVersion.change_summary } : null}
+              setActiveTab={setActiveTab}
+              handleGenerateLink={handleGenerateLink}
+              generatingLink={generatingLink}
+            />
           ) : (
-            <div className="text-center py-12 text-muted-foreground">Select a category to run QA review.</div>
-          )}
-        </TabsContent>
-
-        {/* TAB 6: Compliance — P11 Competitive Benchmarking + P12 FDA */}
-        <TabsContent value="validation" className="space-y-4 mt-3">
-          {category?.id ? (
-            <FormulaValidationTab categoryId={category.id} categoryName={categoryName} activeVersionInfo={activeVersion ? { versionNumber: activeVersion.version_number, changeSummary: activeVersion.change_summary } : null} />
-          ) : (
-            <div className="text-center py-12 text-muted-foreground">Select a category to view compliance data.</div>
+            <div className="text-center py-12 text-muted-foreground">Select a category to view the formula journey.</div>
           )}
         </TabsContent>
 

@@ -1470,14 +1470,19 @@ async function saveToDB(categoryId, grokBrief, claudeBrief, marketData, position
     // analysis" state stays truthful instead of showing fake-real text.
     positioning: positioningData?.positioning || null,
     target_customer: positioningData?.target_customer || null,
-    form_type: 'gummy',
-    form_rationale: 'Category leader uses gummy format',
-    flavor_profile: 'See variant lineup in brief',
+    // 2026-08-29: these were hardcoded gummy/HDPE filler on EVERY category —
+    // absurd on powders ("form_type: gummy" for Electrolyte Powder). Form is
+    // now inferred from the keyword; packaging/rationale left null (honest
+    // "not analyzed") rather than wrong boilerplate — the UI renders null as
+    // a pending state, never fake-real text.
+    form_type: inferFormType(KEYWORD),
+    form_rationale: inferFormType(KEYWORD) ? `Dominant format for "${KEYWORD}" per category scrape` : null,
+    flavor_profile: null,
     flavor_importance: 'high',
     flavor_development_needed: true,
     servings_per_container: leader?.servings_per_container || 45,
     target_price: leader?.price ? Math.round(leader.price * 1.1 * 100) / 100 : 24.99,
-    packaging_type: 'HDPE bottle, white opaque, CRC closure, induction seal',
+    packaging_type: null,
     market_summary: {
       total_products: marketData.category_summary.total_products,
       number_one: `${leader?.brand} BSR ${leader?.bsr_current}`,
@@ -1702,4 +1707,19 @@ async function continueTruncated(onceFn, prompt, maxTokens) {
     finishReason = next.finishReason;
   }
   return { output, finishReason };
+}
+
+// Form factor inferred from the run keyword (hoisted; used by saveToDB).
+// Returns null when no known form word appears — callers/UI treat null as
+// "not analyzed", which is always better than wrong boilerplate.
+function inferFormType(keyword) {
+  const k = (keyword || '').toLowerCase();
+  if (/gumm/.test(k)) return 'gummy';
+  if (/powder/.test(k)) return 'powder';
+  if (/capsule|caps\b/.test(k)) return 'capsule';
+  if (/tablet/.test(k)) return 'tablet';
+  if (/chewable|chew\b|chews\b/.test(k)) return 'chewable';
+  if (/liquid|drops|tincture/.test(k)) return 'liquid';
+  if (/softgel/.test(k)) return 'softgel';
+  return null;
 }

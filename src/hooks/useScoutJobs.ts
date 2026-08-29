@@ -116,9 +116,13 @@ export function useScoutJobs(limit: number = 20) {
   return useQuery({
     queryKey: ["scout_jobs", limit],
     queryFn: async (): Promise<ScoutJobRow[]> => {
+      // Order by last ACTIVITY, not creation date: requeued jobs keep their
+      // old created_at, so an actively-running job could sit buried under
+      // newer completed rows (user: "why don't I see it running in my UI?").
+      // updated_at is bumped on every phase transition by the pipeline.
       const { data, error } = await scoutJobsTable()
         .select("*")
-        .order("created_at", { ascending: false })
+        .order("updated_at", { ascending: false, nullsFirst: false })
         .limit(limit);
 
       // Table not migrated yet (004 pending) -> treat as empty, not an error.
@@ -128,7 +132,9 @@ export function useScoutJobs(limit: number = 20) {
         }
         throw error;
       }
-      return (data ?? []) as ScoutJobRow[];
+      // In-flight jobs always surface above finished ones, regardless of age.
+      const rank = (s: string | null) => (s === "running" || s === "claimed" ? 0 : s === "queued" ? 1 : 2);
+      return ([...(data ?? [])] as ScoutJobRow[]).sort((a, b) => rank(a.status) - rank(b.status));
     },
     refetchInterval: 5_000,
     staleTime: 3_000,

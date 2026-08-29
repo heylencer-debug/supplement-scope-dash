@@ -483,15 +483,19 @@ Produce a validation report in this exact format:
 
 function parseScore(draft) {
   if (!draft) return null;
+  // "/10" must be a complete token — "500/1000mg potassium" contains the
+  // substring "500/10" and the old unanchored regex scored electrolyte
+  // 500/10. A real score is also always within 0–10.
+  const valid = (v) => (v >= 0 && v <= 10 ? v : null);
   // 1. Numeric X/10 anywhere near "competitiveness"
-  const m = draft.match(/Overall formula competitiveness\s*\|?\s*(\d+(?:\.\d+)?)\s*\/\s*10/i)
-         || draft.match(/Overall.*?competitiveness.*?(\d+(?:\.\d+)?)\s*\/\s*10/i)
-         || draft.match(/competitiveness.*?(\d+(?:\.\d+)?)\s*\/\s*10/i)
-         || draft.match(/FORMULA STRENGTH SCORE[\s\S]{0,500}(\d+(?:\.\d+)?)\s*\/\s*10/i);
-  if (m) return parseFloat(m[1]);
+  const m = draft.match(/Overall formula competitiveness\s*\|?\s*(\d+(?:\.\d+)?)\s*\/\s*10\b(?!\d)/i)
+         || draft.match(/Overall.*?competitiveness.*?(\d+(?:\.\d+)?)\s*\/\s*10\b(?!\d)/i)
+         || draft.match(/competitiveness.*?(\d+(?:\.\d+)?)\s*\/\s*10\b(?!\d)/i)
+         || draft.match(/FORMULA STRENGTH SCORE[\s\S]{0,500}(\d+(?:\.\d+)?)\s*\/\s*10\b(?!\d)/i);
+  if (m && valid(parseFloat(m[1])) !== null) return parseFloat(m[1]);
   // 2. Any X/10 in the doc as last resort
-  const any = draft.match(/(\d+(?:\.\d+)?)\s*\/\s*10/);
-  if (any) return parseFloat(any[1]);
+  const any = draft.match(/(\d+(?:\.\d+)?)\s*\/\s*10\b(?!\d)/);
+  if (any && valid(parseFloat(any[1])) !== null) return parseFloat(any[1]);
   // 3. Qualitative text → numeric fallback
   if (/\bSTRONG\b/i.test(draft)) return 7.5;
   if (/\bVERY STRONG\b/i.test(draft)) return 9.0;

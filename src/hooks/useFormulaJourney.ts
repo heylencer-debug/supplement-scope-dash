@@ -111,7 +111,7 @@ export function useFormulaJourney(categoryId?: string): FormulaJourneyResult {
       state: stateFor(1, qaDone),
       headline: hasAnyData
         ? (qaDone
-          ? `${qaVerdict?.verdict || "Reviewed"}${hasAdjustments ? " · adjustments applied" : ""}`
+          ? `${(qaVerdict?.verdict || "Reviewed").replace(/\*+/g, "").trim()}${hasAdjustments ? " · adjustments applied" : ""}`
           : "Waiting on P9 QA review")
         : "Run the pipeline first",
     },

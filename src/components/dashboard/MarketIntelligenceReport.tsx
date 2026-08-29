@@ -12,6 +12,7 @@ import { Panel } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
+import { useProductIntelligence } from "@/hooks/useProductIntelligence";
 
 interface MarketIntelligenceReportProps {
   categoryId: string;
@@ -74,15 +75,206 @@ function extractLabeledParagraphs(text: string): Array<{ label: string; content:
   return results;
 }
 
-function boldify(text: string) {
-  return text.replace(/\*\*([^*]+)\*\*/g, '<strong class="text-foreground">$1</strong>').replace(/\n/g, ' ');
+// ── Lightweight markdown-lite renderer ──────────────────────────────────────
+// The AI reports sometimes embed raw markdown tables ("| Brand | BSR | ... |")
+// and "- bullet" lines inside a labeled paragraph's body. `boldify()` alone
+// only handles **bold** and collapses newlines to spaces, so tables rendered
+// as literal pipe-delimited text and bullets ran together on one line. This
+// splits the text into table / bullet-list / paragraph blocks and renders
+// each with real markup instead of dumping raw markdown into the DOM.
+function renderInlineBold(text: string) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, i) => {
+    const m = part.match(/^\*\*([^*]+)\*\*$/);
+    return m ? <strong key={i} className="text-foreground">{m[1]}</strong> : <span key={i}>{part}</span>;
+  });
 }
 
-function SectionCard({ icon, title, children, accent }: {
-  icon: React.ReactNode; title: string; children: React.ReactNode; accent?: string;
+function isTableRow(line: string) {
+  return /^\s*\|.*\|\s*$/.test(line);
+}
+function isTableDivider(line: string) {
+  return /^\s*\|?[\s:|-]+\|?\s*$/.test(line) && line.includes('-');
+}
+
+function MarkdownTable({ lines }: { lines: string[] }) {
+  const rows = lines
+    .filter(l => !isTableDivider(l))
+    .map(l => l.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim()));
+  if (rows.length === 0) return null;
+  const [header, ...body] = rows;
+  return (
+    <div className="overflow-x-auto rounded-lg border border-border/60 my-1">
+      {/* No w-full / no cell wrapping on purpose: AI-generated tables have
+          unpredictable column counts and a free-text "notes" column — letting
+          the table size to its natural content width and scroll horizontally
+          (instead of squeezing into the panel and wrapping every cell into a
+          10-line-tall row) keeps rows readable at any table shape. */}
+      <table className="text-xs">
+        <thead className="bg-muted/50">
+          <tr>
+            {header.map((h, i) => (
+              <th key={i} className="text-left font-semibold text-foreground px-2.5 py-1.5 whitespace-nowrap">{renderInlineBold(h)}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {body.map((row, ri) => (
+            <tr key={ri} className="border-t border-border/40">
+              {row.map((cell, ci) => (
+                <td key={ci} className="px-2.5 py-1.5 text-muted-foreground align-top whitespace-nowrap max-w-[360px] overflow-hidden text-ellipsis" title={cell}>{renderInlineBold(cell)}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function FormattedText({ text, className }: { text: string; className?: string }) {
+  if (!text) return null;
+  // A numbered pain-point/step list is sometimes written inline as
+  // "intro: 1. First point... 2. Second point..." on a single logical line
+  // rather than one "N. " marker per source line — split those out into
+  // separate items too, or "1. 2. 3." runs together into one unreadable blob.
+  const splitInlineOrdered = (line: string): string[] => {
+    if (!/(^|\s)\d+\.\s+\S/.test(line) || !/\d+\.\s+\S[\s\S]*\d+\.\s+\S/.test(line)) return [line];
+    const parts = line.split(/(?:^|\s)(?=\d+\.\s+)/g).map(s => s.trim()).filter(Boolean);
+    return parts.length > 1 ? parts : [line];
+  };
+  const lines = text.split('\n').flatMap(splitInlineOrdered);
+  const bulletRe = /^\s*[-•]\s+/;
+  const orderedRe = /^\s*\d+\.\s+/;
+  const blocks: Array<{ type: 'table' | 'bullets' | 'ordered' | 'p'; lines: string[] }> = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    if (isTableRow(line)) {
+      const tableLines: string[] = [];
+      while (i < lines.length && (isTableRow(lines[i]) || isTableDivider(lines[i]))) {
+        tableLines.push(lines[i]);
+        i += 1;
+      }
+      blocks.push({ type: 'table', lines: tableLines });
+      continue;
+    }
+    if (bulletRe.test(line)) {
+      const bulletLines: string[] = [];
+      while (i < lines.length && bulletRe.test(lines[i])) {
+        bulletLines.push(lines[i].replace(bulletRe, ''));
+        i += 1;
+      }
+      blocks.push({ type: 'bullets', lines: bulletLines });
+      continue;
+    }
+    if (orderedRe.test(line)) {
+      const orderedLines: string[] = [];
+      while (i < lines.length && orderedRe.test(lines[i])) {
+        orderedLines.push(lines[i].replace(orderedRe, ''));
+        i += 1;
+      }
+      blocks.push({ type: 'ordered', lines: orderedLines });
+      continue;
+    }
+    const pLines: string[] = [];
+    while (i < lines.length && !isTableRow(lines[i]) && !bulletRe.test(lines[i]) && !orderedRe.test(lines[i])) {
+      if (lines[i].trim()) pLines.push(lines[i].trim());
+      i += 1;
+    }
+    if (pLines.length) blocks.push({ type: 'p', lines: pLines });
+  }
+
+  return (
+    <div className={className || "text-sm text-muted-foreground leading-relaxed space-y-2"}>
+      {blocks.map((block, bi) => {
+        if (block.type === 'table') return <MarkdownTable key={bi} lines={block.lines} />;
+        if (block.type === 'bullets') {
+          return (
+            <ul key={bi} className="space-y-1.5">
+              {block.lines.map((l, li) => (
+                <li key={li} className="flex items-start gap-2">
+                  <span className="mt-1.5 w-1 h-1 rounded-full bg-primary shrink-0" />
+                  <span>{renderInlineBold(l)}</span>
+                </li>
+              ))}
+            </ul>
+          );
+        }
+        if (block.type === 'ordered') {
+          return (
+            <ol key={bi} className="space-y-1.5 list-decimal list-inside marker:text-muted-foreground/70">
+              {block.lines.map((l, li) => (
+                <li key={li}>{renderInlineBold(l)}</li>
+              ))}
+            </ol>
+          );
+        }
+        return <p key={bi}>{renderInlineBold(block.lines.join(' '))}</p>;
+      })}
+    </div>
+  );
+}
+
+// ── Live KPI stats (was previously 4 hardcoded constants — $5.2M/#420 Goli/
+// 5.5/10/1k–3k — that never changed between categories). Computed straight
+// from `products` so the numbers are always honest for the selected category. ──
+interface MarketKpiStats {
+  totalRevenue: number | null;
+  revenueProductCount: number;
+  leaderBsr: number | null;
+  leaderBrand: string | null;
+  leaderRevenue: number | null;
+  medianBsr: number | null;
+}
+
+function useMarketKpiStats(categoryId: string) {
+  return useQuery({
+    queryKey: ["market_kpi_stats", categoryId],
+    queryFn: async (): Promise<MarketKpiStats> => {
+      const { data, error } = await supabase
+        .from("products")
+        .select("brand, bsr_current, monthly_revenue")
+        .eq("category_id", categoryId)
+        .limit(1000);
+      if (error) throw error;
+      const rows = data || [];
+
+      const revenues = rows.map(r => r.monthly_revenue).filter((v): v is number => typeof v === "number" && v > 0);
+      const totalRevenue = revenues.length ? revenues.reduce((a, b) => a + b, 0) : null;
+
+      const withBsr = rows.filter((r): r is typeof r & { bsr_current: number } => typeof r.bsr_current === "number" && r.bsr_current > 0);
+      const leader = withBsr.length ? withBsr.reduce((best, r) => (r.bsr_current < best.bsr_current ? r : best)) : null;
+
+      const sortedBsr = withBsr.map(r => r.bsr_current).sort((a, b) => a - b);
+      const medianBsr = sortedBsr.length ? sortedBsr[Math.floor(sortedBsr.length / 2)] : null;
+
+      return {
+        totalRevenue,
+        revenueProductCount: revenues.length,
+        leaderBsr: leader?.bsr_current ?? null,
+        leaderBrand: leader?.brand ?? null,
+        leaderRevenue: leader?.monthly_revenue ?? null,
+        medianBsr,
+      };
+    },
+    enabled: !!categoryId,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+function formatMoney(n: number | null): string {
+  if (n == null) return "—";
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}K`;
+  return `$${n.toFixed(0)}`;
+}
+
+function SectionCard({ icon, title, children }: {
+  icon: React.ReactNode; title: string; children: React.ReactNode;
 }) {
   return (
-    <Panel className={accent ? `border-l-4 ${accent}` : ""}>
+    <Panel>
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">{icon}{title}</CardTitle>
       </CardHeader>
@@ -97,8 +289,7 @@ function LabeledGrid({ items }: { items: Array<{ label: string; content: string 
       {items.map((item, i) => (
         <div key={i}>
           <p className="text-sm font-semibold text-foreground mb-1">{item.label}</p>
-          <p className="text-sm text-muted-foreground leading-relaxed"
-            dangerouslySetInnerHTML={{ __html: boldify(item.content) }} />
+          <FormattedText text={item.content} />
         </div>
       ))}
     </div>
@@ -112,7 +303,7 @@ function BulletList({ items }: { items: string[] }) {
       {items.map((item, i) => (
         <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
           <span className="mt-1 w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
-          <span dangerouslySetInnerHTML={{ __html: boldify(item.replace(/^\*\*[^*]+\*\*:\s*/, '')) }} />
+          <span>{renderInlineBold(item.replace(/^\*\*[^*]+\*\*:\s*/, ''))}</span>
         </li>
       ))}
     </ul>
@@ -121,6 +312,8 @@ function BulletList({ items }: { items: string[] }) {
 
 export function MarketIntelligenceReport({ categoryId, categoryName }: MarketIntelligenceReportProps) {
   const { data: mi, isLoading, error } = useMarketIntelligence(categoryId);
+  const { data: kpiStats } = useMarketKpiStats(categoryId);
+  const { data: productIntel } = useProductIntelligence(categoryId);
 
   if (isLoading) {
     return (
@@ -151,11 +344,32 @@ export function MarketIntelligenceReport({ categoryId, categoryName }: MarketInt
     ? new Date(mi.generated_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
     : null;
 
+  const avgQualityScore = productIntel?.summary.avg_quality_score ?? null;
   const kpis = [
-    { label: "Monthly Revenue", value: "$5.2M", sub: "across 159 products", icon: <DollarSign className="w-4 h-4 text-chart-2" />, color: "text-chart-2" },
-    { label: "Market Leader BSR", value: "#420", sub: "Goli — $448,800/mo", icon: <TrendingUp className="w-4 h-4 text-chart-4" />, color: "text-chart-4" },
-    { label: "Avg Formula Score", value: "5.5/10", sub: "room for premium entry", icon: <FlaskConical className="w-4 h-4 text-primary" />, color: "text-primary" },
-    { label: "DOVIVE BSR Target", value: "1k–3k", sub: "within 6 months", icon: <Target className="w-4 h-4 text-chart-5" />, color: "text-chart-5" },
+    {
+      label: "Monthly Revenue",
+      value: formatMoney(kpiStats?.totalRevenue ?? null),
+      sub: kpiStats?.revenueProductCount ? `across ${kpiStats.revenueProductCount} products` : "no revenue data",
+      icon: <DollarSign className="w-4 h-4 text-chart-2" />, color: "text-chart-2",
+    },
+    {
+      label: "Market Leader BSR",
+      value: kpiStats?.leaderBsr != null ? `#${kpiStats.leaderBsr.toLocaleString()}` : "—",
+      sub: kpiStats?.leaderBrand ? `${kpiStats.leaderBrand} — ${formatMoney(kpiStats.leaderRevenue)}/mo` : "no BSR data",
+      icon: <TrendingUp className="w-4 h-4 text-chart-4" />, color: "text-chart-4",
+    },
+    {
+      label: "Avg Formula Score",
+      value: avgQualityScore != null ? `${avgQualityScore}/10` : "—",
+      sub: avgQualityScore != null && avgQualityScore < 7 ? "room for premium entry" : "strong category baseline",
+      icon: <FlaskConical className="w-4 h-4 text-primary" />, color: "text-primary",
+    },
+    {
+      label: "Category Median BSR",
+      value: kpiStats?.medianBsr != null ? `#${kpiStats.medianBsr.toLocaleString()}` : "—",
+      sub: "current field benchmark",
+      icon: <Target className="w-4 h-4 text-chart-5" />, color: "text-chart-5",
+    },
   ];
 
   const formulaBullets = extractBullets(sections["FORMULA ANALYSIS"] || "");
@@ -201,40 +415,39 @@ export function MarketIntelligenceReport({ categoryId, categoryName }: MarketInt
       {/* Executive Summary */}
       {sections["EXECUTIVE SUMMARY"] && (
         <SectionCard icon={<BarChart3 className="w-4 h-4 text-primary" />} title="Executive Summary">
-          <p className="text-sm text-muted-foreground leading-relaxed"
-            dangerouslySetInnerHTML={{ __html: boldify(sections["EXECUTIVE SUMMARY"]) }} />
+          <FormattedText text={sections["EXECUTIVE SUMMARY"]} />
         </SectionCard>
       )}
 
       {/* 2-col grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {sections["CATEGORY LANDSCAPE"] && (
-          <SectionCard icon={<TrendingUp className="w-4 h-4 text-chart-4" />} title="Category Landscape" accent="border-chart-4/50">
+          <SectionCard icon={<TrendingUp className="w-4 h-4 text-chart-4" />} title="Category Landscape">
             <LabeledGrid items={extractLabeledParagraphs(sections["CATEGORY LANDSCAPE"])} />
           </SectionCard>
         )}
         {formulaBullets.length > 0 && (
-          <SectionCard icon={<FlaskConical className="w-4 h-4 text-primary" />} title="Formula Analysis" accent="border-primary/50">
+          <SectionCard icon={<FlaskConical className="w-4 h-4 text-primary" />} title="Formula Analysis">
             <BulletList items={formulaBullets} />
           </SectionCard>
         )}
         {pricingItems.length > 0 && (
-          <SectionCard icon={<DollarSign className="w-4 h-4 text-chart-2" />} title="Pricing Intelligence" accent="border-chart-2/50">
+          <SectionCard icon={<DollarSign className="w-4 h-4 text-chart-2" />} title="Pricing Intelligence">
             <LabeledGrid items={pricingItems} />
           </SectionCard>
         )}
         {momentumItems.length > 0 && (
-          <SectionCard icon={<Zap className="w-4 h-4 text-chart-5" />} title="Market Momentum" accent="border-chart-5/50">
+          <SectionCard icon={<Zap className="w-4 h-4 text-chart-5" />} title="Market Momentum">
             <LabeledGrid items={momentumItems} />
           </SectionCard>
         )}
         {consumerItems.length > 0 && (
-          <SectionCard icon={<Users className="w-4 h-4 text-chart-1" />} title="Consumer Demand Signals" accent="border-chart-1/50">
+          <SectionCard icon={<Users className="w-4 h-4 text-chart-1" />} title="Consumer Demand Signals">
             <LabeledGrid items={consumerItems} />
           </SectionCard>
         )}
         {whitespaceItems.length > 0 && (
-          <SectionCard icon={<Lightbulb className="w-4 h-4 text-chart-2" />} title="Competitive White Space" accent="border-chart-2/50">
+          <SectionCard icon={<Lightbulb className="w-4 h-4 text-chart-2" />} title="Competitive White Space">
             <LabeledGrid items={whitespaceItems} />
           </SectionCard>
         )}
@@ -242,14 +455,14 @@ export function MarketIntelligenceReport({ categoryId, categoryName }: MarketInt
 
       {/* Risks — full width */}
       {riskItems.length > 0 && (
-        <SectionCard icon={<ShieldAlert className="w-4 h-4 text-destructive" />} title="Market Risks & Watch-outs" accent="border-destructive/40">
+        <SectionCard icon={<ShieldAlert className="w-4 h-4 text-destructive" />} title="Market Risks & Watch-outs">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {riskItems.map((item, i) => (
               <div key={i} className="flex items-start gap-2">
                 <AlertTriangle className="w-3.5 h-3.5 text-destructive mt-0.5 shrink-0" />
-                <div>
+                <div className="min-w-0">
                   <p className="text-sm font-medium text-foreground">{item.label}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5" dangerouslySetInnerHTML={{ __html: boldify(item.content) }} />
+                  <FormattedText text={item.content} className="text-xs text-muted-foreground mt-0.5 space-y-1.5" />
                 </div>
               </div>
             ))}
@@ -272,10 +485,9 @@ export function MarketIntelligenceReport({ categoryId, categoryName }: MarketInt
               {recItems.map((item, i) => (
                 <div key={i} className="flex items-start gap-2">
                   <CheckCircle2 className="w-4 h-4 text-chart-2 mt-0.5 shrink-0" />
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-sm font-semibold text-foreground">{item.label}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed"
-                      dangerouslySetInnerHTML={{ __html: boldify(item.content) }} />
+                    <FormattedText text={item.content} className="text-xs text-muted-foreground mt-0.5 leading-relaxed space-y-1.5" />
                   </div>
                 </div>
               ))}

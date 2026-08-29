@@ -524,10 +524,17 @@ async function run() {
   if (!FORCE) {
     const { data: existing } = await DASH.from('formula_briefs')
       .select('ingredients').eq('category_id', CAT_ID).limit(1).single();
-    if (existing?.ingredients?.competitive_benchmarking) {
-      console.log(`✅ P11 benchmarking already exists. Use --force to regenerate.`);
+    // Match the verifier's standard (run-pipeline isRealModelText): a stale
+    // partial row from a crashed run (empty/[ERROR] draft or validation)
+    // must NOT count as "exists" — otherwise the phase skips in 2s forever
+    // while the verifier keeps failing it (elderberry deadlock, 2026-08-29).
+    const cb = existing?.ingredients?.competitive_benchmarking;
+    const real = (t) => typeof t === 'string' && t.trim().length > 500 && !t.trim().startsWith('[ERROR');
+    if (cb && real(cb.sonnet_draft) && real(cb.opus_validation)) {
+      console.log(`✅ P11 benchmarking already exists (real content). Use --force to regenerate.`);
       return;
     }
+    if (cb) console.log(`⚠️ P11 row exists but content is empty/partial — regenerating.`);
   }
 
   // Load adjusted formula from P10

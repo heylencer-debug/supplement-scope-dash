@@ -598,10 +598,15 @@ async function run() {
   if (!FORCE) {
     const { data: existing } = await DASH.from('formula_briefs')
       .select('ingredients').eq('category_id', CAT_ID).limit(1).single();
-    if (existing?.ingredients?.fda_compliance) {
-      console.log(`✅ P12 FDA compliance already exists. Use --force to regenerate.`);
+    // Same real-content standard as the verifier (see phase10's P11 check):
+    // stale partial rows from crashed runs must not block regeneration.
+    const fc = existing?.ingredients?.fda_compliance;
+    const real = (t) => typeof t === 'string' && t.trim().length > 500 && !t.trim().startsWith('[ERROR');
+    if (fc && real(fc.opus_analysis) && real(fc.sonnet_validation)) {
+      console.log(`✅ P12 FDA compliance already exists (real content). Use --force to regenerate.`);
       return;
     }
+    if (fc) console.log(`⚠️ P12 row exists but content is empty/partial — regenerating.`);
   }
 
   // Load formula

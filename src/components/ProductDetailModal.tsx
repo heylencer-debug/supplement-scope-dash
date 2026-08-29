@@ -227,8 +227,10 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
 
   const getOverallScore = () => {
     if (marketingAnalysis?.overall_score) return marketingAnalysis.overall_score;
-    const rating = product.rating ?? 0;
-    const reviews = product.reviews ?? 0;
+    // `rating`/`reviews` are legacy columns the pipeline mostly no longer
+    // writes to (near-always null) — `rating_value`/`rating_count` are live.
+    const rating = product.rating_value ?? 0;
+    const reviews = product.rating_count ?? 0;
     return Math.min(100, Math.round((rating / 5) * 50 + Math.min(reviews / 100, 50)));
   };
 
@@ -301,10 +303,10 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
             <span>•</span>
             <div className="flex items-center gap-1">
               <Star className="w-4 h-4 fill-chart-2 text-chart-2" />
-              <span>{(product.rating ?? 0).toFixed(1)}</span>
+              <span>{(product.rating_value ?? 0).toFixed(1)}</span>
             </div>
             <span>•</span>
-            <span>{(product.reviews ?? 0).toLocaleString()} reviews</span>
+            <span>{(product.rating_count ?? 0).toLocaleString()} reviews</span>
             {product.asin && (
               <>
                 <span>•</span>
@@ -330,7 +332,7 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
             </TabsTrigger>
             <TabsTrigger value="scout-formula" className={productTabCls}>
               <Beaker className="w-3 h-3" />
-              Formula
+              OCR Formula
             </TabsTrigger>
             <TabsTrigger value="keepa" className={productTabCls}>
               <BarChart3 className="w-3 h-3" />
@@ -338,7 +340,7 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
             </TabsTrigger>
             <TabsTrigger value="scout-reviews" className={productTabCls}>
               <MessageSquare className="w-3 h-3" />
-              Reviews
+              P5 Research
             </TabsTrigger>
             <TabsTrigger value="overview" className={productTabCls}>
               <Image className="w-3 h-3" />
@@ -1588,11 +1590,11 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                   <p className="text-xs text-muted-foreground">BSR</p>
                 </CardContent></Panel>
                 <Panel><CardContent className="pt-4 pb-4 text-center">
-                  <p className="text-xl font-bold text-foreground">{(product.rating ?? 0).toFixed(1)}★</p>
+                  <p className="text-xl font-bold text-foreground">{(product.rating_value ?? 0).toFixed(1)}★</p>
                   <p className="text-xs text-muted-foreground">Rating</p>
                 </CardContent></Panel>
                 <Panel><CardContent className="pt-4 pb-4 text-center">
-                  <p className="text-xl font-bold text-foreground">{(product.reviews ?? 0).toLocaleString()}</p>
+                  <p className="text-xl font-bold text-foreground">{(product.rating_count ?? 0).toLocaleString()}</p>
                   <p className="text-xs text-muted-foreground">Reviews</p>
                 </CardContent></Panel>
               </div>

@@ -367,7 +367,10 @@ export function FormulaBriefTab({ categoryId, categoryName }: Props) {
         id: 'final',
         emoji: '✅',
         title: 'Final Formula — QA Approved',
-        subtitle: (finalFormulaBrief ? 'Complete brief · ' : 'Adjustments only · ') + 'Claude Opus 5 adjudication · ' + (qaVerdict?.verdict || 'Reviewed'),
+        // qaVerdict.verdict is AI-generated text that sometimes wraps itself in
+        // markdown bold ("**APPROVED WITH ADJUSTMENTS**") — this subtitle line
+        // is plain text (no markdown renderer), so strip the literal ** marks.
+        subtitle: (finalFormulaBrief ? 'Complete brief · ' : 'Adjustments only · ') + 'Claude Opus 5 adjudication · ' + (qaVerdict?.verdict?.replace(/\*\*/g, '') || 'Reviewed'),
         badge: qaVerdict?.score ? `${qaVerdict.score}/10` : 'QA',
         borderColor: 'border-green-500/40',
         bgColor: 'bg-green-500/5',

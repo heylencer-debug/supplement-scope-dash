@@ -140,6 +140,11 @@ async function fetchPipelineStatus(categoryId: string): Promise<PhaseStatus[]> {
       p5Count = Math.min(P5_TARGET, p5Fallback.length);
     }
   }
+  // Cap the DISPLAYED count/pct at the target — P5 runs 5 top-BSR + 3
+  // new-brand briefs against an 8-target, but the raw product-level count
+  // can legitimately exceed 8 (e.g. re-runs, extra brand coverage), which
+  // rendered as "19/8 (238%)" instead of a capped, honest "8/8 (100%)".
+  p5Count = Math.min(p5Count, P5_TARGET);
 
   // P7: Market Intelligence - check for ai_market_analysis in formula_briefs.ingredients
   const p7HasMarket = !!(p7_market as any)?.data?.ingredients?.market_intelligence?.ai_market_analysis;
@@ -186,7 +191,11 @@ async function fetchPipelineStatus(categoryId: string): Promise<PhaseStatus[]> {
       description: "BSR trends, monthly sales & revenue data",
       total,
       complete: p2.count ?? 0,
-      status: makeStatus(p2.count ?? 0, total),
+      // Mirrors the pipeline's REAL P2 gate: >=90% complete (not 100%) —
+      // a handful of ASINs can legitimately fail Keepa lookup (delisted,
+      // no history) forever, so verifier-passed runs sitting at 99% used
+      // to show "PARTIAL" indefinitely on an otherwise-done phase.
+      status: total === 0 ? "not_started" : (p2.count ?? 0) >= total * 0.9 ? "complete" : (p2.count ?? 0) > 0 ? "partial" : "not_started",
       pct: total ? Math.round(((p2.count ?? 0) / total) * 100) : 0,
     },
     {

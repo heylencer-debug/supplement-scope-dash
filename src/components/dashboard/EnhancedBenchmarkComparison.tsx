@@ -2664,7 +2664,7 @@ export function EnhancedBenchmarkComparison({
                   // card is a SIBLING of the white competitor Panels in the
                   // same row, and a card is a card whatever surface it wears —
                   // at 2xl it was the only 20px corner in a row of 16px ones.
-                  className="w-full lg:w-[300px] xl:w-[320px] lg:shrink-0 rounded-xl border-l-2 border-l-primary flex flex-col"
+                  className="w-full lg:w-[300px] xl:w-[320px] lg:shrink-0 rounded-xl ring-1 ring-primary/25 flex flex-col"
                 >
                   {/* Header: icon chip + label + score chip */}
                   <div className="px-3 py-2.5 shrink-0 border-b border-white/10 flex items-center gap-2 min-w-0">
@@ -3311,7 +3311,7 @@ export function EnhancedBenchmarkComparison({
                     
                     <div className={cn(
                       "px-3 py-2 border-b border-border/60",
-                      isFormulaReference(product.asin) && "border-l-2 border-l-primary"
+                      isFormulaReference(product.asin) && "ring-1 ring-primary/30"
                     )}>
                       <div className="flex items-center gap-2">
                         <span className="text-[11px] font-semibold tabular-nums text-muted-foreground shrink-0">

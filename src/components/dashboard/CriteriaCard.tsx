@@ -90,9 +90,9 @@ export function CriteriaCard({
   return (
     <div
       className={cn(
-        "rounded-lg border-l-4 p-3 transition-all",
-        colors.border,
-        colors.bg,
+        // Minimalist Pearl surface — score is conveyed by the gauge, not a
+        // colored stripe/tint (user: "solid color on the left looks generic").
+        "rounded-lg border border-border bg-card p-3 transition-all",
         "hover:shadow-md"
       )}
     >

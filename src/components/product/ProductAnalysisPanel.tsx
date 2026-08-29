@@ -109,7 +109,7 @@ function SmartImageCard({
       {/* Analysis shown below the image when expanded */}
       {isExpanded && (image.description || image.analysis) && <div className="p-3 bg-muted/50 rounded-md border border-border text-xs space-y-2 animate-in fade-in slide-in-from-top-2">
           {image.description && <p className="font-medium">{image.description}</p>}
-          {image.analysis && <div className="p-2 bg-card rounded border-l-2 border-primary">
+          {image.analysis && <div className="p-2 bg-card rounded border border-border">
               <p className="text-muted-foreground mb-1 font-semibold">Strategy:</p>
               <p className="leading-relaxed">{image.analysis}</p>
             </div>}
@@ -128,7 +128,7 @@ function EnhancedActionItem({
   const priority = item.priority || 'medium';
   const rationale = item.rationale || '';
   return <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
-      <div className="border-l-4 border-l-primary/50 bg-muted/30 p-3 rounded-r-md">
+      <div className="border border-border bg-muted/30 p-3 rounded-md">
         <div className="flex items-start gap-2">
           <PriorityBadge priority={priority} />
           <div className="flex-1">
@@ -350,7 +350,7 @@ function CreativeStrategyCard({
               </div>
               {targetPersona.demographic && <p className="text-sm font-medium mb-1">{targetPersona.demographic}</p>}
               {targetPersona.psychographic && <p className="text-xs text-muted-foreground mb-2">{targetPersona.psychographic}</p>}
-              {targetPersona.primary_motivation && <div className="mt-2 p-2 bg-card rounded-md border-l-2 border-chart-3">
+              {targetPersona.primary_motivation && <div className="mt-2 p-2 bg-card rounded-md border border-border">
                   <p className="text-xs font-semibold text-muted-foreground mb-1">Primary Motivation:</p>
                   <p className="text-sm">{targetPersona.primary_motivation}</p>
                 </div>}

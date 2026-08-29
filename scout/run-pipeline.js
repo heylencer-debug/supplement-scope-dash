@@ -527,7 +527,10 @@ const PHASES = [
   {
     num: 10, name: 'Formula QA', description: 'QA specialist: dose validation, competitor head-to-head, formula adjustments',
     run: async () => {
-      await runScript('phase9-formula-qa.js', ['--keyword', KEYWORD]);
+      // --force forwarded like every other phase (was the ONLY one missing
+      // it — force reruns silently skipped QA via its own already-exists
+      // check, leaving stale/truncated reports in place).
+      await runScript('phase9-formula-qa.js', ['--keyword', KEYWORD, ...(FORCE ? ['--force'] : [])]);
       // Re-run market intelligence AFTER QA so formula_briefs record has fresh data
       console.log('\n→ Refreshing market intelligence in formula_briefs (post-QA)...');
       await runScript('phase6-market-analysis.js', ['--keyword', KEYWORD, '--force']);

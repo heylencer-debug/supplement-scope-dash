@@ -147,7 +147,7 @@ export default function NewAnalysis() {
       </div>
 
       {/* New Keyword Submission -> Scout cloud queue */}
-      <Panel className="border-l-2 border-l-primary">
+      <Panel>
         <CardContent className="p-4 space-y-3">
           <div className="flex items-start gap-2.5">
             <FileText className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
@@ -184,7 +184,14 @@ export default function NewAnalysis() {
               {activeOrRecentJobs.map((job) => {
                 const meta = jobStatusMeta[job.status] ?? jobStatusMeta.queued;
                 const StatusIcon = meta.icon;
-                const totalPhases = job.total_phases ?? 12;
+                // Guard against stale/bogus scout_jobs.total_phases values
+                // (seen live as literally 2 while current_phase was 9) —
+                // fall back to the real 12-phase pipeline whenever the
+                // stored value is missing or smaller than the current phase.
+                const totalPhases =
+                  job.total_phases && job.total_phases >= (job.current_phase ?? 0)
+                    ? job.total_phases
+                    : 12;
                 const phaseLabel =
                   job.current_phase_name ??
                   (job.current_phase ? SCOUT_PHASE_NAMES[job.current_phase] : null);

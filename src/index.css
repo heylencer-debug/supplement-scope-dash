@@ -733,6 +733,112 @@
     border-color: hsl(var(--brand-neon-deep) / 0.5);
   }
 
+  /* SEGMENTED CONTROL TABS (T3) — smoke track (Dashboard's main tab strip),
+     with a genuine `.pearl-button` sitting in the track for the active
+     trigger, per the "Cockpit Split" redesign. `!important` on the
+     load-bearing declarations mirrors `.pearl-tab`/`.takeout-pipeline-tab`
+     above: tabs.tsx's shared TabsTrigger default ships
+     `data-[state=active]:text-primary data-[state=active]:border-primary`
+     Tailwind utilities at the same specificity as an attribute-selector
+     class rule, and the utilities layer wins ties by later layer order —
+     so plain-specificity overrides here silently lose without it. */
+  .pearl-seg-tab {
+    position: relative;
+    isolation: isolate;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 2.25rem;
+    padding: 0 14px;
+    border-radius: var(--radius-lg);
+    font-size: 12.5px;
+    font-weight: 600;
+    color: hsl(var(--muted-foreground)) !important;
+    background: transparent !important;
+    border: 1px solid transparent !important;
+    box-shadow: none !important;
+    transition: color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
+  }
+  .pearl-seg-tab:hover:not([data-state='active']) {
+    color: hsl(var(--foreground)) !important;
+  }
+  .pearl-seg-tab[data-state='active'] {
+    overflow: hidden;
+    color: #fff !important;
+    background: hsl(var(--brand-ink)) !important;
+    box-shadow:
+      0 1px 2px rgba(0, 0, 0, 0.28),
+      0 6px 16px -8px rgba(0, 0, 0, 0.45),
+      inset 0 0.192em 0.576em color-mix(in oklab, var(--pearl-c-hi) var(--pearl-s-top), transparent),
+      inset 0 -0.064em 0.192em color-mix(in oklab, var(--pearl-c-lo) var(--pearl-s-line), transparent),
+      inset 0 -0.256em 0.576em color-mix(in oklab, var(--pearl-c-hi) var(--pearl-s-bounce), transparent) !important;
+  }
+  /* Same waterline + gloss-cap pseudo-elements as `.pearl-button`, gated to
+     the active trigger only — the point is the active tab reads as a real
+     Pearl button that happens to be sitting in the segmented track. */
+  .pearl-seg-tab[data-state='active']::before,
+  .pearl-seg-tab[data-state='active']::after {
+    content: '';
+    position: absolute;
+    pointer-events: none;
+    z-index: -1;
+  }
+  .pearl-seg-tab[data-state='active']::before {
+    left: -18%;
+    right: -18%;
+    top: -100%;
+    bottom: 34%;
+    border-radius: 50%;
+    background-image: linear-gradient(
+      to bottom,
+      transparent 72%,
+      color-mix(in oklab, var(--pearl-c-hi) var(--pearl-s-arc), transparent) 100%
+    );
+  }
+  .pearl-seg-tab[data-state='active']::after {
+    left: 6%;
+    right: 6%;
+    top: 12%;
+    bottom: 40%;
+    border-radius: 9999px 9999px 0 0;
+    box-shadow: inset 0 0.4em 0.32em -0.4em
+      color-mix(in oklab, var(--pearl-c-sheen) min(100%, calc(var(--pearl-s-cap) * 8 / 3)), transparent);
+    background: linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--pearl-c-sheen) var(--pearl-s-cap), transparent) 0%,
+      color-mix(in oklab, var(--pearl-c-sheen) calc(var(--pearl-s-cap) / 2), transparent) 44%,
+      transparent 78%,
+      transparent 100%
+    );
+    -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 16%, #000 84%, transparent 100%);
+    mask-image: linear-gradient(90deg, transparent 0%, #000 16%, #000 84%, transparent 100%);
+  }
+
+  /* GRADIENT-BORDER CARD — the branded-but-readable alternative to a full
+     `.brand-iris-surface` fill: outer wrapper carries the iris gradient as
+     a ~2px rim (padding trick), inner surface is a plain light `bg-card`
+     so dense structured content (stats, checklists, bullets) stays
+     legible instead of sitting on eerie-black. Used by EnhancedBenchmark-
+     Comparison's "Our Concept" card and (per readability judgment call)
+     optionally by CockpitHero's identity panel. */
+  .pearl-gradient-border {
+    position: relative;
+    border-radius: var(--radius-xl-card);
+    padding: 2px;
+    background: linear-gradient(
+      135deg,
+      hsl(var(--brand-electric)),
+      var(--brand-iris-purple) 55%,
+      var(--brand-iris-cyan)
+    );
+  }
+  .pearl-gradient-border-inner {
+    border-radius: calc(var(--radius-xl-card) - 2px);
+    background: hsl(var(--card));
+    height: 100%;
+  }
+
   /* CHECKLIST ROWS — Data Audit tab, colored status dots */
   .check-item {
     display: flex;

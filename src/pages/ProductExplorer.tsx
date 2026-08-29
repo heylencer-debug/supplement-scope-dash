@@ -199,8 +199,9 @@ export default function ProductExplorer() {
         (priceRange === "20to50" && price >= 20 && price <= 50) ||
         (priceRange === "over50" && price > 50);
       
-      // Rating filter
-      const rating = product.rating ?? 0;
+      // Rating filter — `rating` is a legacy column the pipeline mostly no
+      // longer writes to (near-always null); `rating_value` is the live one.
+      const rating = product.rating_value ?? 0;
       const matchesRating = ratingFilter === "all" ||
         (ratingFilter === "4plus" && rating >= 4) ||
         (ratingFilter === "3to4" && rating >= 3 && rating < 4) ||
@@ -225,12 +226,12 @@ export default function ProductExplorer() {
             bVal = b.price ?? 0;
             break;
           case "rating":
-            aVal = a.rating ?? 0;
-            bVal = b.rating ?? 0;
+            aVal = a.rating_value ?? 0;
+            bVal = b.rating_value ?? 0;
             break;
           case "reviews":
-            aVal = a.reviews ?? 0;
-            bVal = b.reviews ?? 0;
+            aVal = a.rating_count ?? 0;
+            bVal = b.rating_count ?? 0;
             break;
           case "monthly_sales":
             aVal = a.monthly_sales ?? 0;
@@ -618,12 +619,12 @@ export default function ProductExplorer() {
                           </TableCell>
                           <TableCell className="text-center">
                             <div className="flex items-center justify-center gap-1">
-                              <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                              <span>{(product.rating ?? 0).toFixed(1)}</span>
+                              <Star className="w-4 h-4 fill-chart-2 text-chart-2" />
+                              <span>{product.rating_value != null ? product.rating_value.toFixed(1) : "—"}</span>
                             </div>
                           </TableCell>
                           <TableCell className="text-right text-muted-foreground">
-                            {(product.reviews ?? 0).toLocaleString()}
+                            {(product.rating_count ?? 0).toLocaleString()}
                           </TableCell>
                           <TableCell className="text-right text-muted-foreground hidden lg:table-cell">
                             {product.monthly_sales?.toLocaleString() ?? "-"}

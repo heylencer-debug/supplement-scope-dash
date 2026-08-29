@@ -403,22 +403,25 @@ export default function Dashboard() {
     const validPrices = products.map(p => p.price ?? 0).filter(p => p > 0);
     const validBSRs = products.map(p => p.bsr_current ?? 0).filter(b => b > 0);
     const avgPrice = validPrices.length ? validPrices.reduce((s, p) => s + p, 0) / validPrices.length : 0;
-    const avgRating = products.reduce((s, p) => s + (p.rating ?? 0), 0) / total;
-    const avgReviews = products.reduce((s, p) => s + (p.reviews ?? 0), 0) / total;
+    // `rating`/`reviews` are legacy columns the pipeline no longer writes to
+    // (near-always null) — `rating_value`/`rating_count` are the live ones.
+    const validRatings = products.map(p => p.rating_value ?? 0).filter(r => r > 0);
+    const avgRating = validRatings.length ? validRatings.reduce((s, r) => s + r, 0) / validRatings.length : 0;
+    const avgReviews = products.reduce((s, p) => s + (p.rating_count ?? 0), 0) / total;
     const minPrice = validPrices.length ? Math.min(...validPrices) : 0;
     const maxPrice = validPrices.length ? Math.max(...validPrices) : 0;
     const minBSR = validBSRs.length ? Math.min(...validBSRs) : 0;
     const maxBSR = validBSRs.length ? Math.max(...validBSRs) : 0;
 
     // Brand rankings
-    const brandMap = new Map<string, { count: number; bsrSum: number; bsrCount: number; ratingSum: number; reviewSum: number; priceSum: number; priceCount: number }>();
+    const brandMap = new Map<string, { count: number; bsrSum: number; bsrCount: number; ratingSum: number; ratingCount: number; reviewSum: number; priceSum: number; priceCount: number }>();
     products.forEach(p => {
       const brand = p.brand || "Unknown";
-      const e = brandMap.get(brand) ?? { count: 0, bsrSum: 0, bsrCount: 0, ratingSum: 0, reviewSum: 0, priceSum: 0, priceCount: 0 };
+      const e = brandMap.get(brand) ?? { count: 0, bsrSum: 0, bsrCount: 0, ratingSum: 0, ratingCount: 0, reviewSum: 0, priceSum: 0, priceCount: 0 };
       e.count++;
       if (p.bsr_current) { e.bsrSum += p.bsr_current; e.bsrCount++; }
-      e.ratingSum += p.rating ?? 0;
-      e.reviewSum += p.reviews ?? 0;
+      if (p.rating_value) { e.ratingSum += p.rating_value; e.ratingCount++; }
+      e.reviewSum += p.rating_count ?? 0;
       if (p.price) { e.priceSum += p.price; e.priceCount++; }
       brandMap.set(brand, e);
     });
@@ -427,7 +430,7 @@ export default function Dashboard() {
         name,
         productCount: d.count,
         avgBSR: d.bsrCount > 0 ? Math.round(d.bsrSum / d.bsrCount) : null,
-        avgRating: (d.ratingSum / d.count).toFixed(1),
+        avgRating: d.ratingCount > 0 ? (d.ratingSum / d.ratingCount).toFixed(1) : null,
         avgReviews: Math.round(d.reviewSum / d.count),
         avgPrice: d.priceCount > 0 ? (d.priceSum / d.priceCount).toFixed(2) : null,
       }))
@@ -464,18 +467,18 @@ export default function Dashboard() {
     // Rating distribution
     const ratingDistribution = [5, 4, 3, 2, 1].map(star => ({
       star: `${star}★`,
-      count: products.filter(p => Math.round(p.rating ?? 0) === star).length,
+      count: products.filter(p => Math.round(p.rating_value ?? 0) === star).length,
     }));
 
     // Opportunity gap
     const opportunityGap = products
-      .filter(p => (p.bsr_current ?? Infinity) < 10000 && (p.reviews ?? Infinity) < 500)
+      .filter(p => (p.bsr_current ?? Infinity) < 10000 && (p.rating_count ?? Infinity) < 500)
       .slice(0, 10)
       .map(p => ({
         asin: p.asin,
         title: (p.title ?? '').substring(0, 50) + ((p.title?.length ?? 0) > 50 ? '...' : ''),
         bsr: p.bsr_current,
-        reviews: p.reviews,
+        reviews: p.rating_count,
         price: p.price,
       }));
 
@@ -816,7 +819,7 @@ export default function Dashboard() {
                                 </Badge>
                               ) : "-"}
                             </td>
-                            <td className="text-right py-2 px-3">{brand.avgRating}</td>
+                            <td className="text-right py-2 px-3">{brand.avgRating ? `${brand.avgRating}★` : "-"}</td>
                             <td className="text-right py-2 px-3 text-muted-foreground">{brand.avgReviews.toLocaleString()}</td>
                             <td className="text-right py-2 pl-3">{brand.avgPrice ? `$${brand.avgPrice}` : "-"}</td>
                           </tr>

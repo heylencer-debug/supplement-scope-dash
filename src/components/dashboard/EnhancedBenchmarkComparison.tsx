@@ -1393,8 +1393,10 @@ export function EnhancedBenchmarkComparison({
         return -(product.age_months || 999);
       case 'growth':
         // Estimate growth rate from reviews and age
-        const reviewsPerMonth = product.age_months && product.age_months > 0 
-          ? (product.reviews || 0) / product.age_months 
+        // `reviews` is a legacy column the pipeline mostly no longer writes
+        // to (near-always null) — `rating_count` is the live one.
+        const reviewsPerMonth = product.age_months && product.age_months > 0
+          ? (product.rating_count || 0) / product.age_months
           : 0;
         return reviewsPerMonth;
       case 'sales':
@@ -2626,9 +2628,9 @@ export function EnhancedBenchmarkComparison({
                                 <span className="text-[10px] text-muted-foreground">${product.price != null ? Number(product.price).toFixed(2) : '—'}</span>
                                 <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
                                   <Star className="w-2.5 h-2.5 fill-chart-2 text-chart-2" />
-                                  {product.rating?.toFixed(1)}
+                                  {product.rating_value != null ? product.rating_value.toFixed(1) : "—"}
                                 </span>
-                                <span className="text-[10px] text-muted-foreground">{(product.reviews || 0).toLocaleString()} reviews</span>
+                                <span className="text-[10px] text-muted-foreground">{(product.rating_count || 0).toLocaleString()} reviews</span>
                               </div>
                             </div>
                           </div>
@@ -3356,7 +3358,7 @@ export function EnhancedBenchmarkComparison({
                           <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Rating</p>
                         <div className="flex items-center justify-center gap-0.5">
                             <Star className="w-3 h-3 text-muted-foreground" />
-                            <span className="text-[17px] font-semibold tabular-nums text-foreground">{product.rating ? product.rating.toFixed(1) : <span className="inline-flex"><span className="w-1 h-1 rounded-full bg-muted-foreground/60 mx-0.5" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60 mx-0.5" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60 mx-0.5" /></span>}</span>
+                            <span className="text-[17px] font-semibold tabular-nums text-foreground">{product.rating_value != null ? product.rating_value.toFixed(1) : <span className="inline-flex"><span className="w-1 h-1 rounded-full bg-muted-foreground/60 mx-0.5" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60 mx-0.5" /><span className="w-1 h-1 rounded-full bg-muted-foreground/60 mx-0.5" /></span>}</span>
                           </div>
                         </div>
                       </div>
@@ -3373,7 +3375,7 @@ export function EnhancedBenchmarkComparison({
                           </div>
                           <div>
                             <p className="text-muted-foreground">Reviews</p>
-                            <p className="font-medium text-foreground">{(product.reviews || 0).toLocaleString()}</p>
+                            <p className="font-medium text-foreground">{(product.rating_count || 0).toLocaleString()}</p>
                           </div>
                         </div>
                       </div>

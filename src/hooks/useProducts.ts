@@ -15,11 +15,18 @@ export function useProducts(categoryId?: string, opts?: { allowAll?: boolean }) 
     queryKey: ["products", categoryId ?? (allowAll ? "__all__" : "__none__")],
     enabled: !!categoryId || allowAll,
     queryFn: async () => {
+      // `rating`/`reviews` are legacy columns the pipeline mostly no longer
+      // writes to (near-always null) — `rating_value`/`rating_count` are the
+      // live ones. Ordering by the dead `rating` column meant this query was
+      // effectively unordered (NULLS LAST puts ~7/8 of any category first in
+      // insertion order). `.limit(100)` also silently dropped ~35-40% of any
+      // category >100 products (Electrolyte Powder = 161, Hydration = 165) —
+      // every category currently tracked is comfortably under 500.
       let query = supabase
         .from("products")
         .select("*")
-        .order("rating", { ascending: false })
-        .limit(100);
+        .order("rating_value", { ascending: false, nullsFirst: false })
+        .limit(500);
 
       if (categoryId) {
         query = query.eq("category_id", categoryId);

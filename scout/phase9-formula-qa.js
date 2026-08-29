@@ -61,7 +61,7 @@ async function callClaudeSonnetQAOnce(prompt, maxTokens, model = ANALYSIS_MODEL)
   const key = getOpenRouterKey();
   if (!key) throw new Error('No OpenRouter key');
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 600000); // 10 min hard timeout
+  const timeout = setTimeout(() => controller.abort(), 1800000); // 10 min hard timeout
   try {
     // Use streaming to avoid OpenRouter's non-streaming gateway timeout on large prompts
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {

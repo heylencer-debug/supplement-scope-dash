@@ -117,7 +117,7 @@ async function callClaudeOpusOnce(prompt, maxTokens) {
   if (!key) throw new Error('OPENROUTER_API_KEY not set');
   const start = Date.now();
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 600000);
+  const timeout = setTimeout(() => controller.abort(), 1800000);
   try {
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST', signal: controller.signal,
@@ -190,7 +190,7 @@ async function callClaudeSonnetOnce(prompt, maxTokens) {
   if (!key) throw new Error('OPENROUTER_API_KEY not set');
   const start = Date.now();
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 600000);
+  const timeout = setTimeout(() => controller.abort(), 1800000);
   try {
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST', signal: controller.signal,

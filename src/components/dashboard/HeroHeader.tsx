@@ -50,7 +50,7 @@ export function HeroHeader({
   const score10 = opportunityIndex > 10 ? opportunityIndex / 10 : opportunityIndex;
   const normalizedScore = Math.min(100, Math.max(0, score10 * 10));
   const displayScore = score10.toFixed(1);
-  return <div className="relative overflow-hidden rounded-xl bg-card border border-border/60 border-l-2 border-l-primary p-4 text-foreground">
+  return <div className="relative overflow-hidden rounded-xl bg-card border border-border/60 p-4 text-foreground">
       <div className="relative space-y-3">
         {/* Top Row: Title, Score, and Product Images */}
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">

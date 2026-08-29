@@ -14,7 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle, FlaskConical, ShieldCheck, Zap, TrendingUp, Star, Award } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
-  PieChart, Pie, Legend,
+  PieChart, Pie,
 } from "recharts";
 import { cn } from "@/lib/utils";
 
@@ -197,20 +197,40 @@ export function ProductFormulaIntelligence({ categoryId, categoryName }: Props) 
           <CardContent>
             {s.extract_distribution.length > 0 ? (
               <>
-                <ResponsiveContainer width="100%" height={200}>
-                  <PieChart>
-                    <Pie data={s.extract_distribution} dataKey="count" nameKey="label" cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={2}>
-                      {s.extract_distribution.map((entry, i) => (
-                        <Cell key={entry.label} fill={CHART_PALETTE[i % CHART_PALETTE.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      formatter={(val: number, name: string) => [`${val} products (${Math.round(val / s.total * 100)}%)`, name]}
-                      contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "var(--radius)", fontSize: 12, color: "hsl(var(--foreground))" }}
-                    />
-                    <Legend formatter={(value) => <span style={{ fontSize: 11, color: "hsl(var(--foreground))" }}>{value}</span>} />
-                  </PieChart>
-                </ResponsiveContainer>
+                <div className="flex flex-col sm:flex-row items-center gap-4">
+                  <div className="w-full sm:w-1/2 shrink-0">
+                    <ResponsiveContainer width="100%" height={180}>
+                      <PieChart>
+                        <Pie data={s.extract_distribution} dataKey="count" nameKey="label" cx="50%" cy="50%" innerRadius={45} outerRadius={75} paddingAngle={2}>
+                          {s.extract_distribution.map((entry, i) => (
+                            <Cell key={entry.label} fill={CHART_PALETTE[i % CHART_PALETTE.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          formatter={(val: number, name: string) => [`${val} products (${Math.round(val / s.total * 100)}%)`, name]}
+                          contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "var(--radius)", fontSize: 12, color: "hsl(var(--foreground))" }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  {/* Custom legend (not recharts <Legend/>, which absolutely-positions over the pie and overlaps long labels) */}
+                  <div className="w-full sm:w-1/2 space-y-1.5 max-h-[180px] overflow-y-auto pr-1">
+                    {s.extract_distribution.map((entry, i) => (
+                      <div key={entry.label} className="flex items-start gap-2 min-w-0">
+                        <span
+                          className="h-2.5 w-2.5 rounded-full shrink-0 mt-0.5"
+                          style={{ backgroundColor: CHART_PALETTE[i % CHART_PALETTE.length] }}
+                        />
+                        <span className="text-xs text-foreground min-w-0 line-clamp-2" title={entry.label}>
+                          {entry.label}
+                        </span>
+                        <span className="text-xs text-muted-foreground shrink-0 ml-auto tabular-nums">
+                          {entry.pct}%
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
                 {topExtractPct > 0 && (
                   <div className="mt-2 p-2 rounded-lg bg-primary/10 border border-primary/20">
                     <p className="text-xs text-foreground">

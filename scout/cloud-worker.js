@@ -46,7 +46,15 @@ function runPipeline(job) {
     if (job.force) args.push('--force');
     if (job.use_ai) args.push('--ai');
     if (job.from_phase) args.push('--from', `P${job.from_phase}`);
-    if (job.only_phases) args.push('--phases', job.only_phases);
+    // only_phases arrives from Supabase as an ARRAY — stringifying it naively
+    // produced "--phases [10]", which run-pipeline parseInt'd to NaN and ran
+    // ZERO phases while reporting success (silent no-op).
+    if (job.only_phases) {
+      const phasesArg = Array.isArray(job.only_phases)
+        ? job.only_phases.join(',')
+        : String(job.only_phases).replace(/[\[\]\s]/g, '');
+      args.push('--phases', phasesArg);
+    }
 
     console.log(`[cloud-worker] spawning: node ${args.join(' ')}`);
     const proc = spawn('node', args, {

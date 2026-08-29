@@ -104,7 +104,7 @@ export default function ProductExplorer() {
       ? undefined
       : categoryFilter;
 
-  const { data: products, isLoading: productsLoading } = useProducts(effectiveCategoryId);
+  const { data: products, isLoading: productsLoading } = useProducts(effectiveCategoryId, { allowAll: categoryFilter === "all" });
   const { data: categories, isLoading: categoriesLoading } = useCategories();
   const { data: categoryAnalysis } = useCategoryAnalysis(currentCategoryId || categoryFromName?.id);
   const effectiveCategoryIdForAnalysis = currentCategoryId || categoryFromName?.id;

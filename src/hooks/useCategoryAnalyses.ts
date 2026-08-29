@@ -238,7 +238,7 @@ export function useCategoryAnalysis(categoryId?: string) {
         .eq("category_id", categoryId)
         .order("created_at", { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (error && error.code !== "PGRST116") throw error;
       return data as CategoryAnalysis | null;

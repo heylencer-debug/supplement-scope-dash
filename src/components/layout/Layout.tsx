@@ -4,6 +4,7 @@ import { Plus, X, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect, useRef, useCallback, TouchEvent } from "react";
 import { useCategoryAnalyses } from "@/hooks/useCategoryAnalyses";
+import { useActiveScoutJobs } from "@/hooks/useScoutJobs";
 
 const DISMISSED_TABS_KEY = "dismissed_analysis_tabs";
 const PENDING_ANALYSES_KEY = "pending_analyses";
@@ -38,6 +39,9 @@ export function Layout({ children }: LayoutProps) {
   const touchEndX = useRef<number>(0);
   
   const { data: analyses } = useCategoryAnalyses();
+  // Active scout job status per category chip — pulsing amber dot when the
+  // matching keyword has a queued/claimed/running job (see useScoutJobs.ts).
+  const { data: activeJobs } = useActiveScoutJobs();
 
   // Check scroll state
   const handleTabsScroll = useCallback(() => {
@@ -210,15 +214,13 @@ export function Layout({ children }: LayoutProps) {
             inside Dashboard.tsx, since they're per-category-analysis state
             that only exists on that route (see takeout-design-spec.md §1). */}
         <header className="dark h-14 bg-background text-foreground border-b border-border/60 shadow-none flex items-center px-2 sm:px-4 gap-2 sm:gap-3 shrink-0">
-            {/* New Analysis Button */}
+            {/* New Analysis — the one deliberate neon accent in the app;
+                native <button>, never shadcn Button (its cva always injects
+                a base pearl-button/pearl-quiet class that collides with the
+                `:not(.pearl-neon)` exclusions the neon tier depends on). */}
             <button
               onClick={() => navigate("/")}
-              className={cn(
-                "pearl-quiet pearl-radius-tight flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-lg text-sm font-medium transition-colors duration-200 whitespace-nowrap flex-shrink-0",
-                isNewAnalysisActive
-                  ? "bg-brand-smoke/15 border border-brand-smoke/30 text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
+              className="pearl-pill pearl-neon flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 whitespace-nowrap flex-shrink-0"
             >
               <Plus className="w-4 h-4" />
               <span className="hidden sm:inline">New</span>
@@ -228,60 +230,62 @@ export function Layout({ children }: LayoutProps) {
               <>
                 {/* Divider */}
                 <div className="h-5 w-px bg-border/60 flex-shrink-0" />
-                
-                {/* Analysis Tabs - scrollable area with scroll indicators */}
+
+                {/* Analysis Tabs — scrollable, CSS edge-fade mask (no
+                    layout-shifting overlay divs; the mask always applies,
+                    so ends fade whether or not there's more to scroll). */}
                 <div className="flex-1 relative min-w-0 overflow-hidden">
-                  {/* Left scroll indicator */}
-                  <div 
-                    className={cn(
-                      "absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-card to-transparent z-10 pointer-events-none transition-opacity duration-200",
-                      canScrollLeft ? "opacity-100" : "opacity-0"
-                    )}
-                  />
-                  
-                  {/* Scrollable tabs */}
-                  <div 
+                  <div
                     ref={tabsScrollRef}
                     onScroll={handleTabsScroll}
                     onTouchStart={handleTouchStart}
                     onTouchMove={handleTouchMove}
                     onTouchEnd={handleTouchEnd}
                     className="overflow-x-auto scrollbar-hide touch-pan-x"
+                    style={{
+                      WebkitMaskImage: "linear-gradient(90deg, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%)",
+                      maskImage: "linear-gradient(90deg, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%)",
+                    }}
                   >
-                    <div className="flex items-center gap-2 w-max px-1">
+                    <div className="flex items-center gap-1.5 w-max px-1">
                       {allTabs.map((tab) => {
                         const isActive = currentCategory === tab.category_name;
                         const isComplete = (tab.products_analyzed ?? 0) > 0;
-                        
-                                        return (
-                                          <div
-                                            key={tab.id}
-                                            className={cn(
-                                              "flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm transition-colors duration-200 group flex-shrink-0 border",
-                                              isActive
-                                                ? "bg-brand-smoke/15 border-brand-smoke/30 text-foreground font-medium"
-                                                : "border-transparent text-muted-foreground hover:text-foreground"
-                                            )}
-                                          >
-                                            <button
-                                              onClick={() => navigate(`/dashboard?category=${encodeURIComponent(tab.category_name)}`)}
-                                              className="flex items-center gap-1.5 sm:gap-2 whitespace-nowrap"
-                                            >
-                                              {tab.isPending ? (
-                                                <Loader2 className="w-3 h-3 text-chart-2 animate-spin flex-shrink-0" />
-                                              ) : (
-                                                <span 
-                                                  className={cn(
-                                                    "w-2 h-2 rounded-full flex-shrink-0 transition-all",
-                                                    isComplete ? "bg-chart-4" : "bg-chart-2"
-                                                  )} 
-                                                />
-                                              )}
-                                              <span className="max-w-[100px] sm:max-w-[140px] truncate">{stripLabel(tab.category_name)}</span>
-                                            </button>
+                        const normKw = (s: string) => s.replace(/^[=\s]+/, "").trim().toLowerCase();
+                        const hasActiveJob = (activeJobs ?? []).some((j) => normKw(j.keyword || "") === normKw(tab.category_name));
+
+                        return (
+                          <div
+                            key={tab.id}
+                            className={cn(
+                              "flex items-center gap-1.5 sm:gap-2 pl-2.5 pr-1.5 sm:pl-3 sm:pr-2 py-1.5 rounded-full text-xs sm:text-sm transition-colors duration-200 group flex-shrink-0",
+                              isActive
+                                ? "bg-white text-brand-ink font-semibold"
+                                : "bg-white/10 text-white/80 hover:bg-white/[0.15] hover:text-white"
+                            )}
+                          >
+                            <button
+                              onClick={() => navigate(`/dashboard?category=${encodeURIComponent(tab.category_name)}`)}
+                              className="flex items-center gap-1.5 sm:gap-2 whitespace-nowrap min-w-[64px]"
+                            >
+                              {tab.isPending ? (
+                                <Loader2 className="w-3 h-3 text-chart-2 animate-spin flex-shrink-0" />
+                              ) : hasActiveJob ? (
+                                <span className="relative flex h-[7px] w-[7px] shrink-0">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-chart-2 opacity-75" />
+                                  <span className="relative inline-flex h-[7px] w-[7px] rounded-full bg-chart-2" />
+                                </span>
+                              ) : isComplete ? (
+                                <span className="h-[7px] w-[7px] rounded-full bg-chart-4 flex-shrink-0" />
+                              ) : null}
+                              <span className="min-w-[56px] max-w-[100px] sm:max-w-[160px] truncate">{stripLabel(tab.category_name)}</span>
+                            </button>
                             <button
                               onClick={(e) => handleDismissTab(e, tab.category_name)}
-                              className="opacity-0 group-hover:opacity-100 hover:bg-destructive/20 rounded p-0.5 transition-all duration-200 flex-shrink-0"
+                              className={cn(
+                                "opacity-0 group-hover:opacity-100 rounded-full p-0.5 transition-all duration-200 flex-shrink-0",
+                                isActive ? "hover:bg-black/10" : "hover:bg-destructive/20"
+                              )}
                               title="Close tab"
                             >
                               <X className="w-3 h-3" />
@@ -291,14 +295,6 @@ export function Layout({ children }: LayoutProps) {
                       })}
                     </div>
                   </div>
-                  
-                  {/* Right scroll indicator */}
-                  <div 
-                    className={cn(
-                      "absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-card to-transparent z-10 pointer-events-none transition-opacity duration-200",
-                      canScrollRight ? "opacity-100" : "opacity-0"
-                    )}
-                  />
                 </div>
               </>
             )}

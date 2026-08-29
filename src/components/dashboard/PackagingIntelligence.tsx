@@ -17,6 +17,7 @@ import { CompetitorPackagingTable } from "./CompetitorPackagingTable";
 import { ClaimPatternChart } from "./ClaimPatternChart";
 import { formatDistanceToNow } from "date-fns";
 import { extractFlavorFromFormulaBrief } from "@/lib/extractFlavor";
+import { parseClaimsList } from "@/lib/parseClaims";
 
 interface PackagingData {
   type?: string;
@@ -50,6 +51,19 @@ interface VersionInfo {
   isActive: boolean;
   changeSummary?: string | null;
 }
+
+// design_blueprint.trust_signals/conversion_triggers is AI-generated per
+// product; when the image-analysis model can't see the packaging it
+// sometimes writes an apology/explanation instead of a real signal (e.g.
+// "Unable to identify specific badges without images. Redmond products
+// typically feature: Real Salt certification") — without filtering, that
+// whole refusal sentence gets tallied and rendered as a legitimate pill
+// alongside real signals like "Vegan certification". Strip those out.
+const REFUSAL_PATTERN = /\b(unable to identify|cannot identify|can'?t identify|cannot determine|can'?t determine|without (product )?images?|no images? (available|provided)|not (able|possible) to (identify|determine|assess))\b/i;
+function isRefusalText(s: string): boolean {
+  return REFUSAL_PATTERN.test(s);
+}
+
 
 interface PackagingIntelligenceProps {
   packagingData: PackagingData | null;
@@ -184,8 +198,9 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
     productsClaims.forEach(claimsString => {
       if (!claimsString) return;
       
-      // Parse claims - they might be comma-separated or already individual
-      const claims = claimsString.split(/[,;]/).map(c => c.trim()).filter(Boolean);
+      // Parse claims - stored as JSON array, with a comma-split fallback
+      // for any legacy plain-string rows (see parseClaimsList).
+      const claims = parseClaimsList(claimsString);
       
       claims.forEach(claim => {
         // Normalize claim text
@@ -300,7 +315,8 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
       } else if (Array.isArray(signals)) {
         signalList = (signals as unknown[]).filter((s): s is string => typeof s === 'string').map(s => s.trim()).filter(Boolean);
       }
-      
+      signalList = signalList.filter(s => !isRefusalText(s));
+
       signalList.forEach(signal => {
         const normalized = signal.toLowerCase().trim();
         if (normalized.length > 2) {
@@ -361,8 +377,8 @@ export function PackagingIntelligence({ packagingData, productsClaims, productsD
       if (!triggers) return;
 
       // Parse comma-separated triggers
-      const triggerList = triggers.split(/[,;]/).map(t => t.trim()).filter(Boolean);
-      
+      const triggerList = triggers.split(/[,;]/).map(t => t.trim()).filter(Boolean).filter(t => !isRefusalText(t));
+
       triggerList.forEach(trigger => {
         const normalized = trigger.toLowerCase().trim();
         if (normalized.length > 2) {

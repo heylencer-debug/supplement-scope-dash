@@ -28,6 +28,7 @@ import { BrandCard } from "@/components/ui/brand-card";
 import { BrandModal } from "@/components/ui/brand-modal";
 import { CompetitiveAnalysisResults } from "@/components/dashboard/CompetitiveAnalysisResults";
 import { useP5SourcesForKeyword } from "@/hooks/useP5Sources";
+import { parseClaimsList } from "@/lib/parseClaims";
 interface VersionInfo {
   versionNumber: number;
   isActive: boolean;
@@ -2238,9 +2239,9 @@ export function EnhancedBenchmarkComparison({
       return sfClaims.slice(0, 6);
     }
     
-    // Try parsing from claims field
+    // Try parsing from claims field (stored as a JSON-stringified array)
     if (product.claims && typeof product.claims === 'string') {
-      return product.claims.split(/[,;]/).map(c => c.trim()).filter(Boolean).slice(0, 6);
+      return parseClaimsList(product.claims).slice(0, 6);
     }
     
     return [];

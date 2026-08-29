@@ -20,6 +20,7 @@ import type { Product } from "@/hooks/useProducts";
 import { useP5SourcesForProduct } from "@/hooks/useP5Sources";
 import { useCategoryContext } from "@/contexts/CategoryContext";
 import { Globe } from "lucide-react";
+import { parseClaimsList } from "@/lib/parseClaims";
 
 // Single clean active treatment (smoke pill, no border-b + focus-ring
 // double outline) for the product-detail tab strip. Kept as one shared
@@ -1235,10 +1236,10 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                                 </li>
                               ))
                             ) : product.claims ? (
-                              product.claims.split(/[,;]/).filter(Boolean).map((claim, idx) => (
+                              parseClaimsList(product.claims).map((claim, idx) => (
                                 <li key={idx} className="flex items-start gap-2 text-sm">
                                   <CheckCircle className="w-4 h-4 text-chart-4 mt-0.5 shrink-0" />
-                                  <span className="text-foreground">{claim.trim()}</span>
+                                  <span className="text-foreground">{claim}</span>
                                 </li>
                               ))
                             ) : null}

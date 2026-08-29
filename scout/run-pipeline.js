@@ -264,6 +264,40 @@ async function getRunAsins() {
   }
 }
 
+// 2026-08-29: dovive_research accumulates ASINs across every historical run,
+// but cleanup passes (cleanup-stale-products / dedupe-exact-products) can
+// legitimately retire old rows from DASH — leaving "phantom" run-ASINs with
+// no live product row. Counting those in coverage denominators makes gates
+// fail on healthy data (ashwagandha: 129/144 = 89.6% < 90% purely from 15
+// cleaned-up phantoms). Coverage is therefore measured against the LIVE
+// intersection (run-ASINs that actually exist in the category), while the
+// final verifier separately fails LOUDLY if the intersection itself is thin
+// (< 60% of scraped ASINs) — that's the real "migration lost rows" signal,
+// kept as its own check so the live-denominator can't mask it.
+const _liveRunAsinsCache = new Map();
+async function getLiveRunAsins(categoryId) {
+  if (_liveRunAsinsCache.has(categoryId)) return _liveRunAsinsCache.get(categoryId);
+  const all = await getRunAsins();
+  let result = { live: all, all };
+  if (all.length && categoryId) {
+    try {
+      const liveAsins = [];
+      for (let from = 0; ; from += 1000) {
+        const { data, error } = await DASH.from('products').select('asin').eq('category_id', categoryId).range(from, from + 999);
+        if (error) throw error;
+        liveAsins.push(...(data || []).map(r => r.asin));
+        if (!data || data.length < 1000) break;
+      }
+      const liveSet = new Set(liveAsins);
+      result = { live: all.filter(a => liveSet.has(a)), all };
+    } catch (e) {
+      console.warn(`  ⚠️ getLiveRunAsins failed (${e.message}) — falling back to full run-ASIN list`);
+    }
+  }
+  _liveRunAsinsCache.set(categoryId, result);
+  return result;
+}
+
 async function checkPhaseStatus(phaseNum, categoryId) {
   if (FORCE) return { done: false, count: 0, total: 0 };
 
@@ -272,7 +306,9 @@ async function checkPhaseStatus(phaseNum, categoryId) {
 
   // Run-scoped denominator/filter for P2/P3/P8 (see getRunAsins comment above).
   // Empty runAsins => fall back to whole-category (`total`) behavior.
-  const runAsins = await getRunAsins();
+  // LIVE intersection (see getLiveRunAsins) so cleaned-up phantom ASINs
+  // don't deflate coverage ratios.
+  const runAsins = (await getLiveRunAsins(categoryId)).live;
   const scoped = (q) => runAsins.length ? q.in('asin', runAsins) : q;
   const runTotal = runAsins.length || total;
 
@@ -508,7 +544,7 @@ async function runFinalVerifier(categoryId) {
   // per-phase gate agree). `total` above is intentionally left as the whole
   // accumulated category count for P4/P6 (unchanged, out of this task's
   // explicit scope) and for the top-level `total` reported in metrics.
-  const runAsins = await getRunAsins();
+  const { live: runAsins, all: runAsinsAll } = await getLiveRunAsins(categoryId);
   const scopedQ = async (col) => {
     let query = DASH.from('products').select('*', { count: 'exact', head: true }).eq('category_id', categoryId).not(col, 'is', null);
     if (runAsins.length) query = query.in('asin', runAsins);
@@ -555,6 +591,12 @@ async function runFinalVerifier(categoryId) {
   const p12 = !!fc12 && isRealModelText(fc12.opus_analysis) && isRealModelText(fc12.sonnet_validation);
 
   const failures = [];
+  // Migration-loss guard: the live-ASIN denominator above cannot be allowed
+  // to mask a migration that dropped most of the run's products (e.g. the
+  // hydration onConflict bug: 3/139 live would otherwise gate as 3/3 = 100%).
+  if (runAsinsAll.length && runAsins.length < runAsinsAll.length * 0.6) {
+    failures.push(`P1 migration incomplete: only ${runAsins.length}/${runAsinsAll.length} scraped ASINs exist in DASH`);
+  }
   if (!(p2 >= runTotal * 0.9)) failures.push(`P2 ${p2}/${runTotal} (this run) < 90%`);
   // P3 top20 CORRECTED 2026-08-28 (coordinator-verified against job config +
   // logs, superseding the earlier "unset credential" theory): BRIGHTDATA_API_KEY

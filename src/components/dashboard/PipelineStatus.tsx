@@ -5,6 +5,7 @@
  */
 
 import { usePipelineStatus } from "@/hooks/usePipelineStatus";
+import { useActiveScoutJobs } from "@/hooks/useScoutJobs";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   CheckCircle2, Circle, Clock, AlertCircle, RefreshCw,
@@ -50,6 +51,15 @@ const STATUS_CFG: Record<StatusKey, {
 
 export function PipelineStatus({ categoryId, keyword }: PipelineStatusProps) {
   const { data: phases, isLoading, error, isFetching, dataUpdatedAt } = usePipelineStatus(categoryId, keyword);
+  // "Running" must mean a REAL in-flight scout job for this keyword — not
+  // "the data looks partial" (partial data is normal for capped phases like
+  // reviews/OCR and for old categories; the widget used to pulse RUNNING
+  // forever on finished categories because of that heuristic).
+  const { data: activeJobs } = useActiveScoutJobs();
+  const normKw = (s: string | null | undefined) => (s || "").replace(/^[=\s]+/, "").trim().toLowerCase();
+  const activeJob = (activeJobs ?? []).find(
+    (j) => normKw(j.keyword) === normKw(keyword) && (j.status === "running" || j.status === "claimed")
+  );
 
   if (isLoading) {
     return (
@@ -73,7 +83,8 @@ export function PipelineStatus({ categoryId, keyword }: PipelineStatusProps) {
   }
 
   const completedCount = phases.filter(p => p.status === "complete").length;
-  const runningCount   = phases.filter(p => p.status === "partial").length;
+  const runningPhaseNum = activeJob?.current_phase ?? null;
+  const runningCount = activeJob ? 1 : 0;
   const overallPct     = Math.round((completedCount / phases.length) * 100);
   const lastUpdated    = dataUpdatedAt
     ? new Date(dataUpdatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
@@ -116,18 +127,23 @@ export function PipelineStatus({ categoryId, keyword }: PipelineStatusProps) {
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-chart-2 opacity-75" />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-chart-2" />
           </span>
-          {runningCount} phase{runningCount > 1 ? "s" : ""} running · auto-refreshing every 30s
+          Running{activeJob?.current_phase_name ? `: ${activeJob.current_phase_name}` : ""} · auto-refreshing every 30s
         </div>
       )}
 
       {/* Phase cards — 2 rows of 6 on desktop (P1-P11), 2 cols on mobile */}
       <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
         {phases.map(phase => {
-          const cfg  = STATUS_CFG[phase.status];
           const meta = PHASE_META[phase.phase];
           const isDone    = phase.status === "complete";
-          const isRunning = phase.status === "partial";
-          const isPending = phase.status === "pending";
+          // Running = the actual in-flight job is ON this phase right now.
+          const isRunning = runningPhaseNum === phase.phase;
+          const isPending = phase.status === "pending" && !isRunning;
+          const cfg = isRunning
+            ? STATUS_CFG.partial
+            : phase.status === "partial"
+              ? { ...STATUS_CFG.partial, label: "Partial" }
+              : STATUS_CFG[phase.status];
 
           return (
             <div

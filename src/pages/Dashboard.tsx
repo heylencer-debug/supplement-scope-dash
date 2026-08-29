@@ -17,6 +17,7 @@ import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
 import { LowConfidenceProducts } from "@/components/dashboard/LowConfidenceProducts";
 import { PipelineStatus } from "@/components/dashboard/PipelineStatus";
 import { usePipelineStatus } from "@/hooks/usePipelineStatus";
+import { useActiveScoutJobs } from "@/hooks/useScoutJobs";
 import { ProductFormulaIntelligence } from "@/components/dashboard/ProductFormulaIntelligence";
 import { FormulaJourneyTab } from "@/components/dashboard/FormulaJourneyTab";
 import { FormulaPassport } from "@/components/dashboard/FormulaPassport";
@@ -54,8 +55,17 @@ import { useToast } from "@/hooks/use-toast";
 
 function PipelineCollapsible({ categoryId, categoryName }: { categoryId: string; categoryName: string }) {
   const { data: phases } = usePipelineStatus(categoryId, categoryName);
+  // "Running" = a REAL in-flight scout job for this keyword (same honesty
+  // rule as PipelineStatus.tsx) — partial data is a coverage state, not
+  // activity, and used to pulse "N running" forever on finished categories.
+  const { data: activeJobs } = useActiveScoutJobs();
+  const normKw = (s: string | null | undefined) => (s || "").replace(/^[=\s]+/, "").trim().toLowerCase();
+  const activeJob = (activeJobs ?? []).find(
+    (j) => normKw(j.keyword) === normKw(categoryName) && (j.status === "running" || j.status === "claimed")
+  );
+  const runningPhaseNum = activeJob?.current_phase ?? null;
   const completedCount = phases?.filter(p => p.status === "complete").length ?? 0;
-  const runningCount = phases?.filter(p => p.status === "partial").length ?? 0;
+  const runningCount = activeJob ? 1 : 0;
   const totalCount = phases?.length ?? 0;
   const overallPct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
@@ -76,7 +86,7 @@ function PipelineCollapsible({ categoryId, categoryName }: { categoryId: string;
                     {phases.map(phase => {
                       const meta = PHASE_META[phase.phase];
                       const isDone = phase.status === "complete";
-                      const isRunning = phase.status === "partial";
+                      const isRunning = runningPhaseNum === phase.phase;
                       if (!meta) return null;
                       const PhaseIcon = meta.icon;
                       return (
@@ -104,7 +114,7 @@ function PipelineCollapsible({ categoryId, categoryName }: { categoryId: string;
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-chart-2 opacity-75" />
                       <span className="relative inline-flex h-2 w-2 rounded-full bg-chart-2" />
                     </span>
-                    {runningCount} running
+                    Running{activeJob?.current_phase_name ? `: ${activeJob.current_phase_name}` : ""}
                   </span>
                 )}
                 {completedCount === totalCount && totalCount > 0 && (

@@ -111,7 +111,24 @@ async function fetchPipelineStatus(categoryId: string): Promise<PhaseStatus[]> {
     .eq("category_id", categoryId)
     .filter("marketing_analysis->p5_research", "not.is", null);
   let p5Count = p5CountRaw.count ?? 0;
-  const P5_TARGET = 20;
+  // Pipeline runs 5 top-BSR + 3 new-brand briefs (P5_TOP_COUNT/P5_NEW_COUNT);
+  // the verifier passes at >= 6 with content. The old 20 here made every
+  // verifier-green run display as "10/20 PARTIAL" forever.
+  const P5_TARGET = 8;
+
+  // Top-20-by-BSR coverage — the SAME criterion the pipeline's P3/P4 gates
+  // use (reviews and OCR are deliberately capped to the top sellers; blanket
+  // percentages of a 160-product category are not the goal and made
+  // verifier-passed runs show PARTIAL).
+  const { data: top20Rows } = await supabase
+    .from("products")
+    .select("review_analysis, nutrients_count")
+    .eq("category_id", categoryId)
+    .not("bsr_current", "is", null)
+    .order("bsr_current", { ascending: true })
+    .limit(20);
+  const top20P3 = (top20Rows ?? []).filter((r) => r.review_analysis != null).length;
+  const top20P4 = (top20Rows ?? []).filter((r) => (r.nutrients_count ?? 0) > 0).length;
 
   // Fallback: if product-level p5_research is empty, infer P5 complete when formula brief has deep-research data sources.
   // This avoids false 0/20 when P5 wrote to source table but product mirror lagged/missed.
@@ -178,8 +195,11 @@ async function fetchPipelineStatus(categoryId: string): Promise<PhaseStatus[]> {
       description: "Customer sentiment, pain points & review mining",
       total,
       complete: p3.count ?? 0,
-      // P3 is CAPTCHA-limited - partial is expected. Complete = 80%+ coverage.
-      status: (p3.count ?? 0) >= total * 0.8 ? "complete" : (p3.count ?? 0) > 0 ? "partial" : "not_started",
+      // Mirrors the pipeline's REAL P3 gate: >=50% blanket coverage OR
+      // top-20-BSR coverage >= 15 (review scraping is deliberately capped
+      // to the top sellers; blanket % of a 160-product category is not the
+      // goal, and the old 80% bar showed verifier-passed runs as PARTIAL).
+      status: ((p3.count ?? 0) >= total * 0.5 || top20P3 >= 15) ? "complete" : (p3.count ?? 0) > 0 ? "partial" : "not_started",
       pct: total ? Math.round(((p3.count ?? 0) / total) * 100) : 0,
     },
     {
@@ -188,7 +208,9 @@ async function fetchPipelineStatus(categoryId: string): Promise<PhaseStatus[]> {
       description: "Supplement facts extracted from product images",
       total,
       complete: p4.count ?? 0,
-      status: makeStatus(p4.count ?? 0, total),
+      // Mirrors the pipeline's P4 gate: >=80% blanket OR top-20 >= 15
+      // (stick-pack brands publish no facts imagery — a real ceiling).
+      status: ((p4.count ?? 0) >= total * 0.8 || top20P4 >= 15) ? "complete" : (p4.count ?? 0) > 0 ? "partial" : "not_started",
       pct: total ? Math.round(((p4.count ?? 0) / total) * 100) : 0,
     },
     {
@@ -197,7 +219,8 @@ async function fetchPipelineStatus(categoryId: string): Promise<PhaseStatus[]> {
       description: "Top 10 BSR + Top 10 New Brands - Claude Sonnet 5 competitive intelligence",
       total: P5_TARGET,
       complete: p5Count,
-      status: p5Count >= P5_TARGET ? "complete" : p5Count >= 10 ? "partial" : p5Count > 0 ? "partial" : "not_started",
+      // Verifier passes P5 at >= 6 briefs with content (75% of the 8-target).
+      status: p5Count >= 6 ? "complete" : p5Count > 0 ? "partial" : "not_started",
       pct: Math.round((p5Count / P5_TARGET) * 100),
     },
     {

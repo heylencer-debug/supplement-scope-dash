@@ -27,6 +27,8 @@ export interface FormulaJourneyResult {
   hasAnyData: boolean;
   p11Score: number | null;
   p12Score: number | null;
+  /** P13 chief-formulator sign-off — the compliance-corrected final formula document. */
+  finalSignoff: { opus_review?: string; verdict?: string; generated_at?: string; model?: string } | null;
   isLoading: boolean;
   error: unknown;
 }
@@ -151,11 +153,16 @@ export function useFormulaJourney(categoryId?: string): FormulaJourneyResult {
     },
   ];
 
+  // P13 Final Sign-off — the corrected, factory-ready formula document.
+  const signoff = ing?.final_signoff as { opus_review?: string; verdict?: string; generated_at?: string; model?: string } | null | undefined;
+  const finalSignoff = signoff && (signoff.opus_review?.length ?? 0) > 500 ? signoff : null;
+
   return {
     stages,
     hasAnyData,
     p11Score,
     p12Score,
+    finalSignoff,
     isLoading: query.isLoading,
     error: query.error,
   };

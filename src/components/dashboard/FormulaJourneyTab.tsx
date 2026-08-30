@@ -13,7 +13,9 @@
  * Dashboard.tsx but never rendered anywhere.
  */
 import { useRef, useState } from "react";
-import { Check, ChevronDown, FlaskConical, Beaker, BarChart, Shield, Factory, Link2, ArrowRight } from "lucide-react";
+import { Check, ChevronDown, FlaskConical, Beaker, BarChart, Shield, Factory, Link2, ArrowRight, Stamp } from "lucide-react";
+import { DocumentModal } from "@/components/ui/document-modal";
+import { MarkdownDoc } from "@/lib/markdownDoc";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
@@ -79,8 +81,9 @@ function StageDot({ state }: { state: JourneyStageState }) {
 }
 
 export function FormulaJourneyTab({ categoryId, categoryName, activeVersionInfo, setActiveTab, handleGenerateLink, generatingLink }: Props) {
-  const { stages, hasAnyData, isLoading } = useFormulaJourney(categoryId);
+  const { stages, hasAnyData, finalSignoff, isLoading } = useFormulaJourney(categoryId);
   const [openStage, setOpenStage] = useState<JourneyStage["id"] | null>(null);
+  const [signoffOpen, setSignoffOpen] = useState(false);
   const complianceRef = useRef<HTMLDivElement>(null);
 
   const openCombinedReport = () => {
@@ -96,6 +99,46 @@ export function FormulaJourneyTab({ categoryId, categoryName, activeVersionInfo,
 
   return (
     <div className="space-y-3">
+      {/* THE deliverable: the P13-signed-off, compliance-corrected final
+          formula. When it exists it outranks everything else on this tab. */}
+      {finalSignoff && (
+        <div className="pearl-gradient-border rounded-xl">
+          <div className="pearl-gradient-border-inner rounded-[11px] bg-card px-4 py-3.5 flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-3 min-w-0">
+              <Stamp className="h-5 w-5 text-primary shrink-0" />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-foreground">Final Formula — signed off</p>
+                <p className="text-xs text-muted-foreground">
+                  {finalSignoff.verdict || "Reviewed"}
+                  {finalSignoff.generated_at ? ` · ${new Date(finalSignoff.generated_at).toLocaleDateString()}` : ""}
+                  {" · compliance corrections applied by Opus 5"}
+                </p>
+              </div>
+            </div>
+            <Button variant="secondary" size="sm" onClick={() => setSignoffOpen(true)}>
+              Open final formula
+              <ArrowRight className="w-3.5 h-3.5 ml-1" />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {finalSignoff && (
+        <DocumentModal
+          open={signoffOpen}
+          onOpenChange={setSignoffOpen}
+          title={`${(categoryName || "Formula").replace(/^=+/, "").trim()} — Final Formula`}
+          subtitle="Chief-formulator sign-off · compliance corrections applied"
+          chips={[
+            { value: finalSignoff.verdict || "Reviewed" },
+            ...(finalSignoff.model ? [{ value: finalSignoff.model.replace("anthropic/", "") }] : []),
+            ...(finalSignoff.generated_at ? [{ value: new Date(finalSignoff.generated_at).toLocaleDateString() }] : []),
+          ]}
+        >
+          <MarkdownDoc content={finalSignoff.opus_review || ""} />
+        </DocumentModal>
+      )}
+
       {!hasAnyData && (
         <Panel className="border-dashed">
           <div className="px-4 py-6 text-center space-y-1.5">

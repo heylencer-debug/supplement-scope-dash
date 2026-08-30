@@ -18,8 +18,9 @@ import { FormulaJourneyTab } from "@/components/dashboard/FormulaJourneyTab";
 import { FormulaPassport } from "@/components/dashboard/FormulaPassport";
 import { P9BenchmarkOverview } from "@/components/dashboard/P9BenchmarkOverview";
 import { MarketIntelligenceReport } from "@/components/dashboard/MarketIntelligenceReport";
-import { ManufacturerFeedback } from "@/components/document/ManufacturerFeedback";
-import { ManufacturerChat } from "@/components/manufacturer/ManufacturerChat";
+import { FormulaVersionsPanel } from "@/components/manufacturer/FormulaVersionsPanel";
+import { FactoryHandoffCard } from "@/components/manufacturer/FactoryHandoffCard";
+import { PortalFeedbackDisclosure } from "@/components/manufacturer/PortalFeedbackDisclosure";
 import { DataCompletenessChecklist } from "@/components/dashboard/DataCompletenessChecklist";
 
 import {
@@ -880,9 +881,17 @@ export default function Dashboard() {
           )}
         </TabsContent>
 
-        {/* TAB 7: Manufacturer Feedback — living formula brief */}
+        {/* TAB 7: Manufacturer — formula version timeline + factory handoff.
+            Chat now lives in the floating Formulator Agent (bottom-right,
+            mounted once at the Layout level) rather than inline here. */}
         <TabsContent value="manufacturer" className="space-y-4 mt-3">
-          <div className="flex justify-end">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <p className="text-sm font-semibold text-foreground">Manufacturer</p>
+              <p className="text-xs text-muted-foreground">
+                Version history and factory handoff status — chat with the Formulator Agent (bottom-right) to make changes.
+              </p>
+            </div>
             {/* pearl-pill + pearl-neon is the project's own documented "one
                 deliberate accent exception" tier (index.css PILL(neon)) —
                 the shadcn Button's cva always injects a base pearl-button/
@@ -902,14 +911,13 @@ export default function Dashboard() {
             </button>
           </div>
           {category?.id && categoryName ? (
-            <>
-              <ManufacturerChat categoryId={category.id} keyword={categoryName} />
-              <ManufacturerFeedback
-                categoryId={category.id}
-                keyword={categoryName}
-                defaultExpanded
-              />
-            </>
+            <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-4 items-start">
+              <FormulaVersionsPanel categoryId={category.id} keyword={categoryName} />
+              <div className="space-y-4">
+                <FactoryHandoffCard categoryId={category.id} />
+                <PortalFeedbackDisclosure categoryId={category.id} />
+              </div>
+            </div>
           ) : (
             <div className="text-center py-12 text-muted-foreground">Select a category to view manufacturer feedback.</div>
           )}

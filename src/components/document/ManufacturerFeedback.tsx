@@ -153,10 +153,10 @@ export function ManufacturerFeedback({ categoryId, keyword, defaultExpanded = fa
       const ing = data.ingredients as any;
       const briefs: { id: string; label: string; emoji: string; subtitle: string; content: string; created_at: string | null }[] = [];
       if (ing?.ai_generated_brief_grok) {
-        briefs.push({ id: "grok", label: "Formula A — Opus 5", emoji: "🤖", subtitle: "Deep scientific reasoning", content: ing.ai_generated_brief_grok, created_at: data.created_at });
+        briefs.push({ id: "grok", label: "Working draft (Opus 5)", emoji: "🤖", subtitle: "Deep scientific reasoning", content: ing.ai_generated_brief_grok, created_at: data.created_at });
       }
       if (ing?.ai_generated_brief_claude) {
-        briefs.push({ id: "claude", label: "Formula B — Sonnet", emoji: "🧠", subtitle: "1M context synthesis", content: ing.ai_generated_brief_claude, created_at: data.created_at });
+        briefs.push({ id: "claude", label: "Working draft (Sonnet 5)", emoji: "🧠", subtitle: "1M context synthesis", content: ing.ai_generated_brief_claude, created_at: data.created_at });
       } else if (ing?.ai_generated_brief) {
         briefs.push({ id: "legacy", label: "AI Generated Brief", emoji: "🧠", subtitle: "Initial AI brief", content: ing.ai_generated_brief, created_at: data.created_at });
       }

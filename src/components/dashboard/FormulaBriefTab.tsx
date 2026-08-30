@@ -370,7 +370,7 @@ export function FormulaBriefTab({ categoryId, categoryName }: Props) {
       grokBrief && {
         id: 'grok',
         emoji: '🤖',
-        title: 'Formula A — Claude Opus 5',
+        title: 'Working draft (Opus 5)',
         subtitle: 'Deep scientific reasoning',
         badge: `${Math.round(grokBrief.length / 1000)}k chars`,
         borderColor: 'border-blue-500/40',
@@ -381,7 +381,7 @@ export function FormulaBriefTab({ categoryId, categoryName }: Props) {
       claudeBrief && {
         id: 'claude',
         emoji: '🧠',
-        title: 'Formula B — Claude Sonnet 5',
+        title: 'Working draft (Sonnet 5)',
         subtitle: '1M context synthesis',
         badge: `${Math.round(claudeBrief.length / 1000)}k chars`,
         borderColor: 'border-purple-500/40',

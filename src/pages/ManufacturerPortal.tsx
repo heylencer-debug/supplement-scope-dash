@@ -14,6 +14,7 @@ import { FormulaPDF } from "@/components/FormulaPDF";
 import { FormulaViewer } from "@/components/FormulaViewer";
 import { ActivityTimeline, type TimelineComment, type TimelineVersion } from "@/components/ActivityTimeline";
 import { Paperclip, X, FileText, Image } from "lucide-react";
+import { displayFormulaLabel } from "@/lib/formulaLabels";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -545,7 +546,7 @@ export default function ManufacturerPortal() {
                       >
                         <CardHeader className="pb-2 pt-4 px-5">
                           <div className="flex items-center gap-3 flex-wrap">
-                            <span className="font-semibold text-foreground text-sm">{v.label}</span>
+                            <span className="font-semibold text-foreground text-sm">{displayFormulaLabel(v.label)}</span>
                             <span className="text-xs text-muted-foreground">{formatDate(v.created_at)}</span>
                             {verdictBadge(v.qa_verdict)}
                           </div>
@@ -760,7 +761,7 @@ export default function ManufacturerPortal() {
                     comments={allCatComments as TimelineComment[]}
                     versions={versions.map((v) => ({
                       id: v.id,
-                      label: v.label,
+                      label: displayFormulaLabel(v.label),
                       created_at: v.created_at,
                       change_summary: v.change_summary ?? undefined,
                       source: getPromotedPipelineId(v.change_summary) ? "pipeline" as const : "version" as const,

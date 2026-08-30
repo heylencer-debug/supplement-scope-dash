@@ -15,9 +15,11 @@ import { DocumentModal } from "@/components/ui/document-modal";
 import { MarkdownDoc } from "@/lib/markdownDoc";
 import {
   Link2, ChevronRight, MessageSquare, FlaskConical, LayoutDashboard, GitBranch,
-  Pencil, Trash2, Check, X, Eye, EyeOff, FileText, Clock, Maximize2,
+  Pencil, Trash2, Check, X, Eye, EyeOff, FileText, Clock, Maximize2, Bot,
 } from "lucide-react";
 import { ActivityTimeline, type TimelineComment, type TimelineVersion } from "@/components/ActivityTimeline";
+import { ManufacturerChat } from "@/components/manufacturer/ManufacturerChat";
+import { displayFormulaLabel } from "@/lib/formulaLabels";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -66,7 +68,7 @@ interface MfrComment {
   attachment_type: string | null;
 }
 
-type TabKey = "overview" | "formula" | "comments" | "history";
+type TabKey = "overview" | "formula" | "chat" | "comments" | "history";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -439,6 +441,7 @@ export default function ManufacturerPortalInternal() {
   const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
     { key: "overview", label: "Overview", icon: LayoutDashboard },
     { key: "formula",  label: "Formula",  icon: FlaskConical },
+    { key: "chat",     label: "Chat",     icon: Bot },
     { key: "comments", label: "Comments", icon: MessageSquare },
     { key: "history",  label: "History",  icon: Clock },
   ];
@@ -531,7 +534,7 @@ export default function ManufacturerPortalInternal() {
                     <div className="flex items-center gap-2 min-w-0">
                       {item.source === "version" && <GitBranch className="w-3.5 h-3.5 text-primary/60 flex-shrink-0" />}
                       {item.source === "pipeline" && item.emoji && <span className="text-sm flex-shrink-0">{item.emoji}</span>}
-                      <span className="text-[13px] font-bold text-foreground truncate">{item.label}</span>
+                      <span className="text-[13px] font-bold text-foreground truncate">{displayFormulaLabel(item.label)}</span>
                     </div>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
                       {item.is_active && (
@@ -617,7 +620,7 @@ export default function ManufacturerPortalInternal() {
                   }
                 </div>
                 <div className="min-w-0">
-                  <h3 className="text-sm font-bold text-foreground truncate">{activeItem.label}</h3>
+                  <h3 className="text-sm font-bold text-foreground truncate">{displayFormulaLabel(activeItem.label)}</h3>
                   <p className="text-[11px] text-muted-foreground truncate">
                     {activeItem.source === "pipeline" ? "Pipeline Source" : `Version ${activeItem.version_number}`}
                     {activeItem.change_summary ? ` — ${activeItem.change_summary}` : ""}
@@ -669,7 +672,7 @@ export default function ManufacturerPortalInternal() {
                   <div className="max-w-2xl space-y-6">
                     <div className="grid grid-cols-2 gap-4">
                       {[
-                        { label: "Version", value: activeItem.label },
+                        { label: "Version", value: displayFormulaLabel(activeItem.label) },
                         { label: "Source", value: activeItem.source === "pipeline" ? "Pipeline" : "Manual" },
                         { label: "Created", value: formatDate(activeItem.created_at) },
                         { label: "Status", value: activeItem.is_active ? "Active" : "Archived" },
@@ -738,7 +741,7 @@ export default function ManufacturerPortalInternal() {
                   <div className="space-y-6 max-w-3xl">
                     <div className="flex items-center justify-between gap-2">
                       <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                        {activeItem.source === "pipeline" ? activeItem.label : `Version ${activeItem.label}`}
+                        {activeItem.source === "pipeline" ? displayFormulaLabel(activeItem.label) : `Version ${activeItem.label}`}
                       </h3>
                       {activeItem.formula_brief_content && (
                         <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5 rounded-xl" onClick={() => setDocViewerOpen(true)}>
@@ -777,7 +780,7 @@ export default function ManufacturerPortalInternal() {
                     <DocumentModal
                       open={docViewerOpen}
                       onOpenChange={setDocViewerOpen}
-                      title={`${selectedCat?.name ?? "Formula"} — ${activeItem.source === "pipeline" ? activeItem.label : `Version ${activeItem.label}`}`}
+                      title={`${selectedCat?.name ?? "Formula"} — ${activeItem.source === "pipeline" ? displayFormulaLabel(activeItem.label) : `Version ${activeItem.label}`}`}
                       subtitle={activeItem.change_summary || undefined}
                       chips={[
                         ...(activeItem.qa_score != null ? [{ label: "QA", value: `${activeItem.qa_score}/10` }] : []),
@@ -791,12 +794,19 @@ export default function ManufacturerPortalInternal() {
                 )}
 
                 {/* ── COMMENTS ── */}
+                {/* ── CHAT ── */}
+                {activeTab === "chat" && selectedCat && (
+                  <div className="max-w-3xl">
+                    <ManufacturerChat categoryId={selectedCat.id} keyword={selectedCat.name} />
+                  </div>
+                )}
+
                 {activeTab === "comments" && (
                   <div className="max-w-2xl">
                     {comments.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-12 text-center">
                         <MessageSquare className="w-10 h-10 text-muted-foreground/20 mb-3" />
-                        <p className="text-sm text-muted-foreground">No comments yet for {activeItem.label}.</p>
+                        <p className="text-sm text-muted-foreground">No comments yet for {displayFormulaLabel(activeItem.label)}.</p>
                         <p className="text-xs text-muted-foreground/60 mt-1">Start a conversation below.</p>
                       </div>
                     ) : (
@@ -942,7 +952,7 @@ export default function ManufacturerPortalInternal() {
                       comments={allCatComments as TimelineComment[]}
                       versions={versions.map((v) => ({
                         id: v.id,
-                        label: v.label,
+                        label: displayFormulaLabel(v.label),
                         created_at: v.created_at,
                         change_summary: v.change_summary ?? undefined,
                         source: v.source,

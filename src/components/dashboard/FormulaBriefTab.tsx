@@ -13,10 +13,12 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertCircle, FlaskConical, Target, ShieldCheck, Package,
-  DollarSign, AlertTriangle, Zap, Star, ChevronRight, Download, FileText,
+  DollarSign, AlertTriangle, Zap, Star, ChevronRight, Download, FileText, Maximize2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { generateManufacturerPDF } from "@/lib/manufacturerPDF";
+import { DocumentModal } from "@/components/ui/document-modal";
+import { MarkdownDoc } from "@/lib/markdownDoc";
 
 interface Props { categoryId: string; categoryName?: string; }
 
@@ -211,6 +213,7 @@ function FormulaCard({ card, categoryName, generatedAt, onManufacturerPDF }: {
   onManufacturerPDF?: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [docOpen, setDocOpen] = useState(false);
   // Display ref — scoped to this card's visible content
   const cardRef = useRef<HTMLDivElement>(null);
   // Download ref — uses downloadContent (full package) if available, else display content
@@ -220,22 +223,45 @@ function FormulaCard({ card, categoryName, generatedAt, onManufacturerPDF }: {
   return (
     <Panel className={`border ${card.borderColor} transition-all duration-200`}>
       {/* Card header — always visible, click to toggle */}
-      <button
-        className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-t-lg ${card.bgColor} hover:brightness-105 transition-all`}
-        onClick={() => setOpen(o => !o)}
-      >
-        <div className="flex items-center gap-3 min-w-0">
+      <div className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-t-lg ${card.bgColor}`}>
+        <button
+          className="flex items-center gap-3 min-w-0 flex-1 text-left hover:brightness-105 transition-all"
+          onClick={() => setOpen(o => !o)}
+        >
           <span className="text-2xl shrink-0">{card.emoji}</span>
           <div className="text-left min-w-0">
             <p className="text-sm font-semibold text-foreground truncate">{card.title}</p>
             <p className="text-xs text-muted-foreground truncate">{card.subtitle}{generatedAt ? ` · ${new Date(generatedAt).toLocaleDateString()}` : ''}</p>
           </div>
-        </div>
+        </button>
         <div className="flex items-center gap-2 shrink-0">
           <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${card.badgeColor}`}>{card.badge}</span>
-          <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${open ? 'rotate-90' : ''}`} />
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 gap-1 text-[11px] px-2"
+            onClick={(e) => { e.stopPropagation(); setDocOpen(true); }}
+          >
+            <Maximize2 className="h-3 w-3" />
+            Open report
+          </Button>
+          <button onClick={() => setOpen(o => !o)} aria-label={open ? "Collapse" : "Expand"}>
+            <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${open ? 'rotate-90' : ''}`} />
+          </button>
         </div>
-      </button>
+      </div>
+
+      {/* Full-document viewer — same content as the inline expander below,
+          opened wide + clinical-light for actual reading. */}
+      <DocumentModal
+        open={docOpen}
+        onOpenChange={setDocOpen}
+        title={`${categoryName ? `${categoryName} — ` : ""}${card.title}`}
+        subtitle={card.subtitle}
+        chips={generatedAt ? [{ label: "Generated", value: new Date(generatedAt).toLocaleDateString() }] : undefined}
+      >
+        <MarkdownDoc content={card.content} />
+      </DocumentModal>
 
       {/* Expanded content */}
       {open && (

@@ -17,7 +17,8 @@
 import { useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BrandCard } from "@/components/ui/brand-card";
-import { BrandModal } from "@/components/ui/brand-modal";
+import { DocumentModal } from "@/components/ui/document-modal";
+import { MarkdownDoc } from "@/lib/markdownDoc";
 import {
   Collapsible,
   CollapsibleContent,
@@ -162,17 +163,19 @@ function IdentityPanel({ categoryName, analysis, analysisLoading, formulaBrief, 
         </>
       )}
 
-      <BrandModal
+      <DocumentModal
         open={strategyOpen}
         onOpenChange={setStrategyOpen}
-        size="md"
         title={`${cleanCategoryName} — Strategy`}
-        description={hasRealScore ? verdict : "Full formula strategy — opportunity score is pending a category-analysis refresh."}
+        subtitle={hasRealScore ? verdict : "Full formula strategy — opportunity score is pending a category-analysis refresh."}
+        chips={hasRealScore && score10 != null ? [{ label: "Opportunity", value: `${displayScore}/10` }] : undefined}
       >
-        <p className="text-sm leading-relaxed text-foreground whitespace-pre-line">
-          {strategyText || "No strategy text available yet."}
-        </p>
-      </BrandModal>
+        {strategyText ? (
+          <MarkdownDoc content={strategyText} />
+        ) : (
+          <p className="text-sm text-muted-foreground">No strategy text available yet.</p>
+        )}
+      </DocumentModal>
     </BrandCard>
   );
 }

@@ -14,10 +14,12 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertCircle, CheckCircle2, AlertTriangle,
-  ShieldCheck, Scale, ChevronRight, FileText,
+  ShieldCheck, Scale, ChevronRight, FileText, Maximize2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { generateManufacturerPDF } from "@/lib/manufacturerPDF";
+import { DocumentModal } from "@/components/ui/document-modal";
+import { MarkdownDoc } from "@/lib/markdownDoc";
 
 interface Props {
   categoryId: string;
@@ -142,30 +144,53 @@ function renderMarkdown(text: unknown): React.ReactNode {
 
 function ExpandableCard({
   emoji, title, subtitle, badge, badgeColor, borderColor, bgColor, children,
+  docContent, chips,
 }: {
   emoji: string; title: string; subtitle: string; badge: string;
   badgeColor: string; borderColor: string; bgColor: string; children: React.ReactNode;
+  /** Raw markdown for the "Open report" full-document view. Omit to hide the button. */
+  docContent?: string | null;
+  chips?: { label?: string; value: React.ReactNode }[];
 }) {
   const [open, setOpen] = useState(false);
+  const [docOpen, setDocOpen] = useState(false);
   return (
     <Panel className={`border ${borderColor} transition-all duration-200`}>
-      <button
-        className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-t-lg ${bgColor} hover:brightness-105 transition-all`}
-        onClick={() => setOpen((o) => !o)}
-      >
-        <div className="flex items-center gap-3 min-w-0">
+      <div className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-t-lg ${bgColor}`}>
+        <button
+          className="flex items-center gap-3 min-w-0 flex-1 text-left hover:brightness-105 transition-all"
+          onClick={() => setOpen((o) => !o)}
+        >
           <span className="text-2xl shrink-0">{emoji}</span>
           <div className="text-left min-w-0">
             <p className="text-sm font-semibold text-foreground truncate">{title}</p>
             <p className="text-xs text-muted-foreground truncate">{subtitle}</p>
           </div>
-        </div>
+        </button>
         <div className="flex items-center gap-2 shrink-0">
           <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${badgeColor}`}>{badge}</span>
-          <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${open ? "rotate-90" : ""}`} />
+          {docContent && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1 text-[11px] px-2"
+              onClick={(e) => { e.stopPropagation(); setDocOpen(true); }}
+            >
+              <Maximize2 className="h-3 w-3" />
+              Open report
+            </Button>
+          )}
+          <button onClick={() => setOpen((o) => !o)} aria-label={open ? "Collapse" : "Expand"}>
+            <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${open ? "rotate-90" : ""}`} />
+          </button>
         </div>
-      </button>
+      </div>
       {open && <CardContent className="pt-4 pb-4">{children}</CardContent>}
+      {docContent && (
+        <DocumentModal open={docOpen} onOpenChange={setDocOpen} title={title} subtitle={subtitle} chips={chips}>
+          <MarkdownDoc content={docContent} />
+        </DocumentModal>
+      )}
     </Panel>
   );
 }
@@ -348,6 +373,8 @@ export function FormulaValidationTab({ categoryId, categoryName, activeVersionIn
           badgeColor="bg-blue-500/10 text-blue-400"
           borderColor="border-blue-500/30"
           bgColor="bg-blue-500/5"
+          docContent={benchmarking.opus_validation}
+          chips={[{ label: "Adjudicator", value: "Claude Opus 5" }, ...(p11Date ? [{ label: "Run", value: p11Date }] : [])]}
         >
           <div className="max-h-[700px] overflow-y-auto pr-1 space-y-1">
             {renderMarkdown(benchmarking.opus_validation)}
@@ -365,6 +392,8 @@ export function FormulaValidationTab({ categoryId, categoryName, activeVersionIn
           badgeColor="bg-blue-500/10 text-blue-400"
           borderColor="border-blue-500/20"
           bgColor="bg-blue-500/3"
+          docContent={benchmarking.sonnet_draft || benchmarking.grok_draft}
+          chips={p11Date ? [{ label: "Run", value: p11Date }] : undefined}
         >
           <div className="max-h-[700px] overflow-y-auto pr-1 space-y-1">
             {renderMarkdown(benchmarking.sonnet_draft || benchmarking.grok_draft)}
@@ -382,6 +411,8 @@ export function FormulaValidationTab({ categoryId, categoryName, activeVersionIn
           badgeColor="bg-green-500/10 text-green-400"
           borderColor="border-green-500/30"
           bgColor="bg-green-500/5"
+          docContent={fda.opus_analysis}
+          chips={[{ label: "Adjudicator", value: "Claude Opus 5" }, ...(p12Date ? [{ label: "Run", value: p12Date }] : [])]}
         >
           <div className="max-h-[700px] overflow-y-auto pr-1 space-y-1">
             {renderMarkdown(fda.opus_analysis)}
@@ -399,6 +430,7 @@ export function FormulaValidationTab({ categoryId, categoryName, activeVersionIn
           badgeColor="bg-green-500/10 text-green-400"
           borderColor="border-green-500/20"
           bgColor="bg-green-500/3"
+          docContent={fda.sonnet_validation || fda.grok_validation}
         >
           <div className="max-h-[700px] overflow-y-auto pr-1 space-y-1">
             {renderMarkdown(fda.sonnet_validation || fda.grok_validation)}

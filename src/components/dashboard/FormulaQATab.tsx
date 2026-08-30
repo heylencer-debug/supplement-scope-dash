@@ -4,7 +4,7 @@
  * competitor head-to-head, adjustments, and adjusted formula.
  */
 
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useState } from "react";
 import { useFormulaQA } from "@/hooks/useFormulaQA";
 import { CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Panel } from "@/components/ui/panel";
@@ -13,9 +13,22 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertCircle, CheckCircle2, AlertTriangle, FlaskConical,
-  Download, ShieldCheck, Beaker, Scale, Target, Wrench, FileText, Zap, Star,
+  Download, ShieldCheck, Beaker, Scale, Target, Wrench, FileText, Zap, Star, Maximize2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { DocumentModal } from "@/components/ui/document-modal";
+import { MarkdownDoc } from "@/lib/markdownDoc";
+
+// ─── Open-report button — opens any section's full text in a wide DocumentModal ──
+
+function OpenReportButton({ onClick }: { onClick: () => void }) {
+  return (
+    <Button variant="outline" size="sm" className="flex items-center gap-1.5 text-xs" onClick={onClick}>
+      <Maximize2 className="h-3 w-3" />
+      Open report
+    </Button>
+  );
+}
 
 interface Props {
   categoryId: string;
@@ -175,6 +188,7 @@ export function FormulaQATab({ categoryId, categoryName, activeVersionInfo }: Pr
   const adjRef  = useRef<HTMLDivElement>(null);
   const downloadFull = usePDFDownload(fullRef, `${categoryName}-qa-report`);
   const downloadAdj  = usePDFDownload(adjRef, `${categoryName}-adjusted-formula`);
+  const [openDoc, setOpenDoc] = useState<"comparison" | "flavor" | "full" | "adjusted" | null>(null);
 
   if (isLoading) return (
     <div className="space-y-4">
@@ -266,13 +280,16 @@ export function FormulaQATab({ categoryId, categoryName, activeVersionInfo }: Pr
       {/* Comprehensive Comparison — full width */}
       {qa.comprehensive_comparison && (
         <Panel className="border-chart-1/30">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <Scale className="h-4 w-4 text-chart-1" />Comprehensive Ingredient Comparison — DOVIVE vs Competitors
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Every active ingredient compared head-to-head with exact doses · Why we win or where we need to adjust
-            </CardDescription>
+          <CardHeader className="pb-3 flex-row items-start justify-between gap-3 space-y-0">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <Scale className="h-4 w-4 text-chart-1" />Comprehensive Ingredient Comparison — DOVIVE vs Competitors
+              </CardTitle>
+              <CardDescription className="text-xs mt-1.5">
+                Every active ingredient compared head-to-head with exact doses · Why we win or where we need to adjust
+              </CardDescription>
+            </div>
+            <OpenReportButton onClick={() => setOpenDoc("comparison")} />
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto space-y-1">
@@ -285,13 +302,16 @@ export function FormulaQATab({ categoryId, categoryName, activeVersionInfo }: Pr
       {/* Flavor & Taste QA — full width */}
       {qa.flavor_qa && (
         <Panel className="border-chart-2/30">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <Star className="h-4 w-4 text-chart-2" />Flavor & Taste QA
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Taste strategy · Bitterness masking · Sweetener system · Competitor flavor profiles · Review-backed evidence
-            </CardDescription>
+          <CardHeader className="pb-3 flex-row items-start justify-between gap-3 space-y-0">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <Star className="h-4 w-4 text-chart-2" />Flavor & Taste QA
+              </CardTitle>
+              <CardDescription className="text-xs mt-1.5">
+                Taste strategy · Bitterness masking · Sweetener system · Competitor flavor profiles · Review-backed evidence
+              </CardDescription>
+            </div>
+            <OpenReportButton onClick={() => setOpenDoc("flavor")} />
           </CardHeader>
           <CardContent>
             <div className="space-y-1">
@@ -306,13 +326,16 @@ export function FormulaQATab({ categoryId, categoryName, activeVersionInfo }: Pr
 
         {/* Full QA report (3/5 width) */}
         <Panel className="xl:col-span-3">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <Beaker className="h-4 w-4 text-primary" />Full QA Report
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Dose analysis · Manufacturability · Dual formula comparison · All adjustments
-            </CardDescription>
+          <CardHeader className="pb-3 flex-row items-start justify-between gap-3 space-y-0">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <Beaker className="h-4 w-4 text-primary" />Full QA Report
+              </CardTitle>
+              <CardDescription className="text-xs mt-1.5">
+                Dose analysis · Manufacturability · Dual formula comparison · All adjustments
+              </CardDescription>
+            </div>
+            <OpenReportButton onClick={() => setOpenDoc("full")} />
           </CardHeader>
           <CardContent>
             <div ref={fullRef} className="space-y-1 max-h-[800px] overflow-y-auto pr-2 scrollbar-thin">
@@ -323,13 +346,18 @@ export function FormulaQATab({ categoryId, categoryName, activeVersionInfo }: Pr
 
         {/* Adjusted formula (2/5 width) */}
         <Panel className="xl:col-span-2 border-primary/20">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <Wrench className="h-4 w-4 text-primary" />Adjusted Formula
-            </CardTitle>
-            <CardDescription className="text-xs">
-              P9-revised specification — what changed and why
-            </CardDescription>
+          <CardHeader className="pb-3 flex-row items-start justify-between gap-3 space-y-0">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <Wrench className="h-4 w-4 text-primary" />Adjusted Formula
+              </CardTitle>
+              <CardDescription className="text-xs mt-1.5">
+                P9-revised specification — what changed and why
+              </CardDescription>
+            </div>
+            {(qa.adjusted_formula || qa.qa_report?.match(/## MANUFACTURABILITY CHECK([\s\S]*?)(?:\n## COMPETITOR|$)/)?.[1]?.trim()) && (
+              <OpenReportButton onClick={() => setOpenDoc("adjusted")} />
+            )}
           </CardHeader>
           <CardContent>
             {(() => {
@@ -365,6 +393,49 @@ export function FormulaQATab({ categoryId, categoryName, activeVersionInfo }: Pr
           </CardContent>
         </Panel>
       )}
+
+      {/* Full-document viewers — the same content as the inline expanders
+          above, opened wide + clinical-light for actual reading. */}
+      <DocumentModal
+        open={openDoc === "comparison"}
+        onOpenChange={(o) => setOpenDoc(o ? "comparison" : null)}
+        title={`${categoryName || "Formula"} — Comprehensive Ingredient Comparison`}
+        subtitle="DOVIVE vs top competitors, ingredient-by-ingredient"
+        chips={[{ label: "Adjudicator", value: "Claude Opus 5" }, ...(genDate ? [{ label: "Run", value: genDate }] : [])]}
+      >
+        <MarkdownDoc content={qa.comprehensive_comparison} />
+      </DocumentModal>
+
+      <DocumentModal
+        open={openDoc === "flavor"}
+        onOpenChange={(o) => setOpenDoc(o ? "flavor" : null)}
+        title={`${categoryName || "Formula"} — Flavor & Taste QA`}
+        subtitle="Taste strategy · Bitterness masking · Sweetener system · Review-backed evidence"
+      >
+        <MarkdownDoc content={qa.flavor_qa} />
+      </DocumentModal>
+
+      <DocumentModal
+        open={openDoc === "full"}
+        onOpenChange={(o) => setOpenDoc(o ? "full" : null)}
+        title={`${categoryName || "Formula"} — Full QA Report`}
+        subtitle={verdictCfg.label}
+        chips={[
+          ...(qa.qa_verdict?.score ? [{ label: "Score", value: `${qa.qa_verdict.score}/10` }] : []),
+          ...(genDate ? [{ label: "Run", value: genDate }] : []),
+        ]}
+      >
+        <MarkdownDoc content={qa.qa_report} />
+      </DocumentModal>
+
+      <DocumentModal
+        open={openDoc === "adjusted"}
+        onOpenChange={(o) => setOpenDoc(o ? "adjusted" : null)}
+        title={`${categoryName || "Formula"} — Adjusted Formula`}
+        subtitle="P9-revised specification — what changed and why"
+      >
+        <MarkdownDoc content={qa.adjusted_formula || qa.qa_report?.match(/## MANUFACTURABILITY CHECK([\s\S]*?)(?:\n## COMPETITOR|$)/)?.[1]?.trim()} />
+      </DocumentModal>
 
     </div>
   );

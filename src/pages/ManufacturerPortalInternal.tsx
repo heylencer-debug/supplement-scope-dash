@@ -11,9 +11,11 @@ import { useToast } from "@/hooks/use-toast";
 import { PDFDownloadLink } from "@react-pdf/renderer";
 import { FormulaPDF } from "@/components/FormulaPDF";
 import { FormulaViewer } from "@/components/FormulaViewer";
+import { DocumentModal } from "@/components/ui/document-modal";
+import { MarkdownDoc } from "@/lib/markdownDoc";
 import {
   Link2, ChevronRight, MessageSquare, FlaskConical, LayoutDashboard, GitBranch,
-  Pencil, Trash2, Check, X, Eye, EyeOff, FileText, Clock,
+  Pencil, Trash2, Check, X, Eye, EyeOff, FileText, Clock, Maximize2,
 } from "lucide-react";
 import { ActivityTimeline, type TimelineComment, type TimelineVersion } from "@/components/ActivityTimeline";
 
@@ -148,6 +150,7 @@ export default function ManufacturerPortalInternal() {
   const [generatingLink, setGeneratingLink] = useState(false);
   const [publishedLabel, setPublishedLabel] = useState<string | null>(null);
   const [allCatComments, setAllCatComments] = useState<MfrComment[]>([]);
+  const [docViewerOpen, setDocViewerOpen] = useState(false);
 
   // Load categories
   useEffect(() => {
@@ -733,10 +736,16 @@ export default function ManufacturerPortalInternal() {
                 {/* ── FORMULA ── */}
                 {activeTab === "formula" && (
                   <div className="space-y-6 max-w-3xl">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2">
                       <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                         {activeItem.source === "pipeline" ? activeItem.label : `Version ${activeItem.label}`}
                       </h3>
+                      {activeItem.formula_brief_content && (
+                        <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5 rounded-xl" onClick={() => setDocViewerOpen(true)}>
+                          <Maximize2 className="w-3.5 h-3.5" />
+                          Open as document
+                        </Button>
+                      )}
                       {activeItem.formula_brief_content && (
                         <PDFDownloadLink
                           document={
@@ -764,6 +773,20 @@ export default function ManufacturerPortalInternal() {
                     <div className="bg-secondary/30 rounded-xl p-6 border border-border/50">
                       <SectionText text={activeItem.formula_brief_content} fallback="No formula content available." />
                     </div>
+
+                    <DocumentModal
+                      open={docViewerOpen}
+                      onOpenChange={setDocViewerOpen}
+                      title={`${selectedCat?.name ?? "Formula"} — ${activeItem.source === "pipeline" ? activeItem.label : `Version ${activeItem.label}`}`}
+                      subtitle={activeItem.change_summary || undefined}
+                      chips={[
+                        ...(activeItem.qa_score != null ? [{ label: "QA", value: `${activeItem.qa_score}/10` }] : []),
+                        ...(activeItem.fda_score != null ? [{ label: "FDA", value: `${activeItem.fda_score}/100` }] : []),
+                        { label: "Created", value: formatDate(activeItem.created_at) },
+                      ]}
+                    >
+                      <MarkdownDoc content={activeItem.formula_brief_content} />
+                    </DocumentModal>
                   </div>
                 )}
 

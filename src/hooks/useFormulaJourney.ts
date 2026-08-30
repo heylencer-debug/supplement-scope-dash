@@ -10,6 +10,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { parseBenchmarkAndCompliance } from "@/lib/formulaScores";
+import { getCanonicalFormula, type CanonicalFormula } from "@/lib/canonicalFormula";
 
 export type JourneyStageId = "formulation" | "qa" | "benchmark" | "compliance" | "factory";
 export type JourneyStageState = "done" | "current" | "pending";
@@ -29,6 +30,8 @@ export interface FormulaJourneyResult {
   p12Score: number | null;
   /** P13 chief-formulator sign-off — the compliance-corrected final formula document. */
   finalSignoff: { opus_review?: string; verdict?: string; generated_at?: string; model?: string } | null;
+  /** The ONE canonical formula for this category — see src/lib/canonicalFormula.ts. */
+  canonicalFormula: CanonicalFormula;
   isLoading: boolean;
   error: unknown;
 }
@@ -157,12 +160,15 @@ export function useFormulaJourney(categoryId?: string): FormulaJourneyResult {
   const signoff = ing?.final_signoff as { opus_review?: string; verdict?: string; generated_at?: string; model?: string } | null | undefined;
   const finalSignoff = signoff && (signoff.opus_review?.length ?? 0) > 500 ? signoff : null;
 
+  const canonicalFormula = getCanonicalFormula(ing);
+
   return {
     stages,
     hasAnyData,
     p11Score,
     p12Score,
     finalSignoff,
+    canonicalFormula,
     isLoading: query.isLoading,
     error: query.error,
   };

@@ -10,6 +10,7 @@ import { Panel } from "@/components/ui/panel";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useFormulaJourney, type JourneyStage, type JourneyStageState } from "@/hooks/useFormulaJourney";
+import type { CanonicalFormulaSource } from "@/lib/canonicalFormula";
 
 interface Props {
   categoryId?: string;
@@ -34,6 +35,13 @@ const STAGE_PILL_LABEL: Record<JourneyStage["id"], string> = {
   factory: "Factory",
 };
 
+/** Short-form maturity label for the version line, e.g. "Signed off ✓". */
+const MATURITY_TEXT: Record<Exclude<CanonicalFormulaSource, null>, string> = {
+  signoff: "Signed off ✓",
+  qa_adjusted: "QA-adjusted — sign-off pending",
+  brief: "Draft — QA pending",
+};
+
 function StagePill({ stage }: { stage: JourneyStage }) {
   const Icon = STAGE_ICON[stage.id];
   const state: JourneyStageState = stage.state;
@@ -55,7 +63,7 @@ function StagePill({ stage }: { stage: JourneyStage }) {
 }
 
 export function FormulaPassport({ categoryId, categoryName, activeVersionNumber, setActiveTab }: Props) {
-  const { stages, hasAnyData, p11Score, p12Score, isLoading } = useFormulaJourney(categoryId);
+  const { stages, hasAnyData, p11Score, p12Score, canonicalFormula, isLoading } = useFormulaJourney(categoryId);
 
   if (isLoading || !hasAnyData) return null;
 
@@ -73,6 +81,7 @@ export function FormulaPassport({ categoryId, categoryName, activeVersionNumber,
             {categoryName || "Category"}
             <span className="text-white/50 font-normal ml-1.5">
               FORMULA v{activeVersionNumber ?? 1} (active)
+              {canonicalFormula.source && ` · ${MATURITY_TEXT[canonicalFormula.source]}`}
             </span>
           </p>
         </div>

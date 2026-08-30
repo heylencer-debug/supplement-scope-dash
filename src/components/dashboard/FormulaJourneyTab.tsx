@@ -1,16 +1,22 @@
 /**
- * FormulaJourneyTab — the "Formula" tab (Option B of the redesign).
+ * FormulaJourneyTab — the "Formula" tab, "one formula, one audit trail" IA.
  *
- * One linear vertical timeline through the pipeline's formula lifecycle:
- * Formulation (P8) → QA Review (P9) → Competitive Benchmark (P11) →
- * FDA/DSHEA Compliance (P12) → Factory Handoff.
+ * TOP: "The Formula" — the ONE canonical formula for this category, resolved
+ * by src/lib/canonicalFormula.ts (P13 sign-off > QA-adjusted > draft brief).
+ * Rendered inline with zero clicks; "Open full document" opens the complete
+ * document in DocumentModal. A compact Factory Handoff row sits directly
+ * beneath it so the next action stays reachable without expanding anything.
+ *
+ * BELOW: "How this formula was made" — a single collapsed (default closed)
+ * disclosure containing the full formula lifecycle timeline (Formulation →
+ * QA Review → Competitive Benchmark → FDA/DSHEA Compliance → Factory
+ * Handoff), internally unchanged from the original Formula Journey design —
+ * this is the audit trail, not the deliverable.
  *
  * This does not replace any of the underlying report components — it
  * surfaces them. FormulaBriefTab, FormulaQATab, and FormulaValidationTab are
  * rendered exactly as they always were (each fetches/renders its own data);
- * this tab only adds the timeline chrome + expand/collapse around them, and
- * — critically — finally mounts FormulaBriefTab, which was imported by
- * Dashboard.tsx but never rendered anywhere.
+ * this tab only adds the timeline chrome + expand/collapse around them.
  */
 import { useRef, useState } from "react";
 import { Check, ChevronDown, FlaskConical, Beaker, BarChart, Shield, Factory, Link2, ArrowRight, Stamp } from "lucide-react";
@@ -21,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import { cn } from "@/lib/utils";
 import { useFormulaJourney, type JourneyStage, type JourneyStageState } from "@/hooks/useFormulaJourney";
+import type { CanonicalFormulaSource } from "@/lib/canonicalFormula";
 import { FormulaBriefTab } from "@/components/dashboard/FormulaBriefTab";
 import { FormulaQATab } from "@/components/dashboard/FormulaQATab";
 import { FormulaValidationTab } from "@/components/dashboard/FormulaValidationTab";
@@ -40,6 +47,13 @@ const STAGE_ICON: Record<JourneyStage["id"], typeof FlaskConical> = {
   benchmark: BarChart,
   compliance: Shield,
   factory: Factory,
+};
+
+/** The exact maturity chip copy for "The Formula" panel. */
+const MATURITY_CHIP: Record<Exclude<CanonicalFormulaSource, null>, { text: string; className: string }> = {
+  signoff: { text: "Signed off ✓", className: "border-chart-4/30 text-chart-4 bg-chart-4/10" },
+  qa_adjusted: { text: "QA-adjusted — sign-off pending", className: "border-chart-2/30 text-chart-2 bg-chart-2/10" },
+  brief: { text: "Draft — QA pending", className: "border-border bg-muted text-muted-foreground" },
 };
 
 function StateBadge({ state }: { state: JourneyStageState }) {
@@ -81,12 +95,14 @@ function StageDot({ state }: { state: JourneyStageState }) {
 }
 
 export function FormulaJourneyTab({ categoryId, categoryName, activeVersionInfo, setActiveTab, handleGenerateLink, generatingLink }: Props) {
-  const { stages, hasAnyData, finalSignoff, isLoading } = useFormulaJourney(categoryId);
+  const { stages, hasAnyData, canonicalFormula, isLoading } = useFormulaJourney(categoryId);
   const [openStage, setOpenStage] = useState<JourneyStage["id"] | null>(null);
-  const [signoffOpen, setSignoffOpen] = useState(false);
+  const [formulaDocOpen, setFormulaDocOpen] = useState(false);
+  const [auditOpen, setAuditOpen] = useState(false);
   const complianceRef = useRef<HTMLDivElement>(null);
 
   const openCombinedReport = () => {
+    setAuditOpen(true);
     setOpenStage("compliance");
     requestAnimationFrame(() => {
       complianceRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -97,46 +113,95 @@ export function FormulaJourneyTab({ categoryId, categoryName, activeVersionInfo,
     return <div className="text-sm text-muted-foreground py-12 text-center">Loading formula journey…</div>;
   }
 
+  const cleanCategoryName = (categoryName || "Formula").replace(/^=+/, "").trim();
+  const factoryStage = stages.find((s) => s.id === "factory");
+  const chip = canonicalFormula.source ? MATURITY_CHIP[canonicalFormula.source] : null;
+
   return (
     <div className="space-y-3">
-      {/* THE deliverable: the P13-signed-off, compliance-corrected final
-          formula. When it exists it outranks everything else on this tab. */}
-      {finalSignoff && (
+      {/* TOP: The Formula — the ONE canonical answer, zero clicks. */}
+      {canonicalFormula.source && chip && (
         <div className="pearl-gradient-border rounded-xl">
-          <div className="pearl-gradient-border-inner rounded-[11px] bg-card px-4 py-3.5 flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-3 min-w-0">
-              <Stamp className="h-5 w-5 text-primary shrink-0" />
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-foreground">Final Formula — signed off</p>
-                <p className="text-xs text-muted-foreground">
-                  {finalSignoff.verdict || "Reviewed"}
-                  {finalSignoff.generated_at ? ` · ${new Date(finalSignoff.generated_at).toLocaleDateString()}` : ""}
-                  {" · compliance corrections applied by Opus 5"}
-                </p>
+          <div className="pearl-gradient-border-inner rounded-[11px] bg-card p-5 space-y-3.5">
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                <FlaskConical className="h-5 w-5 text-primary shrink-0" />
+                <h2 className="text-base font-semibold text-foreground">The Formula</h2>
+                <span
+                  className={cn(
+                    "inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border whitespace-nowrap",
+                    chip.className
+                  )}
+                >
+                  {canonicalFormula.source === "signoff" && <Stamp className="h-2.5 w-2.5" />}
+                  {chip.text}
+                </span>
               </div>
+              <Button variant="secondary" size="sm" onClick={() => setFormulaDocOpen(true)}>
+                Open full document
+                <ArrowRight className="w-3.5 h-3.5 ml-1" />
+              </Button>
             </div>
-            <Button variant="secondary" size="sm" onClick={() => setSignoffOpen(true)}>
-              Open final formula
-              <ArrowRight className="w-3.5 h-3.5 ml-1" />
-            </Button>
+
+            {canonicalFormula.source === "signoff" && (canonicalFormula.verdict || canonicalFormula.generatedAt) && (
+              <p className="text-xs text-muted-foreground -mt-2.5">
+                {canonicalFormula.verdict || "Reviewed"}
+                {canonicalFormula.generatedAt ? ` · ${new Date(canonicalFormula.generatedAt).toLocaleDateString()}` : ""}
+              </p>
+            )}
+
+            <div className="border-t border-border/60 pt-3.5">
+              <MarkdownDoc content={canonicalFormula.inlineExcerpt} />
+            </div>
           </div>
         </div>
       )}
 
-      {finalSignoff && (
+      {canonicalFormula.source && (
         <DocumentModal
-          open={signoffOpen}
-          onOpenChange={setSignoffOpen}
-          title={`${(categoryName || "Formula").replace(/^=+/, "").trim()} — Final Formula`}
-          subtitle="Chief-formulator sign-off · compliance corrections applied"
+          open={formulaDocOpen}
+          onOpenChange={setFormulaDocOpen}
+          title={`${cleanCategoryName} — Final Formula`}
+          subtitle={
+            canonicalFormula.source === "signoff"
+              ? "Chief-formulator sign-off · compliance corrections applied"
+              : chip?.text
+          }
           chips={[
-            { value: finalSignoff.verdict || "Reviewed" },
-            ...(finalSignoff.model ? [{ value: finalSignoff.model.replace("anthropic/", "") }] : []),
-            ...(finalSignoff.generated_at ? [{ value: new Date(finalSignoff.generated_at).toLocaleDateString() }] : []),
+            ...(chip ? [{ value: chip.text }] : []),
+            ...(canonicalFormula.generatedAt ? [{ value: new Date(canonicalFormula.generatedAt).toLocaleDateString() }] : []),
           ]}
         >
-          <MarkdownDoc content={finalSignoff.opus_review || ""} />
+          <MarkdownDoc content={canonicalFormula.fullDocument} />
         </DocumentModal>
+      )}
+
+      {/* Compact Factory row — stays reachable directly under The Formula,
+          even while the audit trail below is collapsed. */}
+      {canonicalFormula.source && factoryStage && (
+        <Panel>
+          <div className="flex items-center justify-between gap-3 px-4 py-2.5 flex-wrap">
+            <div className="flex items-center gap-2 min-w-0">
+              <Factory
+                className={cn(
+                  "h-3.5 w-3.5 shrink-0",
+                  factoryStage.state === "done" && "text-chart-4",
+                  factoryStage.state === "current" && "text-primary",
+                  factoryStage.state === "pending" && "text-muted-foreground/50"
+                )}
+              />
+              <span className="text-xs font-semibold text-foreground shrink-0">Factory Handoff</span>
+              <StateBadge state={factoryStage.state} />
+              <span className="text-xs text-muted-foreground truncate hidden sm:inline">{factoryStage.headline}</span>
+            </div>
+            <FactoryControl
+              state={factoryStage.state}
+              generatingLink={generatingLink}
+              onGenerateLink={handleGenerateLink}
+              onViewManufacturer={() => setActiveTab("manufacturer")}
+            />
+          </div>
+        </Panel>
       )}
 
       {!hasAnyData && (
@@ -149,96 +214,113 @@ export function FormulaJourneyTab({ categoryId, categoryName, activeVersionInfo,
         </Panel>
       )}
 
-      <div className="relative">
-        {/* Left rail line */}
-        <div className="absolute left-[7px] top-2 bottom-2 w-px bg-border" aria-hidden="true" />
+      {/* BELOW: audit trail — collapsed by default. */}
+      <Collapsible open={auditOpen} onOpenChange={setAuditOpen}>
+        <Panel className="overflow-visible">
+          <CollapsibleTrigger asChild>
+            <button type="button" className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-foreground">How this formula was made</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Working documents and checks that produced the formula above — for audit and trust</p>
+              </div>
+              <ChevronDown className={cn("h-4 w-4 text-muted-foreground shrink-0 transition-transform", auditOpen && "rotate-180")} />
+            </button>
+          </CollapsibleTrigger>
+        </Panel>
 
-        <div className="space-y-3">
-          {stages.map((stage) => {
-            const Icon = STAGE_ICON[stage.id];
-            const isOpen = openStage === stage.id;
+        <CollapsibleContent>
+          <div className="relative pt-3">
+            {/* Left rail line */}
+            <div className="absolute left-[7px] top-5 bottom-2 w-px bg-border" aria-hidden="true" />
 
-            return (
-              <div key={stage.id} className="relative flex gap-3 pl-0">
-                <div className="relative z-10 bg-background">
-                  <StageDot state={stage.state} />
-                </div>
+            <div className="space-y-3">
+              {stages.map((stage) => {
+                const Icon = STAGE_ICON[stage.id];
+                const isOpen = openStage === stage.id;
 
-                <Panel
-                  ref={stage.id === "compliance" ? complianceRef : undefined}
-                  className="flex-1 min-w-0"
-                >
-                  <Collapsible open={isOpen} onOpenChange={(o) => setOpenStage(o ? stage.id : null)}>
-                    <div className="flex items-start justify-between gap-3 px-4 py-3 flex-wrap">
-                      <div className="flex items-start gap-2.5 min-w-0">
-                        <Icon
-                          className={cn(
-                            "h-4 w-4 shrink-0 mt-0.5",
-                            stage.state === "done" && "text-chart-4",
-                            stage.state === "current" && "text-primary",
-                            stage.state === "pending" && "text-muted-foreground/50"
-                          )}
-                        />
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="text-sm font-semibold text-foreground">{stage.label}</p>
-                            <StateBadge state={stage.state} />
-                            {stage.score && (
-                              <span className="text-xs font-semibold tabular-nums text-foreground">{stage.score}</span>
-                            )}
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-0.5">{stage.headline}</p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 shrink-0">
-                        {stage.id === "benchmark" ? (
-                          <Button variant="outline" size="sm" className="text-xs" onClick={openCombinedReport}>
-                            Benchmark + compliance reports <ArrowRight className="h-3 w-3 ml-1" />
-                          </Button>
-                        ) : stage.id === "factory" ? (
-                          <FactoryControl
-                            state={stage.state}
-                            generatingLink={generatingLink}
-                            onGenerateLink={handleGenerateLink}
-                            onViewManufacturer={() => setActiveTab("manufacturer")}
-                          />
-                        ) : (
-                          <CollapsibleTrigger asChild>
-                            <Button variant="ghost" size="sm" className="text-xs gap-1">
-                              {isOpen ? "Collapse" : "Expand"}
-                              <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", isOpen && "rotate-180")} />
-                            </Button>
-                          </CollapsibleTrigger>
-                        )}
-                      </div>
+                return (
+                  <div key={stage.id} className="relative flex gap-3 pl-0">
+                    <div className="relative z-10 bg-background">
+                      <StageDot state={stage.state} />
                     </div>
 
-                    {stage.id !== "benchmark" && stage.id !== "factory" && (
-                      <CollapsibleContent>
-                        <div className="px-4 pb-4 pt-1 border-t border-border/60">
-                          {stage.id === "formulation" && (
-                            <FormulaBriefTab categoryId={categoryId} categoryName={categoryName} />
-                          )}
-                          {stage.id === "qa" && (
-                            <FormulaQATab categoryId={categoryId} categoryName={categoryName} activeVersionInfo={activeVersionInfo} />
-                          )}
-                          {stage.id === "compliance" && (
-                            <>
-                              <p className="text-xs text-muted-foreground mb-3">Benchmark + compliance reports — covers both the Competitive Benchmark (P11) and FDA/DSHEA Compliance (P12) stages.</p>
-                              <FormulaValidationTab categoryId={categoryId} categoryName={categoryName} activeVersionInfo={activeVersionInfo} />
-                            </>
-                          )}
+                    <Panel
+                      ref={stage.id === "compliance" ? complianceRef : undefined}
+                      className="flex-1 min-w-0"
+                    >
+                      <Collapsible open={isOpen} onOpenChange={(o) => setOpenStage(o ? stage.id : null)}>
+                        <div className="flex items-start justify-between gap-3 px-4 py-3 flex-wrap">
+                          <div className="flex items-start gap-2.5 min-w-0">
+                            <Icon
+                              className={cn(
+                                "h-4 w-4 shrink-0 mt-0.5",
+                                stage.state === "done" && "text-chart-4",
+                                stage.state === "current" && "text-primary",
+                                stage.state === "pending" && "text-muted-foreground/50"
+                              )}
+                            />
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="text-sm font-semibold text-foreground">{stage.label}</p>
+                                <StateBadge state={stage.state} />
+                                {stage.score && (
+                                  <span className="text-xs font-semibold tabular-nums text-foreground">{stage.score}</span>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-0.5">{stage.headline}</p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            {stage.id === "benchmark" ? (
+                              <Button variant="outline" size="sm" className="text-xs" onClick={openCombinedReport}>
+                                Benchmark + compliance reports <ArrowRight className="h-3 w-3 ml-1" />
+                              </Button>
+                            ) : stage.id === "factory" ? (
+                              <FactoryControl
+                                state={stage.state}
+                                generatingLink={generatingLink}
+                                onGenerateLink={handleGenerateLink}
+                                onViewManufacturer={() => setActiveTab("manufacturer")}
+                              />
+                            ) : (
+                              <CollapsibleTrigger asChild>
+                                <Button variant="ghost" size="sm" className="text-xs gap-1">
+                                  {isOpen ? "Collapse" : "Expand"}
+                                  <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", isOpen && "rotate-180")} />
+                                </Button>
+                              </CollapsibleTrigger>
+                            )}
+                          </div>
                         </div>
-                      </CollapsibleContent>
-                    )}
-                  </Collapsible>
-                </Panel>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+
+                        {stage.id !== "benchmark" && stage.id !== "factory" && (
+                          <CollapsibleContent>
+                            <div className="px-4 pb-4 pt-1 border-t border-border/60">
+                              {stage.id === "formulation" && (
+                                <FormulaBriefTab categoryId={categoryId} categoryName={categoryName} />
+                              )}
+                              {stage.id === "qa" && (
+                                <FormulaQATab categoryId={categoryId} categoryName={categoryName} activeVersionInfo={activeVersionInfo} />
+                              )}
+                              {stage.id === "compliance" && (
+                                <>
+                                  <p className="text-xs text-muted-foreground mb-3">Benchmark + compliance reports — covers both the Competitive Benchmark (P11) and FDA/DSHEA Compliance (P12) stages.</p>
+                                  <FormulaValidationTab categoryId={categoryId} categoryName={categoryName} activeVersionInfo={activeVersionInfo} />
+                                </>
+                              )}
+                            </div>
+                          </CollapsibleContent>
+                        )}
+                      </Collapsible>
+                    </Panel>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
     </div>
   );
 }

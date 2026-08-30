@@ -52,7 +52,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
 const CHAT_MODEL = "anthropic/claude-sonnet-5";
-const REVISION_MODEL = "anthropic/claude-sonnet-5";
+const REVISION_MODEL = "anthropic/claude-opus-5";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -92,6 +92,7 @@ async function callClaudeOnce(
   messages: Array<{ role: string; content: unknown }>,
   maxTokens: number,
   model: string,
+  reasoning: boolean = false,
 ): Promise<{ content: string; finishReason: string | null }> {
   const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
@@ -103,7 +104,7 @@ async function callClaudeOnce(
     body: JSON.stringify({
       model,
       max_tokens: maxTokens,
-      reasoning: { enabled: false },
+      reasoning: { enabled: reasoning },
       messages,
     }),
   });
@@ -119,8 +120,9 @@ async function callClaude(
   messages: Array<{ role: string; content: unknown }>,
   maxTokens = 64000,
   model = CHAT_MODEL,
+  reasoning = false,
 ): Promise<string> {
-  let { content, finishReason } = await callClaudeOnce(messages, maxTokens, model);
+  let { content, finishReason } = await callClaudeOnce(messages, maxTokens, model, reasoning);
   let segments = 0;
   while (finishReason === "length" && content.length > 500 && segments < 2) {
     segments++;
@@ -132,6 +134,7 @@ async function callClaude(
       ],
       maxTokens,
       model,
+      reasoning,
     );
     if (!next.content) break;
     content += next.content;
@@ -372,22 +375,37 @@ async function insertMessage(
 
 async function handleMessage(
   supabase: ReturnType<typeof createClient>,
-  body: { category_id: string; message: string; history_limit?: number; session_token?: string },
+  body: {
+    category_id: string;
+    message: string;
+    history_limit?: number;
+    session_token?: string;
+    // Manufacturer uploads: images (label photos) and PDFs (spec sheets,
+    // COAs) as data URLs — forwarded to the model as multimodal parts.
+    attachments?: Array<{ kind: "image" | "pdf"; filename?: string; data_url: string }>;
+  },
 ): Promise<ChatMessageRow[]> {
   const { category_id, message } = body;
   const historyLimit = body.history_limit || 30;
   const sessionToken = body.session_token || "internal";
+  const attachments = (body.attachments || []).filter((a) =>
+    a?.data_url?.startsWith("data:") && a.data_url.length < 15_000_000
+  ).slice(0, 5);
 
   if (!category_id || !message?.trim()) {
     throw new Error("category_id and message are required");
   }
 
-  // 1. Store the incoming user message immediately.
+  // 1. Store the incoming user message immediately (attachment names noted
+  // in the stored text — the binary itself is not persisted).
+  const attachNote = attachments.length
+    ? `\n[attached: ${attachments.map((a) => a.filename || a.kind).join(", ")}]`
+    : "";
   const userMessage = await insertMessage(supabase, {
     category_id,
     session_token: sessionToken,
     role: "user",
-    content: message.trim(),
+    content: message.trim() + attachNote,
   });
 
   // 2. Load recent history (including the message we just inserted).
@@ -406,14 +424,36 @@ async function handleMessage(
 
   // 4. Build the conversation for the model.
   const systemPrompt = buildSystemPrompt(corpus.keyword, corpus.text);
-  const conversation = history.map((m) => ({
+  const conversation: Array<{ role: string; content: unknown }> = history.map((m) => ({
     role: m.role === "agent" ? "assistant" : "user",
     content: m.role === "user" ? m.content : m.role === "manufacturer" ? `[Manufacturer] ${m.content}` : m.content,
   }));
 
+  // Current turn goes multimodal when attachments are present: images as
+  // image_url parts, PDFs as OpenRouter file parts (Claude-native PDF).
+  if (attachments.length && conversation.length) {
+    const last = conversation[conversation.length - 1];
+    last.content = [
+      { type: "text", text: String(last.content || "") },
+      ...attachments.map((a) =>
+        a.kind === "pdf"
+          ? { type: "file", file: { filename: a.filename || "document.pdf", file_data: a.data_url } }
+          : { type: "image_url", image_url: { url: a.data_url } }
+      ),
+    ];
+  }
+
+  // Anthropic prompt caching via OpenRouter: the corpus is a large, stable
+  // system prompt resent every turn — a cache_control breakpoint makes every
+  // message after the first ~90% cheaper on input.
+  const cachedSystem = {
+    role: "system",
+    content: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
+  };
+
   const reply = await callClaude(
-    [{ role: "system", content: systemPrompt }, ...conversation],
-    4000,
+    [cachedSystem, ...conversation],
+    64000,
     CHAT_MODEL,
   );
 
@@ -514,12 +554,45 @@ async function handleDecide(
   }
 
   // Second model call — apply the approved card to the canonical formula.
+  // Opus 5 with thinking enabled: the one call where deep reasoning earns
+  // its latency. Full 64k budget + continuation (no truncation policy).
   const revisionPrompt = buildRevisionPrompt(keyword, currentFormula, complianceTemplate, row.change_card);
-  const revisedFormula = await callClaude(
+  let revisedFormula = await callClaude(
     [{ role: "user", content: revisionPrompt }],
-    16000,
+    64000,
     REVISION_MODEL,
+    true,
   );
+
+  // VERIFY before anything is saved (user directive: verify changes before
+  // making changes). A Sonnet 5 checker confirms the revision applied
+  // EXACTLY the approved card — nothing more, nothing less, structure
+  // intact. One corrective regeneration on FAIL; if still failing, the
+  // version is NOT created and the card stays 'approved' (not 'applied').
+  const buildVerifyPrompt = (doc: string) =>
+    `You are a strict formula-revision auditor. Compare the APPROVED CHANGE CARD against the REVISED DOCUMENT.\n\n## APPROVED CHANGE CARD\n${JSON.stringify(row.change_card, null, 2)}\n\n## ORIGINAL DOCUMENT\n${currentFormula}\n\n## REVISED DOCUMENT\n${doc}\n\nAnswer with EXACTLY one line first: PASS or FAIL. Then bullet points: (a) was every change in the card applied precisely? (b) was ANYTHING else changed that the card did not authorize (doses, ingredients, claims, structure)? (c) is the document structure/sections intact? FAIL if any unauthorized change or missed change exists.`;
+  let verification = await callClaude([{ role: "user", content: buildVerifyPrompt(revisedFormula) }], 8000, CHAT_MODEL);
+  if (!/^\s*PASS/i.test(verification)) {
+    const fix = await callClaude(
+      [{ role: "user", content: `${revisionPrompt}\n\n## PREVIOUS ATTEMPT (REJECTED BY AUDIT)\n${revisedFormula}\n\n## AUDIT FINDINGS TO FIX\n${verification}\n\nRegenerate the complete revised document applying EXACTLY the approved card and fixing every audit finding.` }],
+      64000,
+      REVISION_MODEL,
+      true,
+    );
+    if (fix) {
+      revisedFormula = fix;
+      verification = await callClaude([{ role: "user", content: buildVerifyPrompt(fix) }], 8000, CHAT_MODEL);
+    }
+  }
+  if (!/^\s*PASS/i.test(verification)) {
+    const failMsg = await insertMessage(supabase, {
+      category_id,
+      session_token: "agent",
+      role: "agent",
+      content: `I generated the revision but it did NOT pass the change-audit, so no new version was created. Audit findings:\n\n${verification.slice(0, 1500)}\n\nThe card remains approved — ask me to retry, or refine the request.`,
+    });
+    return [failMsg];
+  }
 
   // Create the new formula_brief_versions row — SAME mechanism/shape as
   // process-manufacturer-feedback: deactivate all, insert new active version.

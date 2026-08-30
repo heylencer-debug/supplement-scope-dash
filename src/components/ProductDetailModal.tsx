@@ -632,7 +632,15 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
               </DocSection>
 
               <DocSection title="Historical BSR & Sales">
-                <HistoricalBSRSalesChart historicalData={product.historical_data as any} bare />
+                {(() => {
+                  const histData = product.historical_data as { monthly_bsr_history?: Record<string, number | null>; monthly_sales_history?: Record<string, number | null> } | null;
+                  const hasHistorical = !!histData && (
+                    Object.values(histData.monthly_bsr_history ?? {}).some((v) => v != null) ||
+                    Object.values(histData.monthly_sales_history ?? {}).some((v) => v != null)
+                  );
+                  if (!hasHistorical) return <EmptyLine>No historical BSR/sales data available.</EmptyLine>;
+                  return <HistoricalBSRSalesChart historicalData={histData} bare />;
+                })()}
               </DocSection>
 
               <DocSection icon={DollarSign} title="Price Metrics">

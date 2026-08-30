@@ -34,10 +34,11 @@ export function useSubmitScoutJob() {
       // DOUBLE-SUBMIT / DUPLICATE GUARD: refuse when any session of this
       // keyword is already queued or running (two rapid Enters used to
       // create two identical jobs).
-      const { data: inflight } = await scoutJobsTable()
+      const { data: inflight, error: inflightErr } = await scoutJobsTable()
         .select("id, keyword, status")
         .in("status", ["queued", "claimed", "running"])
         .ilike("keyword", `${base}%`);
+      if (inflightErr) throw new Error("Could not verify queue state — try again in a moment.");
       const inflightHit = (inflight || []).find(
         (j: { keyword: string }) => j.keyword.toLowerCase().replace(/\s*#\d+\s*$/, "") === base
       );
@@ -85,7 +86,7 @@ export function useSubmitScoutJob() {
       let triggerError: string | null = null;
       try {
         const { error: invokeError } = await supabase.functions.invoke("trigger-scout-job", {
-          body: { job_id: (job as ScoutJobRow).id, keyword },
+          body: { scout_job_id: (job as ScoutJobRow).id },
         });
         if (invokeError) {
           triggerOk = false;

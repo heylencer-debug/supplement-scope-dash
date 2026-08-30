@@ -229,6 +229,15 @@ async function clearPhaseData(phaseNum, categoryId) {
           }
         }
         break;
+      case 13: // final sign-off
+        {
+          const { data: prods } = await DASH.from('formula_briefs').select('id, ingredients').eq('category_id', categoryId).single();
+          if (prods?.ingredients?.final_signoff) {
+            const { final_signoff, ...rest } = prods.ingredients;
+            await DASH.from('formula_briefs').update({ ingredients: Object.keys(rest).length ? rest : null }).eq('id', prods.id);
+          }
+        }
+        break;
     }
     console.log(`  ✅ P${phaseNum} data cleared`);
   } catch (e) {
@@ -459,6 +468,13 @@ async function checkPhaseStatus(phaseNum, categoryId) {
       const hasCompliance = !!fc && isRealModelText(fc.opus_analysis) && isRealModelText(fc.sonnet_validation);
       return { done: hasCompliance, count: hasCompliance ? 1 : 0, total: 1, msg: hasCompliance ? `FDA compliance exists (score: ${fc.compliance_score}/100)` : 'FDA compliance not run yet, or analysis/validation empty' };
     }
+    case 13: {
+      // P13 = Final Sign-off (phase12-final-signoff.js)
+      const { data: fb } = await DASH.from('formula_briefs').select('ingredients').eq('category_id', categoryId).single();
+      const fs13 = fb?.ingredients?.final_signoff;
+      const hasSignoff = !!fs13 && isRealModelText(fs13.opus_review);
+      return { done: hasSignoff, count: hasSignoff ? 1 : 0, total: 1, msg: hasSignoff ? `Final sign-off exists (${fs13.verdict})` : 'Final sign-off not run yet' };
+    }
     default: return { done: false, count: 0, total: 0 };
   }
 }
@@ -545,6 +561,10 @@ const PHASES = [
   {
     num: 12, name: 'FDA Compliance', description: 'FDA/DSHEA compliance with live NIH ODS data — Claude Opus 5 primary, Sonnet 5 cross-checks',
     run: async () => runScript('phase11-fda-compliance.js', ['--keyword', KEYWORD, ...(FORCE ? ['--force'] : [])])
+  },
+  {
+    num: 13, name: 'Final Sign-off', description: 'Opus 5 chief-formulator sign-off — applies compliance corrections, issues final verdict',
+    run: async () => runScript('phase12-final-signoff.js', ['--keyword', KEYWORD, ...(FORCE ? ['--force'] : [])])
   },
 ];
 
@@ -661,8 +681,11 @@ async function runFinalVerifier(categoryId) {
   if (!p10) failures.push('P10 qa_report missing');
   if (!p11) failures.push('P11 competitive_benchmarking missing');
   if (!p12) failures.push('P12 fda_compliance missing');
+  const fs13 = fb?.ingredients?.final_signoff;
+  const p13 = !!fs13 && isRealModelText(fs13.opus_review);
+  if (!p13) failures.push('P13 final_signoff missing');
 
-  return { pass: failures.length === 0, failures, metrics: { total, runTotal, runAsinsCount: runAsins.length, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, top20P3, top20P4 } };
+  return { pass: failures.length === 0, failures, metrics: { total, runTotal, runAsinsCount: runAsins.length, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, top20P3, top20P4 } };
 }
 
 async function run() {

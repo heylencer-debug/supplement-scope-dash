@@ -1462,6 +1462,7 @@ async function saveToDB(categoryId, grokBrief, claudeBrief, marketData, position
   // market_intelligence — and when P11/P12 DO rerun, they overwrite anyway.
   const preservedBenchmarking = existingFB?.ingredients?.competitive_benchmarking || null;
   const preservedFda = existingFB?.ingredients?.fda_compliance || null;
+  const preservedSignoff = existingFB?.ingredients?.final_signoff || null;
 
   // Delete existing brief for this category
   await DASH.from('formula_briefs').delete().eq('category_id', categoryId);
@@ -1563,6 +1564,7 @@ async function saveToDB(categoryId, grokBrief, claudeBrief, marketData, position
       market_intelligence: preservedMarketIntel, // Preserved from pre-delete
       competitive_benchmarking: preservedBenchmarking, // Preserved — P11 overwrites when it reruns
       fda_compliance: preservedFda, // Preserved — P12 overwrites when it reruns
+      final_signoff: preservedSignoff, // Preserved — P13 overwrites when it reruns
       data_sources: {
         top5_used: marketData.category_summary.top_performers.length,
         new_winners_used: marketData.formula_references.length,

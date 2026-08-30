@@ -4,18 +4,16 @@ import { MarkdownDoc } from "@/lib/markdownDoc";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Panel } from "@/components/ui/panel";
 import { Progress } from "@/components/ui/progress";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Star, TrendingUp, TrendingDown, AlertCircle, CheckCircle, Target, Users, Beaker,
   Lightbulb, ShoppingCart, Package, Image, BarChart3, DollarSign, Calendar,
   ExternalLink, Play, Award, Info, ChevronDown, Truck, FileText, Box, Link2, Tag,
-  Palette, Type, LayoutGrid, Sparkles, RefreshCw, Loader2, MessageSquare, Copy,
+  LayoutGrid, RefreshCw, Loader2, MessageSquare, Copy,
 } from "lucide-react";
 import { useSupplementFactsAnalysis } from "@/hooks/useSupplementFactsAnalysis";
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis } from "recharts";
+import { Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis } from "recharts";
 import HistoricalBSRSalesChart from "@/components/product/HistoricalBSRSalesChart";
 import type { Product } from "@/hooks/useProducts";
 import { useP5SourcesForProduct } from "@/hooks/useP5Sources";
@@ -94,6 +92,36 @@ function StatChipRow({ children }: { children: React.ReactNode }) {
 /** Single honest line for an empty section — never empty chrome. */
 function EmptyLine({ children }: { children: React.ReactNode }) {
   return <p className="text-sm text-muted-foreground/80 py-1">{children}</p>;
+}
+
+/** Shared supplement-facts table — document-prose treatment, reused by both
+ * the OCR Formula tab and the legacy Formula tab so they render identically
+ * rather than duplicating two different table markups. */
+function SupplementFactsTable({ nutrients, guaranteedAnalysis, footnote }: { nutrients: Nutrient[]; guaranteedAnalysis?: boolean; footnote?: string }) {
+  return (
+    <div className="document-prose">
+      {guaranteedAnalysis && (
+        <p className="text-xs text-muted-foreground -mt-1 mb-2 not-italic">Pet supplements use Guaranteed Analysis instead of % Daily Value.</p>
+      )}
+      <div className="document-table-wrap">
+        <table>
+          <thead>
+            <tr><th>Nutrient</th><th className="text-right">Amount</th>{!guaranteedAnalysis && <th className="text-right">% DV</th>}</tr>
+          </thead>
+          <tbody>
+            {nutrients.map((n, idx) => (
+              <tr key={idx}>
+                <td>{n.name}</td>
+                <td className="text-right">{n.amount != null && n.amount !== '' ? `${n.amount}${n.unit ? ` ${n.unit}` : ""}` : "–"}</td>
+                {!guaranteedAnalysis && <td className="text-right">{n.daily_value_percent != null ? `${n.daily_value_percent}%` : "–"}</td>}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {footnote && <p className="text-[11px] text-muted-foreground/70 mt-2 not-italic">{footnote}</p>}
+    </div>
+  );
 }
 
 /** Thin sentiment bar — replaces the pie chart for the common 3-bucket case. */
@@ -1195,244 +1223,179 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
             </div>
           </TabsContent>
 
-          {/* Formula Tab */}
+          {/* Formula Tab (legacy — pre-OCR-pipeline label/spec fields not
+              surfaced on the "OCR Formula" tab: raw ingredients text,
+              allergens, warnings, directions, product specifications,
+              and important-information sections. Where it overlaps with
+              OCR Formula (the supplement facts panel), it reuses the same
+              SupplementFactsTable component rather than a second markup.) */}
           <TabsContent value="formula" className={`mt-4 ${scrollableContentClass} ${maxContentHeight}`}>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Panel><CardContent className="pt-4 pb-4 text-center"><p className="text-2xl font-bold text-foreground">{product.servings_per_container ?? "-"}</p><p className="text-xs text-muted-foreground">Servings</p></CardContent></Panel>
-                <Panel><CardContent className="pt-4 pb-4 text-center"><p className="text-2xl font-bold text-foreground">{product.calories_per_serving ?? "-"}</p><p className="text-xs text-muted-foreground">Calories/Serving</p></CardContent></Panel>
-                <Panel><CardContent className="pt-4 pb-4 text-center"><p className="text-2xl font-bold text-foreground">{product.nutrients_count ?? "-"}</p><p className="text-xs text-muted-foreground">Nutrients</p></CardContent></Panel>
-                <Panel><CardContent className="pt-4 pb-4 text-center"><p className="text-2xl font-bold text-foreground">{product.has_proprietary_blends ? "Yes" : "No"}</p><p className="text-xs text-muted-foreground">Proprietary Blends</p></CardContent></Panel>
-              </div>
-              
-              {/* OCR Metadata */}
-              {product.ocr_extracted && (
-                <Panel className="border-primary/30 bg-primary/5">
-                  <CardContent className="pt-3 pb-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle className="w-4 h-4 text-green-500" />
-                        <span className="text-sm font-medium">Label Data Extracted via OCR</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        {product.ocr_confidence && (
-                          <Badge variant={product.ocr_confidence === "high" ? "default" : product.ocr_confidence === "medium" ? "secondary" : "outline"}>
-                            {product.ocr_confidence} confidence
-                          </Badge>
-                        )}
-                      </div>
+            <div>
+              <DocSection
+                first
+                title="Formula Overview"
+                action={
+                  <Button size="sm" variant="outline" onClick={handleReanalyze} disabled={isAnalyzing} className="h-7 text-xs gap-1.5">
+                    {isAnalyzing ? <><Loader2 className="w-3 h-3 animate-spin" />Analyzing...</> : <><RefreshCw className="w-3 h-3" />Re-analyze</>}
+                  </Button>
+                }
+              >
+                <StatChipRow>
+                  <StatChip label="Servings" value={product.servings_per_container ?? "-"} />
+                  <StatChip label="Calories/Serving" value={product.calories_per_serving ?? "-"} />
+                  <StatChip label="Nutrients" value={product.nutrients_count ?? "-"} />
+                  <StatChip label="Proprietary Blends" value={product.has_proprietary_blends ? "Yes" : "No"} />
+                </StatChipRow>
+                <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm">
+                  {product.ocr_extracted && (
+                    <span className="flex items-center gap-1.5 text-muted-foreground">
+                      <CheckCircle className="w-3.5 h-3.5 text-chart-4" />
+                      Label data extracted via OCR
+                      {product.ocr_confidence && <Badge variant="outline" className="text-[10px] capitalize ml-1">{product.ocr_confidence} confidence</Badge>}
+                    </span>
+                  )}
+                  {needsReanalysis && (
+                    <span className="flex items-center gap-1.5 text-chart-2">
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      Some ingredient amounts may be missing due to incomplete label extraction.
+                    </span>
+                  )}
+                </div>
+                {product.extraction_notes && <p className="text-xs text-muted-foreground mt-1.5">{product.extraction_notes}</p>}
+              </DocSection>
+
+              {(product.serving_size || (allNutrients && allNutrients.length > 0)) && (
+                <DocSection title="Supplement Facts">
+                  {product.serving_size && (
+                    <KVGrid>
+                      <KV label="Serving Size" value={product.serving_size} />
+                    </KVGrid>
+                  )}
+                  {allNutrients && allNutrients.length > 0 && (
+                    <div className={product.serving_size ? "mt-4" : ""}>
+                      <SupplementFactsTable nutrients={allNutrients} guaranteedAnalysis={supplementFacts?.panel_type === 'guaranteed_analysis'} />
                     </div>
-                    {product.extraction_notes && (
-                      <p className="text-xs text-muted-foreground mt-2">{product.extraction_notes}</p>
-                    )}
-                  </CardContent>
-                </Panel>
+                  )}
+                </DocSection>
               )}
 
-              {product.serving_size && <Panel><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Serving Size</CardTitle></CardHeader><CardContent><p className="text-sm">{product.serving_size}</p></CardContent></Panel>}
-              {/* OCR Analysis Card - always show re-analyze button */}
-              <Panel className={needsReanalysis ? "border-yellow-500/30 bg-yellow-500/10" : ""}>
-                <CardContent className="pt-3 pb-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      {needsReanalysis ? (
-                        <>
-                          <AlertCircle className="w-4 h-4 text-yellow-600" />
-                          <span className="text-sm text-yellow-700">
-                            Some ingredient amounts may be missing due to incomplete label extraction.
-                          </span>
-                        </>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">
-                          OCR Confidence: <span className="font-medium text-foreground capitalize">{product.ocr_confidence || 'Unknown'}</span>
-                        </span>
-                      )}
-                    </div>
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      onClick={handleReanalyze}
-                      disabled={isAnalyzing}
-                      className={needsReanalysis ? "border-yellow-500/50 hover:bg-yellow-500/20" : ""}
-                    >
-                      {isAnalyzing ? (
-                        <>
-                          <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                          Analyzing...
-                        </>
-                      ) : (
-                        <>
-                          <RefreshCw className="w-3 h-3 mr-1" />
-                          Re-analyze
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Panel>
-
-              {allNutrients && allNutrients.length > 0 && (() => {
-                const isGuaranteedAnalysis = supplementFacts?.panel_type === 'guaranteed_analysis';
-                return (
-                  <Panel>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">
-                        {isGuaranteedAnalysis ? 'Guaranteed Analysis' : 'Supplement Facts'}
-                      </CardTitle>
-                      {isGuaranteedAnalysis && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Pet supplements use Guaranteed Analysis instead of % Daily Value.
-                        </p>
-                      )}
-                    </CardHeader>
-                    <CardContent>
-                      <div className="border rounded-md overflow-hidden">
-                        <table className="w-full text-sm">
-                          <thead className="bg-muted">
-                            <tr>
-                              <th className="text-left px-3 py-2 font-medium">Nutrient</th>
-                              <th className="text-right px-3 py-2 font-medium">Amount</th>
-                              {!isGuaranteedAnalysis && (
-                                <th className="text-right px-3 py-2 font-medium">% DV</th>
-                              )}
-                            </tr>
-                          </thead>
-                          <tbody>{allNutrients.map((nutrient, idx) => (
-                            <tr key={idx} className="border-t border-border">
-                              <td className="px-3 py-2">{nutrient.name}</td>
-                              <td className="text-right px-3 py-2 text-muted-foreground">
-                                {nutrient.amount != null && nutrient.amount !== '' 
-                                  ? `${nutrient.amount}${nutrient.unit ?? ''}` 
-                                  : (nutrient.unit ? `(${nutrient.unit})` : '—')
-                                }
-                              </td>
-                              {!isGuaranteedAnalysis && (
-                                <td className="text-right px-3 py-2 text-muted-foreground">
-                                  {nutrient.daily_value_percent != null ? `${nutrient.daily_value_percent}%` : "—"}
-                                </td>
-                              )}
-                            </tr>
-                          ))}</tbody>
-                        </table>
-                      </div>
-                    </CardContent>
-                  </Panel>
-                );
-              })()}
               {proprietaryBlends && proprietaryBlends.length > 0 && (
-                <Panel>
-                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><AlertCircle className="w-4 h-4 text-yellow-500" />Proprietary Blends</CardTitle></CardHeader>
-                  <CardContent className="space-y-4">
+                <DocSection icon={AlertCircle} title="Proprietary Blends">
+                  <div className="space-y-3">
                     {proprietaryBlends.map((blend, idx) => (
-                      <div key={idx} className="border-b border-border pb-3 last:border-0 last:pb-0">
-                        <div className="flex justify-between items-center mb-2"><span className="font-medium text-sm">{blend.name}</span>{blend.total_amount && <Badge variant="outline">{blend.total_amount}</Badge>}</div>
+                      <div key={idx} className="border-b border-border/40 pb-3 last:border-0 last:pb-0">
+                        <div className="flex justify-between items-center gap-3 mb-1"><span className="text-sm font-medium text-foreground">{blend.name}</span>{blend.total_amount && <Badge variant="outline">{blend.total_amount}</Badge>}</div>
                         {blend.ingredients && blend.ingredients.length > 0 && <p className="text-xs text-muted-foreground">{blend.ingredients.join(", ")}</p>}
                       </div>
                     ))}
-                  </CardContent>
-                </Panel>
+                  </div>
+                </DocSection>
               )}
-              {product.ingredients && <Panel><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Ingredients</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground whitespace-pre-wrap">{product.ingredients}</p></CardContent></Panel>}
-              {product.other_ingredients && <Panel><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Other Ingredients</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">{product.other_ingredients}</p></CardContent></Panel>}
-              {product.allergen_info && <Panel><CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><AlertCircle className="w-4 h-4 text-yellow-500" />Allergen Information</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">{product.allergen_info}</p></CardContent></Panel>}
-              {product.warnings && <Panel><CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><AlertCircle className="w-4 h-4 text-destructive" />Warnings</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">{product.warnings}</p></CardContent></Panel>}
-              {product.directions && <Panel><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Directions</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">{product.directions}</p></CardContent></Panel>}
-              {/* Supplement Facts Complete - Enhanced Display */}
+
+              {(product.ingredients || product.other_ingredients) && (
+                <DocSection title="Label Ingredients">
+                  <div className="space-y-3.5">
+                    {product.ingredients && (
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Ingredients</p>
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">{product.ingredients}</p>
+                      </div>
+                    )}
+                    {product.other_ingredients && (
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Other Ingredients</p>
+                        <p className="text-sm text-muted-foreground leading-relaxed">{product.other_ingredients}</p>
+                      </div>
+                    )}
+                  </div>
+                </DocSection>
+              )}
+
+              {(product.allergen_info || product.warnings || product.directions) && (
+                <DocSection icon={AlertCircle} title="Warnings & Directions">
+                  <div className="space-y-3.5">
+                    {product.allergen_info && (
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Allergen Information</p>
+                        <p className="text-sm text-muted-foreground leading-relaxed">{product.allergen_info}</p>
+                      </div>
+                    )}
+                    {product.warnings && (
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Warnings</p>
+                        <p className="text-sm text-destructive/90 leading-relaxed">{product.warnings}</p>
+                      </div>
+                    )}
+                    {product.directions && (
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Directions</p>
+                        <p className="text-sm text-muted-foreground leading-relaxed">{product.directions}</p>
+                      </div>
+                    )}
+                  </div>
+                </DocSection>
+              )}
+
               {supplementFacts && (
-                <Panel className="border-chart-4/30">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-chart-4" />
-                      Extraction Details
-                      {supplementFacts.panel_type && (
-                        <Badge variant="outline" className="ml-2">{supplementFacts.panel_type}</Badge>
-                      )}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {supplementFacts.extraction_completeness && (
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                        <div>
-                          <p className="text-xs text-muted-foreground">Image Quality</p>
-                          <p className="font-medium capitalize">{supplementFacts.extraction_completeness.image_quality ?? "-"}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Panel Visible</p>
-                          <p className="font-medium">{supplementFacts.extraction_completeness.panel_fully_visible ? "Yes" : "No"}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Nutrients Found</p>
-                          <p className="font-medium">{supplementFacts.extraction_completeness.total_nutrients_found ?? "-"}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Confidence</p>
-                          <Badge variant={supplementFacts.confidence === "high" ? "default" : supplementFacts.confidence === "medium" ? "secondary" : "outline"}>
-                            {supplementFacts.confidence ?? "-"}
-                          </Badge>
-                        </div>
-                      </div>
-                    )}
-                    {supplementFacts.extraction_completeness?.notes && (
-                      <p className="text-xs text-muted-foreground italic">{supplementFacts.extraction_completeness.notes}</p>
-                    )}
-                    {supplementFacts.manufacturer && (
-                      <div>
-                        <p className="text-xs text-muted-foreground">Manufacturer (from label)</p>
-                        <p className="text-sm font-medium">{supplementFacts.manufacturer}</p>
-                      </div>
-                    )}
-                    {supplementFacts.claims_on_label && supplementFacts.claims_on_label.length > 0 && (
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-2">Claims on Label</p>
-                        <div className="flex flex-wrap gap-1">
-                          {supplementFacts.claims_on_label.map((claim, idx) => (
-                            <Badge key={idx} variant="secondary" className="text-xs">{claim}</Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Panel>
-              )}
-              {specificationsArray && specificationsArray.length > 0 && (
-                <Panel>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium flex items-center gap-2">
-                      <Info className="w-4 h-4" />
-                      Specifications ({specificationsArray.length})
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {specificationsArray.map((spec, idx) => (
-                        <div key={idx} className="flex justify-between text-sm border-b border-border pb-2 last:border-0">
-                          <span className="text-muted-foreground">{spec.name}</span>
-                          <span className="font-medium text-right max-w-[60%]">{spec.value}</span>
-                        </div>
-                      ))}
+                <DocSection
+                  icon={FileText}
+                  title="Extraction Details"
+                  action={supplementFacts.panel_type ? <Badge variant="outline" className="text-[10px]">{supplementFacts.panel_type}</Badge> : undefined}
+                >
+                  {supplementFacts.extraction_completeness && (
+                    <StatChipRow>
+                      <StatChip label="Image Quality" value={supplementFacts.extraction_completeness.image_quality ?? "-"} />
+                      <StatChip label="Panel Visible" value={supplementFacts.extraction_completeness.panel_fully_visible ? "Yes" : "No"} />
+                      <StatChip label="Nutrients Found" value={supplementFacts.extraction_completeness.total_nutrients_found ?? "-"} />
+                      <StatChip label="Confidence" value={supplementFacts.confidence ?? "-"} />
+                    </StatChipRow>
+                  )}
+                  {supplementFacts.extraction_completeness?.notes && (
+                    <p className="text-xs text-muted-foreground italic mt-2">{supplementFacts.extraction_completeness.notes}</p>
+                  )}
+                  {supplementFacts.manufacturer && (
+                    <div className="mt-3">
+                      <KVGrid><KV label="Manufacturer (from label)" value={supplementFacts.manufacturer} /></KVGrid>
                     </div>
-                  </CardContent>
-                </Panel>
+                  )}
+                  {supplementFacts.claims_on_label && supplementFacts.claims_on_label.length > 0 && (
+                    <div className="mt-3">
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-2">Claims on Label</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {supplementFacts.claims_on_label.map((claim, idx) => <Badge key={idx} variant="outline" className="text-xs">{claim}</Badge>)}
+                      </div>
+                    </div>
+                  )}
+                </DocSection>
               )}
+
+              {specificationsArray && specificationsArray.length > 0 && (
+                <DocSection icon={Info} title={`Specifications (${specificationsArray.length})`}>
+                  <KVGrid>
+                    {specificationsArray.map((spec, idx) => <KV key={idx} label={spec.name} value={spec.value} />)}
+                  </KVGrid>
+                </DocSection>
+              )}
+
               {importantInfo?.sections && importantInfo.sections.length > 0 && (
-                <Panel>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium flex items-center gap-2">
-                      <AlertCircle className="w-4 h-4 text-yellow-500" />
-                      Important Information
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
+                <DocSection icon={AlertCircle} title="Important Information">
+                  <div className="space-y-3.5">
                     {importantInfo.sections.map((section, idx) => (
                       <div key={idx}>
                         <p className="text-sm font-medium text-foreground mb-1">{section.title}</p>
-                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">{section.body}</p>
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">{section.body}</p>
                       </div>
                     ))}
-                  </CardContent>
-                </Panel>
+                  </div>
+                </DocSection>
               )}
-              {!product.ingredients && !product.serving_size && !allNutrients && <Panel><CardContent className="py-8 text-center text-muted-foreground">No formula data available for this product.</CardContent></Panel>}
+
+              {!product.ingredients && !product.other_ingredients && !product.serving_size && !allNutrients &&
+                !(proprietaryBlends && proprietaryBlends.length > 0) && !product.allergen_info && !product.warnings &&
+                !product.directions && !supplementFacts && !(specificationsArray && specificationsArray.length > 0) &&
+                !(importantInfo?.sections && importantInfo.sections.length > 0) && (
+                  <DocSection><EmptyLine>No formula data available for this product.</EmptyLine></DocSection>
+              )}
             </div>
           </TabsContent>
 
@@ -1512,24 +1475,12 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                 )}
 
                 {allNutrients && allNutrients.length > 0 ? (
-                  <div className="document-prose mt-4">
-                    <div className="document-table-wrap">
-                      <table>
-                        <thead>
-                          <tr><th>Nutrient</th><th className="text-right">Amount</th><th className="text-right">% DV</th></tr>
-                        </thead>
-                        <tbody>
-                          {allNutrients.map((n, idx) => (
-                            <tr key={idx}>
-                              <td>{n.name}</td>
-                              <td className="text-right">{n.amount != null ? `${n.amount}${n.unit ? ` ${n.unit}` : ""}` : "–"}</td>
-                              <td className="text-right">{n.daily_value_percent != null ? `${n.daily_value_percent}%` : "–"}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                    <p className="text-[11px] text-muted-foreground/70 mt-2 not-italic">Extracted from label imagery via OCR{product.ocr_confidence ? ` · ${product.ocr_confidence} confidence` : ""}.</p>
+                  <div className="mt-4">
+                    <SupplementFactsTable
+                      nutrients={allNutrients}
+                      guaranteedAnalysis={supplementFacts?.panel_type === 'guaranteed_analysis'}
+                      footnote={`Extracted from label imagery via OCR${product.ocr_confidence ? ` · ${product.ocr_confidence} confidence` : ""}.`}
+                    />
                   </div>
                 ) : product.supplement_facts_raw ? (
                   <pre className="text-xs bg-muted/50 p-3.5 rounded-lg overflow-x-auto whitespace-pre-wrap leading-relaxed mt-4 text-foreground/90">{product.supplement_facts_raw}</pre>

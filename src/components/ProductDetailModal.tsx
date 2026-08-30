@@ -1668,66 +1668,32 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
 
           {/* Keepa Tab */}
           <TabsContent value="keepa" className={`mt-4 ${scrollableContentClass} ${maxContentHeight}`}>
-            <div className="space-y-4">
-              {/* BSR Stats */}
-              <div className="grid grid-cols-3 gap-3">
-                <Panel><CardContent className="pt-4 pb-4 text-center">
-                  <p className="text-xl font-bold">{product.bsr_current ? `#${product.bsr_current.toLocaleString()}` : "-"}</p>
-                  <p className="text-xs text-muted-foreground">Current BSR</p>
-                </CardContent></Panel>
-                <Panel><CardContent className="pt-4 pb-4 text-center">
-                  <p className="text-xl font-bold">{product.bsr_30_days_avg ? `#${Math.round(product.bsr_30_days_avg).toLocaleString()}` : "-"}</p>
-                  <p className="text-xs text-muted-foreground">30-Day Avg BSR</p>
-                </CardContent></Panel>
-                <Panel><CardContent className="pt-4 pb-4 text-center">
-                  <p className="text-xl font-bold">{product.bsr_90_days_avg ? `#${Math.round(product.bsr_90_days_avg).toLocaleString()}` : "-"}</p>
-                  <p className="text-xs text-muted-foreground">90-Day Avg BSR</p>
-                </CardContent></Panel>
-              </div>
+            <div>
+              <DocSection first icon={BarChart3} title="Amazon Ranking & Sales">
+                <StatChipRow>
+                  <StatChip label="Current BSR" value={product.bsr_current ? `#${product.bsr_current.toLocaleString()}` : "-"} />
+                  <StatChip label="30-Day Avg BSR" value={product.bsr_30_days_avg ? `#${Math.round(product.bsr_30_days_avg).toLocaleString()}` : "-"} />
+                  <StatChip label="90-Day Avg BSR" value={product.bsr_90_days_avg ? `#${Math.round(product.bsr_90_days_avg).toLocaleString()}` : "-"} />
+                  <StatChip label="Monthly Sales" value={product.monthly_sales ? product.monthly_sales.toLocaleString() : "-"} />
+                  <StatChip label="Monthly Revenue" value={product.monthly_revenue ? `$${Math.round(product.monthly_revenue).toLocaleString()}` : "-"} tone="up" />
+                </StatChipRow>
+                <KVGrid>
+                  <KV label="Listing Since" value={formatDate(product.listing_since)} />
+                  <KV label="Parent ASIN" value={product.parent_asin ?? "-"} mono />
+                </KVGrid>
+              </DocSection>
 
-              {/* Sales Stats */}
-              <div className="grid grid-cols-2 gap-3">
-                <Panel><CardContent className="pt-4 pb-4 text-center">
-                  <p className="text-xl font-bold">{product.monthly_sales ? product.monthly_sales.toLocaleString() : "-"}</p>
-                  <p className="text-xs text-muted-foreground">Monthly Sales</p>
-                </CardContent></Panel>
-                <Panel><CardContent className="pt-4 pb-4 text-center">
-                  <p className="text-xl font-bold">{product.monthly_revenue ? `$${Math.round(product.monthly_revenue).toLocaleString()}` : "-"}</p>
-                  <p className="text-xs text-muted-foreground">Monthly Revenue</p>
-                </CardContent></Panel>
-              </div>
-
-              {/* Listing info */}
-              <Panel>
-                <CardContent className="pt-4 space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Listing Since</span>
-                    <span className="font-medium">{formatDate(product.listing_since)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Parent ASIN</span>
-                    <span className="font-mono text-xs">{product.parent_asin ?? "-"}</span>
-                  </div>
-                </CardContent>
-              </Panel>
-
-              {/* Historical BSR Chart */}
-              {(() => {
-                const histData = product.historical_data as { bsr_history?: unknown[] } | null;
-                if (histData?.bsr_history && histData.bsr_history.length > 0) {
-                  return (
-                    <Panel>
-                      <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">BSR / Sales History</CardTitle></CardHeader>
-                      <CardContent>
-                        <HistoricalBSRSalesChart historicalData={product.historical_data as { monthly_bsr_history?: Record<string, number | null>; monthly_sales_history?: Record<string, number | null> } | null} />
-                      </CardContent>
-                    </Panel>
+              <DocSection title="BSR / Sales History">
+                {(() => {
+                  const histData = product.historical_data as { monthly_bsr_history?: Record<string, number | null>; monthly_sales_history?: Record<string, number | null> } | null;
+                  const hasHistorical = !!histData && (
+                    Object.values(histData.monthly_bsr_history ?? {}).some((v) => v != null) ||
+                    Object.values(histData.monthly_sales_history ?? {}).some((v) => v != null)
                   );
-                }
-                return (
-                  <Panel><CardContent className="py-6 text-center text-sm text-muted-foreground">No historical BSR data available.</CardContent></Panel>
-                );
-              })()}
+                  if (!hasHistorical) return <EmptyLine>No historical BSR data available.</EmptyLine>;
+                  return <HistoricalBSRSalesChart historicalData={histData} bare />;
+                })()}
+              </DocSection>
             </div>
           </TabsContent>
 

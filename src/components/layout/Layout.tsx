@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { useState, useEffect, useRef, useCallback, TouchEvent } from "react";
 import { useCategoryAnalyses } from "@/hooks/useCategoryAnalyses";
 import { useActiveScoutJobs } from "@/hooks/useScoutJobs";
+import { FormulatorAgent } from "@/components/formulator/FormulatorAgent";
 
 const DISMISSED_TABS_KEY = "dismissed_analysis_tabs";
 const PENDING_ANALYSES_KEY = "pending_analyses";
@@ -320,6 +321,7 @@ export function Layout({ children }: LayoutProps) {
           </div>
         </div>
       </main>
+      <FormulatorAgent />
     </div>
   );
 }

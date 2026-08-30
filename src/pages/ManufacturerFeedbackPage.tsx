@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { useEffect } from "react";
 import { Factory } from "lucide-react";
 import { ManufacturerFeedback } from "@/components/document/ManufacturerFeedback";
+import { ManufacturerChat } from "@/components/manufacturer/ManufacturerChat";
 
 export default function ManufacturerFeedbackPage() {
   const [searchParams] = useSearchParams();
@@ -50,11 +51,14 @@ export default function ManufacturerFeedbackPage() {
           <p className="text-sm text-muted-foreground">{categoryName}</p>
         </div>
       </div>
-      <ManufacturerFeedback
-        categoryId={effectiveCategoryId}
-        keyword={categoryName}
-        defaultExpanded
-      />
+      <div className="space-y-4">
+        <ManufacturerChat categoryId={effectiveCategoryId} keyword={categoryName} />
+        <ManufacturerFeedback
+          categoryId={effectiveCategoryId}
+          keyword={categoryName}
+          defaultExpanded
+        />
+      </div>
     </div>
   );
 }

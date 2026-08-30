@@ -19,6 +19,7 @@ import { FormulaPassport } from "@/components/dashboard/FormulaPassport";
 import { P9BenchmarkOverview } from "@/components/dashboard/P9BenchmarkOverview";
 import { MarketIntelligenceReport } from "@/components/dashboard/MarketIntelligenceReport";
 import { ManufacturerFeedback } from "@/components/document/ManufacturerFeedback";
+import { ManufacturerChat } from "@/components/manufacturer/ManufacturerChat";
 import { DataCompletenessChecklist } from "@/components/dashboard/DataCompletenessChecklist";
 
 import {
@@ -901,11 +902,14 @@ export default function Dashboard() {
             </button>
           </div>
           {category?.id && categoryName ? (
-            <ManufacturerFeedback
-              categoryId={category.id}
-              keyword={categoryName}
-              defaultExpanded
-            />
+            <>
+              <ManufacturerChat categoryId={category.id} keyword={categoryName} />
+              <ManufacturerFeedback
+                categoryId={category.id}
+                keyword={categoryName}
+                defaultExpanded
+              />
+            </>
           ) : (
             <div className="text-center py-12 text-muted-foreground">Select a category to view manufacturer feedback.</div>
           )}

@@ -839,6 +839,126 @@
     height: 100%;
   }
 
+  /* ═══════════════════════════════════════════════════════════════════
+     DOCUMENT MODAL — wide, clinical-light "read the report" surface.
+     Brand lives in a thin iris gradient frame (same recipe as
+     .pearl-gradient-border, scaled to modal radius) + a compact light
+     header band. NEVER a dark interior — this is a formulator tool, the
+     reading surface must stay clinical white/ink. Used by DocumentModal
+     (src/components/ui/document-modal.tsx) and BrandModal's light shell. */
+  .pearl-gradient-border-modal {
+    position: relative;
+    border-radius: var(--radius-xl);
+    padding: 1.5px;
+    background: linear-gradient(
+      135deg,
+      hsl(var(--brand-electric)),
+      var(--brand-iris-purple) 55%,
+      var(--brand-iris-cyan)
+    );
+  }
+  .pearl-gradient-border-modal-inner {
+    border-radius: calc(var(--radius-xl) - 1.5px);
+    background: hsl(var(--card));
+    height: 100%;
+  }
+
+  /* DOCUMENT PROSE — typography system for long-form AI reports (formula
+     briefs, QA reports, benchmarking, FDA compliance, market reports).
+     Applied to the reading column inside DocumentModal (or standalone) —
+     see src/lib/markdownDoc.tsx's MarkdownDoc for the shared renderer that
+     wraps ReactMarkdown output in this class. Only styles BARE tags, so it
+     is safe to apply narrowly around raw markdown/table output without
+     disturbing already-Tailwind-classed dashboard content nearby. */
+  .document-prose {
+    color: hsl(var(--foreground));
+    font-size: 15px;
+    line-height: 1.7;
+  }
+  .document-prose > *:first-child { margin-top: 0 !important; }
+  .document-prose > *:last-child { margin-bottom: 0 !important; }
+  .document-prose h1 {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 0 0 12px;
+    text-wrap: balance;
+  }
+  .document-prose h2 {
+    font-size: 19px;
+    font-weight: 700;
+    margin: 36px 0 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid hsl(var(--border));
+    text-wrap: balance;
+  }
+  .document-prose h3 {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 26px 0 10px;
+    text-wrap: balance;
+  }
+  .document-prose h4 {
+    font-size: 12px;
+    font-weight: 700;
+    margin: 20px 0 8px;
+    color: hsl(var(--muted-foreground));
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .document-prose p { margin: 0 0 16px; color: hsl(var(--foreground) / 0.88); }
+  .document-prose ul, .document-prose ol { margin: 0 0 16px; padding-left: 1.4em; }
+  .document-prose li { margin: 6px 0; line-height: 1.65; }
+  .document-prose li::marker { color: hsl(var(--muted-foreground)); }
+  .document-prose strong { font-weight: 600; color: hsl(var(--foreground)); }
+  .document-prose em { font-style: italic; }
+  .document-prose a { color: hsl(var(--primary)); text-decoration: underline; text-underline-offset: 2px; }
+  .document-prose hr { border: none; border-top: 1px solid hsl(var(--border)); margin: 32px 0; }
+  .document-prose blockquote {
+    margin: 16px 0;
+    padding: 10px 16px;
+    border-left: 3px solid hsl(var(--primary) / 0.5);
+    background: hsl(var(--muted) / 0.4);
+    border-radius: 0 var(--radius-md) var(--radius-md) 0;
+    color: hsl(var(--muted-foreground));
+  }
+  .document-prose code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.85em;
+    background: hsl(var(--muted));
+    color: hsl(var(--primary));
+    padding: 1px 6px;
+    border-radius: 4px;
+  }
+  .document-prose .document-table-wrap {
+    overflow-x: auto;
+    margin: 20px 0;
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-md);
+  }
+  .document-prose table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+  }
+  .document-prose thead { background: hsl(var(--muted) / 0.6); }
+  .document-prose th {
+    text-align: left;
+    font-weight: 600;
+    color: hsl(var(--muted-foreground));
+    padding: 9px 14px;
+    border-bottom: 1px solid hsl(var(--border));
+    white-space: nowrap;
+  }
+  .document-prose td {
+    padding: 8px 14px;
+    border-bottom: 1px solid hsl(var(--border) / 0.6);
+    vertical-align: top;
+  }
+  .document-prose tbody tr:last-child td { border-bottom: none; }
+  .document-prose tbody tr:nth-child(even) { background: hsl(var(--muted) / 0.2); }
+
   /* CHECKLIST ROWS — Data Audit tab, colored status dots */
   .check-item {
     display: flex;

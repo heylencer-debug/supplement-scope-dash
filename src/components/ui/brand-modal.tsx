@@ -4,14 +4,24 @@ import { X as PiX } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /**
- * BRAND MODAL — THE canonical modal for Noodle. New modals should use this,
- * not roll their own Dialog chrome.
+ * BRAND MODAL — THE canonical small/medium modal for Dovive. New confirms,
+ * small forms, and quick-view popups should use this, not roll their own
+ * Dialog chrome. For big long-form documents (formula briefs, QA/benchmark/
+ * FDA reports, product detail) use `DocumentModal` instead — it's the same
+ * family, wide and document-shaped.
  *
- * It is the task-card look as a dialog: the shared `.brand-iris-surface`
- * (core-black orb + iris rim, see brand-card.tsx / index.css) wrapped around
- * the shadcn/Radix Dialog primitive. The orb is re-proportioned to swallow
- * almost the whole box, so the content always sits on eerie black (smoke on
- * black is 15.55:1) and the iris only survives as the rim and a corner bloom.
+ * CLINICAL LIGHT SHELL (2026-08-30): this used to force a `.dark
+ * brand-iris-surface` (core-black orb) interior — inherited from getnoodle,
+ * where BrandModal's black-on-black is the house style. Dovive is a
+ * formulator tool ("we need to be clinical about it" — user), so every
+ * modal interior must read as a clean light document, never dark mode. The
+ * shell now uses the same iris-gradient RIM as DocumentModal
+ * (`.pearl-gradient-border-modal`, src/index.css) — brand survives as a
+ * ~1.5px gradient frame, the interior is plain `bg-card`/ink tokens. No
+ * caller needs to change: every existing consumer already renders its
+ * content with theme tokens (`text-foreground`/`bg-card`/etc, verified via
+ * repo-wide audit), so removing the forced `.dark` scope just makes those
+ * tokens resolve to their light values instead of dark ones.
  *
  * What you get for free:
  * - centered, prop-controlled max-width (`size`: sm 28rem / md 34rem / lg 44rem)
@@ -87,14 +97,11 @@ export const BrandModal = ({
       />
       <DialogPrimitive.Content
         className={cn(
-          // Shell: the brand surface itself. overflow-hidden is load-bearing —
-          // the orb layer is 130% of the box and the rim is ::after at inset 0.
-          // `dark` is deliberate: the iris surface is inherently black, so the
-          // modal forces the dark TOKEN context for its children even when the
-          // app is in light mode — otherwise token-styled content (inputs,
-          // bg-card rows) renders light-on-black and is unreadable.
-          'dark brand-iris-surface fixed left-1/2 top-1/2 z-[1210] -translate-x-1/2 -translate-y-1/2',
-          'flex flex-col overflow-hidden rounded-2xl pointer-events-auto',
+          // Shell: thin iris-gradient rim (same recipe as DocumentModal),
+          // plain light interior — see file header for why this is no
+          // longer a forced-dark `.brand-iris-surface` fill.
+          'pearl-gradient-border-modal fixed left-1/2 top-1/2 z-[1210] -translate-x-1/2 -translate-y-1/2',
+          'pointer-events-auto',
           'w-[calc(100vw-1rem)] max-h-[calc(100dvh-2rem)] sm:w-full sm:max-h-[min(85dvh,52rem)]',
           SIZE_CLASS[size],
           'data-[state=open]:animate-in data-[state=closed]:animate-out',
@@ -103,60 +110,53 @@ export const BrandModal = ({
           'motion-reduce:animate-none',
           className,
         )}
-        style={{
-          // Modal proportions for the shared surface: the black orb covers the
-          // whole content area; iris survives as rim + a faint corner bloom.
-          '--iris-orb-rx': '160%',
-          '--iris-orb-ry': '150%',
-          '--iris-orb-x': '46%',
-          '--iris-orb-y': '44%',
-          '--iris-orb-solid': '62%',
-          boxShadow: 'var(--overlay-shadow)',
-        } as React.CSSProperties}
+        style={{ boxShadow: 'var(--overlay-shadow)' }}
       >
-        {/* Header row — always rendered so the close button always exists. */}
-        <div className="flex items-start gap-3 p-5 pb-4 sm:p-6 sm:pb-4">
-          {icon && (
-            <span
-              className="inline-flex items-center justify-center h-10 w-10 rounded-lg bg-brand-accent/15 text-brand-accent shrink-0"
-              aria-hidden="true"
-            >
-              {icon}
-            </span>
-          )}
-          <div className="flex-1 min-w-0 space-y-1">
-            <DialogPrimitive.Title className="text-lg font-semibold tracking-tight">
-              {title}
-            </DialogPrimitive.Title>
-            {description ? (
-              <DialogPrimitive.Description className="text-sm leading-relaxed opacity-70">
-                {description}
-              </DialogPrimitive.Description>
-            ) : (
-              // Radix warns without a description; keep the tree a11y-clean.
-              <DialogPrimitive.Description className="sr-only">
-                {typeof title === 'string' ? title : 'Dialog'}
-              </DialogPrimitive.Description>
+        <div className="pearl-gradient-border-modal-inner flex flex-col overflow-hidden pointer-events-auto max-h-[inherit]">
+          {/* Header row — always rendered so the close button always exists. */}
+          <div className="flex items-start gap-3 p-5 pb-4 sm:p-6 sm:pb-4">
+            {icon && (
+              <span
+                className="inline-flex items-center justify-center h-10 w-10 rounded-lg bg-primary/10 text-primary shrink-0"
+                aria-hidden="true"
+              >
+                {icon}
+              </span>
             )}
+            <div className="flex-1 min-w-0 space-y-1">
+              <DialogPrimitive.Title className="text-lg font-semibold tracking-tight text-foreground">
+                {title}
+              </DialogPrimitive.Title>
+              {description ? (
+                <DialogPrimitive.Description className="text-sm leading-relaxed text-muted-foreground">
+                  {description}
+                </DialogPrimitive.Description>
+              ) : (
+                // Radix warns without a description; keep the tree a11y-clean.
+                <DialogPrimitive.Description className="sr-only">
+                  {typeof title === 'string' ? title : 'Dialog'}
+                </DialogPrimitive.Description>
+              )}
+            </div>
+            <DialogPrimitive.Close
+              aria-label="Close"
+              className="shrink-0 -mr-2 -mt-1 inline-flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground opacity-70 transition-[opacity,background-color] duration-150 hover:opacity-100 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+            >
+              <PiX className="text-[20px]" aria-hidden="true" />
+            </DialogPrimitive.Close>
           </div>
-          <DialogPrimitive.Close
-            aria-label="Close"
-            className="shrink-0 -mr-2 -mt-1 inline-flex h-11 w-11 items-center justify-center rounded-lg opacity-70 transition-[opacity,background-color] duration-150 hover:opacity-100 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
-          >
-            <PiX className="text-[20px]" aria-hidden="true" />
-          </DialogPrimitive.Close>
-        </div>
 
-        {/* Body — the ONLY thing that scrolls. */}
-        <div className={cn('flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 pb-5 sm:px-6 sm:pb-6', bodyClassName)}>
-          {children}
-        </div>
-
-        {footer && (
-          <div className="flex flex-col-reverse gap-2 border-t border-white/10 p-5 pt-4 sm:flex-row sm:justify-end sm:p-6 sm:pt-4">
-            {footer}
+          {/* Body — the ONLY thing that scrolls. */}
+          <div className={cn('flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 pb-5 sm:px-6 sm:pb-6', bodyClassName)}>
+            {children}
           </div>
-        )}
+
+          {footer && (
+            <div className="flex flex-col-reverse gap-2 border-t border-border p-5 pt-4 sm:flex-row sm:justify-end sm:p-6 sm:pt-4">
+              {footer}
+            </div>
+          )}
+        </div>
       </DialogPrimitive.Content>
     </DialogPrimitive.Portal>
   </DialogPrimitive.Root>

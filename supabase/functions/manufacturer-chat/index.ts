@@ -84,11 +84,15 @@ interface ChatMessageRow {
 
 // ─── OpenRouter call (verbatim gateway/shape from process-manufacturer-feedback) ──
 
-async function callClaude(
+// No-truncation policy (matches the scout pipeline): 64k budget — the model
+// max — and when finish_reason=length with real content, the partial answer
+// becomes assistant context and generation CONTINUES exactly where it
+// stopped (max 2 extra segments). Never a blind retry, nothing discarded.
+async function callClaudeOnce(
   messages: Array<{ role: string; content: unknown }>,
-  maxTokens = 4000,
-  model = CHAT_MODEL,
-): Promise<string> {
+  maxTokens: number,
+  model: string,
+): Promise<{ content: string; finishReason: string | null }> {
   const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -99,12 +103,41 @@ async function callClaude(
     body: JSON.stringify({
       model,
       max_tokens: maxTokens,
+      reasoning: { enabled: false },
       messages,
     }),
   });
   const j = await res.json();
   if (j.error) throw new Error(`Claude error: ${j.error.message || JSON.stringify(j.error)}`);
-  return j.choices?.[0]?.message?.content || "";
+  return {
+    content: j.choices?.[0]?.message?.content || "",
+    finishReason: j.choices?.[0]?.finish_reason || null,
+  };
+}
+
+async function callClaude(
+  messages: Array<{ role: string; content: unknown }>,
+  maxTokens = 64000,
+  model = CHAT_MODEL,
+): Promise<string> {
+  let { content, finishReason } = await callClaudeOnce(messages, maxTokens, model);
+  let segments = 0;
+  while (finishReason === "length" && content.length > 500 && segments < 2) {
+    segments++;
+    const next = await callClaudeOnce(
+      [
+        ...messages,
+        { role: "assistant", content },
+        { role: "user", content: "Continue EXACTLY from where your previous message stopped, mid-sentence if necessary. Do not repeat anything, do not summarize, no preamble — output only the next characters." },
+      ],
+      maxTokens,
+      model,
+    );
+    if (!next.content) break;
+    content += next.content;
+    finishReason = next.finishReason;
+  }
+  return content;
 }
 
 // ─── Corpus assembly ────────────────────────────────────────────────────────
@@ -161,16 +194,63 @@ async function loadCorpus(supabase: ReturnType<typeof createClient>, categoryId:
   const competitiveBenchmarking = (ing.competitive_benchmarking || {}) as Record<string, unknown>;
   const fdaCompliance = (ing.fda_compliance || {}) as Record<string, unknown>;
 
+  // UNTRUNCATED corpus (user directive 2026-08-30): the chat model is
+  // Sonnet 5 with a 1M-token context — the ENTIRE workspace fits with
+  // enormous headroom (all documents together run ~400-600k chars ≈
+  // 100-150k tokens). The per-section caps below are pure safety fuses
+  // against pathological rows, set far above every real document size
+  // observed in production (largest: QA report ~150k chars).
+  const FUSE = 400000;
+
+  // Live product table — the workspace isn't only documents.
+  let productsTable = "";
+  try {
+    const { data: prods } = await supabase
+      .from("products")
+      .select("brand, title, price, rating_value, rating_count, bsr_current, monthly_sales, monthly_revenue")
+      .eq("category_id", categoryId)
+      .not("bsr_current", "is", null)
+      .order("bsr_current", { ascending: true })
+      .limit(30);
+    if (prods?.length) {
+      productsTable = ["| # | Brand | Product | Price | Rating | BSR | Monthly sales | Monthly revenue |", "|---|---|---|---|---|---|---|---|"]
+        .concat(prods.map((p: Record<string, unknown>, i: number) =>
+          `| ${i + 1} | ${p.brand || "—"} | ${String(p.title || "").slice(0, 70)} | $${p.price ?? "—"} | ${p.rating_value ?? "—"} (${p.rating_count ?? "—"}) | #${p.bsr_current} | ${p.monthly_sales ?? "—"} | $${p.monthly_revenue ?? "—"} |`))
+        .join("\n");
+    }
+  } catch (_e) { /* products table is a bonus — never fail the chat over it */ }
+
+  // Formula version history — so the agent knows what has already changed.
+  let versionsList = "";
+  try {
+    const { data: versions } = await supabase
+      .from("formula_brief_versions")
+      .select("version_number, change_summary, is_active, created_at")
+      .eq("category_id", categoryId)
+      .order("version_number", { ascending: false })
+      .limit(20);
+    if (versions?.length) {
+      versionsList = versions.map((v: Record<string, unknown>) =>
+        `- v${v.version_number}${v.is_active ? " (ACTIVE)" : ""} · ${String(v.change_summary || "").slice(0, 200)} · ${String(v.created_at).slice(0, 10)}`).join("\n");
+    }
+  } catch (_e) { /* optional */ }
+
   const sections = [
-    ["P13 FINAL SIGN-OFF (chief formulator review — locked/canonical)", trunc(finalSignoff.opus_review, 8000)],
-    ["QA-ADJUSTED FORMULA (current active ingredient list)", trunc(ing.adjusted_formula, 6000)],
-    ["FINAL FORMULA BRIEF (full compliance-formatted document)", trunc(ing.final_formula_brief, 20000)],
-    ["QA REPORT EXCERPT (P9 adjudication)", trunc(ing.qa_report, 15000)],
-    ["COMPETITIVE BENCHMARKING EXCERPT (P10/P11)", trunc(competitiveBenchmarking.opus_validation || competitiveBenchmarking.sonnet_draft, 12000)],
-    ["FDA/DSHEA COMPLIANCE EXCERPT (P12)", trunc(fdaCompliance.opus_analysis, 12000)],
-    ["MARKET INTELLIGENCE EXCERPT", trunc(ing.market_intelligence, 8000)],
-    ["POSITIONING", trunc(briefRow?.positioning, 1000)],
-    ["MARKET SUMMARY", trunc(briefRow?.market_summary, 2000)],
+    ["P13 FINAL SIGN-OFF — chief formulator review, the CANONICAL formula (full document)", trunc(finalSignoff.opus_review, FUSE)],
+    ["QA-ADJUSTED FORMULA (full)", trunc(ing.adjusted_formula, FUSE)],
+    ["FINAL FORMULA BRIEF (full document)", trunc(ing.final_formula_brief, FUSE)],
+    ["QA REPORT — P10 adjudication (full document)", trunc(ing.qa_report, FUSE)],
+    ["QA SECONDARY OUTPUT (call 2 raw)", trunc(ing.call2_raw_output, FUSE)],
+    ["COMPETITIVE BENCHMARKING — P11 draft (full)", trunc(competitiveBenchmarking.sonnet_draft, FUSE)],
+    ["COMPETITIVE BENCHMARKING — P11 validation (full)", trunc(competitiveBenchmarking.opus_validation, FUSE)],
+    ["FDA/DSHEA COMPLIANCE — P12 analysis (full)", trunc(fdaCompliance.opus_analysis, FUSE)],
+    ["FDA/DSHEA COMPLIANCE — P12 cross-check (full)", trunc(fdaCompliance.sonnet_validation, FUSE)],
+    ["MARKET INTELLIGENCE (full)", trunc(ing.market_intelligence, FUSE)],
+    ["POSITIONING", trunc(briefRow?.positioning, FUSE)],
+    ["MARKET SUMMARY", trunc(briefRow?.market_summary, FUSE)],
+    ["TARGET CUSTOMER", trunc(briefRow?.target_customer, FUSE)],
+    ["TOP 30 PRODUCTS BY BSR (live workspace data)", productsTable],
+    ["FORMULA VERSION HISTORY", versionsList],
   ].filter(([, body]) => body && body.trim());
 
   const text = sections.map(([label, body]) => `## ${label}\n${body}`).join("\n\n---\n\n");
@@ -212,9 +292,17 @@ function parseChangeCard(reply: string): { prose: string; card: ChangeCard | nul
 // ─── System prompt ──────────────────────────────────────────────────────────
 
 function buildSystemPrompt(keyword: string, corpus: string): string {
-  return `You are the DOVIVE Manufacturer Liaison Agent — an expert supplement formulation liaison speaking with the DOVIVE team and its contract manufacturer about the "${keyword}" formula.
+  return `You are the DOVIVE Formulator Agent — a senior supplement formulator and regulatory-savvy product strategist embedded in the DOVIVE "${keyword}" workspace. You speak with the DOVIVE founder (a non-native English speaker — plain, clear language always) and with contract manufacturers.
 
-You are grounded ONLY in the DOCUMENT CORPUS below — the category's real pipeline research, QA adjudication, competitive benchmarking, FDA/DSHEA compliance review, and final sign-off. Never invent ingredients, doses, competitor data, or claims that are not in the corpus. If something isn't covered, say so plainly instead of guessing.
+You have the COMPLETE workspace below, untruncated: the canonical signed-off formula, the QA adjudication, competitive benchmarking, FDA/DSHEA compliance review with its cross-check, market intelligence, live top-30 product data, and the formula version history. You are grounded ONLY in this corpus — never invent ingredients, doses, competitor data, studies, or claims that are not in it. If something isn't covered, say exactly that.
+
+## ANSWER STYLE
+- Lead with the direct answer in the first sentence; explanation after.
+- Cite where the answer comes from ("per the QA report", "the P12 compliance review found...") so the reader can verify.
+- Numbers must trace to the corpus verbatim — doses, prices, scores, competitor stats.
+- Use a small table when comparing ingredients, doses, or competitors; otherwise short paragraphs. No filler, no hedging, no marketing fluff.
+- When the corpus documents DISAGREE (e.g. a draft vs the sign-off), the precedence is: P13 sign-off > QA-adjusted formula > brief — say when you're resolving a conflict.
+- If a question is about a competitor, use the live top-30 product table AND the benchmarking document together.
 
 ## DOCUMENT CORPUS
 

@@ -213,10 +213,23 @@ function ChangeCardPanel({
           </div>
         )}
         {status === "approved" && (
-          <Badge variant="outline" className="text-[10px] gap-1.5">
-            <Loader2 className="w-3 h-3 animate-spin" />
-            Approved — generating revision…
-          </Badge>
+          // 'approved' now means "background revision in flight OR it failed
+          // the audit" (async flow) — spinner alone would spin forever after
+          // an audit failure, so always offer the retry path (re-deciding an
+          // approved card is the server's built-in retry).
+          <div className="flex items-center gap-2 flex-wrap">
+            <Badge variant="outline" className="text-[10px] gap-1.5">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              Approved — revision in progress
+            </Badge>
+            <button
+              type="button"
+              onClick={() => onDecide("approved")}
+              className="text-[10px] font-semibold text-primary hover:underline"
+            >
+              Retry revision
+            </button>
+          </div>
         )}
         {status === "rejected" && (
           <Badge variant="outline" className="text-[10px] text-muted-foreground">Rejected</Badge>

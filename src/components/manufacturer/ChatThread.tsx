@@ -18,7 +18,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Bot, Send, User, AlertTriangle, Sparkles, ArrowRight, Loader2 } from "lucide-react";
+import {
+  Bot,
+  Send,
+  User,
+  AlertTriangle,
+  Sparkles,
+  ArrowRight,
+  Loader2,
+  Paperclip,
+  X,
+  FileText,
+  Image as ImageIcon,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -26,6 +38,26 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { MarkdownDoc } from "@/lib/markdownDoc";
 import { cn } from "@/lib/utils";
+
+const MAX_ATTACHMENTS = 5;
+const MAX_ATTACHMENT_RAW_BYTES = 10 * 1024 * 1024; // 10MB raw (~13MB base64)
+const ATTACHMENT_ACCEPT = "image/png,image/jpeg,image/webp,application/pdf";
+
+interface StagedAttachment {
+  id: string;
+  kind: "image" | "pdf";
+  filename: string;
+  data_url: string;
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error ?? new Error("Failed to read file"));
+    reader.readAsDataURL(file);
+  });
+}
 
 export interface ChangeCardChange {
   target: string;
@@ -228,6 +260,9 @@ function ChatBubble({
               isUser ? "bg-primary/10 text-foreground rounded-tr-sm" : "bg-muted text-foreground rounded-tl-sm"
             )}
           >
+            {message.content.includes("[attached:") && (
+              <Paperclip className="w-3 h-3 text-muted-foreground mb-1 inline-block" />
+            )}
             <MarkdownDoc content={message.content} className="text-sm [&_p]:my-1 [&_p]:leading-relaxed" />
           </div>
         )}
@@ -251,8 +286,10 @@ export function ChatThread({ categoryId, keyword, className, hideHeader, onLates
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState("");
   const [decidingId, setDecidingId] = useState<string | null>(null);
+  const [attachments, setAttachments] = useState<StagedAttachment[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastNotifiedId = useRef<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const queryKey = useMemo(() => ["manufacturer_chat_messages", categoryId], [categoryId]);
 
   const messagesQuery = useQuery({
@@ -311,9 +348,15 @@ export function ChatThread({ categoryId, keyword, className, hideHeader, onLates
   }, [messages, onLatestMessage]);
 
   const sendMutation = useMutation({
-    mutationFn: async (message: string) => {
+    mutationFn: async ({ message, files }: { message: string; files: StagedAttachment[] }) => {
       const { data, error } = await supabase.functions.invoke("manufacturer-chat", {
-        body: { category_id: categoryId, message },
+        body: {
+          category_id: categoryId,
+          message,
+          ...(files.length
+            ? { attachments: files.map(({ kind, filename, data_url }) => ({ kind, filename, data_url })) }
+            : {}),
+        },
       });
       if (error) throw error;
       if (data?.code === "TABLE_MISSING") throw Object.assign(new Error(data.error), { code: "TABLE_MISSING" });
@@ -322,6 +365,7 @@ export function ChatThread({ categoryId, keyword, className, hideHeader, onLates
     },
     onSuccess: () => {
       setDraft("");
+      setAttachments([]);
       queryClient.invalidateQueries({ queryKey });
     },
     onError: (e: Error) => {
@@ -360,7 +404,7 @@ export function ChatThread({ categoryId, keyword, className, hideHeader, onLates
   const handleSend = () => {
     const trimmed = draft.trim();
     if (!trimmed || sendMutation.isPending) return;
-    sendMutation.mutate(trimmed);
+    sendMutation.mutate({ message: trimmed, files: attachments });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -368,6 +412,64 @@ export function ChatThread({ categoryId, keyword, className, hideHeader, onLates
       e.preventDefault();
       handleSend();
     }
+  };
+
+  const removeAttachment = (id: string) => {
+    setAttachments((prev) => prev.filter((a) => a.id !== id));
+  };
+
+  const handleFilesSelected = async (fileList: FileList | null) => {
+    const input = fileInputRef.current;
+    if (!fileList || fileList.length === 0) return;
+    const incoming = Array.from(fileList);
+
+    const oversized = incoming.filter((f) => f.size > MAX_ATTACHMENT_RAW_BYTES);
+    const withinSize = incoming.filter((f) => f.size <= MAX_ATTACHMENT_RAW_BYTES);
+    if (oversized.length > 0) {
+      toast({
+        title: "File too large",
+        description: `${oversized.map((f) => f.name).join(", ")} exceed${oversized.length === 1 ? "s" : ""} the 10MB limit and ${oversized.length === 1 ? "was" : "were"} skipped.`,
+        variant: "destructive",
+      });
+    }
+
+    const roomLeft = MAX_ATTACHMENTS - attachments.length;
+    if (roomLeft <= 0) {
+      toast({
+        title: "Attachment limit reached",
+        description: "You can attach up to 5 files per message.",
+        variant: "destructive",
+      });
+      if (input) input.value = "";
+      return;
+    }
+
+    const accepted = withinSize.slice(0, roomLeft);
+    if (withinSize.length > accepted.length) {
+      toast({
+        title: "Attachment limit reached",
+        description: "You can attach up to 5 files per message — extra files were skipped.",
+        variant: "destructive",
+      });
+    }
+
+    const staged: StagedAttachment[] = [];
+    for (const file of accepted) {
+      try {
+        const dataUrl = await readFileAsDataUrl(file);
+        staged.push({
+          id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          kind: file.type === "application/pdf" ? "pdf" : "image",
+          filename: file.name,
+          data_url: dataUrl,
+        });
+      } catch {
+        toast({ title: "Couldn't read file", description: file.name, variant: "destructive" });
+      }
+    }
+
+    if (staged.length > 0) setAttachments((prev) => [...prev, ...staged]);
+    if (input) input.value = "";
   };
 
   if (migrationPending) {
@@ -430,25 +532,72 @@ export function ChatThread({ categoryId, keyword, className, hideHeader, onLates
         )}
       </div>
 
-      <div className="shrink-0 border-t border-border p-3 flex items-end gap-2">
-        <Textarea
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Ask about the formula, or request a change…"
-          rows={2}
-          className="text-sm resize-none flex-1"
-          disabled={sendMutation.isPending}
-        />
-        <Button
-          size="sm"
-          className="h-9 gap-1.5 flex-shrink-0"
-          disabled={!draft.trim() || sendMutation.isPending}
-          onClick={handleSend}
-        >
-          {sendMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-          Send
-        </Button>
+      <div className="shrink-0 border-t border-border p-3 space-y-2">
+        {attachments.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {attachments.map((a) => (
+              <div
+                key={a.id}
+                className="flex items-center gap-1.5 pl-2 pr-1 py-1 rounded-md bg-muted border border-border/60 text-xs text-foreground max-w-[180px]"
+              >
+                {a.kind === "pdf" ? (
+                  <FileText className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                ) : (
+                  <ImageIcon className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                )}
+                <span className="truncate">{a.filename}</span>
+                <button
+                  type="button"
+                  onClick={() => removeAttachment(a.id)}
+                  disabled={sendMutation.isPending}
+                  className="flex-shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground hover:bg-background/60"
+                  aria-label={`Remove ${a.filename}`}
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="flex items-end gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={ATTACHMENT_ACCEPT}
+            multiple
+            className="hidden"
+            onChange={(e) => handleFilesSelected(e.target.files)}
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 flex-shrink-0 text-muted-foreground hover:text-foreground"
+            disabled={sendMutation.isPending}
+            onClick={() => fileInputRef.current?.click()}
+            title="Attach an image or PDF"
+          >
+            <Paperclip className="w-4 h-4" />
+          </Button>
+          <Textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Ask about the formula, or request a change…"
+            rows={2}
+            className="text-sm resize-none flex-1"
+            disabled={sendMutation.isPending}
+          />
+          <Button
+            size="sm"
+            className="h-9 gap-1.5 flex-shrink-0"
+            disabled={!draft.trim() || sendMutation.isPending}
+            onClick={handleSend}
+          >
+            {sendMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+            Send
+          </Button>
+        </div>
       </div>
     </div>
   );

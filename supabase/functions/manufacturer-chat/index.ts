@@ -558,12 +558,46 @@ async function handleDecide(
     return [ack];
   }
 
-  // decision === "approved"
+  // decision === "approved" — ASYNC: the Opus+thinking revision + audit +
+  // version chain takes minutes, but the Supabase gateway idle-times-out at
+  // 150s (observed live: HTTP 504 mid-revision, card stranded at
+  // 'approved'). So: acknowledge instantly, run the heavy chain in the
+  // background via EdgeRuntime.waitUntil, and post the outcome into the
+  // thread — which the UI already polls. Re-deciding an already-'approved'
+  // card is allowed as the retry path for stranded approvals.
   const { error: approveErr } = await supabase
     .from("manufacturer_chat_messages")
     .update({ card_status: "approved" })
     .eq("id", message_id);
   if (approveErr) throw approveErr;
+
+  const ack = await insertMessage(supabase, {
+    category_id,
+    session_token: "agent",
+    role: "agent",
+    content: `⏳ Applying "${row.change_card.title}" — generating the revised document (Opus 5, deep reasoning), auditing it against the approved card, and creating the new version. This takes a few minutes; I'll post the result here.`,
+  });
+
+  const runtime = (globalThis as Record<string, unknown>).EdgeRuntime as { waitUntil?: (p: Promise<unknown>) => void } | undefined;
+  const work = applyApprovedCard(supabase, category_id, message_id, row).catch(async (e) => {
+    await insertMessage(supabase, {
+      category_id,
+      session_token: "agent",
+      role: "agent",
+      content: `❌ The revision failed before completion: ${(e as Error).message?.slice(0, 300)}. The card stays approved — approve it again to retry.`,
+    }).catch(() => {});
+  });
+  if (runtime?.waitUntil) runtime.waitUntil(work);
+  else await work; // local/dev fallback — no background runtime available
+  return [ack];
+}
+
+async function applyApprovedCard(
+  supabase: ReturnType<typeof createClient>,
+  category_id: string,
+  message_id: string,
+  row: ChatMessageRow,
+): Promise<void> {
 
   // Load the canonical current formula EXACTLY like process-manufacturer-feedback:
   // prefer the active formula_brief_versions row, fall back to the P12/QA
@@ -602,7 +636,7 @@ async function handleDecide(
       role: "agent",
       content: "I couldn't find a formula document to revise (no active version and no P9/P12 formula brief yet). Run the pipeline through P8/P9 first.",
     });
-    return [errMsg];
+    return;
   }
 
   // Second model call — apply the approved card to the canonical formula.
@@ -643,7 +677,7 @@ async function handleDecide(
       role: "agent",
       content: `I generated the revision but it did NOT pass the change-audit, so no new version was created. Audit findings:\n\n${verification.slice(0, 1500)}\n\nThe card remains approved — ask me to retry, or refine the request.`,
     });
-    return [failMsg];
+    return;
   }
 
   // Create the new formula_brief_versions row — SAME mechanism/shape as
@@ -690,7 +724,7 @@ async function handleDecide(
     content: `Applied — created Formula v${(newVersion as Record<string, unknown>).version_number} ("${row.change_card.title}"). It's now the active version.`,
   });
 
-  return [confirmMessage];
+  return;
 }
 
 // ─── Entry point ─────────────────────────────────────────────────────────────

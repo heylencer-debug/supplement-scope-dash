@@ -28,6 +28,10 @@ const { resolveCategory } = require('./utils/category-resolver');
 const SUPABASE_URL  = process.env.SUPABASE_URL;
 const SUPABASE_KEY  = process.env.SUPABASE_KEY;
 const KEYWORD_LABEL = process.argv[2] || 'magnesium gummies';
+// Session suffix (" #2", " #3"...) isolates re-runs of the same keyword into
+// separate workspaces — storage keys keep the FULL label; Amazon is searched
+// with the clean words only.
+const SEARCH_KEYWORD = KEYWORD_LABEL.replace(/\s*#\d+\s*$/, '');
 
 // ── DASH live sync ────────────────────────────────────────────
 const DASH_URL = process.env.DASH_URL || SUPABASE_URL;
@@ -379,7 +383,7 @@ async function runBrightDataFallback(alreadyScraped) {
   console.log('\n🛰️  Bright Data fallback engaged (BRIGHTDATA_API_KEY/BRIGHTDATA present)...');
   await ensureKeyword(KEYWORD_LABEL); // dovive_keywords — same call as the Playwright path
 
-  const products = await brightData.searchAmazonByKeyword(KEYWORD_LABEL, { limit: 40, pages: 3 });
+  const products = await brightData.searchAmazonByKeyword(SEARCH_KEYWORD, { limit: 40, pages: 3 });
   console.log(`  ✓ Bright Data returned ${products.length} products for "${KEYWORD_LABEL}"`);
 
   const toScrape = products.filter(p => p.asin && !alreadyScraped.has(p.asin));
@@ -492,13 +496,13 @@ async function attemptPlaywrightGather(attemptNum, alreadyScraped) {
     if (!searchBox) throw new Error('Search box not found');
 
     // ── Step 2: Search ────────────────────────────────────────────
-    console.log(`\n→ Searching for "${KEYWORD_LABEL}"...`);
+    console.log(`\n→ Searching for "${SEARCH_KEYWORD}"...`);
     await page.evaluate(() => window.scrollTo(0, 0));
     await sleep(rand(500, 1000));
     await searchBox.scrollIntoViewIfNeeded();
     await sleep(rand(500, 800));
     await page.fill('#twotabsearchtextbox', '');
-    await page.type('#twotabsearchtextbox', KEYWORD_LABEL, { delay: rand(60, 130) });
+    await page.type('#twotabsearchtextbox', SEARCH_KEYWORD, { delay: rand(60, 130) });
     await sleep(rand(700, 1200));
     await page.keyboard.press('Enter');
     await sleep(rand(4000, 6000));

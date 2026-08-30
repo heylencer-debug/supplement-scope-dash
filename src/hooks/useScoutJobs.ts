@@ -28,8 +28,43 @@ export function useSubmitScoutJob() {
 
   return useMutation({
     mutationFn: async (params: { keyword: string; force?: boolean; useAi?: boolean }) => {
-      const keyword = params.keyword.trim();
-      if (!keyword) throw new Error("Keyword is required");
+      const base = params.keyword.trim().replace(/\s*#\d+\s*$/, "").toLowerCase();
+      if (!base) throw new Error("Keyword is required");
+
+      // DOUBLE-SUBMIT / DUPLICATE GUARD: refuse when any session of this
+      // keyword is already queued or running (two rapid Enters used to
+      // create two identical jobs).
+      const { data: inflight } = await scoutJobsTable()
+        .select("id, keyword, status")
+        .in("status", ["queued", "claimed", "running"])
+        .ilike("keyword", `${base}%`);
+      const inflightHit = (inflight || []).find(
+        (j: { keyword: string }) => j.keyword.toLowerCase().replace(/\s*#\d+\s*$/, "") === base
+      );
+      if (inflightHit) {
+        throw new Error(`"${inflightHit.keyword}" is already ${inflightHit.status} — wait for it or cancel it first.`);
+      }
+
+      // SESSION ISOLATION: if this keyword already has a workspace (any
+      // category whose search_term is the base or "base #N"), start a FRESH
+      // session — "hydration powder #2" — instead of merging into the old
+      // data. Storage/category keys carry the suffix end-to-end; the
+      // pipeline searches Amazon/web with the clean words.
+      let keyword = base;
+      const { data: siblings } = await supabase
+        .from("categories")
+        .select("search_term, name")
+        .or(`search_term.ilike.${base}%,name.ilike.${base}%`);
+      const sessionNums = (siblings || [])
+        .map((c) => (c.search_term || c.name || "").toLowerCase().trim())
+        .filter((s) => s === base || new RegExp(`^${base.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*#\\d+$`).test(s))
+        .map((s) => {
+          const m = s.match(/#(\d+)\s*$/);
+          return m ? parseInt(m[1], 10) : 1;
+        });
+      if (sessionNums.length) {
+        keyword = `${base} #${Math.max(...sessionNums) + 1}`;
+      }
 
       const insertPayload: ScoutJobInsert = {
         keyword,
@@ -63,12 +98,15 @@ export function useSubmitScoutJob() {
 
       return { job: job as ScoutJobRow, triggerOk, triggerError };
     },
-    onSuccess: ({ triggerOk }) => {
+    onSuccess: ({ job, triggerOk }) => {
       queryClient.invalidateQueries({ queryKey: ["scout_jobs"] });
+      const isSession = /#\d+\s*$/.test(job.keyword);
       if (triggerOk) {
         toast({
-          title: "Analysis queued",
-          description: "Scout picked up the request and is starting the pipeline.",
+          title: isSession ? `Fresh session: ${job.keyword}` : "Analysis queued",
+          description: isSession
+            ? "This keyword was analyzed before — starting a separate workspace so the runs don't mix."
+            : "Scout picked up the request and is starting the pipeline.",
         });
       } else {
         toast({

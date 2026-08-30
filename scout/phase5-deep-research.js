@@ -67,6 +67,9 @@ const DASH   = createClient(process.env.DASH_URL || process.env.SUPABASE_URL, pr
 const DOVIVE = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
 const KEYWORD  = process.argv.includes('--keyword')  ? process.argv[process.argv.indexOf('--keyword')  + 1] : 'ashwagandha gummies';
+// Web searches (Perplexity/DDG) use the clean words; storage keeps the full
+// session label ("hydration powder #2") so re-runs stay isolated.
+const SEARCH_KEYWORD = KEYWORD.replace(/\s*#\d+\s*$/, '');
 const FORCE    = process.argv.includes('--force');
 const POOL_ARG = process.argv.includes('--pool')     ? process.argv[process.argv.indexOf('--pool')     + 1] : 'both';
 
@@ -929,7 +932,7 @@ async function researchOneProduct({ product, rank, pool }, browserContext) {
   const grounding = await fetchGroundingData(product.asin, KEYWORD);
   const groundingText = formatGroundingForPrompt(grounding);
 
-  const scraped = await findAndScrapeSource(browserContext, product, KEYWORD);
+  const scraped = await findAndScrapeSource(browserContext, product, SEARCH_KEYWORD);
   let sourceBlock = '**Off-Amazon source:** Not attempted or no confident match found — relying on Amazon DB data only.';
   let sourceUrl = null, sourceExtracted = null, hadPerplexityFindings = false, citationCount = 0;
 

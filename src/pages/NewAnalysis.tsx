@@ -222,12 +222,22 @@ export default function NewAnalysis() {
   const uniqueCategories = recentCategories ?? [];
   const hasMore = uniqueCategories.length >= visibleCount;
 
+  // Ref-based lock: isPending updates async, so two rapid Enters could both
+  // pass the check and double-queue (observed live: two identical jobs).
+  const submittingRef = useRef(false);
   const handleSubmitKeyword = async (e: React.FormEvent) => {
     e.preventDefault();
     const keyword = keywordInput.trim();
-    if (!keyword || submitScoutJob.isPending) return;
-    await submitScoutJob.mutateAsync({ keyword });
-    setKeywordInput("");
+    if (!keyword || submitScoutJob.isPending || submittingRef.current) return;
+    submittingRef.current = true;
+    try {
+      await submitScoutJob.mutateAsync({ keyword });
+      setKeywordInput("");
+    } catch {
+      /* toast shown by the hook */
+    } finally {
+      submittingRef.current = false;
+    }
   };
 
   const handleSuggestionClick = (keyword: string) => {

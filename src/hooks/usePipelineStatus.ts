@@ -175,6 +175,11 @@ async function fetchPipelineStatus(categoryId: string): Promise<PhaseStatus[]> {
   const p11Complete = p11HasBenchmarking ? 1 : 0;
   const p12Complete = p12HasCompliance ? 1 : 0;
 
+  // P13: Final Sign-off — Opus 5 chief-formulator pass after compliance.
+  const p13Signoff = p10Ingredients?.final_signoff as { opus_review?: string; verdict?: string } | null | undefined;
+  const p13Complete = (p13Signoff?.opus_review?.length ?? 0) > 500 ? 1 : 0;
+  const p13Verdict = p13Complete ? p13Signoff?.verdict || null : null;
+
   return [
     {
       phase: 1,
@@ -294,6 +299,15 @@ async function fetchPipelineStatus(categoryId: string): Promise<PhaseStatus[]> {
       complete: p12Complete,
       status: p12Complete > 0 ? "complete" : p11Complete > 0 ? "not_started" : "pending",
       pct: p12Complete * 100,
+    },
+    {
+      phase: 13,
+      label: "Final Sign-off",
+      description: `Chief-formulator sign-off — Opus 5 applies compliance corrections, issues the final verdict${p13Verdict ? ` · ${p13Verdict}` : ""}`,
+      total: 1,
+      complete: p13Complete,
+      status: p13Complete > 0 ? "complete" : p12Complete > 0 ? "not_started" : "pending",
+      pct: p13Complete * 100,
     },
   ];
 }

@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   CheckCircle2, Circle, Clock, AlertCircle, RefreshCw,
   ShoppingCart, BarChart3, MessageSquare, ScanText, Search,
-  Dna, TrendingUp, Package, ClipboardList, CheckSquare, BarChart, Shield,
+  Dna, TrendingUp, Package, ClipboardList, CheckSquare, BarChart, Shield, Stamp,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -33,6 +33,7 @@ export const PHASE_META: Record<number, { icon: LucideIcon; shortLabel: string }
   10: { icon: CheckSquare,    shortLabel: "Formula QA"    },
   11: { icon: BarChart,       shortLabel: "Benchmark"     },
   12: { icon: Shield,         shortLabel: "FDA"           },
+  13: { icon: Stamp,          shortLabel: "Sign-off"      },
 };
 
 type StatusKey = "complete" | "partial" | "not_started" | "pending";

@@ -10,6 +10,8 @@ export interface CategoryWithImages extends Category {
   product_images?: string[];
   /** Latest scout_jobs status for this category's keyword, if a job row exists. */
   job_status?: ScoutJobStatus | null;
+  /** Normalized 0-10 opportunity score from the most recent category_analyses row, if any. */
+  opportunity_score?: number | null;
 }
 
 /** Strip spreadsheet-import junk (leading "=", quotes, etc.) — display + name-matching. */
@@ -97,6 +99,34 @@ async function fetchProductStats(categoryIds: string[]) {
 }
 
 /**
+ * Latest opportunity score (normalized to a 0-10 scale, matching
+ * CockpitHero's own normalization) per category_id, batched in ONE query
+ * scoped to just the finalist ids actually rendered.
+ */
+async function fetchLatestScores(categoryIds: string[]) {
+  const map = new Map<string, number | null>();
+  if (!categoryIds.length) return map;
+
+  const { data, error } = await supabase
+    .from("category_analyses")
+    .select("category_id, opportunity_index, created_at")
+    .in("category_id", categoryIds)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.warn("useRecentCategories: category_analyses score lookup failed", error);
+    return map;
+  }
+
+  for (const row of data || []) {
+    if (!row.category_id || map.has(row.category_id)) continue; // rows sorted desc — first hit is latest
+    const raw = row.opportunity_index;
+    map.set(row.category_id, raw != null ? (raw > 10 ? raw / 10 : raw) : null);
+  }
+  return map;
+}
+
+/**
  * Fetch recently analyzed categories for the "Recently Analyzed Categories"
  * grid — honest version (2026-08-29 fix; was previously reading raw
  * `categories` rows directly: stale `total_products`, stale timestamps, and
@@ -179,6 +209,9 @@ export function useRecentCategories(limit: number = 20) {
 
       const finalists = deduped.slice(0, limit);
 
+      // Score lookup batched once for just the finalists actually rendered.
+      const scoreMap = await fetchLatestScores(finalists.map((c) => c.id));
+
       // Product images only for the finalists actually rendered (cheap —
       // avoids an image query per category in the wider dedup pool).
       const withImages = await Promise.all(
@@ -196,6 +229,7 @@ export function useRecentCategories(limit: number = 20) {
             name: stripLabel(cat.name),
             updated_at: _recency, // honest last-activity timestamp, not the raw DB column
             product_images: products?.map((p) => p.main_image_url).filter(Boolean) || [],
+            opportunity_score: scoreMap.get(cat.id) ?? null,
           } as CategoryWithImages;
         })
       );
@@ -204,6 +238,41 @@ export function useRecentCategories(limit: number = 20) {
     },
     refetchInterval: 10000,
     staleTime: 5000,
+  });
+}
+
+/**
+ * Which categories have a real P13 chief-formulator sign-off — one query for
+ * ALL categories (not N per-category queries), used to render the "Signed
+ * off ✓" maturity chip in the Launchpad library grid. A row counts as signed
+ * off when `ingredients.final_signoff.verdict` is non-null, mirroring
+ * `getCanonicalFormula`'s own "signoff" tier without re-fetching the full
+ * (often huge) `ingredients` document per category.
+ */
+export function useCategorySignoffs() {
+  return useQuery({
+    queryKey: ["category_signoffs"],
+    queryFn: async (): Promise<Set<string>> => {
+      const { data, error } = await supabase
+        .from("formula_briefs")
+        // JSON-path select: formula_briefs.ingredients->final_signoff->>verdict,
+        // aliased to `verdict`. Not represented in the generated Supabase
+        // types (computed column), hence the `as any` on the select string.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .select("category_id, verdict:ingredients->final_signoff->>verdict" as any);
+
+      if (error) {
+        console.warn("useCategorySignoffs: formula_briefs lookup failed", error);
+        return new Set();
+      }
+
+      const signedOff = new Set<string>();
+      for (const row of (data ?? []) as unknown as { category_id: string | null; verdict: string | null }[]) {
+        if (row.category_id && row.verdict) signedOff.add(row.category_id);
+      }
+      return signedOff;
+    },
+    staleTime: 30_000,
   });
 }
 

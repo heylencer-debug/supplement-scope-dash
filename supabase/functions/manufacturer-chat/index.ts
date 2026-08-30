@@ -53,6 +53,33 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
 const CHAT_MODEL = "anthropic/claude-sonnet-5";
 const REVISION_MODEL = "anthropic/claude-opus-5";
+const PERPLEXITY_API_KEY = Deno.env.get("PERPLEXITY_API_KEY");
+
+// ─── Live web research (Perplexity sonar-pro — same engine as pipeline P5) ──
+async function perplexityResearch(query: string): Promise<string> {
+  if (!PERPLEXITY_API_KEY) return "[research unavailable: PERPLEXITY_API_KEY not configured]";
+  try {
+    const res = await fetch("https://api.perplexity.ai/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${PERPLEXITY_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "sonar-pro",
+        max_tokens: 4000,
+        messages: [
+          { role: "system", content: "You are a precise research assistant for a supplement formulator. Answer factually with specifics (doses, studies, prices, regulations, suppliers). Cite sources." },
+          { role: "user", content: query },
+        ],
+      }),
+    });
+    const j = await res.json();
+    if (j.error) return `[research failed: ${j.error.message || JSON.stringify(j.error)}]`;
+    const content = j.choices?.[0]?.message?.content || "";
+    const citations: string[] = j.citations || j.choices?.[0]?.message?.citations || [];
+    return content + (citations.length ? `\n\nSources:\n${citations.map((c: string, i: number) => `[${i + 1}] ${c}`).join("\n")}` : "");
+  } catch (e) {
+    return `[research failed: ${(e as Error).message}]`;
+  }
+}
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -307,6 +334,15 @@ You have the COMPLETE workspace below, untruncated: the canonical signed-off for
 - When the corpus documents DISAGREE (e.g. a draft vs the sign-off), the precedence is: P13 sign-off > QA-adjusted formula > brief — say when you're resolving a conflict.
 - If a question is about a competitor, use the live top-30 product table AND the benchmarking document together.
 
+## LIVE WEB RESEARCH (your one external tool)
+When a question genuinely needs CURRENT information beyond the corpus — today's competitor pricing or product pages, a study or regulation you can't find in the corpus, supplier/ingredient sourcing, recent market news — reply with ONLY a fenced block (nothing else):
+
+\`\`\`research
+{"query": "one precise, self-contained research question"}
+\`\`\`
+
+The system runs it through live web research and hands you the findings with sources; you then answer normally, citing the source URLs. Rules: never fake web facts without researching; never research what the corpus already answers; at most two research rounds per question; if research fails, say what you tried and answer from the corpus with that caveat.
+
 ## DOCUMENT CORPUS
 
 ${corpus || "(No corpus data available for this category yet.)"}
@@ -451,11 +487,27 @@ async function handleMessage(
     content: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
   };
 
-  const reply = await callClaude(
-    [cachedSystem, ...conversation],
-    64000,
-    CHAT_MODEL,
-  );
+  // Research loop: the model may request live web research (Perplexity
+  // sonar-pro) via a ```research fence — we execute it, feed results back,
+  // and it answers grounded in corpus + fresh sources. Max 2 rounds.
+  let workingConversation = [...conversation];
+  let reply = "";
+  for (let round = 0; round <= 2; round++) {
+    reply = await callClaude([cachedSystem, ...workingConversation], 64000, CHAT_MODEL);
+    const rm = reply.match(/```research\s*\n([\s\S]*?)```/);
+    if (!rm || round === 2) break;
+    let query = "";
+    try { query = (JSON.parse(rm[1]).query || "").trim(); } catch { query = rm[1].trim(); }
+    if (!query) break;
+    const findings = await perplexityResearch(query);
+    workingConversation = [
+      ...workingConversation,
+      { role: "assistant", content: reply },
+      { role: "user", content: `[RESEARCH RESULTS for "${query}"]\n${findings}\n\nNow answer the original question using these findings plus the corpus. Cite the sources by URL. Do not emit another research block unless a genuinely different query is still needed.` },
+    ];
+  }
+  // If the final round still contains an unexecuted research fence, strip it.
+  reply = reply.replace(/```research\s*\n[\s\S]*?```/g, "").trim() || reply;
 
   const { prose, card } = parseChangeCard(reply);
 

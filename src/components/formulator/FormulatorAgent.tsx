@@ -19,7 +19,7 @@
  * show an unread dot for a new agent reply that arrived while collapsed.
  */
 import { useEffect, useState } from "react";
-import { FlaskConical, X, Minus } from "lucide-react";
+import { FlaskConical, X, Minus, Maximize2, Minimize2 } from "lucide-react";
 import { useCategoryContext } from "@/contexts/CategoryContext";
 import { ChatThread, type ChatMessageRow } from "@/components/manufacturer/ChatThread";
 import { cn } from "@/lib/utils";
@@ -28,6 +28,7 @@ export function FormulatorAgent() {
   const { currentCategoryId, categoryName } = useCategoryContext();
   const [open, setOpen] = useState(false);
   const [unread, setUnread] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   // Esc closes the panel.
   useEffect(() => {
@@ -73,7 +74,10 @@ export function FormulatorAgent() {
       <div
         className={cn(
           "fixed z-[1100] flex flex-col bg-card border border-border rounded-[var(--radius)] shadow-xl overflow-hidden",
-          "bottom-24 right-5 w-[420px] max-w-[calc(100vw-2.5rem)] h-[75vh] max-h-[720px]",
+          // Research-assistant width: 600px default, 920px expanded — a
+          // 420px strip was too narrow for tables/citations (user report).
+          "bottom-24 right-5 max-w-[calc(100vw-2.5rem)] h-[80vh] max-h-[820px]",
+          expanded ? "w-[920px]" : "w-[600px]",
           "max-sm:inset-x-0 max-sm:bottom-0 max-sm:right-0 max-sm:left-0 max-sm:w-full max-sm:h-[85vh] max-sm:max-w-none max-sm:rounded-b-none max-sm:rounded-t-2xl",
           "transition-all duration-200 ease-out origin-bottom-right",
           open ? "opacity-100 scale-100 translate-y-0 pointer-events-auto" : "opacity-0 scale-95 translate-y-3 pointer-events-none"
@@ -89,14 +93,24 @@ export function FormulatorAgent() {
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setOpen(false)}
-            aria-label="Close"
-            className="h-7 w-7 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors shrink-0"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              type="button"
+              onClick={() => setExpanded((e) => !e)}
+              aria-label={expanded ? "Shrink panel" : "Expand panel"}
+              className="h-7 w-7 rounded-full hidden sm:flex items-center justify-center hover:bg-white/10 transition-colors"
+            >
+              {expanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            </button>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              aria-label="Close"
+              className="h-7 w-7 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 min-h-0">

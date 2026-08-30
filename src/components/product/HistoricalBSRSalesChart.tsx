@@ -14,6 +14,9 @@ interface HistoricalData {
 
 interface Props {
   historicalData: HistoricalData | null;
+  /** Render without the outer Panel/CardHeader chrome — for use inside a
+   * flat DocSection where the section heading already provides the label. */
+  bare?: boolean;
 }
 
 function parseMonthlyData(history: Record<string, number | null> | undefined) {
@@ -39,7 +42,7 @@ const tooltipStyle = {
   fontSize: "12px",
 };
 
-export default function HistoricalBSRSalesChart({ historicalData }: Props) {
+export default function HistoricalBSRSalesChart({ historicalData, bare }: Props) {
   if (!historicalData) return null;
 
   const bsrData = parseMonthlyData(historicalData.monthly_bsr_history);
@@ -53,15 +56,7 @@ export default function HistoricalBSRSalesChart({ historicalData }: Props) {
     return { ...b, bsr: b.value, sales: s?.value ?? null };
   });
 
-  return (
-    <Panel>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium flex items-center gap-2">
-          <TrendingUp className="w-4 h-4" />
-          Historical BSR & Sales (up to 24 months)
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
+  const body = (
         <Tabs defaultValue="bsr" className="space-y-3">
           <TabsList className="grid w-full grid-cols-3 h-8">
             <TabsTrigger value="bsr" className="text-xs">BSR History</TabsTrigger>
@@ -198,7 +193,19 @@ export default function HistoricalBSRSalesChart({ historicalData }: Props) {
             <p className="text-xs text-muted-foreground mt-1">BSR (line, left axis - lower is better) vs Est. Sales (area, right axis)</p>
           </TabsContent>
         </Tabs>
-      </CardContent>
+  );
+
+  if (bare) return body;
+
+  return (
+    <Panel>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium flex items-center gap-2">
+          <TrendingUp className="w-4 h-4" />
+          Historical BSR & Sales (up to 24 months)
+        </CardTitle>
+      </CardHeader>
+      <CardContent>{body}</CardContent>
     </Panel>
   );
 }

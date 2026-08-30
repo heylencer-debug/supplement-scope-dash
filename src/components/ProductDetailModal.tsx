@@ -549,119 +549,122 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
 
           {/* Sales Tab */}
           <TabsContent value="sales" className={`mt-4 ${scrollableContentClass} ${maxContentHeight}`}>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Panel><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Monthly Sales</p><p className="text-2xl font-bold">{product.monthly_sales?.toLocaleString() ?? "-"}</p>{product.estimated_monthly_sales && product.estimated_monthly_sales !== product.monthly_sales && <p className="text-xs text-muted-foreground">Est: {product.estimated_monthly_sales.toLocaleString()}</p>}</CardContent></Panel>
-                <Panel><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Monthly Revenue</p><p className="text-2xl font-bold text-chart-4">{formatCurrency(product.monthly_revenue)}</p>{product.estimated_revenue && product.estimated_revenue !== product.monthly_revenue && <p className="text-xs text-muted-foreground">Est: {formatCurrency(product.estimated_revenue)}</p>}</CardContent></Panel>
-                <Panel><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Recent Sales</p><p className="text-2xl font-bold">{product.recent_sales ?? "-"}</p></CardContent></Panel>
-                <Panel><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Rating Count</p><p className="text-2xl font-bold">{product.rating_count?.toLocaleString() ?? product.reviews?.toLocaleString() ?? "-"}</p></CardContent></Panel>
-              </div>
-              <Panel>
-                <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><TrendingUp className="w-4 h-4" />Best Seller Rank (BSR)</CardTitle></CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div><p className="text-xs text-muted-foreground">Current BSR</p><p className="text-xl font-bold">#{product.bsr_current?.toLocaleString() ?? "-"}</p></div>
-                    <div><p className="text-xs text-muted-foreground">Primary BSR</p><p className="text-xl font-bold">#{product.bsr_primary?.toLocaleString() ?? "-"}</p></div>
-                    <div><p className="text-xs text-muted-foreground">30-Day Avg</p><p className="text-xl font-bold flex items-center gap-1">#{product.bsr_30_days_avg?.toLocaleString() ?? "-"}{product.bsr_current && product.bsr_30_days_avg && (product.bsr_current < product.bsr_30_days_avg ? <TrendingUp className="w-4 h-4 text-chart-4" /> : product.bsr_current > product.bsr_30_days_avg ? <TrendingDown className="w-4 h-4 text-destructive" /> : null)}</p></div>
-                    <div><p className="text-xs text-muted-foreground">90-Day Avg</p><p className="text-xl font-bold">#{product.bsr_90_days_avg?.toLocaleString() ?? "-"}</p></div>
+            <div>
+              <DocSection first icon={ShoppingCart} title="Sales & Revenue">
+                <StatChipRow>
+                  <StatChip label="Monthly Sales" value={product.monthly_sales?.toLocaleString() ?? "-"} />
+                  <StatChip label="Monthly Revenue" value={formatCurrency(product.monthly_revenue)} tone="up" />
+                  <StatChip label="Recent Sales" value={product.recent_sales ?? "-"} />
+                  <StatChip label="Rating Count" value={product.rating_count?.toLocaleString() ?? product.reviews?.toLocaleString() ?? "-"} />
+                </StatChipRow>
+                {(product.estimated_monthly_sales != null && product.estimated_monthly_sales !== product.monthly_sales) ||
+                (product.estimated_revenue != null && product.estimated_revenue !== product.monthly_revenue) ? (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {product.estimated_monthly_sales != null && product.estimated_monthly_sales !== product.monthly_sales && `Est. sales ${product.estimated_monthly_sales.toLocaleString()}`}
+                    {product.estimated_monthly_sales != null && product.estimated_monthly_sales !== product.monthly_sales && product.estimated_revenue != null && product.estimated_revenue !== product.monthly_revenue && " · "}
+                    {product.estimated_revenue != null && product.estimated_revenue !== product.monthly_revenue && `Est. revenue ${formatCurrency(product.estimated_revenue)}`}
+                  </p>
+                ) : null}
+              </DocSection>
+
+              <DocSection icon={TrendingUp} title="Best Seller Rank">
+                <StatChipRow>
+                  <StatChip label="Current BSR" value={product.bsr_current ? `#${product.bsr_current.toLocaleString()}` : "-"} />
+                  <StatChip label="Primary BSR" value={product.bsr_primary ? `#${product.bsr_primary.toLocaleString()}` : "-"} />
+                  <StatChip
+                    label="30-Day Avg"
+                    value={product.bsr_30_days_avg ? `#${product.bsr_30_days_avg.toLocaleString()}` : "-"}
+                    tone={product.bsr_current && product.bsr_30_days_avg ? (product.bsr_current < product.bsr_30_days_avg ? "up" : product.bsr_current > product.bsr_30_days_avg ? "down" : undefined) : undefined}
+                  />
+                  <StatChip label="90-Day Avg" value={product.bsr_90_days_avg ? `#${product.bsr_90_days_avg.toLocaleString()}` : "-"} />
+                </StatChipRow>
+                {(product.bsr_current || product.bsr_30_days_avg || product.bsr_90_days_avg) && (
+                  <div className="mt-4">
+                    <ResponsiveContainer width="100%" height={110}>
+                      <BarChart data={[
+                        { name: "90-Day Avg", value: product.bsr_90_days_avg ?? 0, fill: "hsl(var(--chart-4))" },
+                        { name: "30-Day Avg", value: product.bsr_30_days_avg ?? 0, fill: "hsl(var(--chart-3))" },
+                        { name: "Current", value: product.bsr_current ?? 0, fill: "hsl(var(--primary))" },
+                      ].filter(d => d.value > 0)} layout="vertical" margin={{ top: 0, right: 8, bottom: 0, left: 0 }}>
+                        <XAxis type="number" axisLine={false} tickLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} tickFormatter={(v) => v.toLocaleString()} />
+                        <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} width={70} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} />
+                        <Tooltip formatter={(value: number) => [`#${value.toLocaleString()}`, "BSR"]} contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }} />
+                        <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={16}>
+                          {[
+                            { fill: "hsl(var(--chart-4))" },
+                            { fill: "hsl(var(--chart-3))" },
+                            { fill: "hsl(var(--primary))" },
+                          ].map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
                   </div>
-                  {(product.bsr_current || product.bsr_30_days_avg || product.bsr_90_days_avg) && (
-                    <div className="pt-2">
-                      <p className="text-xs text-muted-foreground mb-2">BSR Trend (lower is better)</p>
-                      <ResponsiveContainer width="100%" height={120}>
-                        <BarChart data={[
-                          { name: "90-Day Avg", value: product.bsr_90_days_avg ?? 0, fill: "hsl(var(--chart-4))" },
-                          { name: "30-Day Avg", value: product.bsr_30_days_avg ?? 0, fill: "hsl(var(--chart-3))" },
-                          { name: "Current", value: product.bsr_current ?? 0, fill: "hsl(var(--primary))" },
-                        ].filter(d => d.value > 0)} layout="vertical">
-                          <XAxis type="number" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} tickFormatter={(v) => v.toLocaleString()} />
-                          <YAxis dataKey="name" type="category" width={70} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} />
-                          <Tooltip formatter={(value: number) => [`#${value.toLocaleString()}`, "BSR"]} contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }} />
-                          <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                            {[
-                              { fill: "hsl(var(--chart-4))" },
-                              { fill: "hsl(var(--chart-3))" },
-                              { fill: "hsl(var(--primary))" },
-                            ].map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  )}
-                  {product.bsr_category && <p className="text-xs text-muted-foreground">Category: {product.bsr_category}</p>}
-                </CardContent>
-              </Panel>
-              <HistoricalBSRSalesChart historicalData={product.historical_data as any} />
-              <Panel>
-                <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><DollarSign className="w-4 h-4" />Price Metrics</CardTitle></CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div><p className="text-xs text-muted-foreground">Current Price</p><p className="text-xl font-bold text-chart-4">${(product.price_current ?? product.current_price ?? product.price ?? 0).toFixed(2)}</p></div>
-                    <div><p className="text-xs text-muted-foreground">30-Day Avg</p><p className="text-xl font-bold">${product.price_30_days_avg?.toFixed(2) ?? "-"}</p></div>
-                    <div><p className="text-xs text-muted-foreground">90-Day Avg</p><p className="text-xl font-bold">${product.price_90_days_avg?.toFixed(2) ?? "-"}</p></div>
-                    <div><p className="text-xs text-muted-foreground">Unit Price</p><p className="text-xl font-bold">{product.unit_price_value ? `$${product.unit_price_value.toFixed(2)}` : product.unit_price_text ?? "-"}</p></div>
+                )}
+                {product.bsr_category && <p className="text-xs text-muted-foreground mt-1">Category: {product.bsr_category}</p>}
+              </DocSection>
+
+              <DocSection title="Historical BSR & Sales">
+                <HistoricalBSRSalesChart historicalData={product.historical_data as any} bare />
+              </DocSection>
+
+              <DocSection icon={DollarSign} title="Price Metrics">
+                <StatChipRow>
+                  <StatChip label="Current Price" value={`$${(product.price_current ?? product.current_price ?? product.price ?? 0).toFixed(2)}`} tone="up" />
+                  <StatChip label="30-Day Avg" value={product.price_30_days_avg != null ? `$${product.price_30_days_avg.toFixed(2)}` : "-"} />
+                  <StatChip label="90-Day Avg" value={product.price_90_days_avg != null ? `$${product.price_90_days_avg.toFixed(2)}` : "-"} />
+                  <StatChip label="Unit Price" value={product.unit_price_value ? `$${product.unit_price_value.toFixed(2)}` : product.unit_price_text ?? "-"} />
+                </StatChipRow>
+                {(product.price || product.price_30_days_avg || product.price_90_days_avg) && (
+                  <div className="mt-4">
+                    <ResponsiveContainer width="100%" height={110}>
+                      <BarChart data={[
+                        { name: "90-Day Avg", value: product.price_90_days_avg ?? 0, fill: "hsl(var(--chart-4))" },
+                        { name: "30-Day Avg", value: product.price_30_days_avg ?? 0, fill: "hsl(var(--chart-3))" },
+                        { name: "Current", value: product.price_current ?? product.current_price ?? product.price ?? 0, fill: "hsl(var(--chart-2))" },
+                      ].filter(d => d.value > 0)} layout="vertical" margin={{ top: 0, right: 8, bottom: 0, left: 0 }}>
+                        <XAxis type="number" axisLine={false} tickLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} tickFormatter={(v) => `$${v.toFixed(0)}`} domain={['dataMin - 5', 'dataMax + 5']} />
+                        <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} width={70} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} />
+                        <Tooltip formatter={(value: number) => [`$${value.toFixed(2)}`, "Price"]} contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }} />
+                        <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={16}>
+                          {[
+                            { fill: "hsl(var(--chart-4))" },
+                            { fill: "hsl(var(--chart-3))" },
+                            { fill: "hsl(var(--chart-2))" },
+                          ].map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
                   </div>
-                  {(product.price || product.price_30_days_avg || product.price_90_days_avg) && (
-                    <div className="pt-2">
-                      <p className="text-xs text-muted-foreground mb-2">Price Trend</p>
-                      <ResponsiveContainer width="100%" height={120}>
-                        <BarChart data={[
-                          { name: "90-Day Avg", value: product.price_90_days_avg ?? 0, fill: "hsl(var(--chart-4))" },
-                          { name: "30-Day Avg", value: product.price_30_days_avg ?? 0, fill: "hsl(var(--chart-3))" },
-                          { name: "Current", value: product.price_current ?? product.current_price ?? product.price ?? 0, fill: "hsl(var(--chart-2))" },
-                        ].filter(d => d.value > 0)} layout="vertical">
-                          <XAxis type="number" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} tickFormatter={(v) => `$${v.toFixed(0)}`} domain={['dataMin - 5', 'dataMax + 5']} />
-                          <YAxis dataKey="name" type="category" width={70} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} />
-                          <Tooltip formatter={(value: number) => [`$${value.toFixed(2)}`, "Price"]} contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }} />
-                          <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                            {[
-                              { fill: "hsl(var(--chart-4))" },
-                              { fill: "hsl(var(--chart-3))" },
-                              { fill: "hsl(var(--chart-2))" },
-                            ].map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  )}
-                </CardContent>
-              </Panel>
-              <Panel>
-                <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Profitability Estimates</CardTitle></CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div><p className="text-xs text-muted-foreground">FBA Fees Est.</p><p className="text-xl font-bold text-destructive">{formatCurrency(product.fees_estimate)}</p></div>
-                    <div><p className="text-xs text-muted-foreground">Net Est.</p><p className="text-xl font-bold text-chart-4">{formatCurrency(product.net_estimate)}</p></div>
-                    <div><p className="text-xs text-muted-foreground">PPC Bid Est.</p><p className="text-xl font-bold">{product.ppc_bid_estimate ? `$${product.ppc_bid_estimate.toFixed(2)}` : "-"}</p></div>
-                  </div>
-                </CardContent>
-              </Panel>
-              <Panel>
-                <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Star className="w-4 h-4" />Listing Quality Score (LQS)</CardTitle></CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center gap-4">
-                    <div className="relative w-20 h-20">
-                      <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                        <circle cx="50" cy="50" r="40" fill="none" stroke="hsl(var(--secondary))" strokeWidth="10" />
-                        <circle cx="50" cy="50" r="40" fill="none" stroke={product.lqs && product.lqs >= 80 ? "hsl(var(--chart-2))" : product.lqs && product.lqs >= 50 ? "hsl(var(--chart-4))" : "hsl(var(--destructive))"} strokeWidth="10" strokeLinecap="round" strokeDasharray={`${(product.lqs ?? 0) * 2.51} 251`} />
-                      </svg>
-                      <div className="absolute inset-0 flex items-center justify-center"><span className={`text-xl font-bold ${getLqsColor(product.lqs ?? 0)}`}>{product.lqs ?? "-"}</span></div>
-                    </div>
-                    <div className="flex-1 grid grid-cols-2 md:grid-cols-5 gap-3">
-                      <div className="text-center"><p className="text-2xl font-bold">{product.images_count ?? allImages.length}</p><p className="text-xs text-muted-foreground">Images</p></div>
-                      <div className="text-center"><p className="text-2xl font-bold">{product.video_count ?? product.video_urls?.length ?? 0}</p><p className="text-xs text-muted-foreground">Videos</p></div>
-                      <div className="text-center"><p className="text-2xl font-bold">{product.bullets_count ?? product.feature_bullets?.length ?? 0}</p><p className="text-xs text-muted-foreground">Bullets</p></div>
-                      <div className="text-center"><p className="text-2xl font-bold">{product.description_length ? Math.round(product.description_length / 100) * 100 : "-"}</p><p className="text-xs text-muted-foreground">Desc Length</p></div>
-                      <div className="text-center"><p className="text-2xl font-bold">{product.has_a_plus_content ? "Yes" : "No"}</p><p className="text-xs text-muted-foreground">A+ Content</p></div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Panel>
+                )}
+              </DocSection>
+
+              <DocSection title="Profitability Estimates">
+                <StatChipRow>
+                  <StatChip label="FBA Fees Est." value={formatCurrency(product.fees_estimate)} tone="down" />
+                  <StatChip label="Net Est." value={formatCurrency(product.net_estimate)} tone="up" />
+                  <StatChip label="PPC Bid Est." value={product.ppc_bid_estimate ? `$${product.ppc_bid_estimate.toFixed(2)}` : "-"} />
+                </StatChipRow>
+              </DocSection>
+
+              <DocSection icon={Star} title="Listing Quality Score">
+                <StatChipRow>
+                  <StatChip label="LQS" value={product.lqs ?? "-"} tone={product.lqs != null ? (product.lqs >= 80 ? "up" : product.lqs >= 50 ? "warn" : "down") : undefined} />
+                  <StatChip label="Images" value={product.images_count ?? allImages.length} />
+                  <StatChip label="Videos" value={product.video_count ?? product.video_urls?.length ?? 0} />
+                  <StatChip label="Bullets" value={product.bullets_count ?? product.feature_bullets?.length ?? 0} />
+                  <StatChip label="Desc Length" value={product.description_length ? Math.round(product.description_length / 100) * 100 : "-"} />
+                  <StatChip label="A+ Content" value={product.has_a_plus_content ? "Yes" : "No"} />
+                </StatChipRow>
+              </DocSection>
+
               {product.keyword_rank && Object.keys(product.keyword_rank).length > 0 && (
-                <Panel>
-                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Keyword Rankings</CardTitle></CardHeader>
-                  <CardContent><div className="space-y-2">{Object.entries(product.keyword_rank as Record<string, number>).slice(0, 10).map(([keyword, rank]) => <div key={keyword} className="flex justify-between items-center text-sm"><span className="text-muted-foreground">{keyword}</span><Badge variant="outline">#{rank}</Badge></div>)}</div></CardContent>
-                </Panel>
+                <DocSection title="Keyword Rankings">
+                  <KVGrid>
+                    {Object.entries(product.keyword_rank as Record<string, number>).slice(0, 10).map(([keyword, rank]) => (
+                      <KV key={keyword} label={keyword} value={`#${rank}`} />
+                    ))}
+                  </KVGrid>
+                </DocSection>
               )}
             </div>
           </TabsContent>

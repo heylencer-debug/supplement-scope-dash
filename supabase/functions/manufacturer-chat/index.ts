@@ -143,7 +143,7 @@ interface Corpus {
 async function loadCorpus(supabase: ReturnType<typeof createClient>, categoryId: string): Promise<Corpus> {
   const { data: briefRow, error } = await supabase
     .from("formula_briefs")
-    .select("ingredients, positioning, market_summary, target_customer, keyword")
+    .select("ingredients, positioning, market_summary, target_customer")
     .eq("category_id", categoryId)
     .limit(1)
     .maybeSingle();
@@ -151,7 +151,7 @@ async function loadCorpus(supabase: ReturnType<typeof createClient>, categoryId:
   if (error) throw error;
 
   const ing = (briefRow?.ingredients || null) as Record<string, unknown> | null;
-  const keyword = (briefRow as Record<string, unknown> | null)?.keyword as string || (ing?.keyword as string) || "this category";
+  const keyword = (ing?.keyword as string) || "this category";
 
   if (!briefRow || !ing) {
     return { text: "No formula brief has been generated for this category yet (run the pipeline through P8 first).", keyword, ingredients: null };

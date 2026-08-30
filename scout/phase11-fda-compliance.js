@@ -512,7 +512,7 @@ ${opusAnalysis && opusAnalysis.length > 40000 ? '\n[Analysis continues — key s
 
 ## YOUR DELIVERABLE
 
-# P12 GROK VALIDATION REPORT
+# P12 CROSS-CHECK VALIDATION REPORT
 *Validating Claude (via OpenRouter) compliance analysis for ${keyword}*
 
 ## VALIDATION SUMMARY
@@ -541,7 +541,7 @@ ${opusAnalysis && opusAnalysis.length > 40000 ? '\n[Analysis continues — key s
 |---|---|---|---|
 [If none: "✅ No false positives — all flags are valid."]
 
-## GROK'S FINAL COMPLIANCE VERDICT
+## CROSS-CHECK FINAL COMPLIANCE VERDICT
 **Validation result**: [PASS / PASS WITH MINOR CORRECTIONS / FAIL]
 **Adjusted compliance score**: [X/100 or "Agrees with Claude's score of X/100"]
 **Summary**: [2-3 sentences — is this formula compliant? What's the most important action item?]

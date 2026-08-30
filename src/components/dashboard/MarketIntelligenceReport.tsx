@@ -5,14 +5,18 @@
  * Design system tokens only.
  */
 
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Brain, AlertCircle, Clock, TrendingUp, FlaskConical, DollarSign, Users, Target, ShieldAlert, Lightbulb, BarChart3, Star, CheckCircle2, AlertTriangle, Zap } from "lucide-react";
+import { Brain, AlertCircle, Clock, TrendingUp, FlaskConical, DollarSign, Users, Target, ShieldAlert, Lightbulb, BarChart3, Star, CheckCircle2, AlertTriangle, Zap, Maximize2 } from "lucide-react";
 import { CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Panel } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useProductIntelligence } from "@/hooks/useProductIntelligence";
+import { DocumentModal } from "@/components/ui/document-modal";
+import { MarkdownDoc } from "@/lib/markdownDoc";
 
 interface MarketIntelligenceReportProps {
   categoryId: string;
@@ -321,6 +325,7 @@ export function MarketIntelligenceReport({ categoryId, categoryName }: MarketInt
   const { data: mi, isLoading, error } = useMarketIntelligence(categoryId);
   const { data: kpiStats } = useMarketKpiStats(categoryId);
   const { data: productIntel } = useProductIntelligence(categoryId);
+  const [docOpen, setDocOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -405,8 +410,25 @@ export function MarketIntelligenceReport({ categoryId, categoryName }: MarketInt
               <Clock className="w-3 h-3" />{generatedAt}
             </div>
           )}
+          <Button variant="outline" size="sm" className="h-7 gap-1 text-[11px] px-2" onClick={() => setDocOpen(true)}>
+            <Maximize2 className="h-3 w-3" />
+            Open full report
+          </Button>
         </div>
       </div>
+
+      <DocumentModal
+        open={docOpen}
+        onOpenChange={setDocOpen}
+        title={`${categoryName || "Category"} — Market Demand Analysis`}
+        subtitle={`${mi.products_analyzed} products analyzed · ${mi.review_coverage} reviews`}
+        chips={[
+          { label: "Model", value: mi.grok_model || "Grok AI" },
+          ...(generatedAt ? [{ label: "Generated", value: generatedAt }] : []),
+        ]}
+      >
+        <MarkdownDoc content={mi.ai_market_analysis} />
+      </DocumentModal>
 
       {/* KPI Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

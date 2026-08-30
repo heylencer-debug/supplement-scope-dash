@@ -4,14 +4,27 @@
  * Shows DOVIVE vs top competitors, updated per category.
  */
 
-import { Trophy, CheckCircle2, FlaskConical, AlertCircle, Loader2 } from "lucide-react";
+import { useState } from "react";
+import { Trophy, CheckCircle2, FlaskConical, AlertCircle, Loader2, Maximize2 } from "lucide-react";
 import { CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Panel } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { useFormulaBrief } from "@/hooks/useFormulaBrief";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { DocumentModal } from "@/components/ui/document-modal";
+import { MarkdownDoc } from "@/lib/markdownDoc";
+
+function OpenReportButton({ onClick }: { onClick: () => void }) {
+  return (
+    <Button variant="outline" size="sm" className="h-7 gap-1 text-[11px] px-2 shrink-0" onClick={onClick}>
+      <Maximize2 className="h-3 w-3" />
+      Open report
+    </Button>
+  );
+}
 
 interface P9BenchmarkOverviewProps {
   categoryId: string;
@@ -135,6 +148,7 @@ function ComparisonTable({ markdown }: { markdown: string }) {
 
 export function P9BenchmarkOverview({ categoryId, activeVersionContent, activeVersionInfo }: P9BenchmarkOverviewProps) {
   const { data: brief, isLoading, error } = useFormulaBrief(categoryId);
+  const [openDoc, setOpenDoc] = useState<"active" | "comparison" | "adjusted" | "brief" | null>(null);
 
   if (isLoading) {
     return (
@@ -151,19 +165,22 @@ export function P9BenchmarkOverview({ categoryId, activeVersionContent, activeVe
       <div className="space-y-4">
         {/* Active Version Indicator */}
         <Panel className="border-primary/30 bg-primary/5">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-sm text-primary">
-              <CheckCircle2 className="h-4 w-4" />
-              Active Formula — Version {activeVersionInfo?.versionNumber || "?"}
-            </CardTitle>
-            <CardDescription className="text-xs">
-              {activeVersionInfo?.changeSummary || "Currently active formula version"}
-              {activeVersionInfo?.createdAt && (
-                <span className="ml-2 text-muted-foreground">
-                  • {new Date(activeVersionInfo.createdAt).toLocaleDateString()} {new Date(activeVersionInfo.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
-              )}
-            </CardDescription>
+          <CardHeader className="pb-2 flex-row items-start justify-between gap-3 space-y-0">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-sm text-primary">
+                <CheckCircle2 className="h-4 w-4" />
+                Active Formula — Version {activeVersionInfo?.versionNumber || "?"}
+              </CardTitle>
+              <CardDescription className="text-xs mt-1.5">
+                {activeVersionInfo?.changeSummary || "Currently active formula version"}
+                {activeVersionInfo?.createdAt && (
+                  <span className="ml-2 text-muted-foreground">
+                    • {new Date(activeVersionInfo.createdAt).toLocaleDateString()} {new Date(activeVersionInfo.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                )}
+              </CardDescription>
+            </div>
+            <OpenReportButton onClick={() => setOpenDoc("active")} />
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -194,6 +211,16 @@ export function P9BenchmarkOverview({ categoryId, activeVersionContent, activeVe
             )}
           </CardContent>
         </Panel>
+
+        <DocumentModal
+          open={openDoc === "active"}
+          onOpenChange={(o) => setOpenDoc(o ? "active" : null)}
+          title={`Active Formula — Version ${activeVersionInfo?.versionNumber || "?"}`}
+          subtitle={activeVersionInfo?.changeSummary || "Currently active formula version"}
+          chips={activeVersionInfo?.createdAt ? [{ label: "Created", value: new Date(activeVersionInfo.createdAt).toLocaleDateString() }] : undefined}
+        >
+          <MarkdownDoc content={activeVersionContent} />
+        </DocumentModal>
       </div>
     );
   }
@@ -253,14 +280,17 @@ export function P9BenchmarkOverview({ categoryId, activeVersionContent, activeVe
       {/* Competitor Comparison Table */}
       {comparison && (
         <Panel>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <FlaskConical className="h-4 w-4 text-primary" />
-              DOVIVE vs Top Competitors — Formula Benchmark
-            </CardTitle>
-            <CardDescription className="text-xs">
-              AI-generated comparison from P10 QA for {keyword}
-            </CardDescription>
+          <CardHeader className="pb-2 flex-row items-start justify-between gap-3 space-y-0">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <FlaskConical className="h-4 w-4 text-primary" />
+                DOVIVE vs Top Competitors — Formula Benchmark
+              </CardTitle>
+              <CardDescription className="text-xs mt-1.5">
+                AI-generated comparison from P10 QA for {keyword}
+              </CardDescription>
+            </div>
+            <OpenReportButton onClick={() => setOpenDoc("comparison")} />
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -273,14 +303,17 @@ export function P9BenchmarkOverview({ categoryId, activeVersionContent, activeVe
       {/* Adjusted Formula */}
       {adjustedFormula && (
         <Panel className="border-primary/20 bg-primary/5">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-sm text-primary">
-              <CheckCircle2 className="h-4 w-4" />
-              Recommended DOVIVE Formula — QA Adjusted
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Final formula spec from P10 adjudication
-            </CardDescription>
+          <CardHeader className="pb-2 flex-row items-start justify-between gap-3 space-y-0">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-sm text-primary">
+                <CheckCircle2 className="h-4 w-4" />
+                Recommended DOVIVE Formula — QA Adjusted
+              </CardTitle>
+              <CardDescription className="text-xs mt-1.5">
+                Final formula spec from P10 adjudication
+              </CardDescription>
+            </div>
+            <OpenReportButton onClick={() => setOpenDoc("adjusted")} />
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -313,11 +346,12 @@ export function P9BenchmarkOverview({ categoryId, activeVersionContent, activeVe
       {/* Full AI Brief (collapsed) */}
       {finalBrief && !adjustedFormula && (
         <Panel>
-          <CardHeader className="pb-2">
+          <CardHeader className="pb-2 flex-row items-start justify-between gap-3 space-y-0">
             <CardTitle className="flex items-center gap-2 text-sm">
               <FlaskConical className="h-4 w-4 text-primary" />
               Full Formula Brief
             </CardTitle>
+            <OpenReportButton onClick={() => setOpenDoc("brief")} />
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -326,6 +360,33 @@ export function P9BenchmarkOverview({ categoryId, activeVersionContent, activeVe
           </CardContent>
         </Panel>
       )}
+
+      <DocumentModal
+        open={openDoc === "comparison"}
+        onOpenChange={(o) => setOpenDoc(o ? "comparison" : null)}
+        title="DOVIVE vs Top Competitors — Formula Benchmark"
+        subtitle={`AI-generated comparison from P10 QA for ${keyword}`}
+      >
+        <MarkdownDoc content={comparison} />
+      </DocumentModal>
+
+      <DocumentModal
+        open={openDoc === "adjusted"}
+        onOpenChange={(o) => setOpenDoc(o ? "adjusted" : null)}
+        title="Recommended DOVIVE Formula — QA Adjusted"
+        subtitle="Final formula spec from P10 adjudication"
+      >
+        <MarkdownDoc content={adjustedFormula} />
+      </DocumentModal>
+
+      <DocumentModal
+        open={openDoc === "brief"}
+        onOpenChange={(o) => setOpenDoc(o ? "brief" : null)}
+        title="Full Formula Brief"
+        subtitle={keyword}
+      >
+        <MarkdownDoc content={typeof finalBrief === "string" ? finalBrief : undefined} />
+      </DocumentModal>
     </div>
   );
 }

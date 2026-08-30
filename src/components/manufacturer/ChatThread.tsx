@@ -149,7 +149,7 @@ function ChangeCardPanel({
         )}
 
         {card.changes?.length > 0 && (
-          <div className="rounded-lg border border-border/60 overflow-hidden">
+          <div className="rounded-lg border border-border/60 overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
                 <tr className="bg-muted/30">
@@ -252,11 +252,11 @@ function ChatBubble({
       >
         {isUser ? <User className="w-3.5 h-3.5" /> : <Bot className="w-3.5 h-3.5" />}
       </div>
-      <div className={cn("min-w-0 max-w-[80%]", isUser ? "items-end" : "items-start", "flex flex-col")}>
+      <div className={cn("min-w-0 max-w-[85%] overflow-hidden", isUser ? "items-end" : "items-start", "flex flex-col")}>
         {message.content && (
           <div
             className={cn(
-              "rounded-2xl px-4 py-3 text-sm leading-relaxed",
+              "rounded-2xl px-4 py-3 text-sm leading-relaxed max-w-full min-w-0 overflow-hidden break-words",
               isUser ? "bg-primary/10 text-foreground rounded-tr-sm" : "bg-muted text-foreground rounded-tl-sm"
             )}
           >
@@ -504,7 +504,7 @@ export function ChatThread({ categoryId, keyword, className, hideHeader, onLates
         </div>
       )}
 
-      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-5 space-y-5">
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 py-5 space-y-5">
         {messagesQuery.isLoading && (
           <p className="text-xs text-muted-foreground text-center py-6">Loading conversation…</p>
         )}

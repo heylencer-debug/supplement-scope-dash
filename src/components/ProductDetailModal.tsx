@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { BrandModal } from "@/components/ui/brand-modal";
+import { DocumentModal } from "@/components/ui/document-modal";
+import { MarkdownDoc } from "@/lib/markdownDoc";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -7,11 +8,11 @@ import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Panel } from "@/components/ui/panel";
 import { Progress } from "@/components/ui/progress";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { 
-  Star, TrendingUp, TrendingDown, AlertCircle, CheckCircle, Target, Users, Beaker, 
-  Lightbulb, ShoppingCart, Package, Image, BarChart3, DollarSign, Calendar, 
+import {
+  Star, TrendingUp, TrendingDown, AlertCircle, CheckCircle, Target, Users, Beaker,
+  Lightbulb, ShoppingCart, Package, Image, BarChart3, DollarSign, Calendar,
   ExternalLink, Play, Award, Info, ChevronDown, Truck, FileText, Box, Link2, Tag,
-  Palette, Type, LayoutGrid, Sparkles, RefreshCw, Loader2, MessageSquare
+  Palette, Type, LayoutGrid, Sparkles, RefreshCw, Loader2, MessageSquare, Copy,
 } from "lucide-react";
 import { useSupplementFactsAnalysis } from "@/hooks/useSupplementFactsAnalysis";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis } from "recharts";
@@ -21,6 +22,7 @@ import { useP5SourcesForProduct } from "@/hooks/useP5Sources";
 import { useCategoryContext } from "@/contexts/CategoryContext";
 import { Globe } from "lucide-react";
 import { parseClaimsList } from "@/lib/parseClaims";
+import { cn } from "@/lib/utils";
 
 // Single clean active treatment (smoke pill, no border-b + focus-ring
 // double outline) for the product-detail tab strip. Kept as one shared
@@ -29,6 +31,89 @@ const productTabCls =
   "gap-1 text-xs py-1.5 px-3 rounded-md shrink-0 whitespace-nowrap " +
   "data-[state=active]:!bg-primary/10 data-[state=active]:!border-transparent data-[state=active]:!text-primary " +
   "focus-visible:!ring-0 focus-visible:!ring-offset-0";
+
+// ─── Flat "document" section primitives ────────────────────────────────────
+// Modern-minimal treatment (2026-08-30 clutter audit): replaces the old
+// Panel-in-Panel-in-Panel nesting (bordered card wrapping a bordered card
+// wrapping a stat row) with ONE surface level — the tab body itself sits
+// directly on the modal's card background; sections are separated by
+// whitespace + a hairline rule + a small uppercase label, not another box.
+
+function DocSection({
+  icon: Icon, title, action, children, first,
+}: { icon?: React.ComponentType<{ className?: string }>; title?: string; action?: React.ReactNode; children: React.ReactNode; first?: boolean }) {
+  return (
+    <section className={cn("py-5", !first && "border-t border-border/60 first:border-t-0")}>
+      {title && (
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <h3 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            {Icon && <Icon className="w-3.5 h-3.5" />}
+            {title}
+          </h3>
+          {action}
+        </div>
+      )}
+      {children}
+    </section>
+  );
+}
+
+/** Two-column key/value grid — uppercase muted labels, tabular-nums values. */
+function KVGrid({ children, cols = 2 }: { children: React.ReactNode; cols?: 1 | 2 }) {
+  return <div className={cn("grid gap-x-10", cols === 2 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1")}>{children}</div>;
+}
+
+function KV({ label, value, mono, action }: { label: string; value: React.ReactNode; mono?: boolean; action?: React.ReactNode }) {
+  return (
+    <div className="flex items-baseline justify-between gap-4 py-1.5 border-b border-border/40 last:border-b-0 sm:border-b-0 sm:py-1">
+      <span className="text-[11px] uppercase tracking-wide text-muted-foreground shrink-0">{label}</span>
+      <span className={cn("text-sm font-medium text-foreground text-right tabular-nums flex items-center gap-1.5", mono && "font-mono text-xs")}>
+        {value}
+        {action}
+      </span>
+    </div>
+  );
+}
+
+/** Small tabular stat chip — replaces the old colored-card KPI boxes. */
+function StatChip({ label, value, tone }: { label: string; value: React.ReactNode; tone?: "up" | "down" | "warn" }) {
+  return (
+    <div className="flex flex-col gap-0.5 px-3.5 py-2 rounded-lg bg-muted/50 min-w-[96px]">
+      <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</span>
+      <span className={cn(
+        "text-sm font-semibold tabular-nums text-foreground",
+        tone === "up" && "text-chart-4", tone === "down" && "text-destructive", tone === "warn" && "text-chart-2",
+      )}>{value}</span>
+    </div>
+  );
+}
+function StatChipRow({ children }: { children: React.ReactNode }) {
+  return <div className="flex flex-wrap gap-2">{children}</div>;
+}
+
+/** Single honest line for an empty section — never empty chrome. */
+function EmptyLine({ children }: { children: React.ReactNode }) {
+  return <p className="text-sm text-muted-foreground/80 py-1">{children}</p>;
+}
+
+/** Thin sentiment bar — replaces the pie chart for the common 3-bucket case. */
+function SentimentBar({ positive, neutral, negative }: { positive: number; neutral: number; negative: number }) {
+  const total = positive + neutral + negative || 1;
+  return (
+    <div className="space-y-2">
+      <div className="flex h-1.5 rounded-full overflow-hidden bg-muted">
+        {positive > 0 && <div style={{ width: `${(positive / total) * 100}%` }} className="bg-chart-4" />}
+        {neutral > 0 && <div style={{ width: `${(neutral / total) * 100}%` }} className="bg-chart-2" />}
+        {negative > 0 && <div style={{ width: `${(negative / total) * 100}%` }} className="bg-destructive" />}
+      </div>
+      <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
+        <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-chart-4 inline-block" />Positive {positive}%</span>
+        <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-chart-2 inline-block" />Neutral {neutral}%</span>
+        <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-destructive inline-block" />Negative {negative}%</span>
+      </div>
+    </div>
+  );
+}
 
 interface ProductDetailModalProps {
   product: Product | null;
@@ -287,44 +372,41 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
   const scrollableContentClass = "overflow-y-auto pr-2";
   const maxContentHeight = "max-h-[calc(70vh-140px)]";
 
+  const thumbUrl = product.main_image_url ?? allImages[0];
+
   return (
-    <BrandModal
+    <DocumentModal
       open={open}
       onOpenChange={onOpenChange}
-      size="lg"
-      className="sm:max-w-5xl"
-      icon={<Package className="w-5 h-5" />}
-      title={<span className="line-clamp-2">{product.title ?? "Product Details"}</span>}
-    >
-        <div className="pb-3">
-          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-            <span className="font-medium text-foreground">{product.brand}</span>
-            <span>•</span>
-            <span className="font-semibold text-foreground">${(product.price ?? 0).toFixed(2)}</span>
-            <span>•</span>
-            <div className="flex items-center gap-1">
-              <Star className="w-4 h-4 fill-chart-2 text-chart-2" />
-              <span>{(product.rating_value ?? 0).toFixed(1)}</span>
-            </div>
-            <span>•</span>
-            <span>{(product.rating_count ?? 0).toLocaleString()} reviews</span>
-            {product.asin && (
-              <>
-                <span>•</span>
-                <a 
-                  href={`https://amazon.com/dp/${product.asin}`} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-primary hover:underline"
-                >
-                  {product.asin}
-                  <ExternalLink className="w-3 h-3" />
-                </a>
-              </>
-            )}
+      title={product.title ?? "Product Details"}
+      subtitle={product.brand ?? undefined}
+      thumbnail={
+        thumbUrl ? (
+          <img src={thumbUrl} alt="" className="w-12 h-12 rounded-lg object-contain bg-muted border border-border" />
+        ) : (
+          <div className="w-12 h-12 rounded-lg bg-muted border border-border flex items-center justify-center">
+            <Package className="w-5 h-5 text-muted-foreground" />
           </div>
-        </div>
-
+        )
+      }
+      chips={[
+        ...(product.asin ? [{ label: "ASIN", value: product.asin }] : []),
+        { label: "Price", value: `$${(product.price ?? 0).toFixed(2)}` },
+        { label: "Rating", value: `${(product.rating_value ?? 0).toFixed(1)}★ (${(product.rating_count ?? 0).toLocaleString()})` },
+        ...(product.bsr_current ? [{ label: "BSR", value: `#${product.bsr_current.toLocaleString()}` }] : []),
+        ...(product.monthly_sales ? [{ label: "Monthly Sales", value: product.monthly_sales.toLocaleString() }] : []),
+      ]}
+      actions={
+        product.asin ? (
+          <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" asChild>
+            <a href={`https://amazon.com/dp/${product.asin}`} target="_blank" rel="noopener noreferrer">
+              View on Amazon <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          </Button>
+        ) : undefined
+      }
+      bodyClassName="max-w-none px-6 py-5 sm:px-8 sm:py-6"
+    >
         <Tabs defaultValue="scout-overview" className="flex flex-col">
           <TabsList className="flex w-full items-center gap-1 shrink-0 h-auto overflow-x-auto scrollbar-hide justify-start">
             <TabsTrigger value="scout-overview" className={productTabCls}>
@@ -371,139 +453,96 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
 
           {/* Overview Tab */}
           <TabsContent value="overview" className={`mt-4 ${scrollableContentClass} ${maxContentHeight}`}>
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {allImages.length > 0 && (
-                  <Panel>
-                    <CardContent className="pt-4">
-                      <div className="aspect-square rounded-lg overflow-hidden border bg-muted mb-3">
-                        <img src={allImages[selectedImage]} alt={product.title ?? "Product"} className="w-full h-full object-contain" />
-                      </div>
-                      {allImages.length > 1 && (
-                        <div className="flex gap-2 overflow-x-auto pb-2">
-                          {allImages.slice(0, 8).map((url, idx) => (
-                            <button key={idx} onClick={() => setSelectedImage(idx)} className={`w-14 h-14 rounded border overflow-hidden shrink-0 ${selectedImage === idx ? "ring-2 ring-primary" : ""}`}>
-                              <img src={url} alt="" className="w-full h-full object-contain bg-muted" />
-                            </button>
-                          ))}
-                          {allImages.length > 8 && <div className="w-14 h-14 rounded border flex items-center justify-center text-xs text-muted-foreground bg-muted">+{allImages.length - 8}</div>}
-                        </div>
-                      )}
-                      {product.video_urls && product.video_urls.length > 0 && (
-                        <div className="mt-3 pt-3 border-t">
-                          <p className="text-xs font-medium text-muted-foreground mb-2">Videos ({product.video_count ?? product.video_urls.length})</p>
-                          <div className="flex gap-2">
-                            {product.video_urls.slice(0, 3).map((url, idx) => (
-                              <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-primary hover:underline">
-                                <Play className="w-3 h-3" /> Video {idx + 1}
-                              </a>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Panel>
-                )}
-                <div className="space-y-4">
-                  <Panel>
-                    <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Award className="w-4 h-4" />Status & Badges</CardTitle></CardHeader>
-                    <CardContent>
-                      <div className="flex flex-wrap gap-2">
-                        {product.bestseller && <Badge className="bg-chart-2/10 text-chart-2 border-chart-2/30">Bestseller</Badge>}
-                        {product.amazon_choice && <Badge className="bg-chart-3/10 text-chart-3 border-chart-3/30">Amazon's Choice</Badge>}
-                        {product.is_young_competitor && <Badge className="bg-chart-4/10 text-chart-4 border-chart-4/30">New Competitor</Badge>}
-                        {product.is_fba && <Badge variant="outline">FBA</Badge>}
-                        {product.is_available === false && <Badge variant="destructive">Unavailable</Badge>}
-                        {product.has_a_plus_content && <Badge variant="secondary">A+ Content</Badge>}
-                      </div>
-                    </CardContent>
-                  </Panel>
-                  <Panel>
-                    <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Truck className="w-4 h-4" />Seller & Manufacturer</CardTitle></CardHeader>
-                    <CardContent className="space-y-2 text-sm">
-                      <div className="grid grid-cols-2 gap-2">
-                        <div><p className="text-xs text-muted-foreground">Brand</p><p className="font-medium">{product.brand ?? "-"}</p></div>
-                        <div><p className="text-xs text-muted-foreground">Manufacturer</p><p className="font-medium">{product.manufacturer ?? product.manufacturer_from_label ?? "-"}</p></div>
-                        <div><p className="text-xs text-muted-foreground">Seller</p><p className="font-medium">{product.seller_name ?? "-"}</p></div>
-                        <div><p className="text-xs text-muted-foreground">Seller Type</p><p className="font-medium">{product.seller_type ?? "-"}</p></div>
-                      </div>
-                    </CardContent>
-                  </Panel>
-                  <Panel>
-                    <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Box className="w-4 h-4" />Physical Details</CardTitle></CardHeader>
-                    <CardContent className="space-y-2 text-sm">
-                      <div className="grid grid-cols-2 gap-2">
-                        <div><p className="text-xs text-muted-foreground">Packaging</p><p className="font-medium">{product.packaging_type ?? "-"}</p></div>
-                        <div><p className="text-xs text-muted-foreground">Weight</p><p className="font-medium">{product.weight ?? "-"}</p></div>
-                        <div className="col-span-2"><p className="text-xs text-muted-foreground">Dimensions</p><p className="font-medium">{product.dimensions ?? "-"}</p></div>
-                      </div>
-                      {product.flavor_options && product.flavor_options.length > 0 && (
-                        <div className="pt-2">
-                          <p className="text-xs text-muted-foreground mb-2">Flavor Options ({product.variations_count ?? product.flavor_options.length})</p>
-                          <div className="flex flex-wrap gap-1">
-                            {product.flavor_options.slice(0, 8).map((flavor, idx) => <Badge key={idx} variant="outline" className="text-xs">{flavor}</Badge>)}
-                            {product.flavor_options.length > 8 && <Badge variant="outline" className="text-xs">+{product.flavor_options.length - 8}</Badge>}
-                          </div>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Panel>
-                  <Panel>
-                    <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Calendar className="w-4 h-4" />Timeline</CardTitle></CardHeader>
-                    <CardContent className="space-y-2 text-sm">
-                      <div className="grid grid-cols-2 gap-2">
-                        <div><p className="text-xs text-muted-foreground">First Available</p><p className="font-medium">{formatDate(product.date_first_available)}</p></div>
-                        <div><p className="text-xs text-muted-foreground">Listing Since</p><p className="font-medium">{formatDate(product.listing_since)}</p></div>
-                        <div><p className="text-xs text-muted-foreground">Launch Date</p><p className="font-medium">{formatDate(product.launch_date)}</p></div>
-                        <div><p className="text-xs text-muted-foreground">Age</p><p className="font-medium">{product.age_months ? `${product.age_months} months` : "-"}</p></div>
-                      </div>
-                    </CardContent>
-                  </Panel>
-                </div>
-              </div>
-              {product.feature_bullets && product.feature_bullets.length > 0 && (
-                <Panel>
-                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><CheckCircle className="w-4 h-4 text-chart-4" />Feature Bullets ({product.bullets_count ?? product.feature_bullets.length})</CardTitle></CardHeader>
-                  <CardContent>
-                    <ul className="space-y-2">
-                      {product.feature_bullets.map((bullet, idx) => <li key={idx} className="flex items-start gap-2 text-sm"><span className="text-primary mt-1">•</span><span>{bullet}</span></li>)}
-                    </ul>
-                  </CardContent>
-                </Panel>
+            <div>
+              {(product.bestseller || product.amazon_choice || product.is_young_competitor || product.is_fba || product.is_available === false || product.has_a_plus_content) && (
+                <DocSection first title="Status">
+                  <div className="flex flex-wrap gap-2">
+                    {product.bestseller && <Badge variant="outline">Bestseller</Badge>}
+                    {product.amazon_choice && <Badge variant="outline">Amazon's Choice</Badge>}
+                    {product.is_young_competitor && <Badge variant="outline">New Competitor</Badge>}
+                    {product.is_fba && <Badge variant="outline">FBA</Badge>}
+                    {product.is_available === false && <Badge variant="destructive">Unavailable</Badge>}
+                    {product.has_a_plus_content && <Badge variant="outline">A+ Content</Badge>}
+                  </div>
+                </DocSection>
               )}
+
+              <DocSection icon={Truck} title="Seller & Manufacturer">
+                <KVGrid>
+                  <KV label="Manufacturer" value={product.manufacturer ?? product.manufacturer_from_label ?? "-"} />
+                  <KV label="Seller" value={product.seller_name ?? "-"} />
+                  <KV label="Seller Type" value={product.seller_type ?? "-"} />
+                </KVGrid>
+              </DocSection>
+
+              <DocSection icon={Box} title="Physical Details">
+                <KVGrid>
+                  <KV label="Packaging" value={product.packaging_type ?? "-"} />
+                  <KV label="Weight" value={product.weight ?? "-"} />
+                  <KV label="Dimensions" value={product.dimensions ?? "-"} />
+                </KVGrid>
+                {product.flavor_options && product.flavor_options.length > 0 && (
+                  <div className="pt-3 mt-1 border-t border-border/40">
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-2">Flavor Options ({product.variations_count ?? product.flavor_options.length})</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {product.flavor_options.slice(0, 8).map((flavor, idx) => <Badge key={idx} variant="outline" className="text-xs">{flavor}</Badge>)}
+                      {product.flavor_options.length > 8 && <Badge variant="outline" className="text-xs">+{product.flavor_options.length - 8}</Badge>}
+                    </div>
+                  </div>
+                )}
+              </DocSection>
+
+              <DocSection icon={Calendar} title="Timeline">
+                <KVGrid>
+                  <KV label="First Available" value={formatDate(product.date_first_available)} />
+                  <KV label="Listing Since" value={formatDate(product.listing_since)} />
+                  <KV label="Launch Date" value={formatDate(product.launch_date)} />
+                  <KV label="Age" value={product.age_months ? `${product.age_months} months` : "-"} />
+                </KVGrid>
+              </DocSection>
+
+              {product.video_urls && product.video_urls.length > 0 && (
+                <DocSection icon={Play} title={`Videos (${product.video_count ?? product.video_urls.length})`}>
+                  <div className="flex flex-wrap gap-3">
+                    {product.video_urls.slice(0, 3).map((url, idx) => (
+                      <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-sm text-primary hover:underline">
+                        <Play className="w-3.5 h-3.5" /> Video {idx + 1}
+                      </a>
+                    ))}
+                  </div>
+                </DocSection>
+              )}
+
+              {product.feature_bullets && product.feature_bullets.length > 0 && (
+                <DocSection icon={CheckCircle} title={`Feature Bullets (${product.bullets_count ?? product.feature_bullets.length})`}>
+                  <ul className="space-y-2">
+                    {product.feature_bullets.map((bullet, idx) => <li key={idx} className="flex items-start gap-2 text-sm"><span className="text-primary mt-1">•</span><span>{bullet}</span></li>)}
+                  </ul>
+                </DocSection>
+              )}
+
               {product.description_text && (
                 <Collapsible>
-                  <Panel>
-                    <CardHeader className="pb-2">
-                      <CollapsibleTrigger className="flex items-center justify-between w-full">
-                        <CardTitle className="text-sm font-medium flex items-center gap-2"><FileText className="w-4 h-4" />Description ({product.description_length ?? product.description_text.length} chars)</CardTitle>
-                        <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                      </CollapsibleTrigger>
-                    </CardHeader>
-                    <CollapsibleContent><CardContent><p className="text-sm text-muted-foreground whitespace-pre-wrap">{product.description_text}</p></CardContent></CollapsibleContent>
-                  </Panel>
+                  <DocSection icon={FileText} title={`Description (${product.description_length ?? product.description_text.length} chars)`}
+                    action={<CollapsibleTrigger><ChevronDown className="w-4 h-4 text-muted-foreground" /></CollapsibleTrigger>}
+                  >
+                    <CollapsibleContent><p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">{product.description_text}</p></CollapsibleContent>
+                  </DocSection>
                 </Collapsible>
               )}
+
               {(product.claims || (product.claims_on_label && product.claims_on_label.length > 0)) && (
-                <Panel>
-                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Product Claims</CardTitle></CardHeader>
-                  <CardContent className="space-y-3">
-                    {product.claims && <p className="text-sm text-muted-foreground">{product.claims}</p>}
-                    {product.claims_on_label && product.claims_on_label.length > 0 && <div className="flex flex-wrap gap-2">{product.claims_on_label.map((claim, idx) => <Badge key={idx} variant="secondary">{claim}</Badge>)}</div>}
-                  </CardContent>
-                </Panel>
+                <DocSection title="Product Claims">
+                  {product.claims && <p className="text-sm text-muted-foreground mb-3">{product.claims}</p>}
+                  {product.claims_on_label && product.claims_on_label.length > 0 && <div className="flex flex-wrap gap-2">{product.claims_on_label.map((claim, idx) => <Badge key={idx} variant="outline">{claim}</Badge>)}</div>}
+                </DocSection>
               )}
+
               {categoryTree && categoryTree.length > 0 && (
-                <Panel>
-                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Link2 className="w-4 h-4" />Category Path</CardTitle></CardHeader>
-                  <CardContent>
-                    <div className="flex flex-wrap items-center gap-1 text-sm">{categoryTree.map((cat, idx) => <span key={idx} className="flex items-center gap-1">{idx > 0 && <span className="text-muted-foreground">›</span>}<span className="text-muted-foreground">{cat.name}</span></span>)}</div>
-                    {product.categories_flat && <p className="text-xs text-muted-foreground mt-2">{product.categories_flat}</p>}
-                  </CardContent>
-                </Panel>
-              )}
-              {product.product_url && (
-                <Panel><CardContent className="py-3"><a href={product.product_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-primary hover:underline"><ExternalLink className="w-4 h-4" />View on Amazon</a></CardContent></Panel>
+                <DocSection icon={Link2} title="Category Path">
+                  <div className="flex flex-wrap items-center gap-1 text-sm">{categoryTree.map((cat, idx) => <span key={idx} className="flex items-center gap-1">{idx > 0 && <span className="text-muted-foreground">›</span>}<span className="text-muted-foreground">{cat.name}</span></span>)}</div>
+                  {product.categories_flat && <p className="text-xs text-muted-foreground mt-2">{product.categories_flat}</p>}
+                </DocSection>
               )}
             </div>
           </TabsContent>
@@ -629,128 +668,89 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
 
           {/* Marketing Tab */}
           <TabsContent value="marketing" className={`mt-4 ${scrollableContentClass} ${maxContentHeight}`}>
-            <div className="space-y-4">
-              <Panel>
-                <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Overall Marketing Score</CardTitle></CardHeader>
-                <CardContent>
-                  <div className="flex items-center gap-4">
-                    <div className="relative w-24 h-24">
-                      <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                        <circle cx="50" cy="50" r="40" fill="none" stroke="hsl(var(--secondary))" strokeWidth="10" />
-                        <circle cx="50" cy="50" r="40" fill="none" stroke="hsl(var(--primary))" strokeWidth="10" strokeLinecap="round" strokeDasharray={`${getOverallScore() * 2.51} 251`} />
-                      </svg>
-                      <div className="absolute inset-0 flex items-center justify-center"><span className="text-2xl font-bold">{getOverallScore()}</span></div>
-                    </div>
-                    <div className="flex-1 space-y-2">
-                      {marketingAnalysis?.target_demographics ? (
-                        typeof marketingAnalysis.target_demographics === 'string' ? (
-                          <p className="text-sm text-muted-foreground">{marketingAnalysis.target_demographics}</p>
-                        ) : (
-                          <div className="space-y-3">
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
-                              {marketingAnalysis.target_demographics.primary_audience && <div><span className="text-muted-foreground">Audience:</span> {marketingAnalysis.target_demographics.primary_audience}</div>}
-                              {marketingAnalysis.target_demographics.age_range && <div><span className="text-muted-foreground">Age:</span> {marketingAnalysis.target_demographics.age_range}</div>}
-                              {marketingAnalysis.target_demographics.gender_representation && <div><span className="text-muted-foreground">Gender:</span> {marketingAnalysis.target_demographics.gender_representation}</div>}
-                              {marketingAnalysis.target_demographics.fitness_level_shown && <div><span className="text-muted-foreground">Fitness Level:</span> {marketingAnalysis.target_demographics.fitness_level_shown}</div>}
-                              {marketingAnalysis.target_demographics.body_types_shown && <div><span className="text-muted-foreground">Body Types:</span> {marketingAnalysis.target_demographics.body_types_shown}</div>}
-                              {marketingAnalysis.target_demographics.ethnicity_representation && <div><span className="text-muted-foreground">Diversity:</span> {marketingAnalysis.target_demographics.ethnicity_representation}</div>}
-                            </div>
-                            {marketingAnalysis.target_demographics.relatability_score !== undefined && (
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs text-muted-foreground">Relatability:</span>
-                                <Progress value={marketingAnalysis.target_demographics.relatability_score * 10} className="w-24 h-2" />
-                                <span className="text-xs font-medium">{marketingAnalysis.target_demographics.relatability_score}/10</span>
-                              </div>
-                            )}
-                          </div>
-                        )
-                      ) : (
-                        <p className="text-sm text-muted-foreground">Target demographic data not available</p>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Panel>
+            <div>
+              <DocSection first title="Marketing Score">
+                <StatChipRow>
+                  <StatChip label="Overall Score" value={`${getOverallScore()}/100`} tone={getOverallScore() >= 70 ? "up" : getOverallScore() >= 40 ? "warn" : "down"} />
+                  {marketingAnalysis?.image_analysis?.overall_quality_score !== undefined && (
+                    <StatChip label="Image Quality" value={`${marketingAnalysis.image_analysis.overall_quality_score}/10`} />
+                  )}
+                  {marketingAnalysis?.target_demographics && typeof marketingAnalysis.target_demographics !== "string" && marketingAnalysis.target_demographics.relatability_score !== undefined && (
+                    <StatChip label="Relatability" value={`${marketingAnalysis.target_demographics.relatability_score}/10`} />
+                  )}
+                  {marketingAnalysis?.copy_effectiveness?.title_analysis?.clarity_score !== undefined && (
+                    <StatChip label="Title Clarity" value={`${marketingAnalysis.copy_effectiveness.title_analysis.clarity_score}/5`} />
+                  )}
+                </StatChipRow>
+
+                <div className="mt-4">
+                  {marketingAnalysis?.target_demographics ? (
+                    typeof marketingAnalysis.target_demographics === 'string' ? (
+                      <p className="text-sm text-muted-foreground">{marketingAnalysis.target_demographics}</p>
+                    ) : (
+                      <KVGrid>
+                        {marketingAnalysis.target_demographics.primary_audience && <KV label="Audience" value={marketingAnalysis.target_demographics.primary_audience} />}
+                        {marketingAnalysis.target_demographics.age_range && <KV label="Age" value={marketingAnalysis.target_demographics.age_range} />}
+                        {marketingAnalysis.target_demographics.gender_representation && <KV label="Gender" value={marketingAnalysis.target_demographics.gender_representation} />}
+                        {marketingAnalysis.target_demographics.fitness_level_shown && <KV label="Fitness Level" value={marketingAnalysis.target_demographics.fitness_level_shown} />}
+                        {marketingAnalysis.target_demographics.body_types_shown && <KV label="Body Types" value={marketingAnalysis.target_demographics.body_types_shown} />}
+                        {marketingAnalysis.target_demographics.ethnicity_representation && <KV label="Diversity" value={marketingAnalysis.target_demographics.ethnicity_representation} />}
+                      </KVGrid>
+                    )
+                  ) : (
+                    <EmptyLine>Target demographic data not available.</EmptyLine>
+                  )}
+                </div>
+              </DocSection>
+
               {marketingAnalysis?.competitive_analysis?.unique_selling_points && marketingAnalysis.competitive_analysis.unique_selling_points.length > 0 && (
-                <Panel>
-                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><CheckCircle className="w-4 h-4 text-chart-4" />Unique Selling Points</CardTitle></CardHeader>
-                  <CardContent><ul className="space-y-2">{marketingAnalysis.competitive_analysis.unique_selling_points.map((point, idx) => <li key={idx} className="flex items-start gap-2 text-sm"><TrendingUp className="w-4 h-4 text-chart-4 mt-0.5 shrink-0" />{point}</li>)}</ul></CardContent>
-                </Panel>
+                <DocSection icon={CheckCircle} title="Unique Selling Points">
+                  <ul className="space-y-2">{marketingAnalysis.competitive_analysis.unique_selling_points.map((point, idx) => <li key={idx} className="flex items-start gap-2 text-sm"><TrendingUp className="w-4 h-4 text-chart-4 mt-0.5 shrink-0" />{point}</li>)}</ul>
+                </DocSection>
               )}
               {marketingAnalysis?.competitive_analysis?.weaknesses_vs_competitors && marketingAnalysis.competitive_analysis.weaknesses_vs_competitors.length > 0 && (
-                <Panel>
-                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><AlertCircle className="w-4 h-4 text-destructive" />Weaknesses vs Competitors</CardTitle></CardHeader>
-                  <CardContent><ul className="space-y-2">{marketingAnalysis.competitive_analysis.weaknesses_vs_competitors.map((weakness, idx) => <li key={idx} className="flex items-start gap-2 text-sm"><TrendingDown className="w-4 h-4 text-destructive mt-0.5 shrink-0" />{weakness}</li>)}</ul></CardContent>
-                </Panel>
+                <DocSection icon={AlertCircle} title="Weaknesses vs Competitors">
+                  <ul className="space-y-2">{marketingAnalysis.competitive_analysis.weaknesses_vs_competitors.map((weakness, idx) => <li key={idx} className="flex items-start gap-2 text-sm"><TrendingDown className="w-4 h-4 text-destructive mt-0.5 shrink-0" />{weakness}</li>)}</ul>
+                </DocSection>
               )}
               {marketingAnalysis?.competitive_analysis?.parity_features && marketingAnalysis.competitive_analysis.parity_features.length > 0 && (
-                <Panel>
-                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Parity Features</CardTitle></CardHeader>
-                  <CardContent><div className="flex flex-wrap gap-2">{marketingAnalysis.competitive_analysis.parity_features.map((feature, idx) => <Badge key={idx} variant="secondary">{feature}</Badge>)}</div></CardContent>
-                </Panel>
+                <DocSection title="Parity Features">
+                  <div className="flex flex-wrap gap-2">{marketingAnalysis.competitive_analysis.parity_features.map((feature, idx) => <Badge key={idx} variant="outline">{feature}</Badge>)}</div>
+                </DocSection>
               )}
               {marketingAnalysis?.opportunities && marketingAnalysis.opportunities.length > 0 && (
-                <Panel>
-                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Lightbulb className="w-4 h-4 text-yellow-500" />Market Opportunities</CardTitle></CardHeader>
-                  <CardContent><ul className="space-y-2">{marketingAnalysis.opportunities.map((opp, idx) => <li key={idx} className="flex items-start gap-2 text-sm"><span className="text-yellow-500 shrink-0">•</span>{opp}</li>)}</ul></CardContent>
-                </Panel>
+                <DocSection icon={Lightbulb} title="Market Opportunities">
+                  <ul className="space-y-2">{marketingAnalysis.opportunities.map((opp, idx) => <li key={idx} className="flex items-start gap-2 text-sm"><span className="text-chart-2 shrink-0">•</span>{opp}</li>)}</ul>
+                </DocSection>
               )}
               {marketingAnalysis?.positioning_suggestions && marketingAnalysis.positioning_suggestions.length > 0 && (
-                <Panel>
-                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Target className="w-4 h-4 text-primary" />Positioning Suggestions</CardTitle></CardHeader>
-                  <CardContent><ul className="space-y-2">{marketingAnalysis.positioning_suggestions.map((suggestion, idx) => <li key={idx} className="flex items-start gap-2 text-sm"><span className="text-primary shrink-0">→</span>{suggestion}</li>)}</ul></CardContent>
-                </Panel>
+                <DocSection icon={Target} title="Positioning Suggestions">
+                  <ul className="space-y-2">{marketingAnalysis.positioning_suggestions.map((suggestion, idx) => <li key={idx} className="flex items-start gap-2 text-sm"><span className="text-primary shrink-0">→</span>{suggestion}</li>)}</ul>
+                </DocSection>
               )}
               {marketingAnalysis?.copy_effectiveness && (
-                <Panel>
-                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Copy Effectiveness</CardTitle></CardHeader>
-                  <CardContent className="space-y-3">
+                <DocSection title="Copy Effectiveness">
+                  <div className="space-y-3">
                     {marketingAnalysis.copy_effectiveness.title_analysis?.clarity_score !== undefined && (
-                      <div><div className="flex justify-between text-sm mb-1"><span>Title Clarity</span><span>{marketingAnalysis.copy_effectiveness.title_analysis.clarity_score}/5</span></div><Progress value={(marketingAnalysis.copy_effectiveness.title_analysis.clarity_score / 5) * 100} /></div>
+                      <div><div className="flex justify-between text-sm mb-1"><span className="text-muted-foreground">Title Clarity</span><span>{marketingAnalysis.copy_effectiveness.title_analysis.clarity_score}/5</span></div><Progress value={(marketingAnalysis.copy_effectiveness.title_analysis.clarity_score / 5) * 100} className="h-1.5" /></div>
                     )}
                     {marketingAnalysis.copy_effectiveness.bullet_analysis && (
-                      <div className="flex gap-4 text-sm">
-                        <span className="text-muted-foreground">Benefits: <span className="text-foreground font-medium">{marketingAnalysis.copy_effectiveness.bullet_analysis.benefit_count ?? 0}</span></span>
-                        <span className="text-muted-foreground">Features: <span className="text-foreground font-medium">{marketingAnalysis.copy_effectiveness.bullet_analysis.feature_count ?? 0}</span></span>
-                      </div>
+                      <StatChipRow>
+                        <StatChip label="Benefits" value={marketingAnalysis.copy_effectiveness.bullet_analysis.benefit_count ?? 0} />
+                        <StatChip label="Features" value={marketingAnalysis.copy_effectiveness.bullet_analysis.feature_count ?? 0} />
+                      </StatChipRow>
                     )}
-                  </CardContent>
-                </Panel>
+                  </div>
+                </DocSection>
               )}
-              
+
               {/* Image Analysis Section */}
               {marketingAnalysis?.image_analysis && (
-                <Panel>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium flex items-center gap-2">
-                      <Image className="w-4 h-4 text-primary" />
-                      Image Analysis
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {/* Overall Quality Score */}
-                    {marketingAnalysis.image_analysis.overall_quality_score !== undefined && (
-                      <div className="flex items-center gap-4">
-                        <div className="relative w-16 h-16">
-                          <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                            <circle cx="50" cy="50" r="40" fill="none" stroke="hsl(var(--secondary))" strokeWidth="10" />
-                            <circle cx="50" cy="50" r="40" fill="none" stroke="hsl(var(--primary))" strokeWidth="10" strokeLinecap="round" strokeDasharray={`${marketingAnalysis.image_analysis.overall_quality_score * 25.1} 251`} />
-                          </svg>
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <span className="text-lg font-bold">{marketingAnalysis.image_analysis.overall_quality_score}</span>
-                          </div>
-                        </div>
-                        <div>
-                          <p className="font-medium">Overall Image Quality</p>
-                          <p className="text-sm text-muted-foreground">Score out of 10</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Main Image Assessment */}
+                <DocSection icon={Image} title="Image Analysis">
+                  <div className="space-y-4">
                     {marketingAnalysis.image_analysis.main_image_assessment && (
                       <div className="space-y-2">
-                        <p className="text-sm font-medium">Main Image Assessment</p>
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Main Image Assessment</p>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                           {marketingAnalysis.image_analysis.main_image_assessment.clarity !== undefined && (
                             <div className="space-y-1">
@@ -782,12 +782,11 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                       </div>
                     )}
 
-                    {/* Lifestyle Imagery */}
                     {marketingAnalysis.image_analysis.lifestyle_imagery && (
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
-                          <p className="text-sm font-medium">Lifestyle Imagery</p>
-                          <Badge variant={marketingAnalysis.image_analysis.lifestyle_imagery.present ? "default" : "secondary"} className="text-xs">
+                          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Lifestyle Imagery</p>
+                          <Badge variant="outline" className="text-xs">
                             {marketingAnalysis.image_analysis.lifestyle_imagery.present ? "Present" : "Missing"}
                           </Badge>
                         </div>
@@ -810,302 +809,272 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                       </div>
                     )}
 
-                    {/* Label Visibility */}
                     {marketingAnalysis.image_analysis.label_visibility && (
                       <div className="space-y-2">
-                        <p className="text-sm font-medium">Label Visibility</p>
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Label Visibility</p>
                         <div className="flex flex-wrap gap-2">
-                          <Badge variant={marketingAnalysis.image_analysis.label_visibility.supplement_facts_visible ? "default" : "outline"} className="text-xs">
+                          <Badge variant="outline" className="text-xs">
                             {marketingAnalysis.image_analysis.label_visibility.supplement_facts_visible ? "✓" : "✗"} Supplement Facts
                           </Badge>
-                          <Badge variant={marketingAnalysis.image_analysis.label_visibility.ingredients_readable ? "default" : "outline"} className="text-xs">
+                          <Badge variant="outline" className="text-xs">
                             {marketingAnalysis.image_analysis.label_visibility.ingredients_readable ? "✓" : "✗"} Ingredients Readable
                           </Badge>
-                          <Badge variant={marketingAnalysis.image_analysis.label_visibility.claims_prominent ? "default" : "outline"} className="text-xs">
+                          <Badge variant="outline" className="text-xs">
                             {marketingAnalysis.image_analysis.label_visibility.claims_prominent ? "✓" : "✗"} Claims Prominent
                           </Badge>
                         </div>
                       </div>
                     )}
 
-                    {/* Image Count */}
                     {marketingAnalysis.image_analysis.image_count_assessment && (
-                      <div className="flex items-center gap-4 p-3 bg-secondary/50 rounded-lg">
-                        <div className="text-center">
-                          <p className="text-lg font-bold">{marketingAnalysis.image_analysis.image_count_assessment.total_images ?? product.images_count ?? allImages.length}</p>
-                          <p className="text-xs text-muted-foreground">Images</p>
-                        </div>
+                      <StatChipRow>
+                        <StatChip label="Images" value={marketingAnalysis.image_analysis.image_count_assessment.total_images ?? product.images_count ?? allImages.length} />
                         {marketingAnalysis.image_analysis.image_count_assessment.recommended && (
-                          <div className="text-center">
-                            <p className="text-lg font-bold">{marketingAnalysis.image_analysis.image_count_assessment.recommended}</p>
-                            <p className="text-xs text-muted-foreground">Recommended</p>
-                          </div>
+                          <StatChip label="Recommended" value={marketingAnalysis.image_analysis.image_count_assessment.recommended} />
                         )}
                         {marketingAnalysis.image_analysis.image_count_assessment.variety_score !== undefined && (
-                          <div className="flex-1">
-                            <div className="flex justify-between text-xs mb-1"><span className="text-muted-foreground">Variety Score</span><span>{marketingAnalysis.image_analysis.image_count_assessment.variety_score}/10</span></div>
-                            <Progress value={marketingAnalysis.image_analysis.image_count_assessment.variety_score * 10} className="h-1.5" />
-                          </div>
+                          <StatChip label="Variety" value={`${marketingAnalysis.image_analysis.image_count_assessment.variety_score}/10`} />
                         )}
-                      </div>
+                      </StatChipRow>
                     )}
 
-                    {/* Strengths */}
                     {marketingAnalysis.image_analysis.strengths && marketingAnalysis.image_analysis.strengths.length > 0 && (
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium flex items-center gap-1"><CheckCircle className="w-4 h-4 text-green-500" /> Image Strengths</p>
+                      <div className="space-y-1.5">
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground flex items-center gap-1"><CheckCircle className="w-3.5 h-3.5 text-chart-4" /> Image Strengths</p>
                         <ul className="space-y-1">
                           {marketingAnalysis.image_analysis.strengths.map((s, idx) => (
-                            <li key={idx} className="text-sm text-muted-foreground flex items-start gap-2"><span className="text-green-500">•</span>{s}</li>
+                            <li key={idx} className="text-sm text-muted-foreground flex items-start gap-2"><span className="text-chart-4">•</span>{s}</li>
                           ))}
                         </ul>
                       </div>
                     )}
 
-                    {/* Improvement Suggestions */}
                     {marketingAnalysis.image_analysis.improvement_suggestions && marketingAnalysis.image_analysis.improvement_suggestions.length > 0 && (
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium flex items-center gap-1"><Lightbulb className="w-4 h-4 text-yellow-500" /> Improvement Suggestions</p>
+                      <div className="space-y-1.5">
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground flex items-center gap-1"><Lightbulb className="w-3.5 h-3.5 text-chart-2" /> Improvement Suggestions</p>
                         <ul className="space-y-1">
                           {marketingAnalysis.image_analysis.improvement_suggestions.map((s, idx) => (
-                            <li key={idx} className="text-sm text-muted-foreground flex items-start gap-2"><span className="text-yellow-500">→</span>{s}</li>
+                            <li key={idx} className="text-sm text-muted-foreground flex items-start gap-2"><span className="text-chart-2">→</span>{s}</li>
                           ))}
                         </ul>
                       </div>
                     )}
-                  </CardContent>
-                </Panel>
+                  </div>
+                </DocSection>
               )}
 
-              {!marketingAnalysis && <Panel><CardContent className="py-8 text-center text-muted-foreground">No marketing analysis data available for this product.</CardContent></Panel>}
+              {!marketingAnalysis && <DocSection><EmptyLine>No marketing analysis data available for this product.</EmptyLine></DocSection>}
             </div>
           </TabsContent>
 
           {/* Reviews Tab */}
           <TabsContent value="reviews" className={`mt-4 ${scrollableContentClass} ${maxContentHeight}`}>
-            <div className="space-y-4">
-              {reviewAnalysis?.summary && <Panel><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Review Summary</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">{reviewAnalysis.summary}</p></CardContent></Panel>}
-              
-              {/* Analysis Metadata */}
-              {reviewAnalysis?.analysis_metadata && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <Panel><CardContent className="pt-3 pb-3 text-center"><p className="text-lg font-bold">{reviewAnalysis.analysis_metadata.total_reviews_analyzed ?? "-"}</p><p className="text-xs text-muted-foreground">Reviews Analyzed</p></CardContent></Panel>
-                  <Panel><CardContent className="pt-3 pb-3 text-center"><p className="text-lg font-bold">{reviewAnalysis.analysis_metadata.verified_purchase_rate ? `${reviewAnalysis.analysis_metadata.verified_purchase_rate}%` : "-"}</p><p className="text-xs text-muted-foreground">Verified Rate</p></CardContent></Panel>
-                  <Panel><CardContent className="pt-3 pb-3 text-center"><p className="text-lg font-bold">{reviewAnalysis.analysis_metadata.average_helpful_votes?.toFixed(1) ?? "-"}</p><p className="text-xs text-muted-foreground">Avg Helpful Votes</p></CardContent></Panel>
-                  <Panel><CardContent className="pt-3 pb-3 text-center"><Badge variant={reviewAnalysis.analysis_metadata.analysis_quality === "high" ? "default" : "secondary"}>{reviewAnalysis.analysis_metadata.analysis_quality ?? "-"}</Badge><p className="text-xs text-muted-foreground mt-1">Analysis Quality</p></CardContent></Panel>
-                </div>
-              )}
+            <div>
+              {!reviewAnalysis || !(
+                reviewAnalysis.summary || reviewAnalysis.analysis_metadata || sentimentData.length > 0 ||
+                reviewAnalysis.product_experience_breakdown || reviewAnalysis.competitor_comparisons ||
+                reviewAnalysis.demographics_insights || reviewAnalysis.pain_points?.length ||
+                reviewAnalysis.positive_themes?.length || reviewAnalysis.feature_requests?.length ||
+                reviewAnalysis.actionable_recommendations?.length || reviewAnalysis.key_insights?.length
+              ) ? (
+                <DocSection first><EmptyLine>No review analysis data available for this product.</EmptyLine></DocSection>
+              ) : (
+                <>
+                  {reviewAnalysis.summary && (
+                    <DocSection first title="Review Summary">
+                      <MarkdownDoc content={reviewAnalysis.summary} className="text-sm" />
+                    </DocSection>
+                  )}
 
-              {sentimentData.length > 0 && (
-                <Panel>
-                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Sentiment Distribution</CardTitle></CardHeader>
-                  <CardContent>
-                    <div className="h-48">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie data={sentimentData} cx="50%" cy="50%" innerRadius={40} outerRadius={70} paddingAngle={2} dataKey="value" label={({ name, value }) => `${name}: ${value}%`} labelLine={false}>
-                            {sentimentData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
-                          </Pie>
-                          <Tooltip formatter={(value) => `${value}%`} />
-                          <Legend />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </CardContent>
-                </Panel>
-              )}
+                  {reviewAnalysis.analysis_metadata && (
+                    <DocSection title="Analysis Coverage" first={!reviewAnalysis.summary}>
+                      <StatChipRow>
+                        <StatChip label="Reviews Analyzed" value={reviewAnalysis.analysis_metadata.total_reviews_analyzed ?? "-"} />
+                        <StatChip label="Verified Rate" value={reviewAnalysis.analysis_metadata.verified_purchase_rate ? `${reviewAnalysis.analysis_metadata.verified_purchase_rate}%` : "-"} />
+                        <StatChip label="Avg Helpful Votes" value={reviewAnalysis.analysis_metadata.average_helpful_votes?.toFixed(1) ?? "-"} />
+                        <StatChip label="Analysis Quality" value={reviewAnalysis.analysis_metadata.analysis_quality ?? "-"} />
+                      </StatChipRow>
+                    </DocSection>
+                  )}
 
-              {/* Product Experience Breakdown */}
-              {reviewAnalysis?.product_experience_breakdown && (
-                <Panel>
-                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><BarChart3 className="w-4 h-4 text-primary" />Product Experience Breakdown</CardTitle></CardHeader>
-                  <CardContent>
-                    <div className="grid md:grid-cols-2 gap-4">
-                      {reviewAnalysis.product_experience_breakdown.taste_feedback && (
-                        <div className="border rounded-lg p-3">
-                          <p className="text-xs font-medium mb-2">Taste Feedback</p>
-                          <div className="flex gap-3 mb-2 text-xs">
-                            <span className="text-green-600">👍 {reviewAnalysis.product_experience_breakdown.taste_feedback.positive_count ?? 0}</span>
-                            <span className="text-yellow-600">😐 {reviewAnalysis.product_experience_breakdown.taste_feedback.neutral_count ?? 0}</span>
-                            <span className="text-red-600">👎 {reviewAnalysis.product_experience_breakdown.taste_feedback.negative_count ?? 0}</span>
-                          </div>
-                          {reviewAnalysis.product_experience_breakdown.taste_feedback.common_descriptors && reviewAnalysis.product_experience_breakdown.taste_feedback.common_descriptors.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mb-2">{reviewAnalysis.product_experience_breakdown.taste_feedback.common_descriptors.map((d, i) => <Badge key={i} variant="outline" className="text-xs">{d}</Badge>)}</div>
-                          )}
-                          {reviewAnalysis.product_experience_breakdown.taste_feedback.key_insights && <p className="text-xs text-muted-foreground">{reviewAnalysis.product_experience_breakdown.taste_feedback.key_insights}</p>}
-                        </div>
-                      )}
-                      {reviewAnalysis.product_experience_breakdown.efficacy_feedback && (
-                        <div className="border rounded-lg p-3">
-                          <p className="text-xs font-medium mb-2">Efficacy Feedback</p>
-                          <div className="flex gap-3 mb-2 text-xs">
-                            <span className="text-green-600">Works: {reviewAnalysis.product_experience_breakdown.efficacy_feedback.works_count ?? 0}</span>
-                            <span className="text-yellow-600">Mixed: {reviewAnalysis.product_experience_breakdown.efficacy_feedback.mixed_count ?? 0}</span>
-                            <span className="text-red-600">No Effect: {reviewAnalysis.product_experience_breakdown.efficacy_feedback.no_effect_count ?? 0}</span>
-                          </div>
-                          {reviewAnalysis.product_experience_breakdown.efficacy_feedback.time_to_see_results && <p className="text-xs text-muted-foreground mb-1">Time to results: {reviewAnalysis.product_experience_breakdown.efficacy_feedback.time_to_see_results}</p>}
-                          {reviewAnalysis.product_experience_breakdown.efficacy_feedback.key_insights && <p className="text-xs text-muted-foreground">{reviewAnalysis.product_experience_breakdown.efficacy_feedback.key_insights}</p>}
-                        </div>
-                      )}
-                      {reviewAnalysis.product_experience_breakdown.value_perception && (
-                        <div className="border rounded-lg p-3">
-                          <p className="text-xs font-medium mb-2">Value Perception</p>
-                          <div className="flex gap-3 mb-2 text-xs">
-                            <span className="text-green-600">Good Value: {reviewAnalysis.product_experience_breakdown.value_perception.good_value_count ?? 0}</span>
-                            <span className="text-yellow-600">Fair: {reviewAnalysis.product_experience_breakdown.value_perception.fair_price_count ?? 0}</span>
-                            <span className="text-red-600">Overpriced: {reviewAnalysis.product_experience_breakdown.value_perception.overpriced_count ?? 0}</span>
-                          </div>
-                          {reviewAnalysis.product_experience_breakdown.value_perception.key_insights && <p className="text-xs text-muted-foreground">{reviewAnalysis.product_experience_breakdown.value_perception.key_insights}</p>}
-                        </div>
-                      )}
-                      {reviewAnalysis.product_experience_breakdown.packaging_quality && (
-                        <div className="border rounded-lg p-3">
-                          <p className="text-xs font-medium mb-2">Packaging Quality</p>
-                          <div className="flex gap-3 mb-2 text-xs">
-                            <span className="text-green-600">👍 {reviewAnalysis.product_experience_breakdown.packaging_quality.positive_count ?? 0}</span>
-                            <span className="text-red-600">👎 {reviewAnalysis.product_experience_breakdown.packaging_quality.negative_count ?? 0}</span>
-                          </div>
-                          {reviewAnalysis.product_experience_breakdown.packaging_quality.specific_issues && reviewAnalysis.product_experience_breakdown.packaging_quality.specific_issues.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mb-2">{reviewAnalysis.product_experience_breakdown.packaging_quality.specific_issues.map((issue, i) => <Badge key={i} variant="destructive" className="text-xs">{issue}</Badge>)}</div>
-                          )}
-                          {reviewAnalysis.product_experience_breakdown.packaging_quality.key_insights && <p className="text-xs text-muted-foreground">{reviewAnalysis.product_experience_breakdown.packaging_quality.key_insights}</p>}
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Panel>
-              )}
+                  {sentimentData.length > 0 && (() => {
+                    const byName = Object.fromEntries(sentimentData.map(d => [d.name, d.value]));
+                    const positive = Math.round((byName["5★"] ?? 0) + (byName["4★"] ?? 0) + (byName["Positive"] ?? 0));
+                    const neutral = Math.round((byName["3★"] ?? 0) + (byName["Neutral"] ?? 0));
+                    const negative = Math.round((byName["2★"] ?? 0) + (byName["1★"] ?? 0) + (byName["Negative"] ?? 0));
+                    return (
+                      <DocSection title="Sentiment Distribution">
+                        <SentimentBar positive={positive} neutral={neutral} negative={negative} />
+                      </DocSection>
+                    );
+                  })()}
 
-              {/* Competitor Comparisons */}
-              {reviewAnalysis?.competitor_comparisons && (reviewAnalysis.competitor_comparisons.brands_mentioned?.length || reviewAnalysis.competitor_comparisons.wins_against_competitors?.length || reviewAnalysis.competitor_comparisons.loses_against_competitors?.length) && (
-                <Panel>
-                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Target className="w-4 h-4 text-primary" />Competitor Comparisons</CardTitle></CardHeader>
-                  <CardContent className="space-y-4">
-                    {reviewAnalysis.competitor_comparisons.brands_mentioned && reviewAnalysis.competitor_comparisons.brands_mentioned.length > 0 && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-2">Brands Mentioned by Customers</p>
-                        <div className="flex flex-wrap gap-2">{reviewAnalysis.competitor_comparisons.brands_mentioned.map((brand, idx) => <Badge key={idx} variant="outline">{brand}</Badge>)}</div>
-                      </div>
-                    )}
-                    {reviewAnalysis.competitor_comparisons.wins_against_competitors && reviewAnalysis.competitor_comparisons.wins_against_competitors.length > 0 && (
-                      <div>
-                        <p className="text-xs font-medium text-green-600 mb-2">Why Customers Choose This Product</p>
-                        <ul className="space-y-1">{reviewAnalysis.competitor_comparisons.wins_against_competitors.map((win, idx) => <li key={idx} className="text-sm text-muted-foreground flex items-start gap-2"><CheckCircle className="w-3 h-3 text-green-500 mt-1 shrink-0" />{win}</li>)}</ul>
-                      </div>
-                    )}
-                    {reviewAnalysis.competitor_comparisons.loses_against_competitors && reviewAnalysis.competitor_comparisons.loses_against_competitors.length > 0 && (
-                      <div>
-                        <p className="text-xs font-medium text-red-600 mb-2">Where Competitors Win</p>
-                        <ul className="space-y-1">{reviewAnalysis.competitor_comparisons.loses_against_competitors.map((lose, idx) => <li key={idx} className="text-sm text-muted-foreground flex items-start gap-2"><AlertCircle className="w-3 h-3 text-red-500 mt-1 shrink-0" />{lose}</li>)}</ul>
-                      </div>
-                    )}
-                  </CardContent>
-                </Panel>
-              )}
-
-              {reviewAnalysis?.demographics_insights && (
-                <Panel>
-                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><ShoppingCart className="w-4 h-4 text-primary" />Customer Demographics</CardTitle></CardHeader>
-                  <CardContent className="space-y-4">
-                    {reviewAnalysis.demographics_insights.age_groups_mentioned && reviewAnalysis.demographics_insights.age_groups_mentioned.length > 0 && <div><p className="text-xs font-medium text-muted-foreground mb-2">Age Groups</p><div className="flex flex-wrap gap-2">{reviewAnalysis.demographics_insights.age_groups_mentioned.map((age, idx) => <Badge key={idx} variant="outline">{age}</Badge>)}</div></div>}
-                    {reviewAnalysis.demographics_insights.buyer_types && reviewAnalysis.demographics_insights.buyer_types.length > 0 && <div><p className="text-xs font-medium text-muted-foreground mb-2">Buyer Types</p><div className="flex flex-wrap gap-2">{reviewAnalysis.demographics_insights.buyer_types.map((type, idx) => <Badge key={idx} variant="secondary">{type}</Badge>)}</div></div>}
-                    {reviewAnalysis.demographics_insights.use_cases && reviewAnalysis.demographics_insights.use_cases.length > 0 && <div><p className="text-xs font-medium text-muted-foreground mb-2">Common Use Cases</p><div className="flex flex-wrap gap-2">{reviewAnalysis.demographics_insights.use_cases.map((useCase, idx) => <Badge key={idx} variant="outline">{useCase}</Badge>)}</div></div>}
-                  </CardContent>
-                </Panel>
-              )}
-              {reviewAnalysis?.pain_points && reviewAnalysis.pain_points.length > 0 && (
-                <Panel>
-                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><AlertCircle className="w-4 h-4 text-destructive" />Pain Points</CardTitle></CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {reviewAnalysis.pain_points.map((point, idx) => (
-                        <div key={idx} className="border-b border-border pb-2 last:border-0 last:pb-0">
-                          <div className="flex items-center justify-between mb-1">
-                            <div className="flex items-center gap-2">
-                              {point.category && <Badge variant="outline" className="text-xs">{point.category}</Badge>}
-                              <span className={`text-sm font-medium ${getSeverityColor(point.severity)}`}>{point.theme ?? point.issue}</span>
+                  {reviewAnalysis.product_experience_breakdown && (
+                    <DocSection icon={BarChart3} title="Product Experience Breakdown">
+                      <div className="grid md:grid-cols-2 gap-x-8 gap-y-5">
+                        {reviewAnalysis.product_experience_breakdown.taste_feedback && (
+                          <div>
+                            <p className="text-sm font-medium text-foreground mb-1.5">Taste Feedback</p>
+                            <div className="flex gap-3 mb-1.5 text-xs text-muted-foreground">
+                              <span>👍 {reviewAnalysis.product_experience_breakdown.taste_feedback.positive_count ?? 0}</span>
+                              <span>😐 {reviewAnalysis.product_experience_breakdown.taste_feedback.neutral_count ?? 0}</span>
+                              <span>👎 {reviewAnalysis.product_experience_breakdown.taste_feedback.negative_count ?? 0}</span>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <Badge variant="outline" className="text-xs">{point.frequency} mentions</Badge>
-                              {point.affected_percentage && <Badge variant="secondary" className="text-xs">{point.affected_percentage}% affected</Badge>}
-                              {point.severity && <Badge variant={point.severity === "high" ? "destructive" : "secondary"} className="text-xs">{point.severity}</Badge>}
-                            </div>
+                            {reviewAnalysis.product_experience_breakdown.taste_feedback.common_descriptors && reviewAnalysis.product_experience_breakdown.taste_feedback.common_descriptors.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mb-1.5">{reviewAnalysis.product_experience_breakdown.taste_feedback.common_descriptors.map((d, i) => <Badge key={i} variant="outline" className="text-xs">{d}</Badge>)}</div>
+                            )}
+                            {reviewAnalysis.product_experience_breakdown.taste_feedback.key_insights && <p className="text-xs text-muted-foreground">{reviewAnalysis.product_experience_breakdown.taste_feedback.key_insights}</p>}
                           </div>
-                          {(point.quotes?.length || point.representative_quotes?.length) && <p className="text-xs text-muted-foreground italic">"{(point.quotes ?? point.representative_quotes)?.[0]}"</p>}
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Panel>
-              )}
-              {reviewAnalysis?.positive_themes && reviewAnalysis.positive_themes.length > 0 && (
-                <Panel>
-                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><CheckCircle className="w-4 h-4 text-green-500" />Positive Themes</CardTitle></CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {reviewAnalysis.positive_themes.map((theme, idx) => (
-                        <div key={idx} className="border-b border-border pb-2 last:border-0 last:pb-0">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-sm text-foreground">{theme.theme}</span>
-                            <div className="flex items-center gap-2">
-                              <Badge variant="outline" className="text-xs">{theme.frequency} mentions</Badge>
-                              {theme.mentioned_by_percentage && <Badge variant="secondary" className="text-xs">{theme.mentioned_by_percentage}%</Badge>}
-                              {theme.impact && <Badge variant="secondary" className="text-xs">{theme.impact}</Badge>}
+                        )}
+                        {reviewAnalysis.product_experience_breakdown.efficacy_feedback && (
+                          <div>
+                            <p className="text-sm font-medium text-foreground mb-1.5">Efficacy Feedback</p>
+                            <div className="flex gap-3 mb-1.5 text-xs text-muted-foreground">
+                              <span>Works: {reviewAnalysis.product_experience_breakdown.efficacy_feedback.works_count ?? 0}</span>
+                              <span>Mixed: {reviewAnalysis.product_experience_breakdown.efficacy_feedback.mixed_count ?? 0}</span>
+                              <span>No Effect: {reviewAnalysis.product_experience_breakdown.efficacy_feedback.no_effect_count ?? 0}</span>
                             </div>
+                            {reviewAnalysis.product_experience_breakdown.efficacy_feedback.time_to_see_results && <p className="text-xs text-muted-foreground mb-1">Time to results: {reviewAnalysis.product_experience_breakdown.efficacy_feedback.time_to_see_results}</p>}
+                            {reviewAnalysis.product_experience_breakdown.efficacy_feedback.key_insights && <p className="text-xs text-muted-foreground">{reviewAnalysis.product_experience_breakdown.efficacy_feedback.key_insights}</p>}
                           </div>
-                          {theme.representative_quotes && theme.representative_quotes.length > 0 && <p className="text-xs text-muted-foreground italic">"{theme.representative_quotes[0]}"</p>}
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Panel>
-              )}
-              {reviewAnalysis?.feature_requests && reviewAnalysis.feature_requests.length > 0 && (
-                <Panel>
-                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Feature Requests</CardTitle></CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {reviewAnalysis.feature_requests.map((request, idx) => (
-                        <div key={idx} className="flex items-center justify-between">
-                          <span className="text-sm">{request.request}</span>
-                          <div className="flex items-center gap-2"><span className="text-xs text-muted-foreground">{request.frequency}x</span>{getPriorityBadge(request.priority)}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Panel>
-              )}
+                        )}
+                        {reviewAnalysis.product_experience_breakdown.value_perception && (
+                          <div>
+                            <p className="text-sm font-medium text-foreground mb-1.5">Value Perception</p>
+                            <div className="flex gap-3 mb-1.5 text-xs text-muted-foreground">
+                              <span>Good Value: {reviewAnalysis.product_experience_breakdown.value_perception.good_value_count ?? 0}</span>
+                              <span>Fair: {reviewAnalysis.product_experience_breakdown.value_perception.fair_price_count ?? 0}</span>
+                              <span>Overpriced: {reviewAnalysis.product_experience_breakdown.value_perception.overpriced_count ?? 0}</span>
+                            </div>
+                            {reviewAnalysis.product_experience_breakdown.value_perception.key_insights && <p className="text-xs text-muted-foreground">{reviewAnalysis.product_experience_breakdown.value_perception.key_insights}</p>}
+                          </div>
+                        )}
+                        {reviewAnalysis.product_experience_breakdown.packaging_quality && (
+                          <div>
+                            <p className="text-sm font-medium text-foreground mb-1.5">Packaging Quality</p>
+                            <div className="flex gap-3 mb-1.5 text-xs text-muted-foreground">
+                              <span>👍 {reviewAnalysis.product_experience_breakdown.packaging_quality.positive_count ?? 0}</span>
+                              <span>👎 {reviewAnalysis.product_experience_breakdown.packaging_quality.negative_count ?? 0}</span>
+                            </div>
+                            {reviewAnalysis.product_experience_breakdown.packaging_quality.specific_issues && reviewAnalysis.product_experience_breakdown.packaging_quality.specific_issues.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mb-1.5">{reviewAnalysis.product_experience_breakdown.packaging_quality.specific_issues.map((issue, i) => <Badge key={i} variant="outline" className="text-xs text-destructive border-destructive/30">{issue}</Badge>)}</div>
+                            )}
+                            {reviewAnalysis.product_experience_breakdown.packaging_quality.key_insights && <p className="text-xs text-muted-foreground">{reviewAnalysis.product_experience_breakdown.packaging_quality.key_insights}</p>}
+                          </div>
+                        )}
+                      </div>
+                    </DocSection>
+                  )}
 
-              {/* Actionable Recommendations */}
-              {reviewAnalysis?.actionable_recommendations && reviewAnalysis.actionable_recommendations.length > 0 && (
-                <Panel>
-                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Target className="w-4 h-4 text-primary" />Actionable Recommendations</CardTitle></CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {reviewAnalysis.actionable_recommendations.map((rec, idx) => (
-                        <div key={idx} className="border rounded-lg p-3">
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2">
+                  {reviewAnalysis.competitor_comparisons && (reviewAnalysis.competitor_comparisons.brands_mentioned?.length || reviewAnalysis.competitor_comparisons.wins_against_competitors?.length || reviewAnalysis.competitor_comparisons.loses_against_competitors?.length) && (
+                    <DocSection icon={Target} title="Competitor Comparisons">
+                      <div className="space-y-4">
+                        {reviewAnalysis.competitor_comparisons.brands_mentioned && reviewAnalysis.competitor_comparisons.brands_mentioned.length > 0 && (
+                          <div>
+                            <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-2">Brands Mentioned by Customers</p>
+                            <div className="flex flex-wrap gap-2">{reviewAnalysis.competitor_comparisons.brands_mentioned.map((brand, idx) => <Badge key={idx} variant="outline">{brand}</Badge>)}</div>
+                          </div>
+                        )}
+                        {reviewAnalysis.competitor_comparisons.wins_against_competitors && reviewAnalysis.competitor_comparisons.wins_against_competitors.length > 0 && (
+                          <div>
+                            <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-2">Why Customers Choose This Product</p>
+                            <ul className="space-y-1">{reviewAnalysis.competitor_comparisons.wins_against_competitors.map((win, idx) => <li key={idx} className="text-sm text-muted-foreground flex items-start gap-2"><CheckCircle className="w-3.5 h-3.5 text-chart-4 mt-0.5 shrink-0" />{win}</li>)}</ul>
+                          </div>
+                        )}
+                        {reviewAnalysis.competitor_comparisons.loses_against_competitors && reviewAnalysis.competitor_comparisons.loses_against_competitors.length > 0 && (
+                          <div>
+                            <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-2">Where Competitors Win</p>
+                            <ul className="space-y-1">{reviewAnalysis.competitor_comparisons.loses_against_competitors.map((lose, idx) => <li key={idx} className="text-sm text-muted-foreground flex items-start gap-2"><AlertCircle className="w-3.5 h-3.5 text-destructive mt-0.5 shrink-0" />{lose}</li>)}</ul>
+                          </div>
+                        )}
+                      </div>
+                    </DocSection>
+                  )}
+
+                  {reviewAnalysis.demographics_insights && (
+                    <DocSection icon={ShoppingCart} title="Customer Demographics">
+                      <div className="space-y-4">
+                        {reviewAnalysis.demographics_insights.age_groups_mentioned && reviewAnalysis.demographics_insights.age_groups_mentioned.length > 0 && <div><p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-2">Age Groups</p><div className="flex flex-wrap gap-2">{reviewAnalysis.demographics_insights.age_groups_mentioned.map((age, idx) => <Badge key={idx} variant="outline">{age}</Badge>)}</div></div>}
+                        {reviewAnalysis.demographics_insights.buyer_types && reviewAnalysis.demographics_insights.buyer_types.length > 0 && <div><p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-2">Buyer Types</p><div className="flex flex-wrap gap-2">{reviewAnalysis.demographics_insights.buyer_types.map((type, idx) => <Badge key={idx} variant="outline">{type}</Badge>)}</div></div>}
+                        {reviewAnalysis.demographics_insights.use_cases && reviewAnalysis.demographics_insights.use_cases.length > 0 && <div><p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-2">Common Use Cases</p><div className="flex flex-wrap gap-2">{reviewAnalysis.demographics_insights.use_cases.map((useCase, idx) => <Badge key={idx} variant="outline">{useCase}</Badge>)}</div></div>}
+                      </div>
+                    </DocSection>
+                  )}
+
+                  {reviewAnalysis.pain_points && reviewAnalysis.pain_points.length > 0 && (
+                    <DocSection icon={AlertCircle} title="Pain Points">
+                      <div className="space-y-3">
+                        {reviewAnalysis.pain_points.map((point, idx) => (
+                          <div key={idx} className="border-b border-border/40 pb-3 last:border-0 last:pb-0">
+                            <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
+                              <div className="flex items-center gap-2">
+                                {point.category && <Badge variant="outline" className="text-xs">{point.category}</Badge>}
+                                <span className={`text-sm font-medium ${getSeverityColor(point.severity)}`}>{point.theme ?? point.issue}</span>
+                              </div>
+                              <span className="text-xs text-muted-foreground tabular-nums">
+                                {point.frequency} mentions{point.affected_percentage ? ` · ${point.affected_percentage}% affected` : ""}{point.severity ? ` · ${point.severity}` : ""}
+                              </span>
+                            </div>
+                            {(point.quotes?.length || point.representative_quotes?.length) && <p className="text-xs text-muted-foreground italic">"{(point.quotes ?? point.representative_quotes)?.[0]}"</p>}
+                          </div>
+                        ))}
+                      </div>
+                    </DocSection>
+                  )}
+                  {reviewAnalysis.positive_themes && reviewAnalysis.positive_themes.length > 0 && (
+                    <DocSection icon={CheckCircle} title="Positive Themes">
+                      <div className="space-y-3">
+                        {reviewAnalysis.positive_themes.map((theme, idx) => (
+                          <div key={idx} className="border-b border-border/40 pb-3 last:border-0 last:pb-0">
+                            <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
+                              <span className="text-sm font-medium text-foreground">{theme.theme}</span>
+                              <span className="text-xs text-muted-foreground tabular-nums">
+                                {theme.frequency} mentions{theme.mentioned_by_percentage ? ` · ${theme.mentioned_by_percentage}%` : ""}{theme.impact ? ` · ${theme.impact}` : ""}
+                              </span>
+                            </div>
+                            {theme.representative_quotes && theme.representative_quotes.length > 0 && <p className="text-xs text-muted-foreground italic">"{theme.representative_quotes[0]}"</p>}
+                          </div>
+                        ))}
+                      </div>
+                    </DocSection>
+                  )}
+                  {reviewAnalysis.feature_requests && reviewAnalysis.feature_requests.length > 0 && (
+                    <DocSection title="Feature Requests">
+                      <div className="space-y-2.5">
+                        {reviewAnalysis.feature_requests.map((request, idx) => (
+                          <div key={idx} className="flex items-center justify-between gap-3">
+                            <span className="text-sm text-foreground">{request.request}</span>
+                            <div className="flex items-center gap-2 shrink-0"><span className="text-xs text-muted-foreground">{request.frequency}x</span>{getPriorityBadge(request.priority)}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </DocSection>
+                  )}
+
+                  {reviewAnalysis.actionable_recommendations && reviewAnalysis.actionable_recommendations.length > 0 && (
+                    <DocSection icon={Target} title="Actionable Recommendations">
+                      <div className="space-y-4">
+                        {reviewAnalysis.actionable_recommendations.map((rec, idx) => (
+                          <div key={idx}>
+                            <div className="flex items-center gap-2 mb-1">
                               <Badge variant="outline" className="text-xs capitalize">{rec.area}</Badge>
                               {getPriorityBadge(rec.priority)}
                             </div>
+                            <p className="text-sm font-medium text-foreground mb-0.5">{rec.recommendation}</p>
+                            {rec.rationale && <p className="text-xs text-muted-foreground">{rec.rationale}</p>}
                           </div>
-                          <p className="text-sm font-medium mb-1">{rec.recommendation}</p>
-                          {rec.rationale && <p className="text-xs text-muted-foreground">{rec.rationale}</p>}
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Panel>
-              )}
+                        ))}
+                      </div>
+                    </DocSection>
+                  )}
 
-              {reviewAnalysis?.key_insights && reviewAnalysis.key_insights.length > 0 && (
-                <Panel>
-                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Lightbulb className="w-4 h-4 text-yellow-500" />Key Insights</CardTitle></CardHeader>
-                  <CardContent><ul className="space-y-2">{reviewAnalysis.key_insights.map((insight, idx) => <li key={idx} className="text-sm text-muted-foreground flex items-start gap-2"><span className="text-yellow-500 shrink-0">•</span>{insight}</li>)}</ul></CardContent>
-                </Panel>
+                  {reviewAnalysis.key_insights && reviewAnalysis.key_insights.length > 0 && (
+                    <DocSection icon={Lightbulb} title="Key Insights">
+                      <ul className="space-y-2">{reviewAnalysis.key_insights.map((insight, idx) => <li key={idx} className="text-sm text-muted-foreground flex items-start gap-2"><span className="text-chart-2 shrink-0">•</span>{insight}</li>)}</ul>
+                    </DocSection>
+                  )}
+                </>
               )}
-              {!reviewAnalysis && <Panel><CardContent className="py-8 text-center text-muted-foreground">No review analysis data available for this product.</CardContent></Panel>}
             </div>
           </TabsContent>
 
@@ -1579,188 +1548,117 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
 
           {/* Scout Overview Tab */}
           <TabsContent value="scout-overview" className={`mt-4 ${scrollableContentClass} ${maxContentHeight}`}>
-            <div className="space-y-4">
-              {/* Key Stats Grid */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <Panel><CardContent className="pt-4 pb-4 text-center">
-                  <p className="text-xl font-bold text-foreground">${(product.price ?? 0).toFixed(2)}</p>
-                  <p className="text-xs text-muted-foreground">Price</p>
-                </CardContent></Panel>
-                <Panel><CardContent className="pt-4 pb-4 text-center">
-                  <p className="text-xl font-bold text-foreground">{product.bsr_current ? `#${product.bsr_current.toLocaleString()}` : "-"}</p>
-                  <p className="text-xs text-muted-foreground">BSR</p>
-                </CardContent></Panel>
-                <Panel><CardContent className="pt-4 pb-4 text-center">
-                  <p className="text-xl font-bold text-foreground">{(product.rating_value ?? 0).toFixed(1)}★</p>
-                  <p className="text-xs text-muted-foreground">Rating</p>
-                </CardContent></Panel>
-                <Panel><CardContent className="pt-4 pb-4 text-center">
-                  <p className="text-xl font-bold text-foreground">{(product.rating_count ?? 0).toLocaleString()}</p>
-                  <p className="text-xs text-muted-foreground">Reviews</p>
-                </CardContent></Panel>
-              </div>
-
-              {/* Identity */}
-              <Panel>
-                <CardContent className="pt-4 space-y-3">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">ASIN</span>
-                    <span className="font-mono font-medium flex items-center gap-1">
-                      {product.asin ?? "-"}
-                      {product.asin && (
-                        <button onClick={() => navigator.clipboard.writeText(product.asin!)} className="text-muted-foreground hover:text-primary transition-colors" title="Copy ASIN">
-                          <FileText className="w-3 h-3" />
+            <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-8">
+              {/* Imagery — given real room, no card chrome */}
+              {allImages.length > 0 && (
+                <div>
+                  <div className="aspect-square rounded-xl overflow-hidden bg-muted">
+                    <img src={allImages[selectedImage]} alt={product.title ?? "Product"} className="w-full h-full object-contain" />
+                  </div>
+                  {allImages.length > 1 && (
+                    <div className="flex gap-1.5 overflow-x-auto pt-2.5 pb-1">
+                      {allImages.slice(0, 8).map((url, idx) => (
+                        <button key={idx} onClick={() => setSelectedImage(idx)} className={`w-11 h-11 rounded-md overflow-hidden shrink-0 ring-1 transition-all ${selectedImage === idx ? "ring-2 ring-primary" : "ring-border hover:ring-muted-foreground/40"}`}>
+                          <img src={url} alt="" className="w-full h-full object-contain bg-muted" />
                         </button>
-                      )}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Brand</span>
-                    <span className="font-medium">{product.brand ?? "-"}</span>
-                  </div>
-                  {product.asin && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Amazon Link</span>
-                      <a href={`https://amazon.com/dp/${product.asin}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-primary hover:underline text-xs">
-                        View on Amazon <ExternalLink className="w-3 h-3" />
-                      </a>
+                      ))}
                     </div>
                   )}
-                </CardContent>
-              </Panel>
-
-              {/* Badges */}
-              {(product.bestseller || product.amazon_choice) && (
-                <div className="flex gap-2 flex-wrap">
-                  {product.bestseller && <Badge className="bg-chart-2 text-white">🏆 Bestseller</Badge>}
-                  {product.amazon_choice && <Badge className="bg-chart-1 text-white">✓ Amazon's Choice</Badge>}
                 </div>
               )}
 
-              {/* Image Gallery */}
-              {allImages.length > 0 && (
-                <Panel>
-                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Image Gallery ({allImages.length})</CardTitle></CardHeader>
-                  <CardContent>
-                    <div className="aspect-square rounded-lg overflow-hidden border bg-muted mb-3 max-h-48">
-                      <img src={allImages[selectedImage]} alt={product.title ?? "Product"} className="w-full h-full object-contain" />
-                    </div>
-                    {allImages.length > 1 && (
-                      <div className="flex gap-2 overflow-x-auto pb-1">
-                        {allImages.slice(0, 8).map((url, idx) => (
-                          <button key={idx} onClick={() => setSelectedImage(idx)} className={`w-12 h-12 rounded border overflow-hidden shrink-0 ${selectedImage === idx ? "ring-2 ring-primary" : ""}`}>
-                            <img src={url} alt="" className="w-full h-full object-contain bg-muted" />
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Panel>
-              )}
+              <div>
+                <DocSection first title="Identity">
+                  <KVGrid>
+                    <KV
+                      label="ASIN"
+                      mono
+                      value={product.asin ?? "-"}
+                      action={product.asin && (
+                        <button onClick={() => navigator.clipboard.writeText(product.asin!)} className="text-muted-foreground hover:text-primary transition-colors" title="Copy ASIN">
+                          <Copy className="w-3 h-3" />
+                        </button>
+                      )}
+                    />
+                    <KV label="Brand" value={product.brand ?? "-"} />
+                    <KV label="Price" value={`$${(product.price ?? 0).toFixed(2)}`} />
+                    <KV label="Rating" value={`${(product.rating_value ?? 0).toFixed(1)}★ · ${(product.rating_count ?? 0).toLocaleString()} reviews`} />
+                    <KV label="BSR" value={product.bsr_current ? `#${product.bsr_current.toLocaleString()}` : "-"} />
+                  </KVGrid>
+                </DocSection>
 
-              {/* Title */}
-              <Panel>
-                <CardContent className="pt-4">
-                  <p className="text-sm text-muted-foreground mb-1">Title</p>
-                  <p className="text-sm font-medium leading-snug">{product.title ?? "-"}</p>
-                </CardContent>
-              </Panel>
+                {(product.bestseller || product.amazon_choice) && (
+                  <DocSection title="Badges">
+                    <div className="flex gap-2 flex-wrap">
+                      {product.bestseller && <Badge variant="outline" className="gap-1"><Award className="w-3 h-3" />Bestseller</Badge>}
+                      {product.amazon_choice && <Badge variant="outline" className="gap-1"><CheckCircle className="w-3 h-3" />Amazon's Choice</Badge>}
+                    </div>
+                  </DocSection>
+                )}
+
+                <DocSection title="Title">
+                  <p className="text-sm font-medium leading-relaxed text-foreground">{product.title ?? "-"}</p>
+                </DocSection>
+              </div>
             </div>
           </TabsContent>
 
           {/* Scout Formula Tab */}
           <TabsContent value="scout-formula" className={`mt-4 ${scrollableContentClass} ${maxContentHeight}`}>
-            <div className="space-y-4">
-              {/* OCR badge */}
-              <div className="flex flex-wrap gap-2 items-center">
-                {product.ocr_extracted && <Badge className="bg-green-600 text-white">✓ Text Extracted</Badge>}
-                {product.ocr_confidence && (
-                  <Badge variant={product.ocr_confidence === "high" ? "default" : product.ocr_confidence === "medium" ? "secondary" : "outline"}>
-                    {product.ocr_confidence} confidence
-                  </Badge>
+            <div>
+              <DocSection first title="Supplement Facts"
+                action={
+                  <div className="flex items-center gap-1.5">
+                    {product.ocr_extracted && <Badge variant="outline" className="gap-1 text-[10px]"><CheckCircle className="w-3 h-3 text-chart-4" />Extracted</Badge>}
+                    {product.ocr_confidence && <Badge variant="outline" className="text-[10px] capitalize">{product.ocr_confidence} confidence</Badge>}
+                  </div>
+                }
+              >
+                {(product.serving_size || product.servings_per_container) && (
+                  <KVGrid>
+                    {product.serving_size && <KV label="Serving Size" value={product.serving_size} />}
+                    {product.servings_per_container && <KV label="Servings / Container" value={product.servings_per_container} />}
+                  </KVGrid>
                 )}
-              </div>
 
-              {/* Serving info */}
-              {(product.serving_size || product.servings_per_container) && (
-                <div className="grid grid-cols-2 gap-3">
-                  {product.serving_size && (
-                    <Panel><CardContent className="pt-4 pb-4 text-center">
-                      <p className="text-base font-bold">{product.serving_size}</p>
-                      <p className="text-xs text-muted-foreground">Serving Size</p>
-                    </CardContent></Panel>
-                  )}
-                  {product.servings_per_container && (
-                    <Panel><CardContent className="pt-4 pb-4 text-center">
-                      <p className="text-base font-bold">{product.servings_per_container}</p>
-                      <p className="text-xs text-muted-foreground">Servings / Container</p>
-                    </CardContent></Panel>
-                  )}
-                </div>
-              )}
-
-              {/* Supplement Facts Raw */}
-              {product.supplement_facts_raw && (
-                <Panel>
-                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Supplement Facts (Raw)</CardTitle></CardHeader>
-                  <CardContent>
-                    <pre className="text-xs bg-muted p-3 rounded-lg overflow-x-auto whitespace-pre-wrap leading-relaxed">{product.supplement_facts_raw}</pre>
-                  </CardContent>
-                </Panel>
-              )}
-
-              {/* Nutrients Table */}
-              {allNutrients && allNutrients.length > 0 && (
-                <Panel>
-                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Nutrients ({allNutrients.length})</CardTitle></CardHeader>
-                  <CardContent>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
+                {allNutrients && allNutrients.length > 0 ? (
+                  <div className="document-prose mt-4">
+                    <div className="document-table-wrap">
+                      <table>
                         <thead>
-                          <tr className="border-b border-border">
-                            <th className="text-left py-1.5 pr-3 text-muted-foreground font-medium text-xs">Nutrient</th>
-                            <th className="text-right py-1.5 px-3 text-muted-foreground font-medium text-xs">Amount</th>
-                            <th className="text-right py-1.5 pl-3 text-muted-foreground font-medium text-xs">% DV</th>
-                          </tr>
+                          <tr><th>Nutrient</th><th className="text-right">Amount</th><th className="text-right">% DV</th></tr>
                         </thead>
                         <tbody>
                           {allNutrients.map((n, idx) => (
-                            <tr key={idx} className="border-b border-border/50">
-                              <td className="py-1.5 pr-3 text-xs">{n.name}</td>
-                              <td className="text-right py-1.5 px-3 text-xs text-muted-foreground">
-                                {n.amount != null ? `${n.amount}${n.unit ? ` ${n.unit}` : ""}` : "–"}
-                              </td>
-                              <td className="text-right py-1.5 pl-3 text-xs text-muted-foreground">
-                                {n.daily_value_percent != null ? `${n.daily_value_percent}%` : "–"}
-                              </td>
+                            <tr key={idx}>
+                              <td>{n.name}</td>
+                              <td className="text-right">{n.amount != null ? `${n.amount}${n.unit ? ` ${n.unit}` : ""}` : "–"}</td>
+                              <td className="text-right">{n.daily_value_percent != null ? `${n.daily_value_percent}%` : "–"}</td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
                     </div>
-                  </CardContent>
-                </Panel>
-              )}
+                    <p className="text-[11px] text-muted-foreground/70 mt-2 not-italic">Extracted from label imagery via OCR{product.ocr_confidence ? ` · ${product.ocr_confidence} confidence` : ""}.</p>
+                  </div>
+                ) : product.supplement_facts_raw ? (
+                  <pre className="text-xs bg-muted/50 p-3.5 rounded-lg overflow-x-auto whitespace-pre-wrap leading-relaxed mt-4 text-foreground/90">{product.supplement_facts_raw}</pre>
+                ) : (
+                  <EmptyLine>No formula data extracted for this product.</EmptyLine>
+                )}
+              </DocSection>
 
-              {/* Feature Bullets */}
               {product.feature_bullets_text && (
-                <Panel>
-                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Feature Bullets</CardTitle></CardHeader>
-                  <CardContent>
-                    <ul className="space-y-1.5">
-                      {product.feature_bullets_text.split('\n').filter(Boolean).map((bullet, idx) => (
-                        <li key={idx} className="flex gap-2 text-sm">
-                          <span className="text-primary mt-0.5 shrink-0">•</span>
-                          <span className="text-muted-foreground">{bullet.replace(/^[•\-\*]\s*/, '')}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </CardContent>
-                </Panel>
-              )}
-
-              {!product.supplement_facts_raw && !allNutrients && (
-                <Panel><CardContent className="py-8 text-center text-muted-foreground">No formula data extracted for this product.</CardContent></Panel>
+                <DocSection title="Feature Bullets">
+                  <ul className="space-y-1.5">
+                    {product.feature_bullets_text.split('\n').filter(Boolean).map((bullet, idx) => (
+                      <li key={idx} className="flex gap-2 text-sm">
+                        <span className="text-primary mt-0.5 shrink-0">•</span>
+                        <span className="text-muted-foreground">{bullet.replace(/^[•\-\*]\s*/, '')}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </DocSection>
               )}
             </div>
           </TabsContent>
@@ -1832,7 +1730,7 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
 
           {/* Scout Reviews Tab */}
           <TabsContent value="scout-reviews" className={`mt-4 ${scrollableContentClass} ${maxContentHeight}`}>
-            <div className="space-y-4">
+            <div>
               {(() => {
                 const ra = product.review_analysis as (ReviewAnalysis & {
                   key_strengths?: string[];
@@ -1842,174 +1740,135 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                   reddit_notes?: string;
                   external_reviews?: string;
                 }) | null;
-                if (!ra) {
-                  return (
-                    <Panel><CardContent className="py-12 text-center text-muted-foreground">No Phase 5 research data yet</CardContent></Panel>
-                  );
+                const hasAny = ra && (ra.key_strengths || ra.key_weaknesses || ra.benefits || ra.reddit_sentiment || ra.external_reviews);
+                if (!hasAny) {
+                  return <DocSection first title="Off-Amazon Research"><EmptyLine>No Phase 5 research data yet.</EmptyLine></DocSection>;
                 }
                 return (
                   <>
                     {ra.key_strengths && ra.key_strengths.length > 0 && (
-                      <Panel>
-                        <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-green-600">Key Strengths</CardTitle></CardHeader>
-                        <CardContent>
-                          <div className="flex flex-wrap gap-2">
-                            {ra.key_strengths.map((s, idx) => (
-                              <Badge key={idx} className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">{s}</Badge>
-                            ))}
-                          </div>
-                        </CardContent>
-                      </Panel>
+                      <DocSection first title="Key Strengths">
+                        <div className="flex flex-wrap gap-2">
+                          {ra.key_strengths.map((s, idx) => <Badge key={idx} variant="outline" className="text-chart-4 border-chart-4/30">{s}</Badge>)}
+                        </div>
+                      </DocSection>
                     )}
                     {ra.key_weaknesses && ra.key_weaknesses.length > 0 && (
-                      <Panel>
-                        <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-destructive">Key Weaknesses</CardTitle></CardHeader>
-                        <CardContent>
-                          <div className="flex flex-wrap gap-2">
-                            {ra.key_weaknesses.map((w, idx) => (
-                              <Badge key={idx} variant="destructive" className="opacity-80">{w}</Badge>
-                            ))}
-                          </div>
-                        </CardContent>
-                      </Panel>
+                      <DocSection title="Key Weaknesses" first={!ra.key_strengths}>
+                        <div className="flex flex-wrap gap-2">
+                          {ra.key_weaknesses.map((w, idx) => <Badge key={idx} variant="outline" className="text-destructive border-destructive/30">{w}</Badge>)}
+                        </div>
+                      </DocSection>
                     )}
                     {ra.benefits && ra.benefits.length > 0 && (
-                      <Panel>
-                        <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Benefits</CardTitle></CardHeader>
-                        <CardContent>
-                          <ul className="space-y-1.5">
-                            {ra.benefits.map((b, idx) => (
-                              <li key={idx} className="flex gap-2 text-sm">
-                                <span className="text-primary shrink-0">•</span>
-                                <span>{b}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </CardContent>
-                      </Panel>
+                      <DocSection title="Benefits">
+                        <ul className="space-y-1.5">
+                          {ra.benefits.map((b, idx) => (
+                            <li key={idx} className="flex gap-2 text-sm"><span className="text-primary shrink-0">•</span><span>{b}</span></li>
+                          ))}
+                        </ul>
+                      </DocSection>
                     )}
                     {(ra.reddit_sentiment || ra.reddit_notes) && (
-                      <Panel>
-                        <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Reddit Sentiment</CardTitle></CardHeader>
-                        <CardContent className="space-y-2">
-                          {ra.reddit_sentiment && (
-                            <div className="flex items-center gap-2">
-                              <Badge variant="secondary">{ra.reddit_sentiment}</Badge>
-                            </div>
-                          )}
-                          {ra.reddit_notes && <p className="text-sm text-muted-foreground">{ra.reddit_notes}</p>}
-                        </CardContent>
-                      </Panel>
+                      <DocSection title="Reddit Sentiment">
+                        {ra.reddit_sentiment && <Badge variant="outline" className="mb-2">{ra.reddit_sentiment}</Badge>}
+                        {ra.reddit_notes && <MarkdownDoc content={ra.reddit_notes} className="text-sm" />}
+                      </DocSection>
                     )}
                     {ra.external_reviews && (
-                      <Panel>
-                        <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">External Reviews</CardTitle></CardHeader>
-                        <CardContent>
-                          <p className="text-sm text-muted-foreground">{ra.external_reviews}</p>
-                        </CardContent>
-                      </Panel>
-                    )}
-                    {!ra.key_strengths && !ra.key_weaknesses && !ra.benefits && !ra.reddit_sentiment && !ra.external_reviews && (
-                      <Panel><CardContent className="py-12 text-center text-muted-foreground">No Phase 5 research data yet</CardContent></Panel>
+                      <DocSection title="External Reviews">
+                        <MarkdownDoc content={ra.external_reviews} className="text-sm" />
+                      </DocSection>
                     )}
                   </>
                 );
               })()}
 
               {/* Off-Amazon Intelligence — P5 dovive_p5_sources: Perplexity findings,
-                  brand-page excerpts, and citation URLs collected off-Amazon. Previously
-                  collected but never rendered anywhere in the UI. */}
-              <Panel>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium flex items-center gap-2">
-                    <Globe className="w-4 h-4 text-primary" />
-                    Off-Amazon Intelligence
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {!p5Sources || p5Sources.length === 0 ? (
-                    <p className="text-sm text-muted-foreground py-2">No off-Amazon sources found for this product yet.</p>
-                  ) : (
-                    <>
-                      {/* Source links row — favicon-style chip per citation */}
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-1.5">Sources</p>
-                        <div className="flex flex-col gap-1.5">
-                          {p5Sources.map((src) => (
-                            <div key={src.id} className="flex items-center gap-2 flex-wrap">
-                              {src.source_type && (
-                                <Badge variant="secondary" className="text-[10px] shrink-0">{src.source_type}</Badge>
-                              )}
-                              {src.source_url && (
-                                <a
-                                  href={src.source_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex items-center gap-1 text-xs text-primary hover:underline truncate max-w-full"
-                                >
-                                  <img
-                                    src={`https://www.google.com/s2/favicons?domain=${(() => { try { return new URL(src.source_url!).hostname; } catch { return src.source_url; } })()}`}
-                                    alt=""
-                                    className="w-3.5 h-3.5 shrink-0"
-                                  />
-                                  <span className="truncate">{src.source_url}</span>
-                                  <ExternalLink className="w-3 h-3 shrink-0" />
-                                </a>
-                              )}
-                            </div>
-                          ))}
-                          {/* Additional citation URLs found within the research (dedup vs source_url) */}
-                          {Array.from(new Set(p5Sources.flatMap(s => s.extracted?.citations || [])))
-                            .filter(url => !p5Sources.some(s => s.source_url === url))
-                            .slice(0, 10)
-                            .map((url) => (
+                  brand-page excerpts, and citation URLs collected off-Amazon. */}
+              <DocSection icon={Globe} title="Off-Amazon Intelligence">
+                {!p5Sources || p5Sources.length === 0 ? (
+                  <EmptyLine>No off-Amazon sources found for this product yet.</EmptyLine>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Source links — quiet reference list, favicon per citation */}
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-2">Sources</p>
+                      <div className="flex flex-col gap-1.5">
+                        {p5Sources.map((src) => (
+                          <div key={src.id} className="flex items-center gap-2 flex-wrap">
+                            {src.source_type && (
+                              <Badge variant="outline" className="text-[10px] shrink-0">{src.source_type}</Badge>
+                            )}
+                            {src.source_url && (
                               <a
-                                key={url}
-                                href={url}
+                                href={src.source_url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary hover:underline truncate max-w-full"
+                                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary hover:underline truncate max-w-full"
                               >
                                 <img
-                                  src={`https://www.google.com/s2/favicons?domain=${(() => { try { return new URL(url).hostname; } catch { return url; } })()}`}
+                                  src={`https://www.google.com/s2/favicons?domain=${(() => { try { return new URL(src.source_url!).hostname; } catch { return src.source_url; } })()}`}
                                   alt=""
                                   className="w-3.5 h-3.5 shrink-0"
                                 />
-                                <span className="truncate">{url}</span>
+                                <span className="truncate">{src.source_url}</span>
                                 <ExternalLink className="w-3 h-3 shrink-0" />
                               </a>
-                            ))}
-                        </div>
-                      </div>
-
-                      {/* Perplexity findings — structured text, collapsed behind show more */}
-                      {(() => {
-                        const findings = p5Sources.find(s => s.extracted?.perplexity_findings)?.extracted?.perplexity_findings;
-                        if (!findings) return null;
-                        const isLong = findings.length > 500;
-                        const displayText = showFullFindings || !isLong ? findings : `${findings.slice(0, 500)}...`;
-                        return (
-                          <div className="pt-2 border-t border-border/40">
-                            <p className="text-xs font-medium text-muted-foreground mb-1.5">Research Findings</p>
-                            <p className="text-sm text-foreground/90 whitespace-pre-wrap leading-relaxed">{displayText}</p>
-                            {isLong && (
-                              <button
-                                onClick={() => setShowFullFindings(!showFullFindings)}
-                                className="mt-1.5 text-xs text-primary hover:underline"
-                              >
-                                {showFullFindings ? "Show less" : "Show more"}
-                              </button>
                             )}
                           </div>
-                        );
-                      })()}
-                    </>
-                  )}
-                </CardContent>
-              </Panel>
+                        ))}
+                        {/* Additional citation URLs found within the research (dedup vs source_url) */}
+                        {Array.from(new Set(p5Sources.flatMap(s => s.extracted?.citations || [])))
+                          .filter(url => !p5Sources.some(s => s.source_url === url))
+                          .slice(0, 10)
+                          .map((url) => (
+                            <a
+                              key={url}
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary hover:underline truncate max-w-full"
+                            >
+                              <img
+                                src={`https://www.google.com/s2/favicons?domain=${(() => { try { return new URL(url).hostname; } catch { return url; } })()}`}
+                                alt=""
+                                className="w-3.5 h-3.5 shrink-0"
+                              />
+                              <span className="truncate">{url}</span>
+                              <ExternalLink className="w-3 h-3 shrink-0" />
+                            </a>
+                          ))}
+                      </div>
+                    </div>
+
+                    {/* Perplexity findings — real document prose, collapsed behind show more */}
+                    {(() => {
+                      const findings = p5Sources.find(s => s.extracted?.perplexity_findings)?.extracted?.perplexity_findings;
+                      if (!findings) return null;
+                      const isLong = findings.length > 500;
+                      const displayText = showFullFindings || !isLong ? findings : `${findings.slice(0, 500)}...`;
+                      return (
+                        <div className="pt-3 border-t border-border/40">
+                          <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-2">Research Findings</p>
+                          <MarkdownDoc content={displayText} className="text-sm" />
+                          {isLong && (
+                            <button
+                              onClick={() => setShowFullFindings(!showFullFindings)}
+                              className="mt-1.5 text-xs text-primary hover:underline"
+                            >
+                              {showFullFindings ? "Show less" : "Show more"}
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+              </DocSection>
             </div>
           </TabsContent>
         </Tabs>
-    </BrandModal>
+    </DocumentModal>
   );
 }

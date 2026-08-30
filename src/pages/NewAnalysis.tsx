@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
+import { PearlButton } from "@/components/ui/pearl-button";
 import { useToast } from "@/hooks/use-toast";
 import {
   useRecentCategories,
@@ -316,7 +317,11 @@ export default function NewAnalysis() {
 
           <form
             onSubmit={handleSubmitKeyword}
-            className="mt-6 flex items-center gap-1.5 rounded-full border border-border bg-card pl-5 pr-1.5 py-1.5 shadow-sm transition-shadow focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background"
+            // Click anywhere on the pill → focus the input; focus state is a
+            // calm border-tint + soft glow (the old ring-2 + ring-offset-2
+            // drew a jumpy double-halo around the pill on every click).
+            onClick={() => inputRef.current?.focus()}
+            className="mt-6 flex items-center gap-1.5 rounded-full border border-border bg-card pl-5 pr-1.5 py-1.5 shadow-sm cursor-text transition-[border-color,box-shadow] duration-150 focus-within:border-primary/40 focus-within:shadow-[0_4px_20px_-4px_hsl(var(--primary)/0.25)]"
           >
             <Input
               ref={inputRef}
@@ -330,20 +335,22 @@ export default function NewAnalysis() {
                 never shadcn Button (its cva always injects a base
                 pearl-button/pearl-quiet class that collides with the
                 `:not(.pearl-neon)` exclusions the neon tier depends on). */}
-            <button
+            {/* Pearl CTA PRIMARY (user directive) — the real glossy
+                .pearl-button via the PearlButton component. */}
+            <PearlButton
               type="submit"
               disabled={!keywordInput.trim() || submitScoutJob.isPending}
-              className="pearl-pill pearl-neon shrink-0 gap-1.5 whitespace-nowrap"
+              className="shrink-0 whitespace-nowrap"
             >
               {submitScoutJob.isPending ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
               ) : (
                 <>
                   Analyze
-                  <ArrowRight className="w-3.5 h-3.5" />
+                  <ArrowRight className="w-3.5 h-3.5 ml-1" />
                 </>
               )}
-            </button>
+            </PearlButton>
           </form>
 
           <div className="mt-3.5 flex flex-wrap items-center justify-center gap-2">

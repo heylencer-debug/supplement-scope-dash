@@ -1083,20 +1083,20 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
 
           {/* Packaging Audit Tab */}
           <TabsContent value="packaging" className={`mt-4 ${scrollableContentClass} ${maxContentHeight}`}>
-            <div className="space-y-4">
+            <div>
               {(() => {
                 // Primary source: packaging_intelligence from marketing_analysis
                 const packagingIntel = (marketingAnalysis as Record<string, unknown> | null)?.packaging_intelligence as Record<string, unknown> | null;
                 // Fallback: design_blueprint (actual data source from n8n)
                 const designBlueprint = (marketingAnalysis as Record<string, unknown> | null)?.design_blueprint as Record<string, unknown> | null;
-                
+
                 const visualStyle = (packagingIntel?.design_style as string) || (designBlueprint?.visual_style as string);
                 const visualHierarchy = (packagingIntel?.visual_hierarchy as string) || (designBlueprint?.visual_hierarchy as string);
                 const colorStrategy = designBlueprint?.color_strategy as string;
                 const typographyStyle = designBlueprint?.typography_style as string;
                 const layoutStructure = designBlueprint?.layout_structure as string;
                 const differentiationFactor = designBlueprint?.differentiation_factor as string;
-                
+
                 // Parse trust_signals - handle both array and comma-separated string formats
                 let trustSignals: string[] = [];
                 const rawTrustSignals = packagingIntel?.trust_signals || designBlueprint?.trust_signals;
@@ -1105,204 +1105,91 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                 } else if (typeof rawTrustSignals === 'string' && rawTrustSignals.trim()) {
                   trustSignals = rawTrustSignals.split(',').map(s => s.trim()).filter(Boolean);
                 }
-                
+
                 // Parse conversion_triggers - handle both string and comma-separated formats
                 let conversionTriggersList: string[] = [];
                 const rawConversionTriggers = packagingIntel?.conversion_triggers || designBlueprint?.conversion_triggers;
                 if (typeof rawConversionTriggers === 'string' && rawConversionTriggers.trim()) {
                   conversionTriggersList = rawConversionTriggers.split(',').map(s => s.trim()).filter(Boolean);
                 }
-                
+
                 const frontOfPackClaims = (packagingIntel?.front_of_pack_claims as string[]) || [];
-                
-                const hasData = visualStyle || visualHierarchy || trustSignals.length > 0 || conversionTriggersList.length > 0 || 
-                               colorStrategy || typographyStyle || layoutStructure || differentiationFactor ||
-                               frontOfPackClaims.length > 0 || product.claims || (product.claims_on_label && product.claims_on_label.length > 0);
-                
+                const claimsList = frontOfPackClaims.length > 0
+                  ? frontOfPackClaims
+                  : product.claims_on_label && product.claims_on_label.length > 0
+                    ? product.claims_on_label
+                    : product.claims
+                      ? parseClaimsList(product.claims)
+                      : [];
+
+                const designFields: Array<[string, string]> = [
+                  ["Visual Style", visualStyle],
+                  ["Visual Hierarchy", visualHierarchy],
+                  ["Color Strategy", colorStrategy],
+                  ["Typography Style", typographyStyle],
+                  ["Layout Structure", layoutStructure],
+                  ["Differentiation Factor", differentiationFactor],
+                ].filter(([, v]) => v && v !== "N/A") as Array<[string, string]>;
+
+                const hasData = designFields.length > 0 || trustSignals.length > 0 || conversionTriggersList.length > 0 || claimsList.length > 0;
+
                 if (!hasData) {
-                  return (
-                    <Panel>
-                      <CardContent className="py-8 text-center text-muted-foreground">
-                        No packaging audit data available for this product.
-                      </CardContent>
-                    </Panel>
-                  );
+                  return <DocSection first><EmptyLine>Not analyzed.</EmptyLine></DocSection>;
                 }
-                
+
                 return (
-                  <>
-                    {/* Visual Style */}
-                    {visualStyle && visualStyle !== "N/A" && (
-                      <Panel>
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-sm font-medium flex items-center gap-2">
-                            <Image className="w-4 h-4 text-primary" />
-                            Visual Style
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="text-sm text-foreground">{visualStyle}</p>
-                        </CardContent>
-                      </Panel>
+                  <div className="grid grid-cols-1 lg:grid-cols-[200px_1fr] gap-8">
+                    {thumbUrl && (
+                      <div className="aspect-square rounded-xl overflow-hidden bg-muted h-fit">
+                        <img src={thumbUrl} alt={product.title ?? "Packaging"} className="w-full h-full object-contain" />
+                      </div>
                     )}
-                    
-                    {/* Visual Hierarchy */}
-                    {visualHierarchy && visualHierarchy !== "N/A" && (
-                      <Panel>
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-sm font-medium flex items-center gap-2">
-                            <BarChart3 className="w-4 h-4 text-chart-2" />
-                            Visual Hierarchy
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="text-sm text-foreground">{visualHierarchy}</p>
-                        </CardContent>
-                      </Panel>
-                    )}
-                    
-                    {/* Trust Signals */}
-                    {trustSignals.length > 0 && (
-                      <Panel>
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-sm font-medium flex items-center gap-2">
-                            <Award className="w-4 h-4 text-chart-4" />
-                            Trust Signals
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="flex flex-wrap gap-2">
-                            {trustSignals.map((signal, idx) => (
-                              <Badge key={idx} variant="secondary" className="text-xs">
-                                {signal}
-                              </Badge>
+
+                    <div>
+                      {designFields.length > 0 && (
+                        <DocSection first={!thumbUrl} icon={Image} title="Design Overview">
+                          <div className="space-y-3.5">
+                            {designFields.map(([label, value]) => (
+                              <div key={label}>
+                                <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">{label}</p>
+                                <p className="text-sm text-foreground leading-relaxed">{value}</p>
+                              </div>
                             ))}
                           </div>
-                        </CardContent>
-                      </Panel>
-                    )}
-                    
-                    {/* Front of Pack Claims */}
-                    {(frontOfPackClaims.length > 0 || product.claims || (product.claims_on_label && product.claims_on_label.length > 0)) && (
-                      <Panel>
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-sm font-medium flex items-center gap-2">
-                            <Tag className="w-4 h-4 text-chart-3" />
-                            Front of Pack Claims
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
+                        </DocSection>
+                      )}
+
+                      {trustSignals.length > 0 && (
+                        <DocSection icon={Award} title="Trust Signals" first={designFields.length === 0 && !thumbUrl}>
+                          <div className="flex flex-wrap gap-2">
+                            {trustSignals.map((signal, idx) => <Badge key={idx} variant="outline" className="text-xs">{signal}</Badge>)}
+                          </div>
+                        </DocSection>
+                      )}
+
+                      {claimsList.length > 0 && (
+                        <DocSection icon={Tag} title="Front of Pack Claims">
                           <ul className="space-y-1.5">
-                            {frontOfPackClaims.length > 0 ? (
-                              frontOfPackClaims.map((claim, idx) => (
-                                <li key={idx} className="flex items-start gap-2 text-sm">
-                                  <CheckCircle className="w-4 h-4 text-chart-4 mt-0.5 shrink-0" />
-                                  <span className="text-foreground">{claim}</span>
-                                </li>
-                              ))
-                            ) : product.claims_on_label && product.claims_on_label.length > 0 ? (
-                              product.claims_on_label.map((claim, idx) => (
-                                <li key={idx} className="flex items-start gap-2 text-sm">
-                                  <CheckCircle className="w-4 h-4 text-chart-4 mt-0.5 shrink-0" />
-                                  <span className="text-foreground">{claim}</span>
-                                </li>
-                              ))
-                            ) : product.claims ? (
-                              parseClaimsList(product.claims).map((claim, idx) => (
-                                <li key={idx} className="flex items-start gap-2 text-sm">
-                                  <CheckCircle className="w-4 h-4 text-chart-4 mt-0.5 shrink-0" />
-                                  <span className="text-foreground">{claim}</span>
-                                </li>
-                              ))
-                            ) : null}
-                          </ul>
-                        </CardContent>
-                      </Panel>
-                    )}
-                    
-                    {/* Color Strategy */}
-                    {colorStrategy && colorStrategy !== "N/A" && (
-                      <Panel>
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-sm font-medium flex items-center gap-2">
-                            <Palette className="w-4 h-4 text-chart-1" />
-                            Color Strategy
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="text-sm text-foreground">{colorStrategy}</p>
-                        </CardContent>
-                      </Panel>
-                    )}
-                    
-                    {/* Typography Style */}
-                    {typographyStyle && typographyStyle !== "N/A" && (
-                      <Panel>
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-sm font-medium flex items-center gap-2">
-                            <Type className="w-4 h-4 text-chart-2" />
-                            Typography Style
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="text-sm text-foreground">{typographyStyle}</p>
-                        </CardContent>
-                      </Panel>
-                    )}
-                    
-                    {/* Layout Structure */}
-                    {layoutStructure && layoutStructure !== "N/A" && (
-                      <Panel>
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-sm font-medium flex items-center gap-2">
-                            <LayoutGrid className="w-4 h-4 text-chart-3" />
-                            Layout Structure
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="text-sm text-foreground">{layoutStructure}</p>
-                        </CardContent>
-                      </Panel>
-                    )}
-                    
-                    {/* Conversion Triggers */}
-                    {conversionTriggersList.length > 0 && (
-                      <Panel className="border-primary/30 bg-primary/5">
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-sm font-medium flex items-center gap-2">
-                            <Lightbulb className="w-4 h-4 text-primary" />
-                            Conversion Triggers
-                          </CardTitle>
-                          <p className="text-xs text-muted-foreground">Why this packaging converts</p>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="flex flex-wrap gap-2">
-                            {conversionTriggersList.map((trigger, idx) => (
-                              <Badge key={idx} variant="secondary" className="text-xs">
-                                {trigger}
-                              </Badge>
+                            {claimsList.map((claim, idx) => (
+                              <li key={idx} className="flex items-start gap-2 text-sm">
+                                <CheckCircle className="w-4 h-4 text-chart-4 mt-0.5 shrink-0" />
+                                <span className="text-foreground">{claim}</span>
+                              </li>
                             ))}
+                          </ul>
+                        </DocSection>
+                      )}
+
+                      {conversionTriggersList.length > 0 && (
+                        <DocSection icon={Lightbulb} title="Conversion Triggers">
+                          <p className="text-xs text-muted-foreground mb-2">Why this packaging converts</p>
+                          <div className="flex flex-wrap gap-2">
+                            {conversionTriggersList.map((trigger, idx) => <Badge key={idx} variant="outline" className="text-xs">{trigger}</Badge>)}
                           </div>
-                        </CardContent>
-                      </Panel>
-                    )}
-                    
-                    {/* Differentiation Factor */}
-                    {differentiationFactor && differentiationFactor !== "N/A" && (
-                      <Panel className="border-chart-4/30 bg-chart-4/5">
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-sm font-medium flex items-center gap-2">
-                            <Sparkles className="w-4 h-4 text-chart-4" />
-                            Differentiation Factor
-                          </CardTitle>
-                          <p className="text-xs text-muted-foreground">Unique shelf positioning</p>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="text-sm text-foreground">{differentiationFactor}</p>
-                        </CardContent>
-                      </Panel>
-                    )}
-                  </>
+                        </DocSection>
+                      )}
+                    </div>
+                  </div>
                 );
               })()}
             </div>

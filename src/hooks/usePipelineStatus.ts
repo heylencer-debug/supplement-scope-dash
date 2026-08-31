@@ -90,6 +90,25 @@ async function fetchPipelineStatus(categoryId: string): Promise<PhaseStatus[]> {
       .maybeSingle(),
   ]);
 
+  // Robustness fix (2026-09-01): under concurrent load (multiple pipeline
+  // runs + heavy polling), a transient network/HTTP2 hiccup on ANY one of
+  // these ~9 parallel Supabase calls used to be silently swallowed —
+  // supabase-js returns `{ count: null, error: {...} }` instead of
+  // throwing, and this function treated a null count as a REAL "0 done",
+  // making an already-complete pipeline appear to regress to "Next" on a
+  // single flaky poll (confirmed live: a fully-signed-off category briefly
+  // showed P1/P2/P6/P8 as "Next" mid-validation-run, purely from request
+  // contention, not real data loss). Throwing here instead lets React
+  // Query's default retry (3x, backoff) recover transparently — and
+  // crucially, React Query keeps showing the LAST successful `data` while
+  // retrying, instead of ever rendering this corrupted partial result.
+  const firstError = [p1, p2, p3, p4, p6_pi, p7_market, p6_pkg, p8, p9raw].find((r) => (r as { error?: unknown }).error)?.error as
+    | { message?: string }
+    | undefined;
+  if (firstError) {
+    throw new Error(`Pipeline status fetch failed: ${firstError.message || "unknown error"}`);
+  }
+
   const total = p1.count ?? 0;
 
   const makeStatus = (
@@ -110,6 +129,7 @@ async function fetchPipelineStatus(categoryId: string): Promise<PhaseStatus[]> {
     .select("*", { count: "exact", head: true })
     .eq("category_id", categoryId)
     .filter("marketing_analysis->p5_research", "not.is", null);
+  if (p5CountRaw.error) throw new Error(`Pipeline status fetch failed (P5): ${p5CountRaw.error.message}`);
   let p5Count = p5CountRaw.count ?? 0;
   // Pipeline runs 5 top-BSR + 3 new-brand briefs (P5_TOP_COUNT/P5_NEW_COUNT);
   // the verifier passes at >= 6 with content. The old 20 here made every
@@ -120,13 +140,14 @@ async function fetchPipelineStatus(categoryId: string): Promise<PhaseStatus[]> {
   // use (reviews and OCR are deliberately capped to the top sellers; blanket
   // percentages of a 160-product category are not the goal and made
   // verifier-passed runs show PARTIAL).
-  const { data: top20Rows } = await supabase
+  const { data: top20Rows, error: top20Error } = await supabase
     .from("products")
     .select("review_analysis, nutrients_count")
     .eq("category_id", categoryId)
     .not("bsr_current", "is", null)
     .order("bsr_current", { ascending: true })
     .limit(20);
+  if (top20Error) throw new Error(`Pipeline status fetch failed (top20): ${top20Error.message}`);
   const top20P3 = (top20Rows ?? []).filter((r) => r.review_analysis != null).length;
   const top20P4 = (top20Rows ?? []).filter((r) => (r.nutrients_count ?? 0) > 0).length;
 

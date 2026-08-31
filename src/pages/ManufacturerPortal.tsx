@@ -199,10 +199,14 @@ export default function ManufacturerPortal() {
       return;
     }
     (async () => {
+      // maybeSingle(): an invalid/typo'd/expired link is a normal,
+      // expected outcome here — single() 406'd on every bad-token load
+      // instead of just resolving to "no session found" (already handled
+      // below via the `!data` branch).
       const { data } = await (supabase.from as any)("manufacturer_sessions")
         .select("id,token,manufacturer_name,expires_at")
         .eq("token", token)
-        .single();
+        .maybeSingle();
 
       if (!data) {
         setDenied(true);

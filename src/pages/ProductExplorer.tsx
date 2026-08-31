@@ -351,6 +351,25 @@ export default function ProductExplorer() {
     );
   }
 
+  // No category selected/resolved and not explicitly browsing "All
+  // Categories" — useProducts() short-circuits to an empty array in this
+  // case (query disabled), which used to render as a bare, unexplained
+  // "Showing 1-0 of 0 products" table. Mirrors the Packaging page's
+  // friendly prompt for the same situation (landing here directly, e.g. a
+  // bookmark or a fresh tab, without ever picking a category first).
+  if (!effectiveCategoryId && categoryFilter !== "all") {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-center gap-2">
+        <p className="text-sm text-muted-foreground">
+          Select a category from New Analysis to browse its products.
+        </p>
+        <Button variant="secondary" size="sm" onClick={() => navigate("/")}>
+          Go to New Analysis
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       {/* Bulk Analysis Progress Banner */}

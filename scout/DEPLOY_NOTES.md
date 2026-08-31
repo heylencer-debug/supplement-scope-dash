@@ -1,5 +1,68 @@
 # Scout pipeline — Cloud Run Job deploy notes
 
+## 2026-09-01: session-isolation validation run — CRITICAL category-resolver bug found + fixed live
+
+**Trigger**: end-to-end validation of the 2026-08-31 session-isolation feature
+(dbb0647) — submitted "electrolyte powder" through the real Launchpad UI a
+second time (the base category already existed, 161 products, signed off)
+and watched the resulting "electrolyte powder #2" run through the real
+Cloud Run pipeline while doing a full frontend UX audit in parallel.
+
+**CRITICAL bug (commit `22fa89d`)**: `utils/category-resolver.js`'s
+`resolveCategory()` step-1 exact `search_term` match correctly returns 0
+rows for a brand-new "#N" session (nothing has that exact label yet), so it
+fell through to step 2's fuzzy name-word fallback. That fallback's
+first-word `ilike` ("%electrolyte%") matches the SIBLING base category
+("Electrolyte Powder"), then the all-words-must-match filter rejects it
+(the sibling's name doesn't contain "#2") and throws **"No category matched
+all keyword words"** — a different error string than **"No category
+candidates found"**, which is the ONLY message every caller
+(`human-bsr.js getDashCategoryId`, `migrate-p1-to-dash.js
+getOrCreateCategory`) treats as "genuinely new, safe to create." Confirmed
+live: every scraped product logged "Saved [to dovive_research] ✓"
+immediately followed by "getDashCategoryId resolve error ... No category
+matched all keyword words" — DASH product sync was silently skipped for
+every product, and `migrate-p1-to-dash.js` would have hard-crashed the
+whole P1 migration step on the next run. **This would have broken session
+isolation for every repeat-keyword run of every category**, not just this
+one. Fix: a keyword ending in `#N` now skips the fuzzy fallback entirely
+once the exact match is empty, going straight to "create fresh category."
+Non-session keywords are completely unaffected.
+
+Live remediation: cancelled the in-flight broken execution
+(`dovive-scout-c4gv4`), marked its `scout_jobs` row `error`, rebuilt +
+redeployed the image (digest `sha256:bc5ab334...`), resubmitted through the
+real UI — reused the same "#2" session number (no category had been
+created yet for the broken attempt, so no "#3" was needed). The already-
+scraped ASINs from the broken attempt were NOT lost — `migrate-p1-to-dash.js`
+fetches ALL `dovive_research` rows for the exact session keyword, and P1's
+`getAlreadyScraped()` skip-filter meant the resubmit didn't even re-scrape
+them.
+
+**Also fixed (commit `eca3061`)**: 6 first-word-substring
+`ilike('keyword', '%word%')` lookups tightened to exact
+`ilike('keyword', KEYWORD)` — these were mixing a sibling session's data
+into P3/P5 completion gates (run-pipeline.js), into P5's own grounding
+prompt and already-researched skip-filter (phase5-deep-research.js), and
+into P8/P10's formula-brief and competitive-benchmark prompts
+(phase8-formula-brief.js, phase10-competitive-benchmarking.js).
+ocr-phase4.js was matching on `dovive_research.title` substring instead of
+the `keyword` column at all — switched to the same exact-keyword pattern.
+
+**Also fixed (frontend, commits `a3422d4` / `b659943`)**: `usePipelineStatus`
+threw away partial-failure info from its ~9 parallel Supabase queries under
+concurrent load (a real HTTP2-refused-stream flake, not a data bug),
+silently rendering a false "phases regressed to Next" state on an already-
+complete category — now throws on any sub-query error so React Query's
+retry recovers without ever painting the corrupted result. Product Explorer
+showed a bare, unexplained "0 of 0 products" table when landing without a
+category selected — now matches Packaging's friendly prompt.
+
+Image rebuilt twice this session (once for the initial keyword-scoping
+fixes, once more for the category-resolver fix); Cloud Run Job updated both
+times. Validation run itself was left running to reach P13 for a full
+per-phase completeness audit — see scout_memory.md for the outcome.
+
 ## 2026-08-28 follow-up 6: formula_briefs UI-critical fields — real positioning/target_customer, robust market_summary count
 
 Re-diagnosed the "OUR CONCEPT" card / brief UI fields against the ACTUAL

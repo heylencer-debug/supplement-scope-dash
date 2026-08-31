@@ -1418,14 +1418,19 @@ async function run() {
   if (finalNoteCount > 0) {
     console.log('Saving ' + finalNoteCount + ' competitor notes to products...');
     let notesSaved = 0;
+    // Session-isolation fix (2026-09-01, live production incident — see
+    // phase6-product-intelligence.js's matching comment): scope by
+    // (asin, category_id), not asin alone — a "#N" session's ASINs
+    // legitimately overlap with its sibling's, and an unscoped update here
+    // would silently overwrite a DIFFERENT category's product row.
     for (const [asin, note] of Object.entries(finalNotes || {})) {
       const { data: prod } = await DASH.from('products')
-        .select('marketing_analysis').eq('asin', asin).maybeSingle();
+        .select('marketing_analysis').eq('asin', asin).eq('category_id', CAT_ID).maybeSingle();
       if (!prod) continue;
       const existing = prod.marketing_analysis || {};
       const { error: ne } = await DASH.from('products').update({
         marketing_analysis: { ...existing, qa_comparison_note: note }
-      }).eq('asin', asin);
+      }).eq('asin', asin).eq('category_id', CAT_ID);
       if (!ne) notesSaved++;
     }
     console.log('  Notes saved to products: ' + notesSaved + '/' + finalNoteCount + ' OK');

@@ -913,11 +913,29 @@ async function saveToSupabase(record) {
 
 // ─── Save to DASH products table ──────────────────────────────────────────────
 
-async function saveToDashProduct(asin, research) {
+async function saveToDashProduct(asin, research, categoryId) {
+  // Session-isolation fix (2026-09-01, live production incident): the same
+  // ASIN can now legitimately have a separate `products` row per category
+  // (e.g. a "#N" session re-scrapes the same physical Amazon products) —
+  // this MUST scope by (asin, category_id), not asin alone. The unscoped
+  // version fetched by .eq('asin', asin).single(), which is undefined
+  // behavior once 2+ rows share the ASIN (PostgREST errors on ambiguous
+  // .single() results), and then unconditionally .update()d EVERY row
+  // sharing that ASIN across EVERY category — confirmed live: this run's
+  // P5 pass overwrote marketing_analysis on the ORIGINAL "Electrolyte
+  // Powder" category's rows for every shared ASIN. If categoryId isn't
+  // available for some reason, skip rather than risk a cross-category
+  // write — a missing p5_research mirror field is recoverable, corrupting
+  // a signed-off category's data is not.
+  if (!categoryId) {
+    console.warn(`  ⚠️ saveToDashProduct(${asin}): no categoryId — skipping DASH product mirror to avoid an unscoped write`);
+    return;
+  }
   const { data: product } = await DASH.from('products')
     .select('marketing_analysis')
     .eq('asin', asin)
-    .single();
+    .eq('category_id', categoryId)
+    .maybeSingle();
 
   const existing = product?.marketing_analysis || {};
   await DASH.from('products').update({
@@ -934,12 +952,12 @@ async function saveToDashProduct(asin, research) {
         researched_at: research.researched_at,
       },
     },
-  }).eq('asin', asin);
+  }).eq('asin', asin).eq('category_id', categoryId);
 }
 
 // ─── Per-product pipeline: ground → scrape → summarize → save ─────────────────
 
-async function researchOneProduct({ product, rank, pool }, browserContext) {
+async function researchOneProduct({ product, rank, pool }, browserContext, categoryId) {
   const grounding = await fetchGroundingData(product.asin, KEYWORD);
   const groundingText = formatGroundingForPrompt(grounding);
 
@@ -992,7 +1010,7 @@ Page excerpt: ${scraped.raw_html_excerpt.substring(0, 15000)}`;
   });
 
   await saveToSupabase(record);
-  await saveToDashProduct(product.asin, record);
+  await saveToDashProduct(product.asin, record, categoryId);
 
   console.log(`  [P5 source/${product.asin}] perplexity=${hadPerplexityFindings} citations=${citationCount} rawPageFetched=${!!scraped?.raw_html_excerpt} source=${!!sourceUrl || hadPerplexityFindings}`);
 
@@ -1061,7 +1079,7 @@ async function run() {
     const poolLabel = item.pool === 'top10' ? `Top BSR #${item.rank}` : `New Brand #${item.rank}`;
     console.log(`\n[start] ${poolLabel} — ${item.product.brand || item.product.asin}`);
     const t0 = Date.now();
-    const r = await researchOneProduct(item, browserContext);
+    const r = await researchOneProduct(item, browserContext, cat.id);
     const elapsed = Math.round((Date.now() - t0) / 1000);
     console.log(`[done ${elapsed}s] ${poolLabel} — ${item.product.brand || item.product.asin} | model=${r.model} realData=${r.hadRealData} source=${r.hadSource} ${r.memoryFallback ? '⚠ MEMORY FALLBACK' : ''}`);
     return r;

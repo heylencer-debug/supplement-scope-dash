@@ -476,7 +476,7 @@ async function run() {
 
   // Fetch all products with all needed fields
   const { data: products, error } = await DASH.from('products')
-    .select(`asin, brand, title, bsr_current, bsr_30_days_avg, bsr_90_days_avg,
+    .select(`id, asin, brand, title, bsr_current, bsr_30_days_avg, bsr_90_days_avg,
              price, monthly_revenue, monthly_sales, rating_value, rating_count,
              serving_size, servings_per_container, supplement_facts_raw,
              feature_bullets_text, claims_on_label, marketing_analysis`)
@@ -577,11 +577,21 @@ async function run() {
     }
 
     // Save
+    // CRITICAL fix (2026-09-01, live production incident): this used to
+    // .eq('asin', product.asin) with NO category scoping. A "#N" session
+    // re-scrapes the same physical Amazon products as its sibling, so the
+    // same ASIN now legitimately has a separate `products` row PER
+    // category — the unscoped update hit every row sharing that ASIN
+    // across EVERY category. Confirmed live: this overwrote
+    // marketing_analysis.product_intelligence on 123 of the ORIGINAL,
+    // already signed-off "Electrolyte Powder" category's 161 products
+    // mid-run. `id` is the row's own unique primary key (now selected
+    // above), so scoping by it can never cross a category boundary.
     for (const { product, intel } of analyses) {
       const existing = product.marketing_analysis || {};
       const { error: saveErr } = await DASH.from('products').update({
         marketing_analysis: { ...existing, product_intelligence: intel }
-      }).eq('asin', product.asin);
+      }).eq('id', product.id);
       if (saveErr) { errors++; process.stdout.write(`\n  ❌ ${product.asin}: ${saveErr.message}`); }
       else saved++;
     }

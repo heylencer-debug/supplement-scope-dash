@@ -35,13 +35,20 @@ function useMarketIntelligence(categoryId: string) {
   return useQuery({
     queryKey: ["market_intelligence", categoryId],
     queryFn: async () => {
+      // maybeSingle(): a category with no formula_briefs row yet (P7
+      // hasn't run) is a normal, expected state, not an error — single()
+      // threw a 406 on every poll for that case instead of just returning
+      // "no market intel yet."
       const { data, error } = await supabase
         .from("formula_briefs")
         .select("ingredients")
         .eq("category_id", categoryId)
-        .single();
+        .maybeSingle();
       if (error) throw error;
-      return (data?.ingredients as Record<string, unknown>)?.market_intelligence as MarketIntelligence | null;
+      // React Query forbids a query function resolving to `undefined` — an
+      // absent formula_briefs row (data === null) or a present row missing
+      // market_intelligence must both normalize to `null`, not undefined.
+      return ((data?.ingredients as Record<string, unknown>)?.market_intelligence as MarketIntelligence | undefined) ?? null;
     },
     enabled: !!categoryId,
     staleTime: 5 * 60 * 1000,

@@ -18,13 +18,18 @@ export function MarketTrendStatusIndicator() {
 
     // Fetch initial status
     const fetchStatus = async () => {
+      // maybeSingle(): this indicator lives in the layout and runs on
+      // every page for the current category — a category with no
+      // market_trend_analyses row yet (the normal state until that
+      // analysis has run) used to 406 on single() on every single
+      // navigation instead of just resolving to "no status yet."
       const { data } = await supabase
         .from("market_trend_analyses")
         .select("status")
         .eq("category_id", currentCategoryId)
         .order("created_at", { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (data) {
         setStatus(data.status as AnalysisStatus);

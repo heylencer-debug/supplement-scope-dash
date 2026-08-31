@@ -244,12 +244,14 @@ async function callClaudeOpus(prompt, maxTokens = 64000) {
 async function fetchP5OffAmazonData(asins, keyword) {
   if (!asins.length) return {};
   try {
-    const firstWord = keyword.split(' ')[0].toLowerCase();
+    // Session-isolation fix (2026-09-01): exact match, not a first-word-OR-
+    // full-string substring — see phase8-formula-brief.js's matching
+    // comment. `keyword` here is always the full KEYWORD (session label).
     const [researchRes, sourcesRes] = await Promise.all([
       DOVIVE.from('dovive_phase5_research')
         .select('asin, competitor_angle, key_strengths, key_weaknesses, certifications')
         .in('asin', asins)
-        .or(`keyword.ilike.%${firstWord}%,keyword.ilike.%${keyword}%`),
+        .ilike('keyword', keyword),
       DOVIVE.from('dovive_p5_sources')
         .select('asin, source_url, source_type, extracted')
         .in('asin', asins),

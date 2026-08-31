@@ -297,7 +297,6 @@ If the text above genuinely does not contain enough information for a field, use
 // ─── P5 Deep Research Fetch ───────────────────────────────────────────────────
 async function fetchP5DeepResearch(keyword) {
   try {
-    const firstWord = keyword.split(' ')[0].toLowerCase();
     // 2026-08-28 FIX: this select previously used stale column names
     // (bsr/monthly_revenue/research_type/ai_analysis/key_findings/
     // formula_insights/competitive_strengths/competitive_weaknesses/
@@ -310,9 +309,15 @@ async function fetchP5DeepResearch(keyword) {
     // swallowed into an empty array — so P5's real deep-research content
     // NEVER reached P8's prompt on any run, regardless of how much P5 data
     // existed. Select the real columns now.
+    // Session-isolation fix (2026-09-01): exact match on the full session
+    // label, not a first-word-OR-full-string substring — the substring form
+    // pulled a SIBLING session's P5 research into THIS run's formula-brief
+    // prompt (real data-mixing into AI-generated content, not just a gate
+    // miscount). `keyword` here is always the full KEYWORD passed by the
+    // call site below.
     const { data } = await DOVIVE.from('dovive_phase5_research')
       .select('asin, brand, bsr_rank, pool, benefits, formula_notes, key_strengths, key_weaknesses, competitor_angle, certifications, third_party_tested, full_research, researched_by, data_grounding')
-      .or(`keyword.ilike.%${firstWord}%,keyword.ilike.%${keyword}%`)
+      .ilike('keyword', keyword)
       .order('bsr_rank', { ascending: true })
       .limit(20);
     return data || [];

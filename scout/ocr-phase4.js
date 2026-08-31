@@ -205,10 +205,18 @@ async function main() {
 
   // Get products — ordered by BSR so we scope the expensive vision pass to
   // the top N products only (env OCR_TOP_N, default 20).
+  // Session-isolation fix (2026-09-01): was a first-word TITLE substring
+  // match ('%electrolyte%'), which pulled in every dovive_research row from
+  // ANY category/session whose title happens to contain that word —
+  // including totally unrelated products, and (for a "#N" session) a
+  // sibling session's own rows. human-bsr.js writes the full session label
+  // to this table's `keyword` column for every row it scrapes, so an exact
+  // case-insensitive match on `keyword` scopes OCR to THIS run's own
+  // products only.
   const { data: products, error } = await supabase
     .from('dovive_research')
     .select('asin, title, keyword, images, main_image, bsr')
-    .ilike('title', `%${KEYWORD.split(' ')[0]}%`)
+    .ilike('keyword', KEYWORD)
     .not('images', 'is', null)
     .order('bsr', { ascending: true, nullsFirst: false });
 

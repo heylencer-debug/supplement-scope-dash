@@ -169,7 +169,14 @@ async function clearPhaseData(phaseNum, categoryId) {
         await DOVIVE.from('dovive_ocr').delete().eq('keyword', KEYWORD);
         break;
       case 5: // deep research
-        await DOVIVE.from('dovive_phase5_research').delete().ilike('keyword', `%${KEYWORD.split(' ')[0]}%`);
+        // Session-isolation fix (2026-09-01): was a first-word substring
+        // match ('%electrolyte%'), which would delete a SIBLING session's
+        // P5 rows too (e.g. force-clearing "electrolyte powder #2" used to
+        // also nuke the original "electrolyte powder" run's data). KEYWORD
+        // is the full session label written verbatim to this table's
+        // `keyword` column by phase5-deep-research.js, so an exact
+        // case-insensitive match scopes the delete to THIS run only.
+        await DOVIVE.from('dovive_phase5_research').delete().ilike('keyword', KEYWORD);
         break;
       case 6: // product intelligence — only clear product_intelligence key, preserve packaging_intelligence
         {
@@ -369,7 +376,12 @@ async function checkPhaseStatus(phaseNum, categoryId) {
       // tolerates that ceiling while requiring total reviews >= 200 so a
       // truly broken fetch (e.g. fallback not firing at all) still fails.
       const P3_MIN_REVIEWS_TOTAL = 200;
-      const { count: reviewRows } = await DOVIVE.from('dovive_reviews').select('*', { count: 'exact', head: true }).ilike('keyword', `%${KEYWORD.split(' ')[0]}%`);
+      // Session-isolation fix (2026-09-01): exact match on the full session
+      // label (KEYWORD), not a first-word substring — the substring version
+      // let a sibling session's ('electrolyte powder') raw review volume
+      // trivially satisfy this floor for a fresh, review-less session
+      // ('electrolyte powder #2'), making the gate lie about THIS run.
+      const { count: reviewRows } = await DOVIVE.from('dovive_reviews').select('*', { count: 'exact', head: true }).ilike('keyword', KEYWORD);
       const doneByCoverage = count >= runTotal * 0.5;
       const doneByTop20 = top20Done >= 15 && (reviewRows || 0) >= P3_MIN_REVIEWS_TOTAL;
       return {
@@ -421,9 +433,11 @@ async function checkPhaseStatus(phaseNum, categoryId) {
       // (full_research non-null), not just row existence — the P5 save-strip
       // bug (fixed 2026-08-28) previously let empty rows count as "done".
       const p5Target = (parseInt(process.env.P5_TOP_COUNT || '5', 10) + parseInt(process.env.P5_NEW_COUNT || '3', 10));
+      // Session-isolation fix (2026-09-01): exact match, not a first-word
+      // substring — see the P3 gate comment above for the same class of bug.
       const { count } = await DOVIVE.from('dovive_phase5_research')
         .select('*', { count: 'exact', head: true })
-        .ilike('keyword', `%${KEYWORD.split(' ')[0]}%`)
+        .ilike('keyword', KEYWORD)
         .not('full_research', 'is', null);
       // Tolerate a small shortfall (occasional per-product scrape/AI failures
       // are normal) — accept >= 6 or >= 75% of target, whichever is lower,
@@ -596,9 +610,11 @@ async function runFinalVerifier(categoryId) {
   // save-strip-bug context.
   const p5Target = (parseInt(process.env.P5_TOP_COUNT || '5', 10) + parseInt(process.env.P5_NEW_COUNT || '3', 10));
   const p5Min = Math.min(p5Target, Math.max(6, Math.ceil(p5Target * 0.75)));
+  // Session-isolation fix (2026-09-01): exact match, not a first-word
+  // substring (see checkPhaseStatus's matching comment).
   const p5 = (await DOVIVE.from('dovive_phase5_research')
     .select('*', { count: 'exact', head: true })
-    .ilike('keyword', `%${KEYWORD.split(' ')[0]}%`)
+    .ilike('keyword', KEYWORD)
     .not('full_research', 'is', null)).count || 0;
   const p6 = await q('marketing_analysis');
   const p8 = await (async () => {
@@ -651,7 +667,10 @@ async function runFinalVerifier(categoryId) {
   // the fallback silently didn't fire at all, e.g. missing/invalid key ->
   // near-zero reviews overall).
   const P3_MIN_REVIEWS_TOTAL = 200;
-  const { count: reviewRowsTotal } = await DOVIVE.from('dovive_reviews').select('*', { count: 'exact', head: true }).ilike('keyword', `%${KEYWORD.split(' ')[0]}%`);
+  // Session-isolation fix (2026-09-01): exact match, not a first-word
+  // substring (see checkPhaseStatus's matching comment) — otherwise a
+  // sibling session's review volume masks a fresh session's real P3 gap.
+  const { count: reviewRowsTotal } = await DOVIVE.from('dovive_reviews').select('*', { count: 'exact', head: true }).ilike('keyword', KEYWORD);
   if (!((p3 >= runTotal * 0.5) || (top20P3 >= 15 && (reviewRowsTotal || 0) >= P3_MIN_REVIEWS_TOTAL))) failures.push(`P3 ${p3}/${runTotal} (this run) < 50% and Top20 ${top20P3}/20 (raw reviews=${reviewRowsTotal || 0}, need top20>=15 and raw>=${P3_MIN_REVIEWS_TOTAL})`);
   // P4 top20 relaxed 20 → 18 (2026-08-28 "ashwagandha gummies" investigation,
   // 138 products): the 2 top-20 misses (B092H5DCJM, B094T131B4 — both Goli

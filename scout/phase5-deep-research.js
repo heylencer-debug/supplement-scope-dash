@@ -172,9 +172,15 @@ async function runPool(items, concurrency, worker) {
 
 async function fetchGroundingData(asin, keyword) {
   const [researchRes, ocrRes, reviewsRes, keepaRes] = await Promise.all([
+    // Session-isolation fix (2026-09-01): exact match on the full session
+    // label, not a first-word substring — the substring version could pull
+    // a SIBLING session's dovive_research row for the same ASIN into this
+    // run's grounding prompt (data-mixing into AI-generated content, not
+    // just a gate miscount). `keyword` here is always the full KEYWORD
+    // (session label) — see the researchOneProduct() call site.
     DOVIVE.from('dovive_research')
       .select('title, brand, description, bullet_points, price, rating, review_count, bsr')
-      .eq('asin', asin).ilike('keyword', `%${keyword.split(' ')[0]}%`).limit(1).maybeSingle(),
+      .eq('asin', asin).ilike('keyword', keyword).limit(1).maybeSingle(),
     DOVIVE.from('dovive_ocr')
       .select('supplement_facts, other_ingredients, health_claims, certifications')
       .eq('asin', asin).order('image_index', { ascending: true }).limit(8),
@@ -843,9 +849,14 @@ async function getProducts(categoryId) {
 // ─── Check already researched ──────────────────────────────────────────────────
 
 async function getAlreadyResearched() {
+  // Session-isolation fix (2026-09-01): exact match, not a first-word
+  // substring — the substring version made a fresh session ("electrolyte
+  // powder #2") think every ASIN a SIBLING session had already researched
+  // was "done", skipping it and potentially leaving this run with zero new
+  // P5 records.
   const { data } = await DOVIVE.from('dovive_phase5_research')
     .select('asin, pool, researched_by')
-    .ilike('keyword', `%${KEYWORD.split(' ')[0]}%`);
+    .ilike('keyword', KEYWORD);
   return new Set((data || [])
     .filter(r => r.researched_by?.includes('claude') || r.researched_by?.includes('grok'))
     .map(r => `${r.asin}_${r.pool}`));

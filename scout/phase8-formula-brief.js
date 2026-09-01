@@ -325,11 +325,30 @@ async function fetchP5DeepResearch(keyword) {
     // prompt (real data-mixing into AI-generated content, not just a gate
     // miscount). `keyword` here is always the full KEYWORD passed by the
     // call site below.
-    const { data } = await DOVIVE.from('dovive_phase5_research')
-      .select('asin, brand, bsr_rank, pool, benefits, formula_notes, key_strengths, key_weaknesses, competitor_angle, certifications, third_party_tested, full_research, researched_by, data_grounding')
+    // 2026-09-01 CRITICAL FIX: `data_grounding` was included in this select
+    // but does NOT exist on the deployed dovive_phase5_research table (only
+    // phase5-deep-research.js's OWN write path self-heals around this —
+    // saveToSupabase() there already detects and drops the missing column
+    // per-attempt; see its comment for the same root cause). A SELECT with
+    // an unknown column fails the ENTIRE query with a Postgres 42703 error
+    // — and this code never checked `error`, just destructured `data`
+    // (which comes back `null` on any query failure) and fell through to
+    // `data || []`. Found live via a real formula-chain run logging "P5
+    // records: 0" despite 7 real, grounded competitor briefs existing for
+    // the exact keyword — every P8 run has silently built its prompt with
+    // ZERO P5 deep-research content since `data_grounding` was added to
+    // this select, regardless of how much real P5 data existed. Dropped
+    // the nonexistent column and added explicit error logging so a future
+    // schema drift here is loud, not silent.
+    const { data, error } = await DOVIVE.from('dovive_phase5_research')
+      .select('asin, brand, bsr_rank, pool, benefits, formula_notes, key_strengths, key_weaknesses, competitor_angle, certifications, third_party_tested, full_research, researched_by')
       .ilike('keyword', keyword)
       .order('bsr_rank', { ascending: true })
       .limit(20);
+    if (error) {
+      console.warn('  ⚠️ P5 data fetch failed (non-fatal, but P8 prompt will lack P5 grounding):', error.message);
+      return [];
+    }
     return data || [];
   } catch (e) {
     console.warn('  ⚠️ P5 data fetch failed (non-fatal):', e.message);

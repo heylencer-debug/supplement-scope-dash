@@ -5,7 +5,7 @@
  */
 
 import React, { useRef, useCallback, useState } from "react";
-import { useFormulaBrief, type IngredientRow } from "@/hooks/useFormulaBrief";
+import { useFormulaBrief, type IngredientRow, type FormulaBriefData } from "@/hooks/useFormulaBrief";
 import { CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Panel } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
@@ -299,6 +299,28 @@ function FormulaCard({ card, categoryName, generatedAt, onManufacturerPDF }: {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
+// 2026-09-01: a research-scope run (P1-P8) already leaves a REAL
+// `formula_briefs` row behind — phase6-market-analysis.js writes
+// `ingredients.market_intelligence` even though the formula chain (P9-P13)
+// never ran. `!brief` alone was true only for a category with NO row at
+// all, so this empty state (and its "Generate formula brief" button) was
+// unreachable for the exact case it exists for — a fresh research-scope
+// category. Checks for any of the fields that only a REAL formula-chain
+// run ever populates (P9 drafts, the legacy structured shape, or a P10
+// final formula) instead of just "does a row exist."
+function hasRealFormulaContent(ingredients: FormulaBriefData["ingredients"]): boolean {
+  if (!ingredients) return false;
+  const ing = ingredients as Record<string, unknown>;
+  return !!(
+    ing.ai_generated_brief ||
+    ing.ai_generated_brief_grok ||
+    ing.ai_generated_brief_claude ||
+    ing.final_formula_brief ||
+    ing.adjusted_formula ||
+    (ing as { master_formula_per_serving?: unknown }).master_formula_per_serving
+  );
+}
+
 export function FormulaBriefTab({ categoryId, categoryName }: Props) {
   const { data: brief, isLoading, error } = useFormulaBrief(categoryId);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -320,7 +342,7 @@ export function FormulaBriefTab({ categoryId, categoryName }: Props) {
     );
   }
 
-  if (!brief) {
+  if (!brief || !hasRealFormulaContent(brief.ingredients)) {
     return (
       <div className="text-center py-16 space-y-4">
         <FlaskConical className="h-12 w-12 text-muted-foreground/40 mx-auto" />

@@ -74,7 +74,6 @@ export function useFormulaJourney(categoryId?: string): FormulaJourneyResult {
 
   const ing = query.data?.ingredients ?? null;
   const feedbackCount = query.data?.feedbackCount ?? 0;
-  const hasAnyData = !!ing;
 
   const formulationDone = !!(
     ((ing?.final_formula_brief as string)?.length) ||
@@ -85,6 +84,16 @@ export function useFormulaJourney(categoryId?: string): FormulaJourneyResult {
   const { p11Score, p11Complete: benchmarkDone, p12Score, p12Complete: complianceDone } =
     parseBenchmarkAndCompliance(ing);
   const factoryDone = feedbackCount > 0;
+
+  // 2026-09-01: a research-scope run (P1-P8) already leaves a REAL
+  // `formula_briefs` row behind — phase6-market-analysis.js writes
+  // `ingredients.market_intelligence` even though the formula chain
+  // (P9-P13) never ran. `!!ing` alone was true the moment ANY ingredients
+  // JSON existed, so the "Generate formula brief" empty state below was
+  // unreachable for the exact case it exists for — a fresh research-scope
+  // category. Ties `hasAnyData` to the SAME real-content signals the stage
+  // flags already use, not mere row/JSON presence.
+  const hasAnyData = formulationDone || qaDone || benchmarkDone || complianceDone;
 
   const doneFlags = [formulationDone, qaDone, benchmarkDone, complianceDone, factoryDone];
   const firstPendingIdx = doneFlags.findIndex((d) => !d);

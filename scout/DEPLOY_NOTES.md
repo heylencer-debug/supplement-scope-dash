@@ -1,5 +1,114 @@
 # Scout pipeline — Cloud Run Job deploy notes
 
+## 2026-09-01: cheap-mode finale triage — P4 retry-heuristic fix, cleanup, verifier sanity-check
+
+**Trigger**: the prior session's cheap-mode verification run (`scout_job
+90434faf-d4ca-491a-b0aa-61a6e50197fe`, execution `dovive-scout-b7cjh`,
+keyword `"zzz cheap mode verify test"`) had finished with
+`status=error` — verifier FAIL on `P3 10/107` and `P4 2/107` despite the
+AI cost ledger + roll-up working perfectly ($1.6167, 580 calls). Root-caused
+both, fixed the one real bug found, cleaned up the test artifacts.
+
+**Root cause — P4 2/107 (bug found, fixed)**: read the `dovive-scout-b7cjh`
+Cloud Run logs directly. `P4_MODEL`/`OCR_MODEL` were ALREADY explicitly
+pinned to `google/gemini-3.7-flash` on the Cloud Run job (`gcloud run jobs
+describe`) — set during the earlier P6-Gemini-Flash cost pass, **predating**
+cheap mode entirely. So cheap mode's `ANALYSIS_MODEL` override never even
+reached P4 (both files read `P4_MODEL`/`OCR_MODEL` first in their `||`
+chain) — ruling out "cheap mode broke P4" as the cause. The real bug: both
+`ocr-phase4.js` and `phase4-text-extract.js` decided whether to retry/fail
+an OpenRouter call based on **raw response character count** (`content.length
+< 500` = "near-empty", inherited from the pipeline-wide 2026-08-28
+truncation-hardening pass), not on whether the JSON actually parsed or
+`finish_reason` indicated real truncation. Every failing call in the logs
+had `finish_reason: stop` (a genuine completion, never `'length'`) with a
+short-but-complete body — `google/gemini-3.7-flash` legitimately returns
+compact JSON (`has_supplement_facts:false` + empty arrays) for products
+with no facts panel, which regularly lands under 500 chars while being
+100% valid. The heuristic burned an extra retry call on every one of these
+(explains 549 calls for ~100 products), and when the retry came back
+similarly compact, threw a false `[ERROR: truncated/empty]` that discarded
+a real result — `phase4-text-extract.js`'s per-product `catch` then marked
+the whole product FAILED (57/100 failed this way). **This risk is not
+limited to junk products** — a real, single-ingredient supplement's minimal
+valid JSON (e.g. one nutrient row, no claims/certs) can plausibly also land
+under 500 chars, so on a real run this could have silently dropped that
+product's P4 data entirely. Fixed both files: retry/fail decisions now key
+off **parseability** (via `ocr-utils.js`'s existing `parseModelJson`)
+instead of string length — `finish_reason==='length'` is still logged for
+visibility, but only an unparseable response after both attempts is
+treated as truncation evidence. Commit `90e314e`. Image rebuilt (see
+Verification below).
+
+**Root cause — P3 10/107 (junk-input artifact, confirmed, no code change)**:
+the nonsense keyword fuzzy-matched 107 real but totally unrelated Amazon
+products (drug-test kits, urine test cups, sleep/cortisol tests — read
+directly off the `dovive-scout-b7cjh` logs' product titles). P3's 30-ASIN
+scrape cap (`Max ASINs: 30`) got real reviews for only 10 of those 30
+(379 raw, via the Bright Data fallback) — the other 20 genuinely have zero
+reviews (`No reviews on page 1 — done` on every Playwright attempt, not a
+block/CAPTCHA pattern). `top20P3 = 0/20` because none of the top-20-BSR
+junk products happened to be among the 10 that got reviews. Confirmed this
+is NOT a regression from the `eca3061` exact-keyword-scoping fix — that fix
+only changes which rows a query matches (session isolation), not how many
+reviews get scraped or found; the P3/P4 verifier gate code itself (grep'd
+in `run-pipeline.js`) reads only `runTotal`/`top20P3`/`reviewRowsTotal`, no
+`cheap_mode` branch exists there at all. A normal 40-product real-keyword
+run (e.g. "turmeric gummies", 40 products, well below the P1 scrape cap)
+should comfortably clear this gate — real, established supplement products
+in the top 20 BSR virtually always carry organic reviews, unlike disposable
+drug-test-kit SKUs.
+
+**Verifier design sanity-check**: confirmed structural gates behaved exactly
+as designed — `checkPhaseStatus`/`runFinalVerifier`'s P3/P4 thresholds
+(`p3 >= runTotal*0.5 || (top20P3>=15 && reviewRowsTotal>=200)`, `p4 >=
+total*0.8 || top20P4>=15`) have zero `cheap_mode` awareness; cheap mode only
+lowers the AI-*content*-quality bar (Flash vs Sonnet/Opus), never the
+row-count/completeness structural gates, which is exactly the intended
+separation. The run correctly failed on real structural insufficiency
+(genuine review/facts scarcity in a junk category), not on AI quality —
+proof the design boundary holds.
+
+**Cleanup**: `delete-category`'s DB-side logic (category_id-scoped tables:
+`reviews`, `nlp_aspects`/`competitors` via product ids, `products`,
+`formula_conversations`, `formula_generation_tasks`, `ingredient_analyses`,
+`packaging_analyses`, `competitive_analyses`, `formula_brief_versions`,
+`formula_briefs`, `category_scores`, `category_analyses`, `categories`)
+replicated directly via service-role client (same effect, no HTTP round
+trip), PLUS the raw `dovive_*` tables it doesn't touch (scoped by exact
+`keyword`, not `category_id`): `dovive_research` (107), `dovive_reviews`
+(379), `dovive_keepa` (107), `dovive_ocr` (105), `dovive_phase5_research`
+(7), `dovive_p5_sources` (6) — all deleted via exact `.ilike('keyword',
+'zzz cheap mode verify test')` (no wildcards, can't cross-match a sibling
+session). Also deleted the `scout_jobs` row for that keyword.
+**`ai_usage_log`'s 580 rows for that job were deliberately KEPT** per
+instruction (job/cost history) — verified still present after cleanup.
+One incidental find while inspecting: P6's market-intelligence write (in
+scope for a `only_phases=1..8` run) had landed a real
+`formula_briefs.ingredients.market_intelligence` row for the test category
+— also removed by the `formula_briefs` delete above, so no orphan.
+Verified zero collateral damage with before/after `products`-table and
+`dovive_research`-table counts on 6 real categories (Electrolyte Powder ×3,
+Hydration Powder, Magnesium Gummies, Ashwagandha Gummies) — every count
+identical before and after; total category count dropped by exactly 1
+(the test category).
+
+**Verification**: `node --check` clean on both edited files. Image rebuilt
+(`gcloud builds submit --tag
+us-central1-docker.pkg.dev/noodle-worker/dovive-scout/worker:latest
+--project noodle-worker --region us-central1 --timeout=1200s`) and
+`dovive-scout` Cloud Run Job updated to the new image. No frontend files
+touched this pass (no `tsc` needed). No new Cloud Run execution was
+triggered — the next real keyword run is the live validation of the P4
+fix.
+
+**Verdict for the user's next real full-price run**: ready. The one real
+bug found (P4's length-based truncation heuristic) is fixed and deployed;
+the verifier's P3/P4 failures on the cheap-mode run were a correct response
+to genuinely junk test-keyword data, not a pipeline defect, and the
+structural-gate/AI-quality separation cheap mode depends on is confirmed
+intact.
+
 ## 2026-09-01: AI cost ledger + Opus→Sonnet 5 swap + P6→Gemini Flash 3.7 + on-demand formula chain + cheap test mode
 
 Five user-approved tasks landed together (same session, separate commits):

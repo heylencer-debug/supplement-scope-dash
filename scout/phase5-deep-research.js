@@ -67,6 +67,14 @@ const { researchBrand: perplexityResearchBrand, getPerplexityKey } = require('./
 const DASH   = createClient(process.env.DASH_URL || process.env.SUPABASE_URL, process.env.DASH_KEY || process.env.SUPABASE_KEY);
 const DOVIVE = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
+// 2026-09-01: set once resolved in run() below (same pattern as phase6-
+// product-intelligence.js/phase6-market-analysis.js's `_categoryId`) so
+// recordAiUsage() can attribute P5's cost to the right category — was
+// previously omitted entirely, so P5's real AI spend never showed up in the
+// per-category "AI Cost" card (only the job-level roll-up), even though it's
+// a substantial chunk of a run's total cost.
+let _categoryId = null;
+
 const KEYWORD  = process.argv.includes('--keyword')  ? process.argv[process.argv.indexOf('--keyword')  + 1] : 'ashwagandha gummies';
 // Web searches (Perplexity/DDG) use the clean words; storage keeps the full
 // session label ("hydration powder #2") so re-runs stay isolated.
@@ -121,7 +129,7 @@ async function callGrokOnce(prompt, model, maxTokens) {
   }
   const j = await res.json();
   if (j.error) throw new Error(`OpenRouter error (${model}): ${j.error.message || JSON.stringify(j.error)}`);
-  recordAiUsage({ phase: 'P5', model, usage: j.usage, keyword: KEYWORD }).catch(() => {});
+  recordAiUsage({ phase: 'P5', model, usage: j.usage, categoryId: _categoryId, keyword: KEYWORD }).catch(() => {});
   const choice = j.choices?.[0];
   const content = choice?.message?.content || null;
   const finishReason = choice?.finish_reason || 'unknown';
@@ -1040,6 +1048,7 @@ async function run() {
 
   const cat = await lookupCategoryId(KEYWORD);
   console.log(`Category: ${cat.name} (${cat.id})`);
+  _categoryId = cat.id;
 
   console.log('\nFetching products...');
   const { top10, newBrands } = await getProducts(cat.id);

@@ -40,8 +40,16 @@ const fetch = require('node-fetch');
 const { createClient } = require('@supabase/supabase-js');
 const { withUsageTracking, recordAiUsage } = require('./utils/ai-usage');
 const { parseModelJson } = require('./utils/ocr-utils');
+const { resolveCategory } = require('./utils/category-resolver');
 
 const KEYWORD         = process.argv[2] || 'ashwagandha gummies';
+// 2026-09-01: resolved once in main() below, purely so recordAiUsage() can
+// attribute P4's cost to the right category (P4 previously omitted
+// categoryId entirely — its real AI spend, often the largest single-phase
+// cost in a run, never showed up in the per-category "AI Cost" card, only
+// the job-level roll-up). Best-effort — a resolution failure just leaves
+// this null and P4's cost still lands correctly in the job-level total.
+let _categoryId = null;
 const TEST_MODE       = process.argv.includes('--test');
 const _topNIdx        = process.argv.indexOf('--top-n');
 const OCR_TOP_N        = _topNIdx > -1 ? parseInt(process.argv[_topNIdx + 1]) : parseInt(process.env.OCR_TOP_N || '20');
@@ -138,7 +146,7 @@ Return ONLY valid JSON, no markdown.`;
 
     const data = await res.json();
     if (data.error) throw new Error(`Gemini OCR error: ${data.error.message || JSON.stringify(data.error)}`);
-    recordAiUsage({ phase: 'P4', model: ANALYSIS_MODEL, usage: data.usage, keyword: KEYWORD }).catch(() => {});
+    recordAiUsage({ phase: 'P4', model: ANALYSIS_MODEL, usage: data.usage, categoryId: _categoryId, keyword: KEYWORD }).catch(() => {});
     const choice = data.choices?.[0];
     const content = choice?.message?.content || '';
     const finishReason = choice?.finish_reason || 'unknown';
@@ -211,6 +219,14 @@ async function main() {
   console.log(`   Keyword: "${KEYWORD}"`);
   console.log(`   Mode: ${TEST_MODE ? 'TEST (1 product)' : `TOP ${OCR_TOP_N} by BSR`}`);
   console.log(`   Max images/product: ${OCR_MAX_IMAGES} (stops early once facts panel found)`);
+
+  try {
+    const cat = await resolveCategory(supabase, KEYWORD);
+    _categoryId = cat.id;
+    console.log(`   Category (for cost attribution): ${cat.name} (${cat.id})`);
+  } catch (e) {
+    console.warn(`   ⚠ Could not resolve category for cost attribution (${e.message}) — P4 AI cost will still land in the job-level total, just not the per-category breakdown`);
+  }
 
   // Get products — ordered by BSR so we scope the expensive vision pass to
   // the top N products only (env OCR_TOP_N, default 20).

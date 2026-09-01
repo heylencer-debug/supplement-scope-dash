@@ -17,10 +17,15 @@ const fetch = require('node-fetch');
 const { createClient } = require('@supabase/supabase-js');
 const { parseModelJson, normalizeFacts, isValidFacts } = require('./utils/ocr-utils');
 const { withUsageTracking, recordAiUsage } = require('./utils/ai-usage');
+const { resolveCategory } = require('./utils/category-resolver');
 
 // Support both: node phase4-text-extract.js "keyword" AND node phase4-text-extract.js --keyword "keyword"
 const _kwIdx = process.argv.indexOf('--keyword');
 const KEYWORD   = _kwIdx > -1 ? process.argv[_kwIdx + 1] : (process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : 'ashwagandha gummies');
+// 2026-09-01: resolved once in main() below, purely so recordAiUsage() can
+// attribute this pass's cost to the right category (previously omitted
+// entirely — see the same fix in ocr-phase4.js/phase5-deep-research.js).
+let _categoryId = null;
 const TEST_MODE = process.argv.includes('--test');
 const LIMIT_IDX = process.argv.indexOf('--limit');
 const LIMIT     = LIMIT_IDX > -1 ? parseInt(process.argv[LIMIT_IDX + 1]) : null;
@@ -109,7 +114,7 @@ Return ONLY valid JSON, no markdown.`;
     }
 
     const data = await res.json();
-    recordAiUsage({ phase: 'P4', model: ANALYSIS_MODEL, usage: data.usage, keyword: KEYWORD }).catch(() => {});
+    recordAiUsage({ phase: 'P4', model: ANALYSIS_MODEL, usage: data.usage, categoryId: _categoryId, keyword: KEYWORD }).catch(() => {});
     const choice = data.choices?.[0];
     const content = choice?.message?.content || '';
     const finishReason = choice?.finish_reason || 'unknown';
@@ -170,6 +175,14 @@ async function main() {
   console.log(`   Mode    : ${TEST_MODE ? 'TEST (1 product)' : LIMIT ? `LIMIT ${LIMIT}` : 'FULL'}`);
 
   await getOpenAIKey();
+
+  try {
+    const cat = await resolveCategory(sb, KEYWORD);
+    _categoryId = cat.id;
+    console.log(`   Category (for cost attribution): ${cat.name} (${cat.id})`);
+  } catch (e) {
+    console.warn(`   ⚠ Could not resolve category for cost attribution (${e.message}) — cost will still land in the job-level total, just not the per-category breakdown`);
+  }
 
   // Get products with bullet_points
   const { data: products, error } = await sb

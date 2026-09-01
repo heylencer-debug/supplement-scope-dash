@@ -35,14 +35,30 @@ export function useSubmitScoutJob() {
       // DOUBLE-SUBMIT / DUPLICATE GUARD: refuse when any session of this
       // keyword is already queued or running (two rapid Enters used to
       // create two identical jobs).
+      // 2026-09-01: a "queued" row that a Cloud Run execution never claimed
+      // (trigger-scout-job invoke failed/dropped, or the execution crashed
+      // before claiming) used to block this keyword FOREVER — found live
+      // when a 5-day-old orphaned "queued" row from an earlier double-submit
+      // incident silently blocked a brand-new real submission. A genuinely
+      // in-flight job gets claimed within a couple minutes of being queued
+      // (trigger-scout-job invokes the Cloud Run execution synchronously on
+      // insert), so a still-"queued", never-claimed row older than this
+      // window is dead, not in-flight — it no longer blocks new submissions
+      // (the stale row itself is left alone, just excluded from the guard).
+      const STALE_QUEUED_MS = 15 * 60 * 1000;
       const { data: inflight, error: inflightErr } = await scoutJobsTable()
-        .select("id, keyword, status")
+        .select("id, keyword, status, created_at, claimed_at")
         .in("status", ["queued", "claimed", "running"])
         .ilike("keyword", `${base}%`);
       if (inflightErr) throw new Error("Could not verify queue state — try again in a moment.");
-      const inflightHit = (inflight || []).find(
-        (j: { keyword: string }) => j.keyword.toLowerCase().replace(/\s*#\d+\s*$/, "") === base
-      );
+      const inflightHit = (inflight || []).find((j: { keyword: string; status: string; created_at: string; claimed_at: string | null }) => {
+        if (j.keyword.toLowerCase().replace(/\s*#\d+\s*$/, "") !== base) return false;
+        if (j.status === "queued" && !j.claimed_at) {
+          const ageMs = Date.now() - new Date(j.created_at).getTime();
+          if (ageMs > STALE_QUEUED_MS) return false; // orphaned, doesn't block
+        }
+        return true;
+      });
       if (inflightHit) {
         throw new Error(`"${inflightHit.keyword}" is already ${inflightHit.status} — wait for it or cancel it first.`);
       }
@@ -157,13 +173,23 @@ export function useGenerateFormulaBrief() {
       // Double-submit guard — same pattern as useSubmitScoutJob, exact
       // keyword match only (this is a continuation of ONE specific session,
       // not a new base/sibling keyword).
+      // Same staleness exclusion as useSubmitScoutJob's guard — a never-claimed
+      // "queued" row older than 15 minutes is orphaned, not in-flight.
+      const STALE_QUEUED_MS = 15 * 60 * 1000;
       const { data: inflight, error: inflightErr } = await scoutJobsTable()
-        .select("id, keyword, status")
+        .select("id, keyword, status, created_at, claimed_at")
         .in("status", ["queued", "claimed", "running"])
         .eq("keyword", keyword);
       if (inflightErr) throw new Error("Could not verify queue state — try again in a moment.");
-      if (inflight && inflight.length > 0) {
-        throw new Error(`"${keyword}" already has a job ${inflight[0].status} — wait for it to finish first.`);
+      const activeInflight = (inflight || []).filter((j: { status: string; created_at: string; claimed_at: string | null }) => {
+        if (j.status === "queued" && !j.claimed_at) {
+          const ageMs = Date.now() - new Date(j.created_at).getTime();
+          if (ageMs > STALE_QUEUED_MS) return false;
+        }
+        return true;
+      });
+      if (activeInflight.length > 0) {
+        throw new Error(`"${keyword}" already has a job ${activeInflight[0].status} — wait for it to finish first.`);
       }
 
       const insertPayload: ScoutJobInsert = {

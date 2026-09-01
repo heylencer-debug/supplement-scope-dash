@@ -19,6 +19,10 @@ require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const fetch = require('node-fetch');
 const fs = require('fs');
+const { withUsageTracking, recordAiUsage } = require('./utils/ai-usage');
+
+// Set once main() resolves the category — read by the call functions below.
+let _categoryId = null;
 
 // ─── Supabase ─────────────────────────────────────────────────────────────────
 const DASH = createClient(
@@ -54,11 +58,11 @@ async function callClaudeOnce(prompt, maxTokens) {
       'Content-Type': 'application/json',
       'HTTP-Referer': 'https://dovive.com',
     },
-    body: JSON.stringify({
+    body: JSON.stringify(withUsageTracking({
       model: ANALYSIS_MODEL,
       max_tokens: maxTokens,
       messages: [{ role: 'user', content: prompt }],
-    }),
+    })),
   });
   if (res.status === 402) {
     console.error(`  ❌ Living Brief OpenRouter credits exhausted — top up at openrouter.ai`);
@@ -66,6 +70,7 @@ async function callClaudeOnce(prompt, maxTokens) {
   }
   const j = await res.json();
   if (j.error) throw new Error(`Claude error: ${j.error.message}`);
+  recordAiUsage({ phase: 'living_brief', model: ANALYSIS_MODEL, usage: j.usage, categoryId: _categoryId, keyword: KEYWORD }).catch(() => {});
   const choice = j.choices?.[0];
   const content = choice?.message?.content || '';
   const finishReason = choice?.finish_reason || 'unknown';
@@ -111,11 +116,11 @@ async function callClaudeWithImagesOnce(textPrompt, imageUrls, maxTokens) {
       'Content-Type': 'application/json',
       'HTTP-Referer': 'https://dovive.com',
     },
-    body: JSON.stringify({
+    body: JSON.stringify(withUsageTracking({
       model: ANALYSIS_MODEL,
       max_tokens: maxTokens,
       messages: [{ role: 'user', content: messageContent }],
-    }),
+    })),
   });
   if (res.status === 402) {
     console.error(`  ❌ Living Brief Vision OpenRouter credits exhausted — top up at openrouter.ai`);
@@ -123,6 +128,7 @@ async function callClaudeWithImagesOnce(textPrompt, imageUrls, maxTokens) {
   }
   const j = await res.json();
   if (j.error) throw new Error(`Claude Vision error: ${j.error.message}`);
+  recordAiUsage({ phase: 'living_brief', model: ANALYSIS_MODEL, usage: j.usage, categoryId: _categoryId, keyword: KEYWORD }).catch(() => {});
   const choice = j.choices?.[0];
   const content = choice?.message?.content || '';
   const finishReason = choice?.finish_reason || 'unknown';
@@ -209,6 +215,7 @@ async function main() {
     .select('id, name').ilike('name', `%${KEYWORD}%`).limit(1).single();
   if (!cat) { console.error(`Category not found for: ${KEYWORD}`); process.exit(1); }
   const CAT_ID = cat.id;
+  _categoryId = CAT_ID;
   console.log(`  Category: ${cat.name} (${CAT_ID})`);
 
   // 2. Load current active formula brief

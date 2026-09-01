@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { withUsageTracking, recordAiUsage } from "../_shared/aiUsage.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -117,7 +118,7 @@ async function runCompetitiveAnalysis(supabase: any, categoryId: string, formula
     };
 
     // Call AI for analysis
-    const analysis = await callAIForCompetitiveAnalysis(ourConcept, competitorData);
+    const analysis = await callAIForCompetitiveAnalysis(ourConcept, competitorData, supabase, categoryId);
 
     // Save to database
     const { error: upsertError } = await supabase
@@ -140,7 +141,7 @@ async function runCompetitiveAnalysis(supabase: any, categoryId: string, formula
   }
 }
 
-async function callAIForCompetitiveAnalysis(ourConcept: any, competitors: CompetitorData[]) {
+async function callAIForCompetitiveAnalysis(ourConcept: any, competitors: CompetitorData[], supabase: any, categoryId: string) {
   const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
 
   if (!OPENROUTER_API_KEY) {
@@ -184,7 +185,7 @@ Provide a comprehensive competitive analysis.`;
       "HTTP-Referer": Deno.env.get("SUPABASE_URL") || "https://lovable.dev",
       "X-Title": "Noodle Search Competitive Analysis",
     },
-    body: JSON.stringify({
+    body: JSON.stringify(withUsageTracking({
       model: "google/gemini-3-pro-preview",
       messages: [
         { role: "system", content: systemPrompt },
@@ -279,7 +280,7 @@ Provide a comprehensive competitive analysis.`;
         },
       ],
       tool_choice: { type: "function", function: { name: "provide_competitive_analysis" } },
-    }),
+    })),
   });
 
   if (!response.ok) {
@@ -289,6 +290,7 @@ Provide a comprehensive competitive analysis.`;
   }
 
   const data = await response.json();
+  recordAiUsage(supabase, { phase: "competitors", model: "google/gemini-3-pro-preview", usage: data.usage, categoryId }).catch(() => {});
   const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
 
   if (!toolCall?.function?.arguments) {

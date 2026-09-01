@@ -12,6 +12,11 @@ export interface CategoryWithImages extends Category {
   job_status?: ScoutJobStatus | null;
   /** Normalized 0-10 opportunity score from the most recent category_analyses row, if any. */
   opportunity_score?: number | null;
+  /** 2026-09-01 cost ledger: latest scout_jobs.total_cost_usd for this keyword — null on
+   * pre-ledger runs, on failed lookups, or when the migration isn't applied yet. */
+  job_cost_usd?: number | null;
+  /** 2026-09-01: true when the latest job for this keyword was a cheap-mode test run. */
+  job_is_test?: boolean;
 }
 
 /** Strip spreadsheet-import junk (leading "=", quotes, etc.) — display + name-matching. */
@@ -56,6 +61,39 @@ async function fetchLatestJobByKeyword(): Promise<Map<string, JobSignal>> {
     }
   } catch (e) {
     console.warn("useRecentCategories: scout_jobs lookup failed", e);
+  }
+  return map;
+}
+
+interface CostSignal {
+  cost: number | null;
+  isTest: boolean;
+}
+
+/**
+ * 2026-09-01: cost-ledger lookup, kept ENTIRELY SEPARATE from
+ * fetchLatestJobByKeyword() on purpose — total_cost_usd/cheap_mode/is_test
+ * are new columns (scout/migrations/007_ai_usage_cost_ledger.sql) that may
+ * not be applied to the live project yet. If this query 400s for ANY reason
+ * (missing table, missing column, whatever), it must NEVER take the
+ * existing job_status lookup down with it — that's why this is its own
+ * try/catch and its own query, not a widened select on the original one.
+ */
+async function fetchJobCostByKeyword(): Promise<Map<string, CostSignal>> {
+  const map = new Map<string, CostSignal>();
+  try {
+    const { data, error } = await scoutJobsTable()
+      .select("keyword, total_cost_usd, is_test, updated_at")
+      .order("updated_at", { ascending: false })
+      .limit(500);
+    if (error) return map; // graceful — pre-migration or transient, never throws
+    for (const j of data || []) {
+      const key = normalizeKey(j.keyword);
+      if (!key || map.has(key)) continue;
+      map.set(key, { cost: j.total_cost_usd ?? null, isTest: !!j.is_test });
+    }
+  } catch {
+    // graceful — cost badges just don't render for this poll
   }
   return map;
 }
@@ -155,7 +193,7 @@ export function useRecentCategories(limit: number = 20) {
       // candidates to survive junk duplicates before slicing to `limit`.
       const POOL_SIZE = Math.max(limit * 6, 120);
 
-      const [{ data: categories, error: catErr }, jobByKeyword] = await Promise.all([
+      const [{ data: categories, error: catErr }, jobByKeyword, costByKeyword] = await Promise.all([
         supabase
           .from("categories")
           .select(
@@ -164,6 +202,7 @@ export function useRecentCategories(limit: number = 20) {
           .order("updated_at", { ascending: false })
           .limit(POOL_SIZE),
         fetchLatestJobByKeyword(),
+        fetchJobCostByKeyword(),
       ]);
 
       if (catErr) throw catErr;
@@ -174,6 +213,8 @@ export function useRecentCategories(limit: number = 20) {
       const enriched = categories.map((cat) => {
         const job =
           jobByKeyword.get(normalizeKey(cat.search_term)) ?? jobByKeyword.get(normalizeKey(cat.name));
+        const cost =
+          costByKeyword.get(normalizeKey(cat.search_term)) ?? costByKeyword.get(normalizeKey(cat.name));
 
         const recency =
           job?.recency ?? recencyMap.get(cat.id) ?? cat.updated_at ?? cat.created_at ?? null;
@@ -182,6 +223,8 @@ export function useRecentCategories(limit: number = 20) {
           ...cat,
           total_products: countMap.get(cat.id) || 0,
           job_status: job?.status ?? null,
+          job_cost_usd: cost?.cost ?? null,
+          job_is_test: cost?.isTest ?? false,
           _recency: recency,
         };
       });

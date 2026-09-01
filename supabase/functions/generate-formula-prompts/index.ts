@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { withUsageTracking, recordAiUsage } from "../_shared/aiUsage.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -123,7 +124,7 @@ Make the prompts specific to the actual formula - mention real ingredients, dosa
         Authorization: `Bearer ${OPENROUTER_API_KEY}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
+      body: JSON.stringify(withUsageTracking({
         model: "google/gemini-3-pro-preview",
         messages: [
           {
@@ -137,7 +138,7 @@ Make the prompts specific to the actual formula - mention real ingredients, dosa
         ],
         temperature: 0.7,
         max_tokens: 4000,
-      }),
+      })),
     });
 
     if (!response.ok) {
@@ -150,6 +151,7 @@ Make the prompts specific to the actual formula - mention real ingredients, dosa
     }
 
     const data = await response.json();
+    recordAiUsage(supabase, { phase: "formula_prompts", model: "google/gemini-3-pro-preview", usage: data.usage, categoryId }).catch(() => {});
     const content = data.choices?.[0]?.message?.content;
 
     if (!content) {

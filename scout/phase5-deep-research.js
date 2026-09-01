@@ -59,6 +59,7 @@
 
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
+const { withUsageTracking, recordAiUsage } = require('./utils/ai-usage');
 const { resolveCategory } = require('./utils/category-resolver');
 const { launchBrowserContext, launchBrowserAPIOnly } = require('./utils/bright-data-browser');
 const { researchBrand: perplexityResearchBrand, getPerplexityKey } = require('./utils/perplexity');
@@ -108,11 +109,11 @@ async function callGrokOnce(prompt, model, maxTokens) {
       'HTTP-Referer': 'https://dovive.com',
       'X-Title': 'DOVIVE Scout P5 Deep Research',
     },
-    body: JSON.stringify({
+    body: JSON.stringify(withUsageTracking({
       model,
       max_tokens: maxTokens,
       messages: [{ role: 'user', content: prompt }],
-    }),
+    })),
   });
   if (res.status === 402) {
     console.error(`  ❌ P5 OpenRouter credits exhausted — top up at openrouter.ai`);
@@ -120,6 +121,7 @@ async function callGrokOnce(prompt, model, maxTokens) {
   }
   const j = await res.json();
   if (j.error) throw new Error(`OpenRouter error (${model}): ${j.error.message || JSON.stringify(j.error)}`);
+  recordAiUsage({ phase: 'P5', model, usage: j.usage, keyword: KEYWORD }).catch(() => {});
   const choice = j.choices?.[0];
   const content = choice?.message?.content || null;
   const finishReason = choice?.finish_reason || 'unknown';

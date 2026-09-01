@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.86.0";
+import { withUsageTracking, recordAiUsage } from "../_shared/aiUsage.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,8 +10,11 @@ const corsHeaders = {
 const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+// Module-level client purely for the cost-ledger recorder — the request
+// handlers below already create their own per-call clients for real work.
+const _usageClient = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY) : null;
 
-async function callClaude(messages: Array<{ role: string; content: unknown }>, maxTokens = 10000): Promise<string> {
+async function callClaude(messages: Array<{ role: string; content: unknown }>, maxTokens = 10000, categoryId?: string | null): Promise<string> {
   const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -18,14 +22,17 @@ async function callClaude(messages: Array<{ role: string; content: unknown }>, m
       "Content-Type": "application/json",
       "HTTP-Referer": "https://dovive.com",
     },
-    body: JSON.stringify({
+    body: JSON.stringify(withUsageTracking({
       model: "anthropic/claude-sonnet-4-6",
       max_tokens: maxTokens,
       messages,
-    }),
+    })),
   });
   const j = await res.json();
   if (j.error) throw new Error(`Claude error: ${j.error.message}`);
+  if (_usageClient) {
+    recordAiUsage(_usageClient, { phase: "chat", model: "anthropic/claude-sonnet-4-6", usage: j.usage, categoryId }).catch(() => {});
+  }
   return j.choices?.[0]?.message?.content || "";
 }
 
@@ -225,7 +232,7 @@ Format clearly with each distinct point on a new line.`,
         })),
       ];
       try {
-        const extractedText = await callClaude([{ role: "user", content: imageContent }], 4000);
+        const extractedText = await callClaude([{ role: "user", content: imageContent }], 4000, fb.category_id);
         fullFeedbackText = [fullFeedbackText, "\n\n[FROM IMAGES]\n" + extractedText].filter(Boolean).join("\n");
       } catch (e) {
         console.error("Image extraction failed:", e);
@@ -248,7 +255,7 @@ Format clearly with each distinct point on a new line.`,
       recommendedFlavors,
       fullFeedbackText
     );
-    const evaluation = await callClaude([{ role: "user", content: prompt }], 10000);
+    const evaluation = await callClaude([{ role: "user", content: prompt }], 10000, fb.category_id);
 
     // Parse verdict
     const verdictMatch = evaluation.match(

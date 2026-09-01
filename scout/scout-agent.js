@@ -26,6 +26,7 @@ const { chromium } = require('playwright-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 chromium.use(StealthPlugin());
 const fetch = require('node-fetch');
+const { withUsageTracking, recordAiUsage } = require('./utils/ai-usage');
 
 // ============================================================
 // PRODUCT TYPE CONFIGURATION
@@ -1572,11 +1573,11 @@ Be specific. Use the actual data. Plain English — no jargon.`;
         'Content-Type': 'application/json',
         'HTTP-Referer': 'https://heylencer-debug.github.io/Dovive'
       },
-      body: JSON.stringify({
+      body: JSON.stringify(withUsageTracking({
         model: SCOUT_AGENT_MODEL,
         messages: [{ role: 'user', content: prompt }],
         max_tokens: maxTokens
-      })
+      }))
     });
     if (res.status === 402) {
       log('❌ P0 AI summary OpenRouter credits exhausted — top up at openrouter.ai', 'error');
@@ -1587,6 +1588,7 @@ Be specific. Use the actual data. Plain English — no jargon.`;
       throw new Error(`OpenRouter error: ${text}`);
     }
     const data = await res.json();
+    recordAiUsage({ phase: 'P0', model: SCOUT_AGENT_MODEL, usage: data.usage, keyword }).catch(() => {});
     const choice = data.choices?.[0];
     const content = choice?.message?.content || '';
     const finishReason = choice?.finish_reason || 'unknown';

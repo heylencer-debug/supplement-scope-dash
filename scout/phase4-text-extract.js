@@ -16,6 +16,7 @@ require('dotenv').config();
 const fetch = require('node-fetch');
 const { createClient } = require('@supabase/supabase-js');
 const { parseModelJson, normalizeFacts, isValidFacts } = require('./utils/ocr-utils');
+const { withUsageTracking, recordAiUsage } = require('./utils/ai-usage');
 
 // Support both: node phase4-text-extract.js "keyword" AND node phase4-text-extract.js --keyword "keyword"
 const _kwIdx = process.argv.indexOf('--keyword');
@@ -90,11 +91,11 @@ Return ONLY valid JSON, no markdown.`;
         'HTTP-Referer': 'https://dovive.com',
         'X-Title': 'Dovive Scout P4'
       },
-      body: JSON.stringify({
+      body: JSON.stringify(withUsageTracking({
         model: ANALYSIS_MODEL,
         max_tokens: MAX_TOKENS,
         messages: [{ role: 'user', content: prompt }]
-      })
+      }))
     });
 
     if (res.status === 402) {
@@ -108,6 +109,7 @@ Return ONLY valid JSON, no markdown.`;
     }
 
     const data = await res.json();
+    recordAiUsage({ phase: 'P4', model: ANALYSIS_MODEL, usage: data.usage, keyword: KEYWORD }).catch(() => {});
     const choice = data.choices?.[0];
     const content = choice?.message?.content || '';
     const finishReason = choice?.finish_reason || 'unknown';

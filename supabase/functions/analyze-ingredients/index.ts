@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { withUsageTracking, recordAiUsage } from "../_shared/aiUsage.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -741,7 +742,7 @@ Provide a comprehensive analysis including SWOT, clinical dosage adequacy, custo
             'HTTP-Referer': 'https://lovable.dev',
             'X-Title': 'Noodle Search - Ingredient Analysis'
           },
-          body: JSON.stringify({
+          body: JSON.stringify(withUsageTracking({
             model: 'google/gemini-3-pro-preview',
             messages: [
               { role: 'system', content: systemPrompt },
@@ -751,7 +752,7 @@ Provide a comprehensive analysis including SWOT, clinical dosage adequacy, custo
             tool_choice: { type: 'function', function: { name: 'save_ingredient_analysis' } },
             max_tokens: 32000,
             temperature: 0.1
-          })
+          }))
         });
 
         if (!response.ok) {
@@ -762,6 +763,7 @@ Provide a comprehensive analysis including SWOT, clinical dosage adequacy, custo
 
         const data = await response.json();
         console.log('[analyze-ingredients] OpenRouter API response received');
+        recordAiUsage(supabase, { phase: 'ingredients', model: 'google/gemini-3-pro-preview', usage: data.usage, categoryId }).catch(() => {});
 
         // Extract tool call result
         const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];

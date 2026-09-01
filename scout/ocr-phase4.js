@@ -38,6 +38,7 @@
 require('dotenv').config();
 const fetch = require('node-fetch');
 const { createClient } = require('@supabase/supabase-js');
+const { withUsageTracking, recordAiUsage } = require('./utils/ai-usage');
 
 const KEYWORD         = process.argv[2] || 'ashwagandha gummies';
 const TEST_MODE       = process.argv.includes('--test');
@@ -111,7 +112,7 @@ Return ONLY valid JSON, no markdown.`;
         'HTTP-Referer': 'https://dovive.com',
         'X-Title': 'DOVIVE Scout P4 OCR'
       },
-      body: JSON.stringify({
+      body: JSON.stringify(withUsageTracking({
         model: ANALYSIS_MODEL,
         max_tokens: MAX_TOKENS,
         messages: [{
@@ -121,7 +122,7 @@ Return ONLY valid JSON, no markdown.`;
             { type: 'image_url', image_url: { url: imageUrl } }
           ]
         }]
-      })
+      }))
     });
 
     if (res.status === 402) {
@@ -136,6 +137,7 @@ Return ONLY valid JSON, no markdown.`;
 
     const data = await res.json();
     if (data.error) throw new Error(`Gemini OCR error: ${data.error.message || JSON.stringify(data.error)}`);
+    recordAiUsage({ phase: 'P4', model: ANALYSIS_MODEL, usage: data.usage, keyword: KEYWORD }).catch(() => {});
     const choice = data.choices?.[0];
     const content = choice?.message?.content || '';
     const finishReason = choice?.finish_reason || 'unknown';

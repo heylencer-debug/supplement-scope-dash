@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { withUsageTracking, recordAiUsage } from "../_shared/aiUsage.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -817,7 +818,7 @@ ${extractedCompetitorClaims.map(c => `• ${c.brand}: ${c.xIn1Claim ? `"${c.xIn1
             'HTTP-Referer': 'https://lovable.dev',
             'X-Title': 'Noodle Search Packaging Analysis',
           },
-          body: JSON.stringify({
+          body: JSON.stringify(withUsageTracking({
             model: 'google/gemini-3-pro-preview',
             max_tokens: 16384,
             tools: [
@@ -1476,7 +1477,7 @@ The front_panel_text IS the complete label copy. Nothing else will be added.
                 ]
               }
             ]
-          })
+          }))
         });
 
         if (!response.ok) {
@@ -1489,6 +1490,7 @@ The front_panel_text IS the complete label copy. Nothing else will be added.
         console.log('OpenRouter response received for packaging analysis');
         console.log('OpenRouter finish_reason:', openrouterResponse.choices?.[0]?.finish_reason);
         console.log('OpenRouter usage:', JSON.stringify(openrouterResponse.usage));
+        recordAiUsage(supabase, { phase: 'packaging', model: 'google/gemini-3-pro-preview', usage: openrouterResponse.usage, categoryId }).catch(() => {});
 
         // Extract the tool call result from OpenRouter format
         const toolCall = openrouterResponse.choices?.[0]?.message?.tool_calls?.[0];

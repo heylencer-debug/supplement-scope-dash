@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.86.0";
+import { withUsageTracking, recordAiUsage } from "../_shared/aiUsage.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,8 +10,9 @@ const corsHeaders = {
 const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+const _usageClient = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY) : null;
 
-async function callClaude(messages: Array<{ role: string; content: string }>, maxTokens = 16000): Promise<string> {
+async function callClaude(messages: Array<{ role: string; content: string }>, maxTokens = 16000, categoryId?: string | null): Promise<string> {
   const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -18,14 +20,17 @@ async function callClaude(messages: Array<{ role: string; content: string }>, ma
       "Content-Type": "application/json",
       "HTTP-Referer": "https://dovive.com",
     },
-    body: JSON.stringify({
+    body: JSON.stringify(withUsageTracking({
       model: "anthropic/claude-sonnet-4-6",
       max_tokens: maxTokens,
       messages,
-    }),
+    })),
   });
   const j = await res.json();
   if (j.error) throw new Error(`Claude error: ${j.error.message}`);
+  if (_usageClient) {
+    recordAiUsage(_usageClient, { phase: "chat", model: "anthropic/claude-sonnet-4-6", usage: j.usage, categoryId }).catch(() => {});
+  }
   return j.choices?.[0]?.message?.content || "";
 }
 
@@ -201,7 +206,7 @@ Respond in this structure:
 ## CHANGE SUMMARY
 [One sentence describing what was changed]`;
 
-    const result = await callClaude([{ role: "user", content: prompt }]);
+    const result = await callClaude([{ role: "user", content: prompt }], 16000, categoryId);
 
     // Extract updated formula
     const formulaMatch = result.match(/##\s*UPDATED FORMULA BRIEF\s*\n+([\s\S]*?)(?=\n##\s*CHANGE SUMMARY|$)/i);

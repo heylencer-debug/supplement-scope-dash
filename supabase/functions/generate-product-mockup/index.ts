@@ -1,5 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.86.0";
+import { withUsageTracking, recordAiUsage } from "../_shared/aiUsage.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -1033,7 +1035,7 @@ serve(async (req) => {
         "HTTP-Referer": "https://lovable.dev",
         "X-Title": "Product Mockup Generator"
       },
-      body: JSON.stringify({
+      body: JSON.stringify(withUsageTracking({
         model: "google/gemini-3-pro-image-preview",
         messages: [
           {
@@ -1042,7 +1044,7 @@ serve(async (req) => {
           }
         ],
         max_tokens: 4096,
-      }),
+      })),
     });
 
     if (!response.ok) {
@@ -1053,6 +1055,13 @@ serve(async (req) => {
 
     const data = await response.json();
     console.log("API response received");
+    try {
+      const sUrl = Deno.env.get("SUPABASE_URL");
+      const sKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      if (sUrl && sKey) {
+        recordAiUsage(createClient(sUrl, sKey), { phase: "mockup", model: "google/gemini-3-pro-image-preview", usage: data.usage }).catch(() => {});
+      }
+    } catch { /* non-fatal */ }
     
     // Extract image from response
     let imageUrl = null;

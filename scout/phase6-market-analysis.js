@@ -20,8 +20,12 @@
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const { resolveCategory } = require('./utils/category-resolver');
+const { withUsageTracking, recordAiUsage } = require('./utils/ai-usage');
 const fs = require('fs');
 const path = require('path');
+
+// Set once run() resolves the category — read by callGrokOnce() below.
+let _categoryId = null;
 
 const DASH = createClient(
   process.env.DASH_URL || process.env.SUPABASE_URL,
@@ -59,11 +63,11 @@ async function callGrokOnce(prompt, maxTokens) {
       'HTTP-Referer': 'https://dovive.com',
       'X-Title': 'DOVIVE Scout P6 Market Analysis',
     },
-    body: JSON.stringify({
+    body: JSON.stringify(withUsageTracking({
       model: ANALYSIS_MODEL,
       max_tokens: maxTokens,
       messages: [{ role: 'user', content: prompt }],
-    }),
+    })),
   });
   if (res.status === 402) {
     console.error(`  ❌ P6 market-analysis OpenRouter credits exhausted — top up at openrouter.ai`);
@@ -71,6 +75,7 @@ async function callGrokOnce(prompt, maxTokens) {
   }
   const j = await res.json();
   if (j.error) throw new Error(`OpenRouter: ${j.error.message || JSON.stringify(j.error)}`);
+  recordAiUsage({ phase: 'P7', model: ANALYSIS_MODEL, usage: j.usage, categoryId: _categoryId, keyword: KEYWORD }).catch(() => {});
   const choice = j.choices?.[0];
   const content = choice?.message?.content || null;
   const finishReason = choice?.finish_reason || 'unknown';
@@ -485,6 +490,7 @@ async function run() {
 
   // Resolve category dynamically
   const CAT_ID = await lookupCategoryId(KEYWORD);
+  _categoryId = CAT_ID;
 
   // Check for existing (skip unless --force)
   if (!FORCE) {

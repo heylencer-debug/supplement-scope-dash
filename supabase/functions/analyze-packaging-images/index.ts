@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { withUsageTracking, recordAiUsage } from "../_shared/aiUsage.ts";
 
 declare const EdgeRuntime: {
   waitUntil: (promise: Promise<unknown>) => void;
@@ -170,7 +171,7 @@ Use the extract_packaging_analysis tool.`;
         "HTTP-Referer": "https://lovable.dev",
         "X-Title": "Noodle Search Packaging Analysis"
       },
-      body: JSON.stringify({
+      body: JSON.stringify(withUsageTracking({
         model: "google/gemini-3-pro-preview",
         messages: [{ role: "user", content: [{ type: "text", text: prompt }, ...imageContent] }],
         tools: [{
@@ -265,12 +266,13 @@ Use the extract_packaging_analysis tool.`;
           }
         }],
         tool_choice: { type: "function", function: { name: "extract_packaging_analysis" } }
-      }),
+      })),
     });
 
     if (!response.ok) throw new Error(`API error: ${response.status}`);
 
     const data = await response.json();
+    recordAiUsage(supabase, { phase: "packaging", model: "google/gemini-3-pro-preview", usage: data.usage, categoryId }).catch(() => {});
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
     if (!toolCall) throw new Error("No tool call in response");
 

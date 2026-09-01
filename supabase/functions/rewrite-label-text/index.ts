@@ -1,4 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.86.0";
+import { withUsageTracking, recordAiUsage } from "../_shared/aiUsage.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -104,7 +106,7 @@ serve(async (req) => {
             "HTTP-Referer": "https://lovable.dev",
             "X-Title": "Label Text Rewriter",
           },
-          body: JSON.stringify({
+          body: JSON.stringify(withUsageTracking({
             model: "google/gemini-3-pro-preview",
             messages: [
               {
@@ -157,7 +159,7 @@ REMEMBER: This is a REAL PRODUCT LABEL - keep it SHORT, CONVINCING, and FORMULA-
 Headline examples: ${styleConfig.examples}`
               }
             ],
-          }),
+          })),
           signal: controller.signal,
         });
         break; // Success, exit retry loop
@@ -192,6 +194,13 @@ Headline examples: ${styleConfig.examples}`
     }
 
     const data = await response.json();
+    try {
+      const sUrl = Deno.env.get("SUPABASE_URL");
+      const sKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      if (sUrl && sKey) {
+        recordAiUsage(createClient(sUrl, sKey), { phase: "label_rewrite", model: "google/gemini-3-pro-preview", usage: data.usage }).catch(() => {});
+      }
+    } catch { /* non-fatal */ }
     const rewrittenText = data.choices?.[0]?.message?.content;
 
     if (!rewrittenText) {

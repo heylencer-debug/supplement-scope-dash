@@ -8,12 +8,104 @@
  */
 
 import { useState } from "react";
-import { CheckCircle2, AlertTriangle, Loader2, Search } from "lucide-react";
+import { CheckCircle2, AlertTriangle, Loader2, Search, DollarSign } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useDataCompleteness, type PhaseCompleteness } from "@/hooks/useDataCompleteness";
+import { useAiUsageCost } from "@/hooks/useAiUsageCost";
 import { SidePanelShell } from "@/components/ui/side-panel-shell";
+
+/** "$0.02", "<$0.01" for genuinely tiny non-zero amounts, "$12.40" for larger. */
+function formatCost(usd: number): string {
+  if (usd <= 0) return "$0.00";
+  if (usd < 0.01) return "<$0.01";
+  return `$${usd.toFixed(2)}`;
+}
+
+function AiCostCard({ categoryId }: { categoryId: string | null }) {
+  const { data, isLoading } = useAiUsageCost(categoryId);
+
+  if (!categoryId || isLoading) return null;
+
+  if (!data || !data.ledgerAvailable) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            AI Cost
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            Cost tracking isn't available for this category yet — it was analyzed before the AI cost ledger
+            existed, or the ledger hasn't finished setting up. New runs will show real per-phase costs here.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (data.totalCalls === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            AI Cost
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">No AI calls logged for this category yet.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
+        <div>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            AI Cost
+          </CardTitle>
+          <CardDescription>Total for this category — every pipeline phase plus Formulator chat, all-time.</CardDescription>
+        </div>
+        <span className="text-2xl font-bold text-foreground tabular-nums shrink-0">{formatCost(data.totalCostUsd)}</span>
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-border text-muted-foreground">
+                <th className="text-left font-semibold py-1.5 pr-3">Phase</th>
+                <th className="text-left font-semibold py-1.5 pr-3">Model</th>
+                <th className="text-right font-semibold py-1.5 pr-3">Calls</th>
+                <th className="text-right font-semibold py-1.5 pr-3">Tokens in</th>
+                <th className="text-right font-semibold py-1.5 pr-3">Tokens out</th>
+                <th className="text-right font-semibold py-1.5">Cost</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.breakdown.map((row) => (
+                <tr key={`${row.phase}::${row.model}`} className="border-b border-border/50">
+                  <td className="py-1.5 pr-3 text-foreground font-medium">{row.phase}</td>
+                  <td className="py-1.5 pr-3 text-muted-foreground">{row.model}</td>
+                  <td className="py-1.5 pr-3 text-right tabular-nums text-foreground">{row.calls}</td>
+                  <td className="py-1.5 pr-3 text-right tabular-nums text-muted-foreground">{row.prompt_tokens.toLocaleString()}</td>
+                  <td className="py-1.5 pr-3 text-right tabular-nums text-muted-foreground">{row.completion_tokens.toLocaleString()}</td>
+                  <td className="py-1.5 text-right tabular-nums text-foreground font-medium">{formatCost(row.cost_usd || 0)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 interface DataCompletenessChecklistProps {
   keyword: string;
@@ -48,7 +140,9 @@ export function DataCompletenessChecklist({ keyword }: DataCompletenessChecklist
   const completeCount = data.phases.filter((p) => p.status === "complete").length;
 
   return (
-    <Card>
+    <div className="space-y-4">
+      <AiCostCard categoryId={data.categoryId} />
+      <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
         <div>
           <CardTitle className="flex items-center gap-2 text-lg">
@@ -138,6 +232,7 @@ export function DataCompletenessChecklist({ keyword }: DataCompletenessChecklist
           </div>
         </SidePanelShell>
       )}
-    </Card>
+      </Card>
+    </div>
   );
 }

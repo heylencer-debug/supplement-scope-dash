@@ -26,8 +26,14 @@
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const { resolveCategory } = require('./utils/category-resolver');
+const { withUsageTracking, extractUsageFromSSE, recordAiUsage } = require('./utils/ai-usage');
 const fs = require('fs');
 const path = require('path');
+
+// Set once run() resolves CAT_ID — read by recordAiUsage() calls in the
+// module-level call functions below (which run() calls but which don't
+// otherwise receive categoryId).
+let _categoryId = null;
 
 const DASH = createClient(
   process.env.DASH_URL || process.env.SUPABASE_URL,
@@ -80,7 +86,7 @@ const ANALYSIS_MODEL = process.env.ANALYSIS_MODEL || 'anthropic/claude-sonnet-5'
 // Validation/adjudication model — an INDEPENDENT model from the drafting
 // model, so P9's Call 1 (QA adjudicator that reviews both P8 drafts) isn't
 // the same model checking itself. Default: Claude Opus 5 via OpenRouter.
-const VALIDATION_MODEL = process.env.VALIDATION_MODEL || 'anthropic/claude-opus-5';
+const VALIDATION_MODEL = process.env.VALIDATION_MODEL || 'anthropic/claude-sonnet-5'; // 2026-09-01: Opus->Sonnet 5 default swap (cost); override via env to restore Opus
 
 async function callClaudeSonnetQAOnce(prompt, maxTokens, model = ANALYSIS_MODEL, messagesOverride = null) {
   const key = getOpenRouterKey();
@@ -93,8 +99,9 @@ async function callClaudeSonnetQAOnce(prompt, maxTokens, model = ANALYSIS_MODEL,
       method: 'POST',
       signal: controller.signal,
       headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://dovive.com', 'X-Title': 'DOVIVE Scout P10 QA' },
-      body: JSON.stringify({
+      body: JSON.stringify(withUsageTracking({
         model, max_tokens: maxTokens, stream: true,
+        stream_options: { include_usage: true },
         // 2026-08-28 FIX: same disease already fixed in P10/P11 — a live
         // sea-moss-gummies run showed Call 1 (VALIDATION_MODEL=Opus 5, the
         // QA adjudicator) hitting finish_reason=length with the FULL
@@ -109,7 +116,7 @@ async function callClaudeSonnetQAOnce(prompt, maxTokens, model = ANALYSIS_MODEL,
         // output instead.
         reasoning: { enabled: false },
         messages: messagesOverride || [{ role: 'user', content: prompt }],
-      }),
+      })),
     });
     if (res.status === 402) {
       console.error(`  ❌ P9 OpenRouter credits exhausted — top up at openrouter.ai`);
@@ -124,6 +131,7 @@ async function callClaudeSonnetQAOnce(prompt, maxTokens, model = ANALYSIS_MODEL,
     let reasoningChars = '';
     let promptTokens = 0, completionTokens = 0, finishReason = null;
     const text = await res.text();
+    recordAiUsage({ phase: 'P10', model, usage: extractUsageFromSSE(text), categoryId: _categoryId, keyword: KEYWORD }).catch(() => {});
     for (const line of text.split('\n')) {
       if (!line.startsWith('data: ')) continue;
       const data = line.slice(6).trim();
@@ -547,14 +555,14 @@ No other text. Pure JSON only.`;
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST', signal: controller.signal,
       headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      body: JSON.stringify(withUsageTracking({
         model: ANALYSIS_MODEL,
         max_tokens: 2000,
         // 2026-08-28 FIX: same reasoning-tokens disease applied for
         // consistency/safety across every OpenRouter call in this file.
         reasoning: { enabled: false },
         messages: [{ role: 'user', content: prompt }]
-      })
+      }))
     });
     if (res.status === 402) {
       console.error(`  ❌ P9 competitor-notes OpenRouter credits exhausted — top up at openrouter.ai`);
@@ -562,6 +570,7 @@ No other text. Pure JSON only.`;
     }
     const text = await res.text();
     const json = JSON.parse(text);
+    recordAiUsage({ phase: 'P10', model: ANALYSIS_MODEL, usage: json.usage, categoryId: _categoryId, keyword: KEYWORD }).catch(() => {});
     const choice = json.choices?.[0];
     const raw = choice?.message?.content || '';
     console.log(`  [P9 competitor-notes] finish_reason: ${choice?.finish_reason || 'unknown'} | output_chars: ${raw.length}`);
@@ -974,7 +983,7 @@ Replace each "one sentence" with your comparison. Focus on the most important di
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST', signal: controller.signal,
       headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      body: JSON.stringify(withUsageTracking({
         model: ANALYSIS_MODEL,
         // Small utility (one sentence per competitor, up to 25) — 4000 is
         // sensible headroom without treating this as a heavy analysis call.
@@ -983,7 +992,7 @@ Replace each "one sentence" with your comparison. Focus on the most important di
         // consistency/safety across every OpenRouter call in this file.
         reasoning: { enabled: false },
         messages: [{ role: 'user', content: prompt }]
-      })
+      }))
     });
     if (res.status === 402) {
       console.error(`  ❌ P9 Call 3 OpenRouter credits exhausted — top up at openrouter.ai`);
@@ -991,6 +1000,7 @@ Replace each "one sentence" with your comparison. Focus on the most important di
     }
     const text = await res.text();
     const parsed = JSON.parse(text);
+    recordAiUsage({ phase: 'P10', model: ANALYSIS_MODEL, usage: parsed.usage, categoryId: _categoryId, keyword: KEYWORD }).catch(() => {});
     if (parsed.usage) {
       console.log(`  Call 3 tokens: ${parsed.usage.prompt_tokens}→${parsed.usage.completion_tokens}`);
       tokenLog.push({ call: tokenLog.length + 1, prompt_tokens: parsed.usage.prompt_tokens, completion_tokens: parsed.usage.completion_tokens, total_tokens: parsed.usage.total_tokens, ts: new Date().toISOString() });
@@ -1054,6 +1064,7 @@ async function run() {
   try {
     const cat = await resolveCategory(DASH, KEYWORD);
     CAT_ID = cat.id;
+    _categoryId = cat.id;
     catName = cat.name;
     console.log(`  → Resolved category (${cat.method}): "${cat.name}" (${cat.id})`);
   } catch (e) {

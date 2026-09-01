@@ -45,6 +45,42 @@ const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 const OPENCLAW_GATEWAY = process.env.OPENCLAW_GATEWAY;
 const OPENCLAW_TOKEN = process.env.OPENCLAW_TOKEN;
 
+// ─── AI cost-ledger roll-up (2026-09-01) ──────────────────────────────────────
+// Aggregates every ai_usage_log row written by this job's phase children into
+// scout_jobs.total_cost_usd/total_prompt_tokens/total_completion_tokens, so
+// the frontend reads one cheap column set instead of summing the log every
+// time. Called on BOTH success and error/crash exits — best-effort, never
+// throws (a logging failure must never affect the pipeline's real exit code).
+async function rollupJobCost() {
+  if (!SCOUT_JOB_ID) return;
+  try {
+    const rows = [];
+    let from = 0;
+    for (;;) {
+      const { data, error } = await DASH
+        .from('ai_usage_log')
+        .select('cost_usd, prompt_tokens, completion_tokens')
+        .eq('scout_job_id', SCOUT_JOB_ID)
+        .range(from, from + 999);
+      if (error) throw error;
+      rows.push(...(data || []));
+      if (!data || data.length < 1000) break;
+      from += 1000;
+    }
+    const totalCost = rows.reduce((sum, r) => sum + (r.cost_usd || 0), 0);
+    const totalPrompt = rows.reduce((sum, r) => sum + (r.prompt_tokens || 0), 0);
+    const totalCompletion = rows.reduce((sum, r) => sum + (r.completion_tokens || 0), 0);
+    await updateJobStatus({
+      total_cost_usd: Math.round(totalCost * 1e6) / 1e6,
+      total_prompt_tokens: totalPrompt,
+      total_completion_tokens: totalCompletion,
+    });
+    if (rows.length) console.log(`💰 Job cost roll-up: $${totalCost.toFixed(4)} (${totalPrompt}in/${totalCompletion}out tokens, ${rows.length} AI calls logged)`);
+  } catch (e) {
+    console.warn(`⚠ Cost roll-up failed (non-fatal, ai_usage_log table may not be migrated yet): ${e.message}`);
+  }
+}
+
 // ─── Args ─────────────────────────────────────────────────────────────────────
 
 const KEYWORD = process.argv.includes('--keyword')
@@ -61,6 +97,22 @@ const USE_AI = process.argv.includes('--ai');
 const FORCE = process.argv.includes('--force');
 const RECOVER_SYNC = process.argv.includes('--recover') && process.argv[process.argv.indexOf('--recover') + 1] === 'sync';
 const RUN_PHASE0 = process.argv.includes('--phase0');
+
+// ─── Cheap engineering test mode (2026-09-01) ─────────────────────────────────
+// Routes every phase's ANALYSIS_MODEL/VALIDATION_MODEL to Gemini Flash by
+// overriding the env vars BEFORE any phase script is spawned — every phase
+// already reads these two names with a Sonnet/Opus default, so setting them
+// here reaches every call site with zero per-file changes (P6 has its own
+// independent P6_MODEL default that's already Flash, unaffected either way).
+// `--cheap` CLI flag (used by cloud-worker.js when scout_jobs.cheap_mode is
+// true) or CHEAP_MODE=true env (local runs) both trigger it.
+const CHEAP_MODE = process.argv.includes('--cheap') || process.env.CHEAP_MODE === 'true';
+if (CHEAP_MODE) {
+  const CHEAP_FLASH_MODEL = process.env.CHEAP_MODE_MODEL || 'google/gemini-3.7-flash';
+  process.env.ANALYSIS_MODEL = CHEAP_FLASH_MODEL;
+  process.env.VALIDATION_MODEL = CHEAP_FLASH_MODEL;
+  console.log(`🧪 CHEAP_MODE active — all analysis/validation calls routed to ${CHEAP_FLASH_MODEL} for this run (test/engineering run, not for real formula output).`);
+}
 
 if (!KEYWORD && !RUN_PHASE0) {
   console.error('Usage: node run-pipeline.js --keyword "ashwagandha gummies" [--from P3] [--ai] [--force]');
@@ -584,7 +636,15 @@ const PHASES = [
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-async function runFinalVerifier(categoryId) {
+// scopePhases (2026-09-01, Task A "formula chain becomes on-demand"): the
+// phase numbers this RUN actually attempted (ONLY_PHASES || FROM_PHASE-bounded
+// list from PHASES below — see the call sites). Defaults to null, which
+// preserves the original "check every phase" behavior for any caller that
+// doesn't pass it. A research-scope run (default Launchpad submit, phases
+// 1-8) must NOT fail the verifier for missing P9-P13 formula-chain output —
+// those phases were never asked to run.
+async function runFinalVerifier(categoryId, scopePhases = null) {
+  const inScope = (n) => !scopePhases || scopePhases.includes(n);
   const { count: total } = await DASH.from('products').select('*', { count: 'exact', head: true }).eq('category_id', categoryId);
   const q = async (col) => (await DASH.from('products').select('*', { count: 'exact', head: true }).eq('category_id', categoryId).not(col, 'is', null)).count || 0;
 
@@ -648,7 +708,7 @@ async function runFinalVerifier(categoryId) {
   if (runAsinsAll.length && runAsins.length < runAsinsAll.length * 0.6) {
     failures.push(`P1 migration incomplete: only ${runAsins.length}/${runAsinsAll.length} scraped ASINs exist in DASH`);
   }
-  if (!(p2 >= runTotal * 0.9)) failures.push(`P2 ${p2}/${runTotal} (this run) < 90%`);
+  if (inScope(2) && !(p2 >= runTotal * 0.9)) failures.push(`P2 ${p2}/${runTotal} (this run) < 90%`);
   // P3 top20 CORRECTED 2026-08-28 (coordinator-verified against job config +
   // logs, superseding the earlier "unset credential" theory): BRIGHTDATA_API_KEY
   // WAS bound on the Cloud Run job (secretKeyRef -> scout-brightdata-key), and
@@ -671,7 +731,7 @@ async function runFinalVerifier(categoryId) {
   // substring (see checkPhaseStatus's matching comment) — otherwise a
   // sibling session's review volume masks a fresh session's real P3 gap.
   const { count: reviewRowsTotal } = await DOVIVE.from('dovive_reviews').select('*', { count: 'exact', head: true }).ilike('keyword', KEYWORD);
-  if (!((p3 >= runTotal * 0.5) || (top20P3 >= 15 && (reviewRowsTotal || 0) >= P3_MIN_REVIEWS_TOTAL))) failures.push(`P3 ${p3}/${runTotal} (this run) < 50% and Top20 ${top20P3}/20 (raw reviews=${reviewRowsTotal || 0}, need top20>=15 and raw>=${P3_MIN_REVIEWS_TOTAL})`);
+  if (inScope(3) && !((p3 >= runTotal * 0.5) || (top20P3 >= 15 && (reviewRowsTotal || 0) >= P3_MIN_REVIEWS_TOTAL))) failures.push(`P3 ${p3}/${runTotal} (this run) < 50% and Top20 ${top20P3}/20 (raw reviews=${reviewRowsTotal || 0}, need top20>=15 and raw>=${P3_MIN_REVIEWS_TOTAL})`);
   // P4 top20 relaxed 20 → 18 (2026-08-28 "ashwagandha gummies" investigation,
   // 138 products): the 2 top-20 misses (B092H5DCJM, B094T131B4 — both Goli
   // Ashwagandha & Vitamin D Gummy SKUs) have bullet_points containing only
@@ -683,7 +743,7 @@ async function runFinalVerifier(categoryId) {
   // supplement-facts image or dosage bullets (LMNT-style sticks) — same
   // real-world ceiling class as P3. 15/20 (75%) tolerates that class of real gap while still failing hard on
   // genuinely broken coverage (e.g. 5/20).
-  if (!((p4 >= total * 0.8) || (top20P4 >= 15))) failures.push(`P4 ${p4}/${total} and Top20 ${top20P4}/20 (need top20>=15)`);
+  if (inScope(4) && !((p4 >= total * 0.8) || (top20P4 >= 15))) failures.push(`P4 ${p4}/${total} and Top20 ${top20P4}/20 (need top20>=15)`);
   // P5 was deliberately slimmed (2026-08-28, "P5 too heavy" decision) from
   // Top10+Top10=20 to P5_TOP_COUNT+P5_NEW_COUNT (default 5+3=8 products) —
   // see phase5-deep-research.js. The old hardcoded `>= 20` gate is stale and
@@ -692,17 +752,17 @@ async function runFinalVerifier(categoryId) {
   // save-strip bug that used to produce empty rows can't silently satisfy
   // this gate again) reach >= 75% of the configured target (min 6), tolerating
   // occasional per-product AI/scrape failures without masking a broken run.
-  if (!(p5 >= p5Min)) failures.push(`P5 ${p5}/${p5Target} (need >= ${p5Min} with content)`);
-  if (!(p6 >= total * 0.9)) failures.push(`P6 ${p6}/${total} < 90%`);
-  if (!p7) failures.push('P7 market_intelligence missing');
-  if (!(p8 >= runTotal * 0.9)) failures.push(`P8 ${p8}/${runTotal} (this run) < 90%`);
-  if (!p9) failures.push('P9 ai_generated_brief missing');
-  if (!p10) failures.push('P10 qa_report missing');
-  if (!p11) failures.push('P11 competitive_benchmarking missing');
-  if (!p12) failures.push('P12 fda_compliance missing');
+  if (inScope(5) && !(p5 >= p5Min)) failures.push(`P5 ${p5}/${p5Target} (need >= ${p5Min} with content)`);
+  if (inScope(6) && !(p6 >= total * 0.9)) failures.push(`P6 ${p6}/${total} < 90%`);
+  if (inScope(7) && !p7) failures.push('P7 market_intelligence missing');
+  if (inScope(8) && !(p8 >= runTotal * 0.9)) failures.push(`P8 ${p8}/${runTotal} (this run) < 90%`);
+  if (inScope(9) && !p9) failures.push('P9 ai_generated_brief missing');
+  if (inScope(10) && !p10) failures.push('P10 qa_report missing');
+  if (inScope(11) && !p11) failures.push('P11 competitive_benchmarking missing');
+  if (inScope(12) && !p12) failures.push('P12 fda_compliance missing');
   const fs13 = fb?.ingredients?.final_signoff;
   const p13 = !!fs13 && isRealModelText(fs13.opus_review);
-  if (!p13) failures.push('P13 final_signoff missing');
+  if (inScope(13) && !p13) failures.push('P13 final_signoff missing');
 
   return { pass: failures.length === 0, failures, metrics: { total, runTotal, runAsinsCount: runAsins.length, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, top20P3, top20P4 } };
 }
@@ -751,7 +811,7 @@ async function run() {
       await runScript('migrate-keepa-to-dash.js', [KEYWORD]);
       await runScript('migrate-reviews-to-dash.js', [KEYWORD]);
       await runScript('migrate-ocr-to-dash.js', [KEYWORD]);
-      const v = await runFinalVerifier(categoryId);
+      const v = await runFinalVerifier(categoryId, phasesToRun);
       console.log('Verifier metrics:', v.metrics);
       if (!v.pass) {
         console.error('❌ Verifier FAIL in recover sync:', v.failures.join(' | '));
@@ -815,6 +875,13 @@ async function run() {
       // rest of the loop and for the final verifier instead of staying null.
       if (!categoryId) {
         categoryId = await getCategoryId();
+        // Stamp the freshly-created category as a test row the moment it
+        // exists, so a cheap-mode run is never mistaken for real analysis in
+        // the Library. Best-effort — a failure here never blocks the run.
+        if (categoryId && CHEAP_MODE) {
+          try { await DASH.from('categories').update({ is_test: true }).eq('id', categoryId); }
+          catch (e) { console.warn(`⚠ Failed to stamp category is_test (non-fatal): ${e.message}`); }
+        }
       }
 
       const elapsed = Math.round((Date.now() - phaseStart) / 1000);
@@ -878,7 +945,7 @@ async function run() {
     categoryId = await getCategoryId();
   }
 
-  const verifier = categoryId ? await runFinalVerifier(categoryId) : { pass: false, failures: ['category not resolved'], metrics: {} };
+  const verifier = categoryId ? await runFinalVerifier(categoryId, phasesToRun) : { pass: false, failures: ['category not resolved'], metrics: {} };
 
   if (verifier.pass && failed === 0) {
     console.log(`\n${'═'.repeat(60)}`);
@@ -893,6 +960,7 @@ async function run() {
 
     const summary = `🔍 Scout Pipeline Done: "${KEYWORD}"\n✅ ${completed} complete | ⏭️ ${skipped} skipped | ❌ ${failed} failed\nTotal: ${Math.floor(totalElapsed / 60)}m ${totalElapsed % 60}s\n\nPhases:\n${results.map(r => `${r.status === 'complete' ? '✅' : r.status === 'skipped' ? '⏭️' : '❌'} P${r.phase}: ${r.name}`).join('\n')}`;
     await notify(summary);
+    await rollupJobCost();
     await updateJobStatus({ status: 'complete', finished_at: new Date().toISOString() });
   } else {
     console.log(`\n${'═'.repeat(60)}`);
@@ -900,6 +968,7 @@ async function run() {
     console.log(`${'═'.repeat(60)}`);
     console.log('Verifier FAIL:', verifier.failures.join(' | '));
     await notify(`❌ Pipeline incomplete for "${KEYWORD}"\nVerifier FAIL:\n- ${verifier.failures.join('\n- ')}`);
+    await rollupJobCost();
     await updateJobStatus({ status: 'error', error: `Verifier FAIL: ${verifier.failures.join(' | ')}`.slice(0, 2000), finished_at: new Date().toISOString() });
     process.exitCode = 2;
   }
@@ -908,6 +977,7 @@ async function run() {
 run().catch(async (e) => {
   console.error('PIPELINE ERROR:', e.message);
   await notify(`❌ Pipeline crashed: ${e.message}`);
+  await rollupJobCost();
   await updateJobStatus({ status: 'error', error: `Pipeline crashed: ${e.message}`.slice(0, 2000), finished_at: new Date().toISOString() });
   process.exit(1);
 });

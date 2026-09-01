@@ -23,8 +23,12 @@
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const { resolveCategory } = require('./utils/category-resolver');
+const { withUsageTracking, extractUsageFromSSE, recordAiUsage } = require('./utils/ai-usage');
 const fs = require('fs');
 const path = require('path');
+
+// Set once run() resolves CAT_ID — read by the module-level call functions.
+let _categoryId = null;
 
 const DASH = createClient(
   process.env.DASH_URL || process.env.SUPABASE_URL,
@@ -110,7 +114,7 @@ function getOpenRouterKey()  { return process.env.OPENROUTER_API_KEY || null; }
 // VALIDATION_MODEL (Opus 5, a genuinely different model). The adversarial
 // cross-check is independent-model again.
 const ANALYSIS_MODEL = process.env.ANALYSIS_MODEL || 'anthropic/claude-sonnet-5';
-const VALIDATION_MODEL = process.env.VALIDATION_MODEL || 'anthropic/claude-opus-5';
+const VALIDATION_MODEL = process.env.VALIDATION_MODEL || 'anthropic/claude-sonnet-5'; // 2026-09-01: Opus->Sonnet 5 default swap (cost); override via env to restore Opus
 
 async function callClaudeOpusOnce(prompt, maxTokens, messagesOverride = null) {
   const key = getOpenRouterKey();
@@ -127,12 +131,13 @@ async function callClaudeOpusOnce(prompt, maxTokens, messagesOverride = null) {
         'HTTP-Referer': 'https://dovive.com',
         'X-Title': 'DOVIVE Scout P12 FDA Compliance',
       },
-      body: JSON.stringify({
+      body: JSON.stringify(withUsageTracking({
         model: ANALYSIS_MODEL,
         max_tokens: maxTokens,
         stream: true,
+        stream_options: { include_usage: true },
         messages: messagesOverride || [{ role: 'user', content: prompt }],
-      }),
+      })),
     });
     if (res.status === 402) {
       console.error(`  ❌ P11 Claude Opus OpenRouter credits exhausted — top up at openrouter.ai`);
@@ -145,6 +150,7 @@ async function callClaudeOpusOnce(prompt, maxTokens, messagesOverride = null) {
     let output = '';
     let promptTokens = 0, completionTokens = 0, finishReason = null;
     const text = await res.text();
+    recordAiUsage({ phase: 'P12', model: ANALYSIS_MODEL, usage: extractUsageFromSSE(text), categoryId: _categoryId, keyword: KEYWORD }).catch(() => {});
     for (const line of text.split('\n')) {
       if (!line.startsWith('data: ')) continue;
       const data = line.slice(6).trim();
@@ -200,12 +206,13 @@ async function callClaudeSonnetOnce(prompt, maxTokens, messagesOverride = null) 
         'HTTP-Referer': 'https://dovive.com',
         'X-Title': 'DOVIVE Scout P12 FDA Compliance',
       },
-      body: JSON.stringify({
+      body: JSON.stringify(withUsageTracking({
         model: VALIDATION_MODEL,
         max_tokens: maxTokens,
         stream: true,
+        stream_options: { include_usage: true },
         messages: messagesOverride || [{ role: 'user', content: prompt }],
-      }),
+      })),
     });
     if (res.status === 402) {
       console.error(`  ❌ P11 Claude Sonnet OpenRouter credits exhausted — top up at openrouter.ai`);
@@ -218,6 +225,7 @@ async function callClaudeSonnetOnce(prompt, maxTokens, messagesOverride = null) 
     let output = '';
     let promptTokens = 0, completionTokens = 0, finishReason = null;
     const text = await res.text();
+    recordAiUsage({ phase: 'P12', model: VALIDATION_MODEL, usage: extractUsageFromSSE(text), categoryId: _categoryId, keyword: KEYWORD }).catch(() => {});
     for (const line of text.split('\n')) {
       if (!line.startsWith('data: ')) continue;
       const data = line.slice(6).trim();
@@ -586,6 +594,7 @@ async function run() {
   try {
     const cat = await resolveCategory(DASH, KEYWORD);
     CAT_ID = cat.id;
+    _categoryId = cat.id;
     catName = cat.name;
     console.log(`  → Resolved category (${cat.method}): "${cat.name}" (${cat.id})`);
   } catch (e) {

@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { withUsageTracking, recordAiUsage } from "../_shared/aiUsage.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -89,7 +90,7 @@ serve(async (req) => {
     // Fetch product with images and current confidence
     const { data: product, error: productError } = await supabase
       .from("products")
-      .select("id, asin, title, brand, main_image_url, image_urls, ocr_confidence, ocr_extracted")
+      .select("id, asin, title, brand, main_image_url, image_urls, ocr_confidence, ocr_extracted, category_id")
       .eq("id", productId)
       .single();
 
@@ -167,10 +168,10 @@ Use the extract_supplement_facts tool to return your analysis.`;
         "HTTP-Referer": "https://lovable.dev",
         "X-Title": "Auto Supplement Facts Re-Analysis"
       },
-      body: JSON.stringify({
+      body: JSON.stringify(withUsageTracking({
         model: "google/gemini-3-pro-preview",
-        messages: [{ 
-          role: "user", 
+        messages: [{
+          role: "user",
           content: [{ type: "text", text: prompt }, ...imageContent] 
         }],
         tools: [{
@@ -250,7 +251,7 @@ Use the extract_supplement_facts tool to return your analysis.`;
           }
         }],
         tool_choice: { type: "function", function: { name: "extract_supplement_facts" } }
-      }),
+      })),
     });
 
     if (!response.ok) {
@@ -263,6 +264,7 @@ Use the extract_supplement_facts tool to return your analysis.`;
     }
 
     const data = await response.json();
+    recordAiUsage(supabase, { phase: "P4", model: "google/gemini-3-pro-preview", usage: data.usage, categoryId: product.category_id }).catch(() => {});
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
     
     if (!toolCall) {

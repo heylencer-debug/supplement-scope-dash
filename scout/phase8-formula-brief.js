@@ -13,6 +13,12 @@
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const { resolveCategory } = require('./utils/category-resolver');
+const { withUsageTracking, extractUsageFromSSE, recordAiUsage } = require('./utils/ai-usage');
+
+// Set once run() resolves the category — read by recordAiUsage() calls
+// throughout this file so the cost ledger can be scoped per-category without
+// threading categoryId through every call function's signature.
+let _categoryId = null;
 
 const DASH = createClient(
   process.env.DASH_URL || process.env.SUPABASE_URL,
@@ -42,7 +48,7 @@ const ANALYSIS_MODEL = process.env.ANALYSIS_MODEL || 'anthropic/claude-sonnet-5'
 // Validation/second-opinion model — restores an INDEPENDENT cross-check
 // model instead of the same model checking itself. Default: Claude Opus 5
 // via OpenRouter (1M context, valid OpenRouter model id).
-const VALIDATION_MODEL = process.env.VALIDATION_MODEL || 'anthropic/claude-opus-5';
+const VALIDATION_MODEL = process.env.VALIDATION_MODEL || 'anthropic/claude-sonnet-5'; // 2026-09-01: Opus->Sonnet 5 default swap (cost); override via env to restore Opus
 
 // ─── DUAL AI Formulation ───────────────────────────────────────────────────────
 // P9 generates TWO independent formula briefs in parallel (Draft A + Draft B).
@@ -72,11 +78,11 @@ async function callGrok42(prompt, maxTokens = 64000) {
         'HTTP-Referer': 'https://dovive.com',
         'X-Title': 'DOVIVE Scout P8 Formula (Draft A)',
       },
-      body: JSON.stringify({
+      body: JSON.stringify(withUsageTracking({
         model: VALIDATION_MODEL,
         max_tokens: mt,
         messages: messagesOverride || [{ role: 'user', content: prompt }],
-      }),
+      })),
     });
     if (res.status === 402) {
       console.error(`  ❌ Claude (Draft A) OpenRouter credits exhausted — top up at openrouter.ai`);
@@ -84,6 +90,7 @@ async function callGrok42(prompt, maxTokens = 64000) {
     }
     const j = await res.json();
     if (j.error) throw new Error(`Claude (Draft A) error: ${j.error.message}`);
+    recordAiUsage({ phase: 'P9', model: VALIDATION_MODEL, usage: j.usage, categoryId: _categoryId, keyword: KEYWORD }).catch(() => {});
     const choice = j.choices?.[0];
     const content = choice?.message?.content || null;
     const finishReason = choice?.finish_reason || 'unknown';
@@ -141,12 +148,13 @@ async function callClaudeSonnetOnce(prompt, maxTokens, messagesOverride = null) 
         'HTTP-Referer': 'https://dovive.com',
         'X-Title': 'DOVIVE Scout P8 Formula (Draft B)',
       },
-      body: JSON.stringify({
+      body: JSON.stringify(withUsageTracking({
         model: ANALYSIS_MODEL,
         max_tokens: maxTokens,
         stream: true,
+        stream_options: { include_usage: true },
         messages: messagesOverride || [{ role: 'user', content: prompt }],
-      }),
+      })),
     });
     if (res.status === 402) {
       console.error(`  ❌ Claude (Draft B) OpenRouter credits exhausted — top up at openrouter.ai`);
@@ -160,6 +168,7 @@ async function callClaudeSonnetOnce(prompt, maxTokens, messagesOverride = null) 
     let finishReason = null;
     let reasoningTokens = null;
     const text = await res.text();
+    recordAiUsage({ phase: 'P9', model: ANALYSIS_MODEL, usage: extractUsageFromSSE(text), categoryId: _categoryId, keyword: KEYWORD }).catch(() => {});
     for (const line of text.split('\n')) {
       if (!line.startsWith('data: ')) continue;
       const data = line.slice(6).trim();
@@ -254,11 +263,11 @@ If the text above genuinely does not contain enough information for a field, use
         'HTTP-Referer': 'https://dovive.com',
         'X-Title': 'DOVIVE Scout P8 Positioning Extract',
       },
-      body: JSON.stringify({
+      body: JSON.stringify(withUsageTracking({
         model: ANALYSIS_MODEL,
         max_tokens: mt,
         messages: [{ role: 'user', content: prompt }],
-      }),
+      })),
     });
     if (res.status === 402) {
       console.error(`  ❌ P8 positioning-extract OpenRouter credits exhausted — top up at openrouter.ai`);
@@ -266,6 +275,7 @@ If the text above genuinely does not contain enough information for a field, use
     }
     const j = await res.json();
     if (j.error) throw new Error(`Positioning extract error: ${j.error.message}`);
+    recordAiUsage({ phase: 'P9', model: ANALYSIS_MODEL, usage: j.usage, categoryId: _categoryId, keyword: KEYWORD }).catch(() => {});
     const choice = j.choices?.[0];
     const content = choice?.message?.content || null;
     const finishReason = choice?.finish_reason || 'unknown';
@@ -1612,6 +1622,7 @@ async function run() {
   const cat = await resolveCategory(DASH, KEYWORD);
   console.log(`  → Resolved category (${cat.method}): "${cat.name}" (${cat.id})`);
   console.log(`Category: ${cat.name} (${cat.id})\n`);
+  _categoryId = cat.id;
 
   // Check if brief already exists WITH actual AI content (not just a market intel stub)
   if (!FORCE) {

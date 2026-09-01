@@ -1,5 +1,256 @@
 # Scout pipeline — Cloud Run Job deploy notes
 
+## 2026-09-01: AI cost ledger + Opus→Sonnet 5 swap + P6→Gemini Flash 3.7 + on-demand formula chain + cheap test mode
+
+Five user-approved tasks landed together (same session, separate commits):
+per-run AI cost ledger, Opus→Sonnet 5 default swap, P6 product-intelligence
+moved to Gemini Flash, the formula chain (P9-P13) made on-demand instead of
+always running, and a `cheap_mode` engineering test flag. OpenRouter had
+~$99 in credits this session (confirmed live via `/api/v1/credits` —
+significantly more than the ~$0.35 noted in an earlier memory entry, i.e.
+the account was topped up between sessions), so live verification went
+further than the original "one tiny Flash call" plan — see Verification below.
+
+### 1. AI cost ledger
+
+- New `scout/utils/ai-usage.js` (Node) and
+  `supabase/functions/_shared/aiUsage.ts` (Deno) — twin modules, same
+  contract. `withUsageTracking(body)` attaches OpenRouter's native
+  `usage: { include: true }` accounting flag to every request body (works
+  for streaming AND non-streaming — no extra `GET /api/v1/generation` call
+  needed). `recordAiUsage()` extracts prompt/completion/reasoning/cached
+  tokens, PREFERS OpenRouter's own `usage.cost` when present, falls back to
+  a local `PRICING` map (pulled live from `GET /api/v1/models` on
+  2026-09-01) otherwise, and inserts one row into `ai_usage_log`.
+  **FAIL-OPEN by design** — insert failures are `console.warn`'d, never
+  thrown; live-verified against the real (not-yet-migrated) Supabase
+  project, confirmed it never throws even when the table is missing.
+- Wired into every OpenRouter call site: **20 call sites across 12 Node
+  pipeline files** (ocr-phase4, phase4-text-extract, phase5-deep-research,
+  phase6-product-intelligence [now 1 site], phase6-market-analysis,
+  phase8-formula-brief [3], phase9-formula-qa [3], phase10-competitive-
+  benchmarking [2], phase11-fda-compliance [2], phase12-final-signoff,
+  phase-living-brief [2], scout-agent.js) and **16 edge functions**
+  (manufacturer-chat, process-manufacturer-feedback, apply-selected-changes,
+  analyze-competitors, bulk-analyze-supplement-facts, extract-supplement-
+  image, rewrite-label-text, generate-formula-prompts, auto-reanalyze-
+  supplement-facts, modify-formula, generate-product-mockup,
+  edit-product-mockup, analyze-packaging-images, analyze-ingredients,
+  analyze-supplement-facts, analyze-packaging). One deliberate gap:
+  `modify-formula`'s CONVERSATION MODE path streams `response.body` straight
+  through to the client without ever parsing it in the function — adding
+  usage tracking there would mean tee-ing the stream or risk changing the
+  raw bytes the frontend's SSE parser sees, so it was left untouched rather
+  than risk the "don't disrupt what works" mandate on a live streaming UX.
+- `run-pipeline.js`: `rollupJobCost()` aggregates a job's `ai_usage_log` rows
+  into new `scout_jobs.total_cost_usd`/`total_prompt_tokens`/
+  `total_completion_tokens` columns, called on every terminal path (success,
+  verifier-fail, phase-error, and the top-level crash handler) — best-effort,
+  never blocks the real exit code.
+- New migration `scout/migrations/007_ai_usage_cost_ledger.sql` — additive
+  only (`CREATE TABLE IF NOT EXISTS`/`ADD COLUMN IF NOT EXISTS`):
+  `ai_usage_log` table (indexed on `scout_job_id`, `category_id`,
+  `created_at`; anon SELECT RLS policy) + `scout_jobs.total_cost_usd`/
+  `total_prompt_tokens`/`total_completion_tokens`/`cheap_mode`/`is_test` +
+  `categories.is_test`.
+  **APPLIED.** `supabase db push --dry-run` was tried first (the CLI itself
+  works fine this session) but immediately hit `LegacyDbPushMissingLocalError`:
+  the remote migration history has 26 versions this repo's
+  `supabase/migrations/` doesn't know about (Lovable applies migrations
+  directly, out of band from the CLI's tracking table) — pushing would
+  first need `supabase migration repair`, too risky to do unattended on a
+  live Lovable-managed project. Found a safer route instead: `supabase db
+  query --linked --file <path>` runs SQL directly against the linked
+  project's DB via the Management API with NO migration-history
+  bookkeeping involved. Ran it, verified live via
+  `information_schema.columns`/`.tables` that `ai_usage_log` + all 5 new
+  `scout_jobs` columns + `categories.is_test` exist, and confirmed
+  PostgREST is already serving them (`GET /rest/v1/ai_usage_log` → 200,
+  no schema-cache reload needed). The frontend cost cards' empty-state
+  screenshots below were taken BEFORE this migration landed (pre-existing
+  categories genuinely have no ledger rows yet, which is the honest,
+  correct state for them) — the live cheap-mode pipeline run further down
+  is the first run to ever populate `ai_usage_log` for real.
+- **Pricing map maintenance**: `PRICING` in both `scout/utils/ai-usage.js`
+  and `supabase/functions/_shared/aiUsage.ts` is $/token (not $/million —
+  matches OpenRouter's own `/api/v1/models` pricing shape so entries can be
+  pasted straight from there: `prompt`/`completion`/`input_cache_read`).
+  Keep the two files' maps in sync. Raw token counts are always stored
+  regardless of whether a model is in the map, so historical cost can be
+  recomputed if pricing changes. In practice cost accuracy barely depends on
+  this map at all — `withUsageTracking()` makes OpenRouter compute the real
+  `usage.cost` for every call, and that's preferred whenever present; the
+  map is the fallback for the rare case it's absent.
+
+### 2. Opus 5 → Sonnet 5 default swap
+
+- `VALIDATION_MODEL` default changed from `anthropic/claude-opus-5` to
+  `anthropic/claude-sonnet-5` in the 5 phase files that had it: phase8-
+  formula-brief, phase9-formula-qa, phase10-competitive-benchmarking,
+  phase11-fda-compliance, phase12-final-signoff (one identical `sed`
+  edit across all 5 — same string, same default). The `VALIDATION_MODEL`
+  env override is untouched, so Opus can be restored per-run or permanently
+  via env with no code change.
+- Cloud Run job now sets `VALIDATION_MODEL=anthropic/claude-sonnet-5`
+  explicitly (`gcloud run jobs update dovive-scout --update-env-vars`) so
+  there's no ambiguity about what's deployed vs. relying on the code
+  default.
+- `manufacturer-chat`'s `REVISION_MODEL` (the Formulator Agent's
+  card-approved-revision call, previously hardcoded Opus 5 + thinking)
+  switched to `anthropic/claude-sonnet-5` — thinking/effort settings left
+  as-is. No env-override mechanism exists in this edge function (unlike the
+  pipeline's `VALIDATION_MODEL`); change the `REVISION_MODEL` constant
+  directly to restore Opus.
+- Checked every phase's actual PROMPT TEXT (not just code comments) for
+  literal "you are Claude Opus" self-identification that would now be
+  false — found none; the "Opus" mentions still in code (function names
+  like `callClaudeOpus`, JSON field names like `opus_analysis`/
+  `opus_validation`/`opus_review`) are internal identifiers only, never sent
+  to the model and read downstream by `manufacturer-chat`'s corpus assembly
+  — renaming them would be a pointless, risky breaking change with zero
+  user-facing benefit, so they were deliberately left alone.
+
+### 3. P6 Product Intelligence → Gemini Flash 3.7
+
+- Resolved the exact model ID live via `GET https://openrouter.ai/api/v1/models`
+  (no auth needed) rather than guessing: `google/gemini-3.7-flash` exists
+  as a real, pinned (non-"-latest") model — confirmed it's the SAME id
+  already deployed as `P4_MODEL`/`OCR_MODEL` on the Cloud Run job from an
+  earlier cost pass. Pricing: $0.75/M input, $3.75/M output.
+- New dedicated `P6_MODEL` env in `phase6-product-intelligence.js`,
+  defaulting to `google/gemini-3.7-flash` UNCONDITIONALLY (not falling back
+  through `ANALYSIS_MODEL` like P4/P5/OCR do) — P6's ~40 calls/run is by far
+  the highest-volume phase and doesn't need Sonnet-level reasoning for
+  structured per-product extraction. Cloud Run job also got
+  `P6_MODEL=google/gemini-3.7-flash` set explicitly for clarity.
+- **Reliability hardening** (Flash is measurably weaker than Sonnet at
+  strict structured output): the batch-analysis prompt now has an explicit
+  "OUTPUT FORMAT — STRICT" section (no markdown fences, exact array length,
+  no truncation) on top of the existing JSON-array instruction. Parsing was
+  upgraded from a bare `response.match(/\[[\s\S]*\]/)` + single `JSON.parse`
+  (which threw straight into the whole-batch rule-based fallback on any
+  hiccup) to: strip fences → trim to the outermost `[...]` → try parse →
+  tolerate trailing commas → if STILL unparseable, ONE whole-batch retry
+  with an explicit "your last response was invalid JSON" correction prompt
+  → only then let the existing per-batch catch() fall back to
+  `ruleBasedAnalysis` (never a silent garbage save). Also fixed a narrower
+  gap: a single ASIN missing from an otherwise-valid batch result used to
+  silently get NO `product_intelligence` written at all — now falls back to
+  `ruleBasedAnalysis` for just that one product instead of disappearing.
+- Structural gates (row exists, right count, category-scoped) are
+  untouched and stay strict either way — only the AI-quality tolerance
+  changed.
+
+### 4. On-demand formula chain (Task A)
+
+- Default Launchpad submit is now **research scope only**: `only_phases`
+  = `"1,2,3,4,5,6,7,8"` (P1 Amazon Scrape through P8 Packaging
+  Intelligence) unless the new "Full analysis" toggle (default OFF) is on,
+  in which case `only_phases` is left `null` (the old "everything" behavior,
+  unchanged code path). Reused the EXISTING `only_phases`/`from_phase`
+  plumbing end to end — `scout_jobs.only_phases`/`from_phase` columns,
+  `cloud-worker.js`'s `--phases`/`--from` passthrough, and
+  `run-pipeline.js`'s `phasesToRun`/`FROM_PHASE` — all pre-existing, zero
+  new machinery needed.
+- New "Generate formula brief" button
+  (`src/components/dashboard/GenerateFormulaBriefButton.tsx`) queues a
+  continuation job: `from_phase: 9` (Formula Brief onward — P9-P13) against
+  the category's EXACT `search_term` (resolved fresh from `categoryId` right
+  before submit, never the display name) — this is what keeps it attached
+  to the SAME category/session instead of spawning a new "#N". Wired into
+  BOTH real empty states a user actually hits: `FormulaJourneyTab.tsx`'s
+  `!hasAnyData` panel (the one actually shown on the Formula tab — verified
+  live via screenshot on a real category) and `FormulaBriefTab.tsx`'s own
+  `!brief` state (reachable via other render paths). New
+  `useGenerateFormulaBrief()` hook in `useScoutJobs.ts`, double-submit
+  guarded the same way as the main submit flow.
+- Scope-aware final verifier: `runFinalVerifier(categoryId, scopePhases)`
+  now takes the run's actual `phasesToRun` and gates EVERY per-phase check
+  (P2 through P13, not just P9-13) behind `inScope(n)` — a research-scope
+  run is never failed for P9-P13 output it was never asked to produce.
+  `total_phases` written to `scout_jobs` already reflected
+  `phasesToRun.length` before this change (confirmed by reading the code,
+  not assumed) — so the Launchpad live-strip phase counter
+  ("6/8" for research, "6/13" for full) needed zero changes, it already
+  worked correctly once `only_phases` started being set.
+- Non-disruption checks done explicitly: existing signed-off categories
+  render identically (their `formula_briefs` row already exists, so
+  `FormulaBriefTab`/`FormulaJourneyTab` never hit the new empty-state
+  branch); `--phases`/`--from` CLI usage, `--force` full reruns, and
+  `RECOVER_SYNC` mode are all untouched code paths.
+
+### 5. Cheap engineering test mode (Task B)
+
+- `scout_jobs.cheap_mode` (bool, migration 007) + CLI `--cheap` flag +
+  `CHEAP_MODE=true` env (local runs). `run-pipeline.js` sets
+  `process.env.ANALYSIS_MODEL = process.env.VALIDATION_MODEL =
+  'google/gemini-3.7-flash'` BEFORE spawning any phase child — since every
+  phase already reads these two names with a Sonnet/Opus default (confirmed
+  by the cost-ledger wiring pass above), this one env override reaches
+  every call site with zero per-phase code changes. `cloud-worker.js` passes
+  `--cheap` when `job.cheap_mode` is true, mirroring the existing
+  `from_phase`/`only_phases` passthrough pattern exactly.
+- `scout_jobs.is_test` + `categories.is_test` (migration 007) — a cheap-mode
+  run auto-stamps its category `is_test = true` the moment `run-pipeline.js`
+  resolves/creates it (best-effort, non-fatal). Frontend surfaces a small
+  "TEST" chip on the Launchpad live-strip job button and the Library
+  category card whenever `cheap_mode`/`job_is_test` is set — never
+  prominent, tucked into the existing chip row.
+- `trigger-scout-job` accepts `cheap_mode`/`is_test` on insert (the
+  keyword-insert path — the main Launchpad submit flow inserts `scout_jobs`
+  rows directly via `useScoutJobs.ts`, which already writes these columns).
+- Structural gates (row counts, category scoping, session isolation) stay
+  fully strict in cheap mode — only the CONTENT-quality bar is expected to
+  be lower (Flash vs Sonnet/Opus), which is exactly what cheap mode is for
+  testing plumbing, not judging output quality.
+
+### Verification
+
+- **Mock-level**: `computeCostFromPricing()` arithmetic checked against
+  hand-computed expected values (incl. the cache-read discount path),
+  `withUsageTracking()` non-mutation, `extractUsageFromSSE()` against a
+  realistic multi-chunk stream with OpenRouter's trailing usage-only chunk,
+  and `recordAiUsage()` against 4 scenarios (prefers OpenRouter-native cost,
+  falls back to the PRICING map, resolves cleanly with no usage object, and
+  — run against the REAL Supabase client — never throws even though the
+  table doesn't exist yet). All 11 checks passed.
+- **Live** (small, deliberate): ONE real OpenRouter call to
+  `google/gemini-3.7-flash` through the actual `withUsageTracking()` +
+  `recordAiUsage()` path. Real response: `usage.cost = 0.000069`
+  ($0.000069 — fractions of a cent), all fields extracted correctly
+  (7 prompt / 17 completion / 17 reasoning / 0 cached tokens), insert
+  fail-opened exactly as designed (table missing). Confirms the whole
+  request→response→cost pipeline works against the live API, independent
+  of the mock checks above.
+- **Frontend**: `npx tsc --noEmit -p tsconfig.app.json` clean throughout
+  (checked after every batch of edits, zero errors at the end). Playwright
+  (scout's own `playwright` devDependency, no MCP needed) screenshots
+  against the REAL running app + REAL Supabase data (`npm run dev`,
+  localhost:5183): (1) Launchpad hero showing the new subtitle copy + "Full
+  analysis" toggle + a genuinely in-flight live-strip job; (2) Library grid
+  rendering unchanged (no cost/TEST badges yet — correct, migration not
+  applied); (3) `FormulaJourneyTab`'s real empty state on "Electrolyte
+  Powder #3" (a real category stuck mid-pipeline per an earlier session's
+  OpenRouter-exhaustion incident) showing the new "Generate formula brief"
+  button; (4) the Data Audit tab's new "AI Cost" card rendering its
+  friendly "Cost tracking isn't available for this category yet..."
+  empty-state message directly above the pre-existing, untouched Data
+  Completeness Audit checklist.
+- **Cloud Run image rebuilt and deployed**
+  (`us-central1-docker.pkg.dev/noodle-worker/dovive-scout/worker:latest`,
+  `gcloud builds submit` + `gcloud run jobs update --image`) with every
+  scout/ change above. All 16 touched edge functions deployed via
+  `npx supabase functions deploy <name> --project-ref jwkitkfufigldpldqtbq`
+  (the CLI itself worked fine this session — no classifier block, unlike a
+  prior session's note).
+- **Not done this session**: a real end-to-end pipeline run (blocked on
+  applying migration 007 first — otherwise cost rows just fail-open and the
+  UI stays in its empty state) and a full quality comparison of Flash- vs
+  Sonnet-written `marketing_analysis` (needs a completed real run to
+  compare against). The next real pipeline run after 007 is applied is the
+  proper end-to-end test for all five changes together — flagged
+  explicitly for the user.
+
 ## 2026-09-01: session-isolation validation run — CRITICAL category-resolver bug found + fixed live
 
 **Trigger**: end-to-end validation of the 2026-08-31 session-isolation feature

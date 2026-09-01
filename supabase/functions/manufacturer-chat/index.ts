@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.86.0";
+import { withUsageTracking, recordAiUsage } from "../_shared/aiUsage.ts";
 
 /**
  * manufacturer-chat — real running conversation over a category's full
@@ -52,7 +53,10 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
 const CHAT_MODEL = "anthropic/claude-sonnet-5";
-const REVISION_MODEL = "anthropic/claude-opus-5";
+// 2026-09-01: Opus 5 -> Sonnet 5 default swap (cost pass). No env override
+// mechanism exists in this edge function (unlike the pipeline's
+// VALIDATION_MODEL) — change this constant directly to restore Opus.
+const REVISION_MODEL = "anthropic/claude-sonnet-5";
 const PERPLEXITY_API_KEY = Deno.env.get("PERPLEXITY_API_KEY");
 
 // ─── Live web research (Perplexity sonar-pro — same engine as pipeline P5) ──
@@ -120,6 +124,7 @@ async function callClaudeOnce(
   maxTokens: number,
   model: string,
   reasoning: boolean = false,
+  usageCtx?: { supabase: ReturnType<typeof createClient>; categoryId?: string | null; keyword?: string | null; phase: string },
 ): Promise<{ content: string; finishReason: string | null }> {
   const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
@@ -128,15 +133,24 @@ async function callClaudeOnce(
       "Content-Type": "application/json",
       "HTTP-Referer": "https://dovive.com",
     },
-    body: JSON.stringify({
+    body: JSON.stringify(withUsageTracking({
       model,
       max_tokens: maxTokens,
       reasoning: { enabled: reasoning },
       messages,
-    }),
+    })),
   });
   const j = await res.json();
   if (j.error) throw new Error(`Claude error: ${j.error.message || JSON.stringify(j.error)}`);
+  if (usageCtx) {
+    recordAiUsage(usageCtx.supabase, {
+      phase: usageCtx.phase,
+      model,
+      usage: j.usage,
+      categoryId: usageCtx.categoryId,
+      keyword: usageCtx.keyword,
+    }).catch(() => {});
+  }
   return {
     content: j.choices?.[0]?.message?.content || "",
     finishReason: j.choices?.[0]?.finish_reason || null,
@@ -148,8 +162,9 @@ async function callClaude(
   maxTokens = 64000,
   model = CHAT_MODEL,
   reasoning = false,
+  usageCtx?: { supabase: ReturnType<typeof createClient>; categoryId?: string | null; keyword?: string | null; phase: string },
 ): Promise<string> {
-  let { content, finishReason } = await callClaudeOnce(messages, maxTokens, model, reasoning);
+  let { content, finishReason } = await callClaudeOnce(messages, maxTokens, model, reasoning, usageCtx);
   let segments = 0;
   while (finishReason === "length" && content.length > 500 && segments < 2) {
     segments++;
@@ -162,6 +177,7 @@ async function callClaude(
       maxTokens,
       model,
       reasoning,
+      usageCtx,
     );
     if (!next.content) break;
     content += next.content;
@@ -493,7 +509,7 @@ async function handleMessage(
   let workingConversation = [...conversation];
   let reply = "";
   for (let round = 0; round <= 2; round++) {
-    reply = await callClaude([cachedSystem, ...workingConversation], 64000, CHAT_MODEL);
+    reply = await callClaude([cachedSystem, ...workingConversation], 64000, CHAT_MODEL, false, { supabase, categoryId: category_id, keyword: corpus.keyword, phase: "chat" });
     const rm = reply.match(/```research\s*\n([\s\S]*?)```/);
     if (!rm || round === 2) break;
     let query = "";
@@ -643,11 +659,13 @@ async function applyApprovedCard(
   // Opus 5 with thinking enabled: the one call where deep reasoning earns
   // its latency. Full 64k budget + continuation (no truncation policy).
   const revisionPrompt = buildRevisionPrompt(keyword, currentFormula, complianceTemplate, row.change_card);
+  const usageCtx = { supabase, categoryId: category_id, keyword, phase: "chat" };
   let revisedFormula = await callClaude(
     [{ role: "user", content: revisionPrompt }],
     64000,
     REVISION_MODEL,
     true,
+    usageCtx,
   );
 
   // VERIFY before anything is saved (user directive: verify changes before
@@ -657,17 +675,18 @@ async function applyApprovedCard(
   // version is NOT created and the card stays 'approved' (not 'applied').
   const buildVerifyPrompt = (doc: string) =>
     `You are a strict formula-revision auditor. Compare the APPROVED CHANGE CARD against the REVISED DOCUMENT.\n\n## APPROVED CHANGE CARD\n${JSON.stringify(row.change_card, null, 2)}\n\n## ORIGINAL DOCUMENT\n${currentFormula}\n\n## REVISED DOCUMENT\n${doc}\n\nAnswer with EXACTLY one line first: PASS or FAIL. Then bullet points: (a) was every change in the card applied precisely? (b) was ANYTHING else changed that the card did not authorize (doses, ingredients, claims, structure)? (c) is the document structure/sections intact? FAIL if any unauthorized change or missed change exists.`;
-  let verification = await callClaude([{ role: "user", content: buildVerifyPrompt(revisedFormula) }], 8000, CHAT_MODEL);
+  let verification = await callClaude([{ role: "user", content: buildVerifyPrompt(revisedFormula) }], 8000, CHAT_MODEL, false, usageCtx);
   if (!/^\s*PASS/i.test(verification)) {
     const fix = await callClaude(
       [{ role: "user", content: `${revisionPrompt}\n\n## PREVIOUS ATTEMPT (REJECTED BY AUDIT)\n${revisedFormula}\n\n## AUDIT FINDINGS TO FIX\n${verification}\n\nRegenerate the complete revised document applying EXACTLY the approved card and fixing every audit finding.` }],
       64000,
       REVISION_MODEL,
       true,
+      usageCtx,
     );
     if (fix) {
       revisedFormula = fix;
-      verification = await callClaude([{ role: "user", content: buildVerifyPrompt(fix) }], 8000, CHAT_MODEL);
+      verification = await callClaude([{ role: "user", content: buildVerifyPrompt(fix) }], 8000, CHAT_MODEL, false, usageCtx);
     }
   }
   if (!/^\s*PASS/i.test(verification)) {

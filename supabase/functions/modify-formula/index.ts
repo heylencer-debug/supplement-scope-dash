@@ -1,6 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.86.0";
+import { withUsageTracking, recordAiUsage } from "../_shared/aiUsage.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -46,7 +47,8 @@ async function processGenerationTask(
   supabaseUrl: string,
   supabaseKey: string,
   messages: Array<{ role: string; content: string }>,
-  originalLength: number // Length of original formula for validation
+  originalLength: number, // Length of original formula for validation
+  categoryId?: string | null
 ) {
   console.log(`[Background Task] Starting generation for task: ${taskId}`);
   
@@ -79,12 +81,12 @@ async function processGenerationTask(
             'HTTP-Referer': 'https://lovable.dev',
             'X-Title': 'Noodle Search Formula Modifier'
           },
-          body: JSON.stringify({
+          body: JSON.stringify(withUsageTracking({
             model: 'anthropic/claude-sonnet-4-6',
             messages,
             stream: false,
             max_tokens: 64000
-          })
+          }))
         },
         TIMEOUT_MS
       );
@@ -96,6 +98,7 @@ async function processGenerationTask(
       }
 
       const data = await response.json();
+      recordAiUsage(supabase, { phase: 'formula_modify', model: 'anthropic/claude-sonnet-4-6', usage: data.usage, categoryId }).catch(() => {});
       const content = data.choices?.[0]?.message?.content || '';
       
       console.log(`[Background Task] Generation complete, content length: ${content.length}`);
@@ -451,7 +454,7 @@ IMPORTANT RULES:
       // Process generation in background using EdgeRuntime.waitUntil
       // Pass original formula length for validation
       // @ts-ignore - EdgeRuntime is available in Supabase Edge Functions
-      EdgeRuntime.waitUntil(processGenerationTask(task.id, SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!, messages, originalLength));
+      EdgeRuntime.waitUntil(processGenerationTask(task.id, SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!, messages, originalLength, categoryId));
 
       return immediateResponse;
 

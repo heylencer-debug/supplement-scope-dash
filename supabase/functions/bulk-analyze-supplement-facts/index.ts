@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { withUsageTracking, recordAiUsage } from "../_shared/aiUsage.ts";
 
 declare const EdgeRuntime: {
   waitUntil: (promise: Promise<unknown>) => void;
@@ -64,7 +65,8 @@ async function analyzeProduct(
   supabase: any,
   openrouterApiKey: string,
   productId: string,
-  imageUrls: string[]
+  imageUrls: string[],
+  categoryId?: string | null
 ): Promise<{ success: boolean; nutrients_count: number; error?: string }> {
   try {
     const imageContent = imageUrls.slice(0, 10).map((url) => ({
@@ -104,11 +106,11 @@ Use the extract_supplement_facts tool to return your analysis.`;
         "HTTP-Referer": "https://lovable.dev",
         "X-Title": "Bulk Supplement Facts Extraction"
       },
-      body: JSON.stringify({
+      body: JSON.stringify(withUsageTracking({
         model: "google/gemini-3-pro-preview",
-        messages: [{ 
-          role: "user", 
-          content: [{ type: "text", text: prompt }, ...imageContent] 
+        messages: [{
+          role: "user",
+          content: [{ type: "text", text: prompt }, ...imageContent]
         }],
         tools: [{
           type: "function",
@@ -187,7 +189,7 @@ Use the extract_supplement_facts tool to return your analysis.`;
           }
         }],
         tool_choice: { type: "function", function: { name: "extract_supplement_facts" } }
-      }),
+      })),
     });
 
     if (!response.ok) {
@@ -195,6 +197,7 @@ Use the extract_supplement_facts tool to return your analysis.`;
     }
 
     const data = await response.json();
+    recordAiUsage(supabase, { phase: "P4", model: "google/gemini-3-pro-preview", usage: data.usage, categoryId }).catch(() => {});
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
     
     if (!toolCall) {
@@ -337,7 +340,7 @@ async function processBulkAnalysis(
 
     console.log(`[bulk-analyze] Analyzing ${product.asin}...`);
     
-    const result = await analyzeProduct(supabase, openrouterApiKey, product.id, allImages);
+    const result = await analyzeProduct(supabase, openrouterApiKey, product.id, allImages, categoryId);
     completed++;
     
     if (result.success) {

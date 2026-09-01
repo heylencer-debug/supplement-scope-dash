@@ -1,4 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.86.0";
+import { withUsageTracking, recordAiUsage } from "../_shared/aiUsage.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -134,12 +136,12 @@ serve(async (req) => {
         "HTTP-Referer": "https://supplement-scope-dash.lovable.app",
         "X-Title": "Supplement Scope - Image Extraction",
       },
-      body: JSON.stringify({
+      body: JSON.stringify(withUsageTracking({
         model: "google/gemini-3-pro-preview",
         messages: [
           {
             role: "system",
-            content: `You are an expert at reading supplement facts panels from product images. 
+            content: `You are an expert at reading supplement facts panels from product images.
 Your task is to extract all structured data from the Supplement Facts panel including:
 - Serving size and servings per container
 - All active ingredients with exact amounts, units, and % daily values
@@ -168,7 +170,7 @@ Extract ingredients in the order they appear on the label.`,
         tools: [extractionTool],
         tool_choice: { type: "function", function: { name: "extract_supplement_facts" } },
         max_tokens: 4096,
-      }),
+      })),
     });
 
     if (!response.ok) {
@@ -182,6 +184,13 @@ Extract ingredients in the order they appear on the label.`,
 
     const result = await response.json();
     console.log("Gemini response received:", JSON.stringify(result).slice(0, 500));
+    try {
+      const sUrl = Deno.env.get("SUPABASE_URL");
+      const sKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      if (sUrl && sKey) {
+        recordAiUsage(createClient(sUrl, sKey), { phase: "extract_image", model: "google/gemini-3-pro-preview", usage: result.usage }).catch(() => {});
+      }
+    } catch { /* non-fatal — never block extraction on logging */ }
 
     // Extract the tool call arguments
     const toolCall = result.choices?.[0]?.message?.tool_calls?.[0];

@@ -19,6 +19,10 @@
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const { resolveCategory } = require('./utils/category-resolver');
+const { withUsageTracking, extractUsageFromSSE, recordAiUsage } = require('./utils/ai-usage');
+
+// Set once run() resolves the category — read by callOpusOnce() below.
+let _categoryId = null;
 
 const DASH = createClient(
   process.env.DASH_URL || process.env.SUPABASE_URL,
@@ -30,7 +34,7 @@ const KEYWORD = process.argv.includes('--keyword')
   : 'ashwagandha gummies';
 const FORCE = process.argv.includes('--force');
 
-const VALIDATION_MODEL = process.env.VALIDATION_MODEL || 'anthropic/claude-opus-5';
+const VALIDATION_MODEL = process.env.VALIDATION_MODEL || 'anthropic/claude-sonnet-5'; // 2026-09-01: Opus->Sonnet 5 default swap (cost); override via env to restore Opus
 
 // Form-aware serving language (same derivation as phase9-formula-qa.js).
 const FORM = (() => {
@@ -66,13 +70,14 @@ async function callOpusOnce(prompt, maxTokens, messagesOverride = null) {
         'HTTP-Referer': 'https://dovive.com',
         'X-Title': 'DOVIVE Scout P13 Final Sign-off',
       },
-      body: JSON.stringify({
+      body: JSON.stringify(withUsageTracking({
         model: VALIDATION_MODEL,
         max_tokens: maxTokens,
         stream: true,
+        stream_options: { include_usage: true },
         reasoning: { enabled: false },
         messages: messagesOverride || [{ role: 'user', content: prompt }],
-      }),
+      })),
     });
     if (res.status === 402) {
       console.error('  ❌ P13 OpenRouter credits exhausted — top up at openrouter.ai');
@@ -85,6 +90,7 @@ async function callOpusOnce(prompt, maxTokens, messagesOverride = null) {
     let output = '';
     let promptTokens = 0, completionTokens = 0, finishReason = null;
     const text = await res.text();
+    recordAiUsage({ phase: 'P13', model: VALIDATION_MODEL, usage: extractUsageFromSSE(text), categoryId: _categoryId, keyword: KEYWORD }).catch(() => {});
     for (const line of text.split('\n')) {
       if (!line.startsWith('data: ')) continue;
       const data = line.slice(6).trim();
@@ -185,6 +191,7 @@ async function run() {
 
   const cat = await resolveCategory(DASH, KEYWORD);
   console.log(`  → Resolved category (${cat.method}): "${cat.name}" (${cat.id})`);
+  _categoryId = cat.id;
 
   const { data: fb } = await DASH.from('formula_briefs')
     .select('id, ingredients').eq('category_id', cat.id).limit(1).maybeSingle();

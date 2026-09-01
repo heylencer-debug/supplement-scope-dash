@@ -23,8 +23,12 @@
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const { resolveCategory } = require('./utils/category-resolver');
+const { withUsageTracking, recordAiUsage } = require('./utils/ai-usage');
 const fs = require('fs');
 const path = require('path');
+
+// Set once run() resolves the category — read by callGrokOnce() below.
+let _categoryId = null;
 
 const DASH = createClient(
   process.env.DASH_URL || process.env.SUPABASE_URL,
@@ -89,8 +93,16 @@ function getOpenRouterKey() {
   return process.env.OPENROUTER_API_KEY || null;
 }
 
-// Analysis model — configurable without a rebuild. Default: Claude Sonnet 5 via OpenRouter.
-const ANALYSIS_MODEL = process.env.ANALYSIS_MODEL || 'anthropic/claude-sonnet-5';
+// Analysis model — P6 has its OWN dedicated env var (2026-09-01 cost pass):
+// per-product scoring is high-volume (~40 calls/run) and doesn't need Sonnet-
+// level reasoning for structured extraction, so it defaults to Gemini Flash
+// 3.7 regardless of ANALYSIS_MODEL (unlike every other phase, which stays on
+// Sonnet 5 by default). `google/gemini-3.7-flash` confirmed live via
+// GET https://openrouter.ai/api/v1/models on 2026-09-01 — same pinned ID
+// already deployed as P4_MODEL/OCR_MODEL on the Cloud Run job. Override with
+// P6_MODEL if needed; CHEAP_MODE routes everything (including P6) here too,
+// so cheap runs don't change P6's behavior.
+const P6_MODEL = process.env.P6_MODEL || 'google/gemini-3.7-flash';
 
 async function callGrokOnce(prompt, maxTokens) {
   const key = getOpenRouterKey();
@@ -103,11 +115,11 @@ async function callGrokOnce(prompt, maxTokens) {
       'HTTP-Referer': 'https://dovive.com',
       'X-Title': 'DOVIVE Scout P6 Product Intelligence',
     },
-    body: JSON.stringify({
-      model: ANALYSIS_MODEL,
+    body: JSON.stringify(withUsageTracking({
+      model: P6_MODEL,
       max_tokens: maxTokens,
       messages: [{ role: 'user', content: prompt }],
-    }),
+    })),
   });
   if (res.status === 402) {
     console.error(`  ❌ P6 OpenRouter credits exhausted — top up at openrouter.ai`);
@@ -115,6 +127,7 @@ async function callGrokOnce(prompt, maxTokens) {
   }
   const j = await res.json();
   if (j.error) throw new Error(`OpenRouter: ${j.error.message || JSON.stringify(j.error)}`);
+  recordAiUsage({ phase: 'P6', model: P6_MODEL, usage: j.usage, categoryId: _categoryId, keyword: KEYWORD }).catch(() => {});
   const choice = j.choices?.[0];
   const content = choice?.message?.content || null;
   const finishReason = choice?.finish_reason || 'unknown';
@@ -453,13 +466,53 @@ Scoring guidance (generic - applies to ANY supplement category; use judgment, no
 - competitor_threat_level: consider BSR strength, formula quality, and review sentiment together (very low BSR + strong formula + genuinely positive reviews = Very High/High threat; weak formula or a pattern of real complaints in the review sentiment above should pull the threat level down even if BSR looks strong).
 - key_strengths/key_weaknesses: ground at least one of each in the REVIEW SENTIMENT above when real complaint/praise patterns exist there — don't infer purely from the catalog data if actual customer voice is available.
 - market_opportunity_gap: be specific to this category and, where the review sentiment reveals an unmet need or recurring complaint, name it directly — what formula gap can DOVIVE exploit?
-- Return ONLY the JSON array. No other text.`;
 
-  const response = await callGrok(prompt, 64000);
+OUTPUT FORMAT — STRICT (this is machine-parsed, not read by a human):
+- Return ONLY the raw JSON array. No markdown code fences (no \`\`\`json), no preamble, no explanation, no trailing commentary.
+- The array MUST contain exactly ${products.length} objects, one per product listed above, in the same ASIN order.
+- Every string value must be valid JSON (escaped quotes/newlines) — no unescaped line breaks inside a string.
+- Do not truncate — if you are running low on budget, prefer shorter field values over stopping mid-array.`;
+
+  // 2026-09-01: P6 moved to Gemini Flash (cheaper, higher call volume) which
+  // is measurably weaker than Sonnet at strict structured output — a raw
+  // `[\s\S]*\]` regex + single JSON.parse used to throw straight into the
+  // batch's rule-based fallback on any hiccup (stray fence, trailing comma,
+  // wrapped commentary). Harden the extraction (strip fences, trim to the
+  // outermost array, tolerate trailing commas) and add ONE whole-batch retry
+  // with an explicit "your last response was invalid JSON" correction before
+  // giving up — only then does the existing per-batch catch() in run() fall
+  // back to ruleBasedAnalysis for real (never a silent garbage save).
+  function extractJsonArray(raw) {
+    if (!raw) return null;
+    let cleaned = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
+    const start = cleaned.indexOf('[');
+    const end = cleaned.lastIndexOf(']');
+    if (start === -1 || end === -1 || end < start) return null;
+    cleaned = cleaned.slice(start, end + 1);
+    try {
+      return JSON.parse(cleaned);
+    } catch {
+      // Tolerate the most common Flash malformation: trailing commas before ] or }.
+      try {
+        return JSON.parse(cleaned.replace(/,(\s*[\]}])/g, '$1'));
+      } catch {
+        return null;
+      }
+    }
+  }
+
+  let response = await callGrok(prompt, 64000);
   if (!response) throw new Error('Empty AI response');
-  const jsonMatch = response.match(/\[[\s\S]*\]/);
-  if (!jsonMatch) throw new Error('No JSON array in AI response');
-  return JSON.parse(jsonMatch[0]);
+  let parsed = extractJsonArray(response);
+  if (!parsed) {
+    console.warn(`  ⚠️ P6 batch: could not parse a valid JSON array from the response — retrying once with a correction reminder...`);
+    const retryPrompt = `${prompt}\n\nYOUR PREVIOUS RESPONSE WAS NOT VALID JSON. Return ONLY the raw JSON array this time — no markdown fences, no commentary, exactly ${products.length} objects.`;
+    response = await callGrok(retryPrompt, 64000);
+    parsed = extractJsonArray(response);
+  }
+  if (!parsed) throw new Error('No parseable JSON array in AI response after retry');
+  if (!Array.isArray(parsed)) throw new Error('AI response parsed but was not a JSON array');
+  return parsed;
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -470,9 +523,10 @@ async function run() {
   console.log(`${'═'.repeat(62)}\n`);
 
   const xaiKey = getOpenRouterKey();
-  console.log(`AI: ${xaiKey ? `✅ Claude via OpenRouter (${ANALYSIS_MODEL})` : '⚠️  No key - rule-based fallback'}`);
+  console.log(`AI: ${xaiKey ? `✅ via OpenRouter (${P6_MODEL})` : '⚠️  No key - rule-based fallback'}`);
 
   const CAT_ID = await lookupCategoryId(KEYWORD);
+  _categoryId = CAT_ID;
 
   // Fetch all products with all needed fields
   const { data: products, error } = await DASH.from('products')
@@ -542,6 +596,18 @@ async function run() {
         const grokResults = await analyzeWithGrok(batch, marketMetricsMap, categoryMedianPrice, reviewSentimentMap);
         for (let i = 0; i < batch.length; i++) {
           const gr = grokResults.find((r) => r.asin === batch[i].asin) || grokResults[i];
+          // 2026-09-01: a per-product miss inside an otherwise-successful
+          // batch (Flash returned a valid array but dropped/mismatched one
+          // ASIN) used to silently skip that product entirely — no
+          // product_intelligence written, no error surfaced. Falls back to
+          // the existing, proven ruleBasedAnalysis for just that product
+          // instead of leaving it with nothing.
+          if (!gr) {
+            console.warn(`  ⚠️ P6: no AI result for ${batch[i].asin} in this batch — falling back to rule-based for this product only.`);
+            analyses.push({ product: batch[i], intel: ruleBasedAnalysis(batch[i], marketMetricsMap[batch[i].asin]) });
+            ruleCount++;
+            continue;
+          }
           if (gr) {
             const mm = marketMetricsMap[batch[i].asin];
             const ashwagandhaAmt = gr.ashwagandha_amount_mg;

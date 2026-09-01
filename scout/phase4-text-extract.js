@@ -122,20 +122,32 @@ Return ONLY valid JSON, no markdown.`;
     try {
       let { content, finishReason } = await callOnce();
 
-      if (finishReason === 'length' && content.length > 500) {
-        // Substantial content despite hitting the ceiling — keep it, don't burn tokens retrying.
-        console.log(`  [NOTE: output reached token ceiling] — keeping truncated-but-substantial content`);
-      } else if (content.length < 500) {
-        console.log(`  ⚠️  Near-empty output (finish_reason=${finishReason}) — retrying once at same budget...`);
+      // Retry decision is based on PARSEABILITY, not raw character count —
+      // Gemini Flash 3.7 legitimately returns compact JSON (e.g. bullet
+      // points with no facts panel yield has_supplement_facts:false + empty
+      // arrays) that can land under any fixed char threshold while still
+      // being complete, valid output. A char-length heuristic was treating
+      // those correct-but-terse answers as "near-empty", burning an extra
+      // retry call, and — when the retry came back similarly compact —
+      // throwing a false [ERROR: truncated/empty] that discarded a real
+      // (if sparse) product's data entirely. finish_reason='length'
+      // (genuinely hit the token ceiling) is still logged for visibility;
+      // only an UNPARSEABLE response is now treated as evidence of truncation.
+      let parsed = parseModelJson(content);
+
+      if (!parsed.parsed) {
+        console.log(`  ⚠️  Unparseable output (finish_reason=${finishReason}, ${content.length} chars) — retrying once at same budget...`);
         const retry = await callOnce();
-        if (retry.content.length < 500) {
-          throw new Error('[ERROR: truncated/empty] — retry still produced no content');
+        const retryParsed = parseModelJson(retry.content);
+        if (!retryParsed.parsed) {
+          throw new Error(`[ERROR: truncated/empty] — retry still produced no parseable content (${retryParsed.method})`);
         }
         content = retry.content;
+        parsed = retryParsed;
+      } else if (finishReason === 'length') {
+        console.log(`  [NOTE: output reached token ceiling] — content still parsed as valid JSON, keeping it`);
       }
 
-      const parsed = parseModelJson(content);
-      if (!parsed.parsed) throw new Error(`Could not parse GPT response (${parsed.method})`);
       return parsed.parsed;
     } catch (err) {
       if (err.message.includes('[ERROR: credits]')) throw err;

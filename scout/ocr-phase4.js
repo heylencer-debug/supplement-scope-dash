@@ -39,6 +39,7 @@ require('dotenv').config();
 const fetch = require('node-fetch');
 const { createClient } = require('@supabase/supabase-js');
 const { withUsageTracking, recordAiUsage } = require('./utils/ai-usage');
+const { parseModelJson } = require('./utils/ocr-utils');
 
 const KEYWORD         = process.argv[2] || 'ashwagandha gummies';
 const TEST_MODE       = process.argv.includes('--test');
@@ -147,27 +148,33 @@ Return ONLY valid JSON, no markdown.`;
   let { content, finishReason, usage } = await doCall();
   console.log(`\n  finish_reason: ${finishReason} | output_chars: ${content.length}`);
 
-  if (finishReason === 'length' && content.length > 500) {
-    // Substantial content despite hitting the ceiling — keep it, don't burn tokens retrying.
-    console.log(`  [NOTE: output reached token ceiling] — keeping truncated-but-substantial content`);
-  } else if (content.length < 500) {
-    console.log(`  ⚠️  Near-empty output (finish_reason=${finishReason}) — retrying once at same budget...`);
+  // Retry decision is based on PARSEABILITY, not raw character count — Gemini
+  // Flash 3.7 legitimately returns compact JSON (e.g. `has_supplement_facts:
+  // false` with empty arrays) that can land under any fixed char threshold
+  // while still being complete, valid output. A char-length heuristic was
+  // treating those correct-but-terse answers as "near-empty" and burning an
+  // extra retry call, and — when the retry came back similarly compact —
+  // throwing a false [ERROR: truncated/empty] that discarded a real result.
+  // finish_reason='length' (genuinely hit the token ceiling) is still logged;
+  // only an UNPARSEABLE response is treated as evidence of truncation now.
+  let parsed = parseModelJson(content).parsed;
+
+  if (!parsed) {
+    console.log(`  ⚠️  Unparseable output (finish_reason=${finishReason}, ${content.length} chars) — retrying once at same budget...`);
     const retry = await doCall();
     console.log(`  finish_reason (retry): ${retry.finishReason} | output_chars: ${retry.content.length}`);
-    if (retry.content.length < 500) {
-      throw new Error('[ERROR: truncated/empty] — retry still produced no content');
+    const retryParsed = parseModelJson(retry.content).parsed;
+    if (!retryParsed) {
+      throw new Error('[ERROR: truncated/empty] — retry still produced no parseable content');
     }
     content = retry.content;
     usage = retry.usage;
+    parsed = retryParsed;
+  } else if (finishReason === 'length') {
+    console.log(`  [NOTE: output reached token ceiling] — content still parsed as valid JSON, keeping it`);
   }
 
-  try {
-    return { result: JSON.parse(content), usage };
-  } catch {
-    const match = content.match(/\{[\s\S]*\}/);
-    if (match) return { result: JSON.parse(match[0]), usage };
-    throw new Error('Could not parse Claude response: ' + content.slice(0, 100));
-  }
+  return { result: parsed, usage };
 }
 
 // ── Save to Supabase ──────────────────────────────────────────

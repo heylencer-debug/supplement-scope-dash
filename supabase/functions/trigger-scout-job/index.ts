@@ -75,6 +75,13 @@ serve(async (req) => {
           use_ai: !!body.use_ai,
           from_phase: body.from_phase ?? null,
           only_phases: body.only_phases ?? null,
+          // 2026-09-01: cheap_mode (routes every AI call to Gemini Flash —
+          // engineering test runs only) + is_test (surfaces the "TEST" chip
+          // in the frontend so cheap/test runs are never mistaken for real
+          // analysis). Both default false/undefined-safe via !! — existing
+          // callers that don't send these fields are unaffected.
+          cheap_mode: !!body.cheap_mode,
+          is_test: !!body.is_test,
           status: "queued",
         })
         .select("id")

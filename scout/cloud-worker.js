@@ -55,6 +55,10 @@ function runPipeline(job) {
         : String(job.only_phases).replace(/[\[\]\s]/g, '');
       args.push('--phases', phasesArg);
     }
+    // Cheap engineering test mode (2026-09-01) — routes ANALYSIS_MODEL/
+    // VALIDATION_MODEL to Gemini Flash for the whole run. See
+    // run-pipeline.js's CHEAP_MODE block for what this actually does.
+    if (job.cheap_mode) args.push('--cheap');
 
     console.log(`[cloud-worker] spawning: node ${args.join(' ')}`);
     const proc = spawn('node', args, {

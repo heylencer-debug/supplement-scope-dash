@@ -402,7 +402,8 @@ async function runBrightDataFallback(alreadyScraped) {
   console.log(`  ${toScrape.length} to save | ${skipped} already in DB`);
 
   let saved = 0;
-  for (const p of toScrape) {
+  for (let i = 0; i < toScrape.length; i++) {
+    const p = toScrape[i];
     const record = {
       asin:          p.asin,
       keyword:       KEYWORD_LABEL,
@@ -432,6 +433,10 @@ async function runBrightDataFallback(alreadyScraped) {
     } catch (err) {
       console.error(`  → Save failed for ${record.asin}: ${err.message}`);
     }
+
+    // Mid-phase heartbeat (throttled internally to ~10 products/60s) — see
+    // scout/utils/job-heartbeat.js. Fail-open, never blocks the fallback.
+    await reportProgress(i + 1, toScrape.length);
   }
 
   console.log(`\n✅ Bright Data fallback done. ${saved}/${toScrape.length} new products saved. (${skipped} skipped — already in DB)`);

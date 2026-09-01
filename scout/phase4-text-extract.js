@@ -202,6 +202,27 @@ async function main() {
     return;
   }
 
+  // 2026-09-01: SESSION-ISOLATION FIX — dovive_ocr is UNIQUE(asin,
+  // image_index) BY DESIGN (one canonical record per product, shared across
+  // every session — same as dovive_keepa). The upsert below always included
+  // `keyword: KEYWORD`, so a sibling session re-processing the same ASIN's
+  // text extraction (image_index=99) would silently REASSIGN the `keyword`
+  // column, corrupting the ORIGINAL session's data (exactly the dovive_keepa
+  // bug found live this session, applied here too). Pre-fetch which of
+  // THIS batch's ASINs already have an image_index=99 row under ANY keyword
+  // so `keyword` is only set on genuine first-write.
+  const existingTextExtractAsins = new Set();
+  const listAsins = list.map(p => p.asin);
+  for (let i = 0; i < listAsins.length; i += 100) {
+    const chunk = listAsins.slice(i, i + 100);
+    try {
+      const { data } = await sb.from('dovive_ocr').select('asin').eq('image_index', 99).in('asin', chunk);
+      (data || []).forEach(r => existingTextExtractAsins.add(r.asin));
+    } catch (e) {
+      console.warn(`  ⚠ Pre-fetch of existing dovive_ocr text-extract rows failed (${e.message}) — keyword attribution may not be preserved for this batch`);
+    }
+  }
+
   let saved = 0, skipped = 0, failed = 0;
 
   for (let i = 0; i < list.length; i++) {
@@ -223,7 +244,7 @@ async function main() {
       } else {
         const record = {
           asin: p.asin,
-          keyword: KEYWORD,
+          ...(existingTextExtractAsins.has(p.asin) ? {} : { keyword: KEYWORD }),
           image_url: null,
           image_index: 99, // marker: text extraction, not image OCR
           serving_size: extracted.serving_size || null,

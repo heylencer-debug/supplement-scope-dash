@@ -210,7 +210,22 @@ async function saveKeepa(record) {
 }
 
 // ── Also update dovive_research with validated Keepa data ─────
-async function updateResearch(asin, parsed) {
+// 2026-09-01: SESSION-ISOLATION FIX — dovive_research is UNIQUE(asin,
+// keyword) (a separate row per session, by design — see
+// migrations/004_consolidated_cloud.sql), but this PATCH filtered by `asin`
+// ALONE, so re-scraping an ASIN already researched under a SIBLING session
+// (e.g. "hydration powder #2" re-finding a product from the original
+// "hydration powder" run — the same real Amazon product, different session)
+// silently overwrote the ORIGINAL session's title/brand/price/bsr/images/
+// review_count/rating with the new session's freshly-scraped values. Found
+// live via a direct isolation check during a real validation run — the
+// original category's `products` table (what the dashboard renders) was
+// untouched (keepa-phase2.js never writes there), but its raw
+// `dovive_research` provenance was silently corrupted, which would surface
+// the next time that category is re-synced/repaired from raw data. Now
+// scoped to the exact (asin, keyword) pair, matching the table's own
+// documented intent ("P2 validated overwrite" — of THIS session's row).
+async function updateResearch(asin, keyword, parsed) {
   const update = {
     title:       parsed.title || undefined,
     brand:       parsed.brand || undefined,
@@ -225,7 +240,7 @@ async function updateResearch(asin, parsed) {
   Object.keys(update).forEach(k => update[k] === undefined && delete update[k]);
   if (!Object.keys(update).length) return;
 
-  await fetch(`${SUPABASE_URL}/rest/v1/dovive_research?asin=eq.${asin}`, {
+  await fetch(`${SUPABASE_URL}/rest/v1/dovive_research?asin=eq.${asin}&keyword=eq.${encodeURIComponent(keyword)}`, {
     method: 'PATCH',
     headers: {
       apikey: SUPABASE_KEY,
@@ -251,6 +266,36 @@ async function main() {
 
   const list = TEST_MODE ? products.slice(0, 1) : products;
   let success = 0, failed = 0;
+
+  // 2026-09-01: SESSION-ISOLATION FIX — dovive_keepa is UNIQUE(asin) BY
+  // DESIGN (one canonical, freshest-wins record per real Amazon product,
+  // shared across every keyword/session that ever scraped it — unlike
+  // dovive_research/reviews/ocr, which are one row PER SESSION). That part
+  // is intentional and stays. But saveKeepa()'s upsert always included
+  // `keyword: KEYWORD` in the body, so PostgREST's merge-duplicates
+  // silently REASSIGNED the `keyword` attribution column to whichever
+  // session most recently re-scraped that ASIN — found live via a direct
+  // isolation check (99→33 rows for the original "hydration powder"
+  // keyword after a sibling "#2" session re-scraped 66 of the same real
+  // products). `keyword` is read by keyword-scoped audits/repairs
+  // (idx_dovive_keepa_keyword exists for exactly this), so it needs
+  // first-writer-wins semantics even though the DATA fields (price/BSR/
+  // history) should stay freshest-wins. Pre-fetch which ASINs already have
+  // a dovive_keepa row so `keyword` is only ever set on first INSERT, never
+  // clobbered on a later session's refresh.
+  const existingKeepaAsins = new Set();
+  for (let i = 0; i < list.length; i += 100) {
+    const chunk = list.slice(i, i + 100).map(p => p.asin);
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/dovive_keepa?select=asin&asin=in.(${chunk.join(',')})`, {
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      });
+      if (res.ok) (await res.json()).forEach(r => existingKeepaAsins.add(r.asin));
+    } catch (e) {
+      console.warn(`  ⚠ Pre-fetch of existing dovive_keepa ASINs failed (${e.message}) — keyword attribution may not be preserved for this batch`);
+    }
+  }
+  console.log(`✓ ${existingKeepaAsins.size}/${list.length} ASINs already have a dovive_keepa record — their keyword attribution will be preserved`);
 
   // ── Batch ASINs in groups of 100 (Keepa API limit per request) ──
   const BATCH_SIZE = 100;
@@ -288,8 +333,9 @@ async function main() {
           // already distilled above) so future features can re-mine fields
           // this pipeline doesn't parse today without a fresh Keepa call.
           const { csv, ...rawJsonLite } = product;
-          await saveKeepa({ ...parsed, keyword: KEYWORD, raw_json: rawJsonLite });
-          await updateResearch(parsed.asin, parsed);
+          const keywordField = existingKeepaAsins.has(parsed.asin) ? {} : { keyword: KEYWORD };
+          await saveKeepa({ ...parsed, ...keywordField, raw_json: rawJsonLite });
+          await updateResearch(parsed.asin, KEYWORD, parsed);
           success++;
         } catch (err) {
           console.error(`  ✗ Parse/save error for ${product.asin}: ${err.message}`);

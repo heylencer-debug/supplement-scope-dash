@@ -242,6 +242,29 @@ async function main() {
   const list = TEST_MODE ? toProcess.slice(0, 1) : toProcess;
   if (!list.length) { console.log('✅ All in-scope products already processed!'); return; }
 
+  // 2026-09-01: SESSION-ISOLATION FIX — dovive_ocr is UNIQUE(asin,
+  // image_index) BY DESIGN (one canonical OCR record per real product
+  // image, shared across every session that ever scraped it — same
+  // rationale as dovive_keepa). But saveOCR()'s upsert always included
+  // `keyword: KEYWORD`, so a sibling session re-OCRing the same image
+  // silently REASSIGNED the `keyword` column — corrupting the ORIGINAL
+  // session's keyword-scoped data (getProcessed() above reads it as the
+  // "already done" gate) exactly like the dovive_keepa bug found live this
+  // session. Pre-fetch which (asin, image_index) pairs already exist so
+  // `keyword` is only set on first INSERT, never clobbered by a later
+  // session's re-scrape.
+  const existingOcrKeys = new Set();
+  const listAsins = list.map(p => p.asin);
+  for (let i = 0; i < listAsins.length; i += 100) {
+    const chunk = listAsins.slice(i, i + 100);
+    try {
+      const { data } = await supabase.from('dovive_ocr').select('asin, image_index').in('asin', chunk);
+      (data || []).forEach(r => existingOcrKeys.add(`${r.asin}::${r.image_index}`));
+    } catch (e) {
+      console.warn(`  ⚠ Pre-fetch of existing dovive_ocr rows failed (${e.message}) — keyword attribution may not be preserved for this batch`);
+    }
+  }
+
   let saved = 0, skipped = 0, totalTokens = 0;
 
   for (let i = 0; i < list.length; i++) {
@@ -282,10 +305,12 @@ async function main() {
         totalTokens += usage?.total_tokens || 0;
         process.stdout.write(`${result.has_supplement_facts ? '✅ SUPPLEMENT FACTS' : '⬜ no facts'} | tokens: ${usage?.total_tokens}\n`);
 
-        // Save each image result
+        // Save each image result — `keyword` only set on genuine first-write
+        // for this (asin, image_index) pair (see existingOcrKeys above).
+        const ocrKeywordField = existingOcrKeys.has(`${product.asin}::${imgIdx}`) ? {} : { keyword: KEYWORD };
         await saveOCR({
           asin:                  product.asin,
-          keyword:               KEYWORD,
+          ...ocrKeywordField,
           image_url:             imageUrl,
           image_index:           imgIdx,
           serving_size:          result.serving_size || null,

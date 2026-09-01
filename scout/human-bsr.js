@@ -33,6 +33,16 @@ const KEYWORD_LABEL = process.argv[2] || 'magnesium gummies';
 // with the clean words only.
 const SEARCH_KEYWORD = KEYWORD_LABEL.replace(/\s*#\d+\s*$/, '');
 
+// 2026-09-01: "top products" cap — the Bright Data fallback path already
+// requested `limit: 40` from the Datasets API, but the primary Playwright
+// SERP-scrape path had NO cap at all: it kept every relevance-matching
+// organic result across all 3 scanned pages (up to ~144 for a
+// high-volume keyword like "hydration powder" — found live during a
+// validation run). Both paths now share one constant so a run's product
+// count reflects the product's actual "top N by search rank" intent,
+// not an accident of how many organic results Amazon happened to render.
+const P1_PRODUCT_CAP = 40;
+
 // ── DASH live sync ────────────────────────────────────────────
 const DASH_URL = process.env.DASH_URL || SUPABASE_URL;
 const DASH_KEY = process.env.DASH_KEY || SUPABASE_KEY;
@@ -383,7 +393,7 @@ async function runBrightDataFallback(alreadyScraped) {
   console.log('\n🛰️  Bright Data fallback engaged (BRIGHTDATA_API_KEY/BRIGHTDATA present)...');
   await ensureKeyword(KEYWORD_LABEL); // dovive_keywords — same call as the Playwright path
 
-  const products = await brightData.searchAmazonByKeyword(SEARCH_KEYWORD, { limit: 40, pages: 3 });
+  const products = await brightData.searchAmazonByKeyword(SEARCH_KEYWORD, { limit: P1_PRODUCT_CAP, pages: 3 });
   console.log(`  ✓ Bright Data returned ${products.length} products for "${KEYWORD_LABEL}"`);
 
   const toScrape = products.filter(p => p.asin && !alreadyScraped.has(p.asin));
@@ -579,16 +589,26 @@ async function attemptPlaywrightGather(attemptNum, alreadyScraped) {
 
     // Deduplicate
     const seenAsins = new Set();
-    const uniqueGummies = allGummies.filter(p => {
+    const dedupedGummies = allGummies.filter(p => {
       if (seenAsins.has(p.asin)) return false;
       seenAsins.add(p.asin); return true;
     });
+
+    // Cap to the TOP N by SERP rank (2026-09-01 fix — see P1_PRODUCT_CAP
+    // above). `rank` was already computed per-card during collection
+    // ((pNum-1)*48 + i + 1), so this is a true top-N-by-search-relevance
+    // slice, not an arbitrary truncation — consistent with the Bright Data
+    // fallback's `limit: 40`.
+    const uniqueGummies = dedupedGummies
+      .slice()
+      .sort((a, b) => a.rank - b.rank)
+      .slice(0, P1_PRODUCT_CAP);
 
     // Filter out already-scraped
     const toScrape = uniqueGummies.filter(p => !alreadyScraped.has(p.asin));
     const skipped  = uniqueGummies.length - toScrape.length;
 
-    console.log(`\nTotal products: ${uniqueGummies.length} unique | ${skipped} already in DB | ${toScrape.length} to scrape`);
+    console.log(`\nTotal products: ${dedupedGummies.length} unique found | capped to top ${uniqueGummies.length} by rank | ${skipped} already in DB | ${toScrape.length} to scrape`);
 
     // Zero-gathered guard (2026-08-28): if the search "succeeded" but yielded
     // NOTHING new and NOTHING was already in the DB, treat it as a FAILED

@@ -243,13 +243,25 @@ further than the original "one tiny Flash call" plan — see Verification below.
   `npx supabase functions deploy <name> --project-ref jwkitkfufigldpldqtbq`
   (the CLI itself worked fine this session — no classifier block, unlike a
   prior session's note).
-- **Not done this session**: a real end-to-end pipeline run (blocked on
-  applying migration 007 first — otherwise cost rows just fail-open and the
-  UI stays in its empty state) and a full quality comparison of Flash- vs
-  Sonnet-written `marketing_analysis` (needs a completed real run to
-  compare against). The next real pipeline run after 007 is applied is the
-  proper end-to-end test for all five changes together — flagged
-  explicitly for the user.
+- **Live cheap-mode finale, launched**: migration 007 landed mid-session (see
+  above), which unblocked triggering a real Cloud Run execution —
+  `scout_job_id 90434faf-d4ca-491a-b0aa-61a6e50197fe`, execution
+  `dovive-scout-b7cjh`, keyword `"zzz cheap mode verify test"`,
+  `only_phases=1..8`, `cheap_mode=true`, `is_test=true`. Confirmed live:
+  `queued`→`running` transition, `total_phases=8` (scope-aware `only_phases`
+  proven end to end), real Amazon scraping flowing through the deployed
+  image (Cloud Run logs). The nonsense keyword fuzzy-matched 107 real
+  (irrelevant — drug-test/sleep-test products) Amazon results, so P1 alone
+  ran well past 10 minutes; this session's active work concluded before the
+  run reached P5-P8 (where cheap-mode Flash routing and `ai_usage_log`
+  population from a live Cloud Run run would be the final proof). **Left
+  running** — check `scout_jobs` for that id, or the
+  `dovive-scout-b7cjh` execution's logs, to see it finish. It's tagged
+  `is_test`, safe to delete afterward regardless of outcome.
+- A full quality comparison of Flash- vs Sonnet-written `marketing_analysis`
+  needs a completed REAL (non-test) run to compare against — the next real
+  pipeline run is the proper end-to-end test for all five changes together,
+  including that comparison — flagged explicitly for the user.
 
 ## 2026-09-01: session-isolation validation run — CRITICAL category-resolver bug found + fixed live
 

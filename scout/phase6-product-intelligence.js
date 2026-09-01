@@ -24,6 +24,7 @@ require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const { resolveCategory } = require('./utils/category-resolver');
 const { withUsageTracking, recordAiUsage } = require('./utils/ai-usage');
+const { reportProgress } = require('./utils/job-heartbeat');
 const fs = require('fs');
 const path = require('path');
 
@@ -663,6 +664,13 @@ async function run() {
     }
 
     console.log(` → saved ${analyses.length}`);
+
+    // Mid-phase heartbeat (throttled internally to ~10 products/60s) — see
+    // scout/utils/job-heartbeat.js. Reported in terms of products, not
+    // batches, so it's comparable to the other phases' progress. Fail-open,
+    // never blocks scoring.
+    await reportProgress(Math.min((bi + 1) * BATCH_SIZE, toProcess.length), toProcess.length);
+
     if (bi < batches.length - 1) await new Promise(r => setTimeout(r, 1500));
   }
 

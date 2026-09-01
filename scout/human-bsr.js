@@ -24,6 +24,7 @@ const path = require('path');
 const brightData = require('./bright-data-amazon');
 const { createClient } = require('@supabase/supabase-js');
 const { resolveCategory } = require('./utils/category-resolver');
+const { reportProgress } = require('./utils/job-heartbeat');
 
 const SUPABASE_URL  = process.env.SUPABASE_URL;
 const SUPABASE_KEY  = process.env.SUPABASE_KEY;
@@ -683,6 +684,10 @@ async function runDetailScrapeAndSave(context, toScrape, skipped) {
 
     // Save cookies periodically
     if (i % 10 === 0) await saveCookies(context);
+
+    // Mid-phase heartbeat (throttled internally to ~10 products/60s) — see
+    // scout/utils/job-heartbeat.js. Fail-open, never blocks the scrape.
+    await reportProgress(i + 1, toScrape.length);
 
     // Longer, randomized delay between products (key anti-detection measure)
     const delay = rand(3000, 6000);

@@ -224,7 +224,13 @@ function PipelineMicroGrid({ categoryId, categoryName, open, onExpand }: { categ
 
           if (isRunning) {
             statusKind = "running";
-            statusText = "Running";
+            // Mid-phase heartbeat (scout/migrations/008) — shows real
+            // sub-progress ("37/140") instead of a bare "Running" for phases
+            // that report it (P1/P3/P4/P6); graceful no-op for phases/older
+            // runs without it.
+            statusText = activeJob?.phase_progress?.total
+              ? `${activeJob.phase_progress.done}/${activeJob.phase_progress.total}`
+              : "Running";
             statusClass = "text-foreground";
           } else if (phase.status === "complete") {
             statusKind = "done";

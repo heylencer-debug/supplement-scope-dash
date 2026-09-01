@@ -39,6 +39,14 @@ export interface ScoutJobRow {
   cheap_mode: boolean;
   /** 2026-09-01: surfaces a "TEST" chip — set automatically when cheap_mode is on. */
   is_test: boolean;
+  /** 2026-09-02: mid-phase heartbeat (scout/migrations/008) — sub-progress
+   * within the CURRENT phase (e.g. P4 OCR product 37 of 140), written by
+   * scout/utils/job-heartbeat.js roughly every 10 products or 60s. Null on
+   * rows from before this migration, or between heartbeat writes for phases
+   * that don't report sub-progress (P2/P5/P7/P8-P13 run too fast/coarse to
+   * need it) — always treat null as "no sub-progress available", not an
+   * error. */
+  phase_progress: { done: number; total: number } | null;
 }
 
 export interface ScoutJobInsert {

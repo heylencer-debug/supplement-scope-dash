@@ -33,6 +33,7 @@ const stealth = require('puppeteer-extra-plugin-stealth');
 chromium.use(stealth());
 const fetch = require('node-fetch');
 const brightData = require('./bright-data-amazon');
+const { reportProgress } = require('./utils/job-heartbeat');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
@@ -302,6 +303,11 @@ async function main() {
       console.error(`  ✗ ${err.message}`);
       zeroReviewRows.push(row);
     }
+
+    // Mid-phase heartbeat (throttled internally to ~10 ASINs/60s) — see
+    // scout/utils/job-heartbeat.js. Fail-open, never blocks the scrape.
+    await reportProgress(done + failed, toScrape.length);
+
     await sleep(rand(2000, 5000));
   }
 

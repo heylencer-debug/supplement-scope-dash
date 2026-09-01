@@ -128,7 +128,9 @@ export function PipelineStatus({ categoryId, keyword }: PipelineStatusProps) {
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-chart-2 opacity-75" />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-chart-2" />
           </span>
-          Running{activeJob?.current_phase_name ? `: ${activeJob.current_phase_name}` : ""} · auto-refreshing every 30s
+          Running{activeJob?.current_phase_name ? `: ${activeJob.current_phase_name}` : ""}
+          {activeJob?.phase_progress?.total ? ` — ${activeJob.phase_progress.done}/${activeJob.phase_progress.total}` : ""}
+          {" "}· auto-refreshing every 30s
         </div>
       )}
 

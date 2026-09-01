@@ -65,6 +65,27 @@ function formatCost(cost: number | null | undefined): string | null {
   return cost < 0.01 && cost > 0 ? `<$0.01` : `$${cost.toFixed(2)}`;
 }
 
+/** Mid-phase sub-progress text — "37/140". Null/undefined (older runs from
+ * before scout/migrations/008, or a phase that doesn't report sub-progress)
+ * renders nothing — graceful, never a fabricated count. */
+function formatSubProgress(progress: { done: number; total: number } | null | undefined): string | null {
+  if (!progress || !progress.total) return null;
+  return `${progress.done}/${progress.total}`;
+}
+
+/** Subtle "last activity Xs ago" affordance for the live strip — cheap
+ * reassurance that a long-running phase (P1/P4/P6, 20-40min with no phase
+ * transition) is still alive, not frozen. Seconds precision under a minute
+ * (the strip refetches every 5s), falls back to date-fns' relative format
+ * beyond that. Null when updated_at is missing. */
+function formatLastActivity(updatedAt: string | null | undefined): string | null {
+  if (!updatedAt) return null;
+  const seconds = Math.max(0, Math.floor((Date.now() - new Date(updatedAt).getTime()) / 1000));
+  if (seconds < 5) return "just now";
+  if (seconds < 60) return `${seconds}s ago`;
+  return formatDistanceToNow(new Date(updatedAt), { addSuffix: true });
+}
+
 function StatusChip({ cat, isSignedOff }: { cat: CategoryWithImages; isSignedOff: boolean }) {
   if (isSignedOff) {
     return (
@@ -450,8 +471,16 @@ export default function NewAnalysis() {
                       ({job.current_phase}/{totalPhases})
                     </span>
                   )}
+                  {formatSubProgress(job.phase_progress) && (
+                    <span className="text-muted-foreground/80 tabular-nums text-[11px]">
+                      {formatSubProgress(job.phase_progress)}
+                    </span>
+                  )}
                   {formatCost(job.total_cost_usd) && (
                     <span className="text-muted-foreground/70 tabular-nums text-[11px]">{formatCost(job.total_cost_usd)}</span>
+                  )}
+                  {formatLastActivity(job.updated_at) && (
+                    <span className="text-muted-foreground/50 text-[10px]">{formatLastActivity(job.updated_at)}</span>
                   )}
                 </button>
               );

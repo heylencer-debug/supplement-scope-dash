@@ -41,6 +41,7 @@ const { createClient } = require('@supabase/supabase-js');
 const { withUsageTracking, recordAiUsage } = require('./utils/ai-usage');
 const { parseModelJson } = require('./utils/ocr-utils');
 const { resolveCategory } = require('./utils/category-resolver');
+const { reportProgress } = require('./utils/job-heartbeat');
 
 const KEYWORD         = process.argv[2] || 'ashwagandha gummies';
 // 2026-09-01: resolved once in main() below, purely so recordAiUsage() can
@@ -285,6 +286,13 @@ async function main() {
 
   for (let i = 0; i < list.length; i++) {
     const product = list[i];
+
+    // Mid-phase heartbeat (throttled internally to ~10 products/60s) — see
+    // scout/utils/job-heartbeat.js. Placed at the top of the loop (not just
+    // the bottom) so the early "no valid image URLs" `continue` below still
+    // reports progress. Fail-open, never blocks OCR.
+    await reportProgress(i, list.length);
+
     try {
     let images = product.images || [];
     // Handle case where images is stored as a JSON string
@@ -372,6 +380,8 @@ async function main() {
     }
     await sleep(2000); // Buffer between products
   }
+
+  await reportProgress(list.length, list.length); // final heartbeat — always fires regardless of throttle
 
   console.log(`\n✅ Done. ${saved} products processed | ${skipped} skipped | ~${totalTokens} total tokens`);
   console.log(`   Estimated cost: ~$${(totalTokens * 0.000005).toFixed(3)}`);

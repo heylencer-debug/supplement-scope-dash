@@ -18,6 +18,7 @@ const { createClient } = require('@supabase/supabase-js');
 const { parseModelJson, normalizeFacts, isValidFacts } = require('./utils/ocr-utils');
 const { withUsageTracking, recordAiUsage } = require('./utils/ai-usage');
 const { resolveCategory } = require('./utils/category-resolver');
+const { reportProgress } = require('./utils/job-heartbeat');
 
 // Support both: node phase4-text-extract.js "keyword" AND node phase4-text-extract.js --keyword "keyword"
 const _kwIdx = process.argv.indexOf('--keyword');
@@ -290,6 +291,10 @@ async function main() {
       console.error(`  ❌ Failed: ${err.message}`);
       failed++;
     }
+
+    // Mid-phase heartbeat (throttled internally to ~10 products/60s) — see
+    // scout/utils/job-heartbeat.js. Fail-open, never blocks extraction.
+    await reportProgress(i + 1, list.length);
   }
 
   console.log(`\n─────────────────────────────────────────`);

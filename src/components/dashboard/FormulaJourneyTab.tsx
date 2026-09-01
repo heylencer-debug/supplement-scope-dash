@@ -31,6 +31,7 @@ import type { CanonicalFormulaSource } from "@/lib/canonicalFormula";
 import { FormulaBriefTab } from "@/components/dashboard/FormulaBriefTab";
 import { FormulaQATab } from "@/components/dashboard/FormulaQATab";
 import { FormulaValidationTab } from "@/components/dashboard/FormulaValidationTab";
+import { GenerateFormulaBriefButton } from "@/components/dashboard/GenerateFormulaBriefButton";
 
 interface Props {
   categoryId: string;
@@ -206,10 +207,16 @@ export function FormulaJourneyTab({ categoryId, categoryName, activeVersionInfo,
 
       {!hasAnyData && (
         <Panel className="border-dashed">
-          <div className="px-4 py-6 text-center space-y-1.5">
+          <div className="px-4 py-6 text-center space-y-3">
             <FlaskConical className="h-8 w-8 text-muted-foreground/40 mx-auto" />
             <p className="text-sm font-medium text-foreground">No formula data yet for {categoryName || "this category"}</p>
-            <p className="text-xs text-muted-foreground">Run the pipeline first — start with <code className="text-foreground bg-muted px-1.5 py-0.5 rounded">phase8-formula-brief.js</code>.</p>
+            <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+              If research (scraping + market intelligence) is done for this category, generate the formula
+              brief, QA, competitive benchmarking, FDA compliance, and final sign-off now.
+            </p>
+            <div className="flex justify-center pt-1">
+              <GenerateFormulaBriefButton categoryId={categoryId} />
+            </div>
           </div>
         </Panel>
       )}

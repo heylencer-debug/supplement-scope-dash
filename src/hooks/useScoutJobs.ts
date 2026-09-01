@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import type { ScoutJobInsert, ScoutJobRow } from "@/types/scoutJobs";
+import { RESEARCH_SCOPE_PHASES, FORMULA_CHAIN_FROM_PHASE } from "@/types/scoutJobs";
 
 /**
  * scout_jobs isn't in the generated Supabase types yet (004 migration not
@@ -27,7 +28,7 @@ export function useSubmitScoutJob() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (params: { keyword: string; force?: boolean; useAi?: boolean }) => {
+    mutationFn: async (params: { keyword: string; force?: boolean; useAi?: boolean; fullAnalysis?: boolean; cheapMode?: boolean }) => {
       const base = params.keyword.trim().replace(/\s*#\d+\s*$/, "").toLowerCase();
       if (!base) throw new Error("Keyword is required");
 
@@ -67,11 +68,22 @@ export function useSubmitScoutJob() {
         keyword = `${base} #${Math.max(...sessionNums) + 1}`;
       }
 
+      // 2026-09-01: default Launchpad submit = research scope only (P1-P8 —
+      // scraping through Packaging Intelligence). The formula chain (P9
+      // Formula Brief through P13 Final Sign-off, the phases that used to be
+      // all-Opus) is expensive and now runs on-demand via "Generate formula
+      // brief" on the category dashboard, or the explicit "Full analysis"
+      // toggle here. only_phases is a comma-separated TEXT column (see
+      // cloud-worker.js's job.only_phases handling) — the same plumbing that
+      // already powers --phases for continuation/retry runs.
       const insertPayload: ScoutJobInsert = {
         keyword,
         status: "queued",
         force: params.force ?? false,
         use_ai: params.useAi ?? false,
+        only_phases: params.fullAnalysis ? null : RESEARCH_SCOPE_PHASES.join(","),
+        cheap_mode: params.cheapMode ?? false,
+        is_test: params.cheapMode ?? false,
       };
 
       const { data: job, error: insertError } = await scoutJobsTable()
@@ -119,6 +131,77 @@ export function useSubmitScoutJob() {
     onError: (error: Error) => {
       toast({
         title: "Failed to queue analysis",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+}
+
+/**
+ * Queue a continuation job for a category's EXACT existing session keyword —
+ * from_phase=9 (Formula Brief onward), never a new "#N" spawn. This is the
+ * "Generate formula brief" action: the category already went through the
+ * research scope (P1-P8); this picks up exactly where it left off on the
+ * SAME category, respecting the session-isolation keyword-matching rules
+ * already in place (exact keyword, no fuzzy fallback).
+ */
+export function useGenerateFormulaBrief() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: { keyword: string }) => {
+      const keyword = params.keyword.trim();
+      if (!keyword) throw new Error("Keyword is required");
+
+      // Double-submit guard — same pattern as useSubmitScoutJob, exact
+      // keyword match only (this is a continuation of ONE specific session,
+      // not a new base/sibling keyword).
+      const { data: inflight, error: inflightErr } = await scoutJobsTable()
+        .select("id, keyword, status")
+        .in("status", ["queued", "claimed", "running"])
+        .eq("keyword", keyword);
+      if (inflightErr) throw new Error("Could not verify queue state — try again in a moment.");
+      if (inflight && inflight.length > 0) {
+        throw new Error(`"${keyword}" already has a job ${inflight[0].status} — wait for it to finish first.`);
+      }
+
+      const insertPayload: ScoutJobInsert = {
+        keyword,
+        status: "queued",
+        from_phase: FORMULA_CHAIN_FROM_PHASE,
+      };
+
+      const { data: job, error: insertError } = await scoutJobsTable()
+        .insert(insertPayload)
+        .select()
+        .single();
+      if (insertError) throw insertError;
+
+      let triggerOk = true;
+      try {
+        const { error: invokeError } = await supabase.functions.invoke("trigger-scout-job", {
+          body: { scout_job_id: (job as ScoutJobRow).id },
+        });
+        if (invokeError) triggerOk = false;
+      } catch {
+        triggerOk = false;
+      }
+
+      return { job: job as ScoutJobRow, triggerOk };
+    },
+    onSuccess: ({ triggerOk }) => {
+      queryClient.invalidateQueries({ queryKey: ["scout_jobs"] });
+      toast({
+        title: "Formula brief queued",
+        description: triggerOk
+          ? "Generating the formula brief, QA, benchmarking, compliance, and sign-off — this'll show in the live strip."
+          : "Queued — cloud trigger pending, will run on the next sweep.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to queue formula brief",
         description: error.message,
         variant: "destructive",
       });

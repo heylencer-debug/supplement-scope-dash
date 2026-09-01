@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { generateManufacturerPDF } from "@/lib/manufacturerPDF";
 import { DocumentModal } from "@/components/ui/document-modal";
 import { MarkdownDoc } from "@/lib/markdownDoc";
+import { GenerateFormulaBriefButton } from "@/components/dashboard/GenerateFormulaBriefButton";
 
 interface Props { categoryId: string; categoryName?: string; }
 
@@ -321,10 +322,16 @@ export function FormulaBriefTab({ categoryId, categoryName }: Props) {
 
   if (!brief) {
     return (
-      <div className="text-center py-16 space-y-3">
+      <div className="text-center py-16 space-y-4">
         <FlaskConical className="h-12 w-12 text-muted-foreground/40 mx-auto" />
         <p className="text-foreground font-medium">No formula brief yet for {categoryName}</p>
-        <p className="text-muted-foreground text-sm">Run the full P1–P7 pipeline, then: <code className="text-foreground text-xs bg-muted px-1.5 py-0.5 rounded">node phase8-formula-brief.js --keyword "{categoryName}"</code></p>
+        <p className="text-muted-foreground text-sm max-w-md mx-auto">
+          Research is in — generate the formula brief, QA, competitive benchmarking,
+          FDA compliance, and final sign-off for this category.
+        </p>
+        <div className="flex justify-center">
+          <GenerateFormulaBriefButton categoryId={categoryId} />
+        </div>
       </div>
     );
   }

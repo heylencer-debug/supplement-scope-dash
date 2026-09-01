@@ -31,6 +31,14 @@ export interface ScoutJobRow {
   cloud_run_execution: string | null;
   created_at: string;
   updated_at: string;
+  /** 2026-09-01 cost-ledger columns — null on rows from before the ledger existed. */
+  total_cost_usd: number | null;
+  total_prompt_tokens: number | null;
+  total_completion_tokens: number | null;
+  /** 2026-09-01: cheap engineering test mode (routes every AI call to Gemini Flash). */
+  cheap_mode: boolean;
+  /** 2026-09-01: surfaces a "TEST" chip — set automatically when cheap_mode is on. */
+  is_test: boolean;
 }
 
 export interface ScoutJobInsert {
@@ -40,7 +48,18 @@ export interface ScoutJobInsert {
   from_phase?: number | null;
   only_phases?: string | null;
   use_ai?: boolean;
+  cheap_mode?: boolean;
+  is_test?: boolean;
 }
+
+/** Research-scope phases (P1 Amazon Scrape through P8 Packaging Intelligence) —
+ * the default Launchpad submit scope as of the 2026-09-01 on-demand formula
+ * chain change. The formula chain (P9-P13) runs only via "Generate formula
+ * brief" or the explicit "Full analysis" toggle. */
+export const RESEARCH_SCOPE_PHASES = [1, 2, 3, 4, 5, 6, 7, 8];
+/** Formula-chain phases (P9 Formula Brief through P13 Final Sign-off) — run
+ * as a continuation job from an existing research-scope category. */
+export const FORMULA_CHAIN_FROM_PHASE = 9;
 
 /** Human-readable phase names, matching run-pipeline.js's phase order (P1-P11/P12). */
 export const SCOUT_PHASE_NAMES: Record<number, string> = {

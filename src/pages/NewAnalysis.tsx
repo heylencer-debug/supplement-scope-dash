@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { PearlButton } from "@/components/ui/pearl-button";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -55,6 +56,13 @@ const jobStatusMeta: Record<ScoutJobRow["status"], { label: string; icon: typeof
 /** Strips the same spreadsheet-import junk prefix the hooks already normalize on write. */
 function stripLabel(name: string | null | undefined): string {
   return (name || "").replace(/^[=+\-'"\s]+/, "").trim();
+}
+
+/** Small muted cost badge text — "$0.02"/"$12.40". Null/undefined (pre-ledger runs, or the
+ * migration not applied yet) renders nothing — never a fabricated "$0.00". */
+function formatCost(cost: number | null | undefined): string | null {
+  if (cost == null) return null;
+  return cost < 0.01 && cost > 0 ? `<$0.01` : `$${cost.toFixed(2)}`;
 }
 
 function StatusChip({ cat, isSignedOff }: { cat: CategoryWithImages; isSignedOff: boolean }) {
@@ -153,13 +161,19 @@ function CategoryCard({ cat, isSignedOff, onOpen, onDelete, onCopyAsins, deleteP
           {cat.name}
         </h3>
       </div>
-      <div className="mt-1.5">
+      <div className="mt-1.5 flex items-center gap-1.5">
         <StatusChip cat={cat} isSignedOff={isSignedOff} />
+        {cat.job_is_test && (
+          <Badge variant="outline" className="text-[9px] font-bold uppercase tracking-wide px-1 py-0 shrink-0 bg-chart-2/10 text-chart-2 border-chart-2/20">
+            Test
+          </Badge>
+        )}
       </div>
 
       <p className="mt-2 text-xs text-muted-foreground tabular-nums">
         {(cat.total_products || 0).toLocaleString()} products · {scoreLabel}
         {cat.updated_at && ` · ${formatDistanceToNow(new Date(cat.updated_at), { addSuffix: true })}`}
+        {formatCost(cat.job_cost_usd) && ` · ${formatCost(cat.job_cost_usd)}`}
       </p>
 
       {images.length > 0 ? (
@@ -194,6 +208,11 @@ export default function NewAnalysis() {
 
   // Command bar submission -> scout_jobs cloud queue (unchanged flow).
   const [keywordInput, setKeywordInput] = useState("");
+  // 2026-09-01: default submit = research scope only (P1-P8); the formula
+  // chain (brief/QA/benchmarking/compliance/sign-off) runs on-demand via
+  // "Generate formula brief" on the category dashboard. This toggle opts
+  // back into the old "everything in one go" behavior. Default OFF.
+  const [fullAnalysis, setFullAnalysis] = useState(false);
   const submitScoutJob = useSubmitScoutJob();
   const { data: activeJobs } = useActiveScoutJobs();
 
@@ -231,7 +250,7 @@ export default function NewAnalysis() {
     if (!keyword || submitScoutJob.isPending || submittingRef.current) return;
     submittingRef.current = true;
     try {
-      await submitScoutJob.mutateAsync({ keyword });
+      await submitScoutJob.mutateAsync({ keyword, fullAnalysis });
       setKeywordInput("");
     } catch {
       /* toast shown by the hook */
@@ -322,7 +341,7 @@ export default function NewAnalysis() {
             Analyze any supplement category
           </h1>
           <p className="mt-2 text-[13px] sm:text-sm text-muted-foreground">
-            13 phases · scraping, market intelligence, formulation, QA, compliance, sign-off — fully automated
+            Research scope by default (8 phases: scraping + market intelligence) · flip on Full analysis for formulation, QA, compliance & sign-off too
           </p>
 
           <form
@@ -375,6 +394,23 @@ export default function NewAnalysis() {
               </button>
             ))}
           </div>
+
+          {/* 2026-09-01: research-scope-by-default toggle. Default run is P1-P8
+              (scraping through Packaging Intelligence) — the formula chain
+              (brief/QA/benchmarking/compliance/sign-off) is queued separately
+              via "Generate formula brief" on the category dashboard once
+              research is in. Flip this ON for the old one-shot behavior. */}
+          <div className="mt-3 flex items-center justify-center gap-2">
+            <Switch
+              id="full-analysis-toggle"
+              checked={fullAnalysis}
+              onCheckedChange={setFullAnalysis}
+              className="scale-90"
+            />
+            <label htmlFor="full-analysis-toggle" className="text-xs text-muted-foreground cursor-pointer select-none">
+              Full analysis (includes formula brief, QA, benchmarking, compliance & sign-off)
+            </label>
+          </div>
         </div>
       </section>
 
@@ -403,11 +439,19 @@ export default function NewAnalysis() {
                     <span className="relative inline-flex h-[7px] w-[7px] rounded-full bg-chart-2" />
                   </span>
                   <span className="font-semibold text-foreground">{stripLabel(job.keyword)}</span>
+                  {job.cheap_mode && (
+                    <span className="rounded border border-chart-2/30 bg-chart-2/10 px-1 py-px text-[9px] font-bold uppercase tracking-wide text-chart-2">
+                      Test
+                    </span>
+                  )}
                   {phaseLabel && <span className="text-muted-foreground">· {phaseLabel}</span>}
                   {job.current_phase != null && (
                     <span className="text-muted-foreground tabular-nums">
                       ({job.current_phase}/{totalPhases})
                     </span>
+                  )}
+                  {formatCost(job.total_cost_usd) && (
+                    <span className="text-muted-foreground/70 tabular-nums text-[11px]">{formatCost(job.total_cost_usd)}</span>
                   )}
                 </button>
               );

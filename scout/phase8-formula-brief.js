@@ -526,13 +526,16 @@ async function compileMarketData(categoryId) {
   }
 
   // Top 20 all-time performers by BSR (expanded from 5 for richer formula comparison)
+  // `cohort` (2026-09-03) — established/emerging/context tag from
+  // utils/cohort.js, computed deterministically in migrate-keepa-to-dash.js.
+  // Feeds the PROVEN BASELINE vs EMERGING EDGE split below.
   const { data: top20 } = await DASH.from('products')
     .select(`
       asin, brand, title, bsr_current, bsr_30_days_avg, bsr_90_days_avg,
       price, monthly_revenue, monthly_sales, rating_value, rating_count,
       packaging_type, serving_size, servings_per_container,
       claims_on_label, supplement_facts_raw, all_nutrients, other_ingredients,
-      proprietary_blends, feature_bullets_text, marketing_analysis
+      proprietary_blends, feature_bullets_text, marketing_analysis, cohort
     `)
     .eq('category_id', categoryId)
     .not('bsr_current', 'is', null)
@@ -547,7 +550,7 @@ async function compileMarketData(categoryId) {
       asin, brand, title, bsr_current, price, monthly_revenue, monthly_sales,
       rating_count, packaging_type, serving_size, servings_per_container,
       claims_on_label, supplement_facts_raw, all_nutrients, other_ingredients,
-      proprietary_blends, feature_bullets_text, marketing_analysis
+      proprietary_blends, feature_bullets_text, marketing_analysis, cohort
     `)
     .eq('category_id', categoryId)
     .not('bsr_current', 'is', null)
@@ -808,6 +811,7 @@ async function compileMarketData(categoryId) {
         ingredients: p.all_nutrients,
         flavor_options: [],
         nutrients_count: p.all_nutrients ? Object.keys(p.all_nutrients).length : 'Unknown',
+        cohort: p.cohort || null,
       })),
     },
     formula_references: (newWinners || [])
@@ -817,6 +821,7 @@ async function compileMarketData(categoryId) {
         age_months: Math.round((p.rating_count || 0) / 30),
         nutrients: p.all_nutrients,
         ingredients: p.supplement_facts_raw,
+        cohort: p.cohort || null,
       })),
     // NEW: P6 market intelligence (single holistic analysis)
     market_intelligence: marketIntelDoc ? {
@@ -841,6 +846,7 @@ async function compileMarketData(categoryId) {
         price: p.price,
         rating: p.rating_value,
         reviews: p.rating_count,
+        cohort: p.cohort || null,
         // Extracted formula data
         ashwagandha_mg: pi.ashwagandha_amount_mg,
         extract_type: pi.ashwagandha_extract_type,
@@ -921,8 +927,13 @@ ${(mi.report?.length || 0) > 30000 ? '\n[... report continues â€" using first
 P8 will still run but with reduced market context.`;
 
   // Top 20 competitor formula table
+  // Cohort labels for inline display (2026-09-03) — see utils/cohort.js.
+  // UNCLASSIFIED means no Keepa signal existed to tag it (not "context") —
+  // shown as-is so the model never treats missing data as a real classification.
+  const cohortLabel = (c) => c === 'established' ? '[ESTABLISHED]' : c === 'emerging' ? '[EMERGING]' : c === 'context' ? '[CONTEXT]' : '[UNCLASSIFIED]';
+
   const top20FormulasSection = top20.slice(0, 50).map(c => `
-### #${c.rank} ${c.brand} â€" BSR ${c.bsr?.toLocaleString()} | $${c.monthly_revenue?.toLocaleString()}/mo | $${c.price} | ${c.rating}â­ (${c.reviews?.toLocaleString()} reviews)
+### #${c.rank} ${c.brand} ${cohortLabel(c.cohort)} â€" BSR ${c.bsr?.toLocaleString()} | $${c.monthly_revenue?.toLocaleString()}/mo | $${c.price} | ${c.rating}â­ (${c.reviews?.toLocaleString()} reviews)
 **Formula:** ${c.ashwagandha_mg || '?'}mg ${c.extract_type || 'Unknown'} ${c.withanolides ? `(${c.withanolides} withanolides)` : ''}
 **Bonus ingredients:** ${c.bonus_ingredients.join(', ') || 'None'}
 **Certifications:** ${c.certifications.join(', ') || 'None'} | Sugar-Free: ${c.is_sugar_free} | Vegan: ${c.is_vegan} | 3rd Party Tested: ${c.is_third_party_tested}
@@ -952,7 +963,7 @@ ${leader.supplement_facts_raw || JSON.stringify(leader.all_nutrients || 'Not ava
 
   const newWinnersSection = refs && refs.length > 0
     ? refs.slice(0, 15).map((p, i) => `
-New Winner #${i + 1}: ${p.brand} (BSR: ${p.bsr_current?.toLocaleString()}, Rev: $${(p.monthly_revenue || 0).toLocaleString()}/mo, Reviews: ${p.rating_count || 'unknown'})
+New Winner #${i + 1}: ${p.brand} ${cohortLabel(p.cohort)} (BSR: ${p.bsr_current?.toLocaleString()}, Rev: $${(p.monthly_revenue || 0).toLocaleString()}/mo, Reviews: ${p.rating_count || 'unknown'})
 - Form: ${p.packaging_type || 'Not specified'} | Serving: ${p.serving_size || 'Not specified'}
 - Claims: ${(p.claims_on_label || []).join(', ') || 'Not available'}
 
@@ -968,7 +979,7 @@ ${p.other_ingredients || 'Not specified'}
     : 'No specific new winners identified.';
 
   const top5Section = cs.top_performers.slice(0, 5).map((p, i) => `
-#${i + 1}: ${p.brand}
+#${i + 1}: ${p.brand} ${cohortLabel(p.cohort)}
 - Form: ${p.packaging_type || 'Not specified'}
 - Serving Size: ${p.serving_size || 'Not specified'}
 - Ingredient Count: ${p.nutrients_count || 'Unknown'}
@@ -977,6 +988,26 @@ ${p.other_ingredients || 'Not specified'}
 - Monthly Revenue: $${(p.monthly_revenue || 0).toLocaleString()}
 - Ingredients: ${p.supplement_facts_raw ? p.supplement_facts_raw.substring(0, 1500) : JSON.stringify((p.all_nutrients || []).slice ? (p.all_nutrients || []).slice(0, 15) : p.all_nutrients || 'Not available')}
 `).join('\n---\n');
+
+  // ── Cohort-tagged evidence pools (2026-09-03) ─────────────────────────────
+  // Groups the SAME top20 products already deconstructed below into two
+  // explicit evidence pools by their deterministic Keepa-derived cohort tag
+  // (utils/cohort.js) — this is what makes "PROVEN BASELINE" (established
+  // only) vs "EMERGING EDGE" (emerging only) possible downstream instead of
+  // the model inferring "old vs new" from prose. Mirrors P5's Pool A
+  // (established-first) / Pool B (emerging-first) alignment, not a parallel
+  // notion of its own.
+  const establishedPool = top20.filter(c => c.cohort === 'established');
+  const emergingPool = top20.filter(c => c.cohort === 'emerging');
+  const summarizeForPool = (c) => `- ${c.brand} (BSR #${c.rank}, $${c.monthly_revenue?.toLocaleString() || 0}/mo, ${c.reviews?.toLocaleString() || 0} reviews): ${c.ashwagandha_mg ? `${c.ashwagandha_mg}mg ${c.extract_type || ''} — ` : ''}${c.bonus_ingredients?.length ? `bonus: ${c.bonus_ingredients.join(', ')} — ` : ''}${c.certifications?.length ? `certs: ${c.certifications.join(', ')}` : 'no certs found'}`;
+  const cohortEvidenceSection = `
+### ESTABLISHED COHORT — the PROVEN BASELINE evidence pool (${establishedPool.length} products: years on market, big review base, stable sales — the Liquid I.V./Nuun tier of THIS category)
+${establishedPool.length ? establishedPool.map(summarizeForPool).join('\n') : 'None met the established thresholds in this category — treat the overall top BSR performers as the closest available baseline evidence instead, and say so explicitly rather than inventing a baseline that is not there.'}
+
+### EMERGING COHORT — the EMERGING EDGE evidence pool (${emergingPool.length} products: young listing, fast review velocity, climbing BSR — real but NOT YET PROVEN)
+${emergingPool.length ? emergingPool.map(summarizeForPool).join('\n') : 'None met the emerging thresholds in this category — the EMERGING EDGE section below may be thin or empty; do not manufacture trends that are not in the data.'}
+
+### UNCLASSIFIED / CONTEXT-ONLY (${top20.length - establishedPool.length - emergingPool.length} products — not a model to follow either way, ignore for baseline/edge purposes)`;
 
   const ingredientFrequency = cs.top_ingredients.length > 0
     ? cs.top_ingredients.map((ing, idx) =>
@@ -1081,6 +1112,20 @@ Per-product deep research covering formula advantages, weaknesses, and market ga
 USE THIS to understand WHY top products win and where to attack.
 
 ${p5Section}
+
+---
+
+## COHORT-TAGGED COMPETITIVE EVIDENCE — READ THIS BEFORE THE FULL TOP-20 LIST BELOW
+
+Every competitor below and in the Top-20 deconstruction is tagged
+[ESTABLISHED] / [EMERGING] / [CONTEXT] / [UNCLASSIFIED]. This is the
+evidence split your PROVEN BASELINE and EMERGING EDGE sections (required
+later in this brief) must be built from — established-cohort products are
+the ONLY valid source for a "baseline" claim; emerging-cohort products are
+the ONLY valid source for an "edge" claim. [CONTEXT]/[UNCLASSIFIED]
+products are neither — do not cite them as evidence for a baseline or edge
+decision.
+${cohortEvidenceSection}
 
 ---
 
@@ -1205,6 +1250,41 @@ Brief overview: Product name, dosage form, target market, key differentiators vs
 
 ---
 
+## 1B. PROVEN BASELINE — TABLE STAKES FROM THE ESTABLISHED COHORT
+
+Built ONLY from the ESTABLISHED COHORT evidence pool above (years on market,
+big review base, stable sales). These are decisions a new entrant CANNOT
+skip without losing on table stakes — doses/forms/flavor systems/price
+anchors that every established winner in this category already clusters
+around. If the established pool was empty for this category, say so
+explicitly here instead of inventing a baseline.
+
+| Decision | What the Established Cohort Does | Consensus Strength |
+|----------|-----------------------------------|---------------------|
+[One row per table-stakes decision — dose, form, flavor system, or price
+anchor. "Consensus Strength" = how many of the established products agree,
+e.g. "4 of 4 established winners" or "3 of 5 — not universal".]
+
+---
+
+## 1C. EMERGING EDGE — WHAT EMERGING WINNERS DO DIFFERENTLY
+
+Built ONLY from the EMERGING COHORT evidence pool above (young listing,
+fast review velocity, climbing BSR — real momentum, NOT YET PROVEN at
+established-brand scale). These are the novel ingredients, positioning,
+formats, or claims worth a calculated bet — each one MUST carry a risk
+note that says whether it's a single-brand bet or a real multi-brand trend.
+If the emerging pool was empty or thin for this category, say so explicitly
+instead of manufacturing a trend that isn't in the data.
+
+| Decision | What the Emerging Cohort Does | Risk Note (one-brand bet vs multi-brand trend) |
+|----------|--------------------------------|--------------------------------------------------|
+[One row per edge decision. Risk Note must explicitly say e.g. "2 of 3
+emerging brands — a real trend" vs "only 1 emerging brand does this — a
+single-brand bet, treat as higher-risk upside, not a safe assumption".]
+
+---
+
 ## 2. FORMULA COMPOSITION
 
 ### Master Formula (Per Serving)
@@ -1237,19 +1317,19 @@ FORMULATION STRATEGY:
    If the dosage form is NOT a gummy, apply the equivalent constraints for that form (capsule fill weight limits, tablet compression issues, powder flowability, etc.).
 
 #### PRIMARY ACTIVE INGREDIENTS:
-| Ingredient | Amount per Serving | Form/Standardization | Function | Clinical Evidence | vs #1 Rationale |
-|------------|-------------------|---------------------|----------|-------------------|-----------------|
-[EVERY primary active with EXACT mg/mcg/IU. For Clinical Evidence: cite the specific study (author/year, population size, dose used, outcome measured) that justifies this dose. If no human RCT exists at this dose, say so explicitly.]
+| Ingredient | Amount per Serving | Form/Standardization | Function | Clinical Evidence | vs #1 Rationale | Provenance |
+|------------|-------------------|---------------------|----------|-------------------|-----------------|------------|
+[EVERY primary active with EXACT mg/mcg/IU. For Clinical Evidence: cite the specific study (author/year, population size, dose used, outcome measured) that justifies this dose. If no human RCT exists at this dose, say so explicitly. Provenance: "baseline — <consensus, e.g. all established winners cluster here>" or "edge — <risk note, e.g. 2 of 3 emerging brands>" or "clinical floor — not a competitive signal, this is the published minimum effective dose" — every row must carry one of these three, tying back to sections 1B/1C above.]
 
 #### SECONDARY ACTIVE INGREDIENTS:
-| Ingredient | Amount per Serving | Form/Standardization | Function | Clinical Evidence |
-|------------|-------------------|---------------------|----------|-------------------|
-[ALL supporting ingredients with exact amounts and study citation per ingredient]
+| Ingredient | Amount per Serving | Form/Standardization | Function | Clinical Evidence | Provenance |
+|------------|-------------------|---------------------|----------|-------------------|------------|
+[ALL supporting ingredients with exact amounts and study citation per ingredient. Provenance column: same baseline/edge/clinical-floor convention as above.]
 
 #### TERTIARY ACTIVES (Differentiation):
-| Ingredient | Amount per Serving | Form/Standardization | Function | Clinical Evidence |
-|------------|-------------------|---------------------|----------|-------------------|
-[Unique differentiating ingredients with study citation per ingredient]
+| Ingredient | Amount per Serving | Form/Standardization | Function | Clinical Evidence | Provenance |
+|------------|-------------------|---------------------|----------|-------------------|------------|
+[Unique differentiating ingredients with study citation per ingredient. Tertiary/differentiation actives are almost always "edge" — if one is, its Provenance must include the same one-brand-bet-vs-multi-brand-trend risk note required in section 1C.]
 
 #### FUNCTIONAL EXCIPIENTS:
 | Ingredient | Amount per Serving | Function | Grade/Spec |
@@ -1460,6 +1540,8 @@ END OF FORMULA SPECIFICATION
 
 âœ… MUST INCLUDE:
 - Complete Executive Summary
+- Section 1B (PROVEN BASELINE) and Section 1C (EMERGING EDGE) — REQUIRED, built strictly from the cohort-tagged evidence pools, not from the ungrouped Top-20 list
+- A "Provenance" column on every Primary/Secondary/Tertiary Actives row (baseline / edge / clinical floor — see Section 2 table instructions)
 - ALL ingredient tables with EVERY ingredient (no "etc." or abbreviations)
 - EXACT amounts for every ingredient (mg, mcg, IU, CFU)
 - Complete raw material specifications

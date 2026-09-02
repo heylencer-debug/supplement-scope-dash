@@ -440,3 +440,41 @@ export function useActiveScoutJobs() {
   const active = (data ?? []).filter((j) => j.status === "queued" || j.status === "claimed" || j.status === "running");
   return { data: active, ...rest };
 }
+
+/**
+ * The single most recent scout_jobs row for a keyword, REGARDLESS of status
+ * (2026-09-02 UX fix). `PipelineStatus` used to derive its "is something
+ * running" state from `useActiveScoutJobs`, which only counts
+ * running/claimed — a freshly-queued rerun produced ZERO visible change on
+ * the dashboard until a Cloud Run execution actually claimed it (the exact
+ * "not very UX friendly" gap the user hit on their first real click). This
+ * gives callers the queued/claimed/running/complete/error row directly, so
+ * "queued but not yet claimed" and "failed, here's why" can both render
+ * immediately instead of silently.
+ *
+ * Case-insensitive match: callers here are almost always passing a
+ * DISPLAY-NAME string (`CockpitHero`'s `categoryName`), not
+ * `categories.search_term` — same class of bug fixed in `useRerunFromPhase`
+ * (job `a37dee06`), but this is a READ, so a plain case-insensitive `ilike`
+ * (no `%` wildcards — exact match, just case-insensitive) is sufficient and
+ * doesn't need the categoryId round-trip an INSERT does.
+ *
+ * Reuses `useScoutJobs()`'s own cache/polling/Realtime subscription instead
+ * of a second network round-trip's worth of new machinery.
+ */
+export function useLatestJobForKeyword(keyword: string | null | undefined) {
+  const { data, ...rest } = useScoutJobs(100);
+  const normalize = (s: string | null | undefined) => (s || "").trim().toLowerCase();
+  const target = normalize(keyword);
+  const candidates = target ? (data ?? []).filter((j) => normalize(j.keyword) === target) : [];
+  // useScoutJobs() re-sorts in-flight-first across ALL keywords, which can
+  // shuffle recency ordering for any single keyword's own rows — always
+  // want the row with the newest updated_at for THIS keyword specifically,
+  // not whatever tier-sort position it landed in.
+  const latest = candidates.length
+    ? candidates.reduce((newest, row) =>
+        new Date(row.updated_at).getTime() > new Date(newest.updated_at).getTime() ? row : newest
+      )
+    : null;
+  return { data: latest, ...rest };
+}

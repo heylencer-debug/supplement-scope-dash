@@ -80,10 +80,42 @@ function renderMarkdown(text: string): React.ReactNode {
     } else if (line.startsWith('### ')) {
       elements.push(<h3 key={i} className="text-base font-bold text-foreground mt-6 mb-2 border-b border-border pb-1">{renderInline(line.slice(4))}</h3>);
     } else if (line.startsWith('## ')) {
+      // Cohort-split sections (2026-09-03) — "1B. PROVEN BASELINE" /
+      // "1C. EMERGING EDGE" get a themed accent bar + chip instead of the
+      // default blue bar, so they read as a distinct, deliberate part of
+      // the brief rather than just another generic heading. Purely
+      // additive to the default branch below (keyed off heading TEXT, not
+      // position) — a brief without these headings renders byte-identical
+      // to before, which is the "old briefs render exactly as before"
+      // fallback this was built to guarantee.
+      const headingText = line.slice(3);
+      const isBaseline = /PROVEN BASELINE/i.test(headingText);
+      const isEdge = /EMERGING EDGE/i.test(headingText);
       elements.push(
-        <h2 key={i} className="text-lg font-bold text-foreground mt-8 mb-3 flex items-center gap-2">
-          <span className="w-1 h-6 bg-primary rounded-full shrink-0 inline-block" />
-          {renderInline(line.slice(3))}
+        <h2
+          key={i}
+          className={cn(
+            "text-lg font-bold text-foreground mt-8 mb-3 flex items-center gap-2",
+            (isBaseline || isEdge) && "pl-3 py-1.5 rounded-r-lg",
+            isBaseline && "bg-chart-4/5",
+            isEdge && "bg-chart-2/5",
+          )}
+        >
+          <span className={cn(
+            "w-1 h-6 rounded-full shrink-0 inline-block",
+            isBaseline ? "bg-chart-4" : isEdge ? "bg-chart-2" : "bg-primary"
+          )} />
+          {renderInline(headingText)}
+          {isBaseline && (
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border border-chart-4/30 text-chart-4 bg-chart-4/10">
+              Baseline
+            </span>
+          )}
+          {isEdge && (
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border border-chart-2/30 text-chart-2 bg-chart-2/10">
+              Edge
+            </span>
+          )}
         </h2>
       );
     } else if (line.startsWith('# ')) {

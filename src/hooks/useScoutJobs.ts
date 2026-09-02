@@ -274,10 +274,32 @@ export function useRerunFromPhase() {
         throw new Error(`"${keyword}" already has a job ${activeInflight[0].status} — wait for it to finish first.`);
       }
 
+      // Inherit the ORIGINAL run's phase scope (2026-09-02 fix) — a
+      // continuation must stay within the same research-scope-vs-full-analysis
+      // boundary the user originally chose. Without this, "Rerun from P3" on a
+      // research-scope-only category (only_phases="1,2,3,4,5,6,7,8") would
+      // insert only_phases=null, and cloud-worker.js only passes --phases to
+      // run-pipeline.js when only_phases is truthy — so a null value silently
+      // falls through to run-pipeline.js's "no --phases flag" default of ALL
+      // phases, meaning the rerun would run straight through the P9-P13
+      // formula chain instead of stopping at P8 as originally scoped. Looks
+      // up the most recent scout_jobs row for this exact keyword (any status)
+      // and reuses its only_phases verbatim; a category with no prior scoped
+      // run (only_phases was already null) still reruns unrestricted, which
+      // matches its original behavior.
+      const { data: priorJobs, error: priorErr } = await scoutJobsTable()
+        .select("only_phases, created_at")
+        .eq("keyword", keyword)
+        .order("created_at", { ascending: false })
+        .limit(1);
+      if (priorErr) throw new Error("Could not resolve this category's original phase scope — try again in a moment.");
+      const inheritedScope = priorJobs?.[0]?.only_phases ?? null;
+
       const insertPayload: ScoutJobInsert = {
         keyword,
         status: "queued",
         from_phase: params.fromPhase,
+        only_phases: inheritedScope,
       };
 
       const { data: job, error: insertError } = await scoutJobsTable()

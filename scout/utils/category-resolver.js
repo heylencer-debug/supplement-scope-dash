@@ -60,28 +60,28 @@ async function resolveCategory(DASH, keyword) {
     throw new Error(`No category candidates found for '${keyword}'`);
   }
 
-  const words = keyword.toLowerCase().split(' ').filter(Boolean);
+  // 2026-09-03 CONTAMINATION FIX (found live during the 9-keyword queue):
+  // the old fallback matched when ALL keyword words appeared in a category
+  // NAME — a SUBSET match. Base keyword "electrolytes" therefore resolved
+  // into the existing "Sugar Free Electrolytes" category (its name contains
+  // the word) and the whole run wrote into a signed-off sibling category.
+  // And "electrolyte packets" (no name contains both words) threw the OTHER
+  // error string ("No category matched all keyword words") which creation
+  // callers do NOT treat as create-a-new-category, so no category was ever
+  // made and the run died at the verifier with "category not resolved".
+  // New contract: the name fallback matches ONLY an exact normalized name
+  // (case/whitespace-insensitive equality with the keyword) — for legacy
+  // categories that predate search_term. Anything else is a genuinely new
+  // category: throw the ONE error string every creation caller recognizes.
+  const norm = (s) => (s || '').toLowerCase().replace(/\s+/g, ' ').trim();
   const { data: cats } = await DASH
     .from('categories')
     .select('id,name')
-    .ilike('name', `%${words[0]}%`)
+    .ilike('name', keyword)
     .limit(50);
 
-  if (!cats?.length) throw new Error(`No category candidates found for '${keyword}'`);
-
-  const scored = cats
-    .map(c => {
-      const lower = c.name.toLowerCase();
-      const score = words.filter(w => lower.includes(w)).length;
-      return { ...c, score };
-    })
-    .filter(c => c.score >= words.length)
-    .sort((a, b) => b.score - a.score);
-
-  if (!scored.length) throw new Error(`No category matched all keyword words for '${keyword}'`);
-
-  const topScore = scored[0].score;
-  const tied = scored.filter(c => c.score === topScore);
+  const tied = (cats || []).filter(c => norm(c.name) === norm(keyword));
+  if (!tied.length) throw new Error(`No category candidates found for '${keyword}'`);
 
   if (tied.length === 1) {
     return { id: tied[0].id, name: tied[0].name, method: 'name_word_match' };

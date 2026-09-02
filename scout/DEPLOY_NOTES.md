@@ -1687,3 +1687,71 @@ keys committed in plaintext. Findings and fixes:
   6 above. Nothing in the *current* tree reads a secret from anywhere but
   `process.env` (worker/local) or GCP Secret Manager (Cloud Run) or
   `Deno.env` (edge functions).
+
+## 2026-09-03: Cohort separation (established/emerging) — migration + P2/P5/P8/P9 wiring + UI
+
+**What shipped**: `products.cohort` ('established' | 'emerging' | 'context')
+column (migration `009_products_cohort.sql`, additive, applied live via
+`supabase db query --linked --file`). `scout/utils/cohort.js` — deterministic,
+no-AI-cost classifier off Keepa signals (listing age, review count, monthly
+sales, BSR trend), env-tunable thresholds. Wired into
+`migrate-keepa-to-dash.js` (computes + writes cohort right after every
+category's P2 Keepa sync — automatic going forward), `phase5-deep-research.js`
+(Pool A/B now prefer cohort='established'/'emerging' before falling back to
+the prior BSR/review-count heuristics), `phase8-formula-brief.js` (new
+required "## 1B. PROVEN BASELINE" / "## 1C. EMERGING EDGE" sections + a
+Provenance column on every actives table row), `phase9-formula-qa.js` (new
+HARD ENFORCEMENT RULE 6 + required "## BASELINE/EDGE CONSISTENCY CHECK"
+section — flags any edge bet that silently contradicts a baseline
+table-stake). Frontend: cohort chips + Established/Emerging filter on
+`EnhancedBenchmarkComparison.tsx` (Products tab), themed Baseline/Edge
+section rendering in `FormulaBriefTab.tsx` (additive to the existing generic
+markdown renderer — old briefs without the split render byte-identical to
+before).
+
+**Real bug found + fixed before this was usable**: `dovive_keepa.review_count`
+(Keepa's own `stats.current[16]`) is stuck at ~45-48 for nearly every ASIN
+regardless of the product's actual review count — verified live against
+Nuun/Liquid I.V./LMNT (Liquid I.V.'s real ~106k reviews reported as 46 by
+Keepa). This silently zeroed out the entire established cohort on the
+classifier's first real run (0 established across every category). Switched
+the review-count signal to `products.rating_count` (the real P1 Bright Data
+scrape figure, untouched by the Keepa migration's own patch) in both
+`migrate-keepa-to-dash.js` and `backfill-cohort.js`. The Keepa field bug
+itself is separate and NOT fixed (flagged for a future pass, out of scope
+here).
+
+**One-shot backfill run** (`scout/backfill-cohort.js`, free, no AI cost,
+idempotent): 1418 products tagged across every existing category — 330
+established / 36 emerging / 1052 context. Sanity check (electrolyte
+categories should land Liquid I.V./LMNT/Nuun as established): confirmed —
+Pedialyte, Ultima Replenisher, DripDrop, Nuun, Liquid I.V., Drink LMNT,
+REDMOND, Skratch Labs, THORNE, Vital Proteins all landed 'established' in
+the real electrolyte-category data. "sugar free electrolytes"
+(`ed3c65bb-faee-4e83-9cf1-d790bf84e219`) specifically: 20 established / 4
+emerging / 16 context.
+
+**Image rebuilt + Cloud Run Job updated** — `gcloud builds submit --tag
+us-central1-docker.pkg.dev/noodle-worker/dovive-scout/worker:latest
+--project noodle-worker --region us-central1 --timeout=1200s` (digest
+`sha256:801fe5cadc1ef1d741663925893a45d95ab501e45786faa61792b2795f43221f`),
+`gcloud run jobs update dovive-scout --image ...:latest --region
+us-central1 --project noodle-worker` applied. Covers the migrate-keepa/P5/
+P8/P9 pipeline changes. No new Cloud Run execution triggered — per
+instruction, no paid pipeline runs were started this session.
+
+**UI verified** (Playwright, real Supabase data on "sugar free
+electrolytes" except the split-brief mock): cohort filter chips
+("Established 20" / "Emerging 4") + per-card Established/Emerging badges,
+both unfiltered and Established-filtered states, at 1440px. Baseline/Edge
+split rendering verified via route-interception mock (no real category has
+been regenerated with the split yet) at 1440px and 390px — green "1B.
+PROVEN BASELINE" section, amber "1C. EMERGING EDGE" section, and the
+Provenance column on the Primary Actives table all render correctly.
+`npx tsc --noEmit -p tsconfig.app.json` clean throughout.
+
+**Left for the user**: the "sugar free electrolytes" category needs a real
+"Rerun from P9 — Formula Brief" (via the dashboard's per-phase rerun button,
+~$2 based on this category's own past P9+ spend) to see the cohort split in
+a REAL (non-mocked) brief — the classifier/pipeline code is deployed and
+correct, but no paid run has generated a real split brief yet this session.

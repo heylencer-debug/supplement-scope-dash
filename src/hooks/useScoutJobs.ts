@@ -251,10 +251,33 @@ export function useRerunFromPhase() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (params: { keyword: string; fromPhase: number }) => {
-      const keyword = params.keyword.trim();
-      if (!keyword) throw new Error("Keyword is required");
+    mutationFn: async (params: { categoryId: string; fromPhase: number }) => {
+      if (!params.categoryId) throw new Error("Category is required");
       if (!params.fromPhase || params.fromPhase < 1) throw new Error("Invalid phase number");
+
+      // Resolve the REAL job keyword from the category row (2026-09-02
+      // fix, live-caught by the user's first real click on this button:
+      // job a37dee06 was queued with keyword "Sugar Free Electrolytes" —
+      // the category DISPLAY NAME, title case — instead of the real job
+      // keyword "sugar free electrolytes". Every caller of this hook only
+      // has a display-name string in scope (CockpitHero passes categoryName
+      // straight through to PipelineStatus's `keyword` prop, sourced from
+      // the URL/category-card display name, never search_term) — using
+      // that string directly breaks every case-sensitive `.eq("keyword",
+      // ...)` lookup against scout_jobs/dovive_* downstream, INCLUDING the
+      // scope-inheritance lookup two blocks below (which silently found no
+      // prior job and fell back to unrestricted `only_phases: null`).
+      // Same resolution GenerateFormulaBriefButton already does correctly
+      // (search_term || name) — mirrored here instead of trusting whatever
+      // string the caller passes in.
+      const { data: catRow, error: catErr } = await supabase
+        .from("categories")
+        .select("search_term, name")
+        .eq("id", params.categoryId)
+        .maybeSingle();
+      if (catErr || !catRow) throw new Error(catErr?.message || "Couldn't resolve this category's keyword");
+      const keyword = (catRow.search_term || catRow.name || "").trim();
+      if (!keyword) throw new Error("This category has no keyword to run against");
 
       // Double-submit guard — same pattern as useGenerateFormulaBrief.
       const STALE_QUEUED_MS = 15 * 60 * 1000;
@@ -282,14 +305,32 @@ export function useRerunFromPhase() {
       // run-pipeline.js when only_phases is truthy — so a null value silently
       // falls through to run-pipeline.js's "no --phases flag" default of ALL
       // phases, meaning the rerun would run straight through the P9-P13
-      // formula chain instead of stopping at P8 as originally scoped. Looks
-      // up the most recent scout_jobs row for this exact keyword (any status)
-      // and reuses its only_phases verbatim; a category with no prior scoped
-      // run (only_phases was already null) still reruns unrestricted, which
-      // matches its original behavior.
+      // formula chain instead of stopping at P8 as originally scoped.
+      // MUST be the most recent BASE run (`from_phase IS NULL` — a genuine
+      // Launchpad submit, never a continuation) for this keyword, NOT simply
+      // the most recent row of any kind: a `from_phase`-continuation row
+      // (this hook's own prior insert, or a `useGenerateFormulaBrief` one)
+      // can itself carry `only_phases: null` (e.g. from the earlier
+      // wrong-case-keyword incident, job a37dee06 — "Sugar Free
+      // Electrolytes" instead of "sugar free electrolytes", found no prior
+      // row under the wrong case, inherited null) and, being newer, would
+      // otherwise poison every subsequent rerun forever by getting picked
+      // ahead of the real base run. Live-confirmed on category ed3c65bb:
+      // ordering by created_at with no `from_phase` filter returns a37dee06
+      // (only_phases: null) first; filtering to `from_phase IS NULL`
+      // correctly returns the real base run (only_phases:
+      // "1,2,3,4,5,6,7,8"). No matching base run (e.g. a category whose
+      // only history is continuations) falls back to `null` — unrestricted,
+      // the same default this hook had before the 2026-09-02 inheritance
+      // feature existed. Case-insensitive `ilike` (belt-and-braces, not a
+      // substring match — no `%` wildcards, same exact-match-but-
+      // case-insensitive pattern already used for session isolation in
+      // run-pipeline.js) in case any OTHER caller ever inserts a keyword
+      // whose case doesn't exactly match categories.search_term.
       const { data: priorJobs, error: priorErr } = await scoutJobsTable()
         .select("only_phases, created_at")
-        .eq("keyword", keyword)
+        .ilike("keyword", keyword)
+        .is("from_phase", null)
         .order("created_at", { ascending: false })
         .limit(1);
       if (priorErr) throw new Error("Could not resolve this category's original phase scope — try again in a moment.");

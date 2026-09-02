@@ -287,7 +287,12 @@ export function PipelineStatus({ categoryId, keyword }: PipelineStatusProps) {
             <AlertDialogAction
               disabled={rerun.isPending}
               onClick={() => {
-                if (rerunPhase !== null) rerun.mutate({ keyword, fromPhase: rerunPhase });
+                // categoryId, not the display-name `keyword` prop above (that's
+                // for the confirmation text only) — useRerunFromPhase resolves
+                // the REAL job keyword (categories.search_term) itself. See the
+                // hook's 2026-09-02 comment for why passing a display-name
+                // string directly here broke case-sensitive keyword lookups.
+                if (rerunPhase !== null) rerun.mutate({ categoryId, fromPhase: rerunPhase });
                 setRerunPhase(null);
               }}
             >

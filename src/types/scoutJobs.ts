@@ -69,7 +69,7 @@ export const RESEARCH_SCOPE_PHASES = [1, 2, 3, 4, 5, 6, 7, 8];
  * as a continuation job from an existing research-scope category. */
 export const FORMULA_CHAIN_FROM_PHASE = 9;
 
-/** Human-readable phase names, matching run-pipeline.js's phase order (P1-P11/P12). */
+/** Human-readable phase names, matching run-pipeline.js's phase order (P1-P13). */
 export const SCOUT_PHASE_NAMES: Record<number, string> = {
   1: "Amazon Scrape",
   2: "Keepa Enrichment",
@@ -83,4 +83,5 @@ export const SCOUT_PHASE_NAMES: Record<number, string> = {
   10: "Formula QA",
   11: "Competitive Benchmark",
   12: "FDA Compliance",
+  13: "Final Sign-off",
 };

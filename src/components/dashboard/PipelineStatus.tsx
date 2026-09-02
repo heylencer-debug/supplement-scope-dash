@@ -4,11 +4,18 @@
  * Design system tokens only.
  */
 
+import { useState } from "react";
 import { usePipelineStatus } from "@/hooks/usePipelineStatus";
-import { useActiveScoutJobs } from "@/hooks/useScoutJobs";
+import { useActiveScoutJobs, useRerunFromPhase } from "@/hooks/useScoutJobs";
+import { useAiUsageCost } from "@/hooks/useAiUsageCost";
+import { SCOUT_PHASE_NAMES } from "@/types/scoutJobs";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  CheckCircle2, Circle, Clock, AlertCircle, RefreshCw,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  CheckCircle2, Circle, Clock, AlertCircle, RefreshCw, RotateCcw,
   ShoppingCart, BarChart3, MessageSquare, ScanText, Search,
   Dna, TrendingUp, Package, ClipboardList, CheckSquare, BarChart, Shield, Stamp,
   type LucideIcon,
@@ -61,6 +68,27 @@ export function PipelineStatus({ categoryId, keyword }: PipelineStatusProps) {
   const activeJob = (activeJobs ?? []).find(
     (j) => normKw(j.keyword) === normKw(keyword) && (j.status === "running" || j.status === "claimed")
   );
+
+  // "Rerun from here" (2026-09-02) — per-phase continuation via from_phase,
+  // same pattern as "Generate formula brief" generalized to any phase. Cost
+  // estimate is LEDGER-BASED: this category's own historical ai_usage_log
+  // spend for every phase >= the rerun point (P1-P3 rarely appear — they're
+  // scrape/sync phases with no AI calls, so they estimate at $0, which is
+  // honest, not a bug). Real spend on a rerun can differ (fewer/more
+  // products in scope, different model routing) — framed as an estimate,
+  // never a guarantee.
+  const [rerunPhase, setRerunPhase] = useState<number | null>(null);
+  const rerun = useRerunFromPhase();
+  const { data: aiCost } = useAiUsageCost(categoryId);
+  const estimateRerunCost = (fromPhase: number): number => {
+    if (!aiCost?.breakdown) return 0;
+    return aiCost.breakdown
+      .filter((r) => {
+        const n = parseInt(r.phase.replace(/^P/i, ""), 10);
+        return Number.isFinite(n) && n >= fromPhase;
+      })
+      .reduce((sum, r) => sum + (r.cost_usd || 0), 0);
+  };
 
   if (isLoading) {
     return (
@@ -200,17 +228,74 @@ export function PipelineStatus({ categoryId, keyword }: PipelineStatusProps) {
                 </div>
               )}
 
-              {/* Status badge */}
-              <span className={cn(
-                "self-start text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wide",
-                cfg.badge
-              )}>
-                {cfg.label}
-              </span>
+              {/* Status badge + "Rerun from here" */}
+              <div className="flex items-center justify-between gap-1">
+                <span className={cn(
+                  "self-start text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wide",
+                  cfg.badge
+                )}>
+                  {cfg.label}
+                </span>
+                {!isPending && !activeJob && (
+                  <button
+                    type="button"
+                    onClick={() => setRerunPhase(phase.phase)}
+                    title={`Rerun from P${phase.phase} (${SCOUT_PHASE_NAMES[phase.phase] ?? "Phase " + phase.phase})`}
+                    className="shrink-0 p-0.5 rounded text-muted-foreground/50 hover:text-foreground hover:bg-muted transition-colors"
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
             </div>
           );
         })}
       </div>
+
+      {/* "Rerun from here" confirm dialog — ledger-based cost estimate from
+          THIS category's own ai_usage_log history (see estimateRerunCost
+          above). Same from_phase continuation pattern as "Generate formula
+          brief", generalized to any phase. */}
+      <AlertDialog open={rerunPhase !== null} onOpenChange={(open) => !open && setRerunPhase(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {rerunPhase !== null
+                ? `Rerun from P${rerunPhase} — ${SCOUT_PHASE_NAMES[rerunPhase] ?? "Phase " + rerunPhase}`
+                : "Rerun from here"}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-left">
+                <p>
+                  Re-runs P{rerunPhase}{rerunPhase && rerunPhase < 13 ? `–P13` : ""} for "{keyword}" against this
+                  SAME category — earlier phases are left untouched, and the structural
+                  gates that stop a run against incomplete underlying data still apply.
+                </p>
+                <p className="font-medium text-foreground">
+                  {rerunPhase !== null && estimateRerunCost(rerunPhase) > 0
+                    ? `Estimated AI cost: ~$${estimateRerunCost(rerunPhase).toFixed(2)} (based on this category's own past spend for P${rerunPhase}+)`
+                    : "No prior AI spend recorded for this range yet — these may be non-AI scrape/sync phases, or this category has no cost history."}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Actual cost can differ (product count, model routing) — this is an estimate, not a guarantee.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={rerun.isPending}
+              onClick={() => {
+                if (rerunPhase !== null) rerun.mutate({ keyword, fromPhase: rerunPhase });
+                setRerunPhase(null);
+              }}
+            >
+              {rerun.isPending ? "Queuing…" : "Rerun"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

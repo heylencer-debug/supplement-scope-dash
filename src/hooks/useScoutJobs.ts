@@ -236,6 +236,88 @@ export function useGenerateFormulaBrief() {
 }
 
 /**
+ * Queue a continuation job starting at an ARBITRARY phase (2026-09-02,
+ * "Rerun from here" — PipelineStatus's per-phase rerun action). Same
+ * from_phase continuation pattern as useGenerateFormulaBrief (SAME category's
+ * EXACT existing session keyword, never a new "#N" spawn — session isolation
+ * matches scout_jobs.keyword against categories.search_term VERBATIM), just
+ * generalized to any phase number instead of being hardcoded to 9. Phases
+ * before `fromPhase` are left untouched (run-pipeline.js's `phase.num <
+ * FROM_PHASE` skip), and the 2026-09-02 mid-run structural gates (before P5,
+ * before P9) still apply exactly as they would for any other invocation —
+ * this button does not bypass them.
+ */
+export function useRerunFromPhase() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: { keyword: string; fromPhase: number }) => {
+      const keyword = params.keyword.trim();
+      if (!keyword) throw new Error("Keyword is required");
+      if (!params.fromPhase || params.fromPhase < 1) throw new Error("Invalid phase number");
+
+      // Double-submit guard — same pattern as useGenerateFormulaBrief.
+      const STALE_QUEUED_MS = 15 * 60 * 1000;
+      const { data: inflight, error: inflightErr } = await scoutJobsTable()
+        .select("id, keyword, status, created_at, claimed_at")
+        .in("status", ["queued", "claimed", "running"])
+        .eq("keyword", keyword);
+      if (inflightErr) throw new Error("Could not verify queue state — try again in a moment.");
+      const activeInflight = (inflight || []).filter((j: { status: string; created_at: string; claimed_at: string | null }) => {
+        if (j.status === "queued" && !j.claimed_at) {
+          const ageMs = Date.now() - new Date(j.created_at).getTime();
+          if (ageMs > STALE_QUEUED_MS) return false;
+        }
+        return true;
+      });
+      if (activeInflight.length > 0) {
+        throw new Error(`"${keyword}" already has a job ${activeInflight[0].status} — wait for it to finish first.`);
+      }
+
+      const insertPayload: ScoutJobInsert = {
+        keyword,
+        status: "queued",
+        from_phase: params.fromPhase,
+      };
+
+      const { data: job, error: insertError } = await scoutJobsTable()
+        .insert(insertPayload)
+        .select()
+        .single();
+      if (insertError) throw insertError;
+
+      let triggerOk = true;
+      try {
+        const { error: invokeError } = await supabase.functions.invoke("trigger-scout-job", {
+          body: { scout_job_id: (job as ScoutJobRow).id },
+        });
+        if (invokeError) triggerOk = false;
+      } catch {
+        triggerOk = false;
+      }
+
+      return { job: job as ScoutJobRow, triggerOk, fromPhase: params.fromPhase };
+    },
+    onSuccess: ({ triggerOk, fromPhase }) => {
+      queryClient.invalidateQueries({ queryKey: ["scout_jobs"] });
+      toast({
+        title: `Rerunning from P${fromPhase}`,
+        description: triggerOk
+          ? "Queued — this'll show in the live strip and the phase tracker above."
+          : "Queued — cloud trigger pending, will run on the next sweep.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to queue rerun",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+}
+
+/**
  * List recent scout_jobs (queued/running/failed/complete), polled every 5s.
  * Also subscribes to Supabase Realtime so phase updates show up immediately
  * between polls, matching the pattern other Scout status hooks use

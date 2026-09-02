@@ -1301,6 +1301,7 @@ export type Database = {
           category_tree: Json | null
           claims: string | null
           claims_on_label: string[] | null
+          cohort: string | null
           created_at: string | null
           current_price: number | null
           date_first_available: string | null
@@ -1400,6 +1401,7 @@ export type Database = {
           category_tree?: Json | null
           claims?: string | null
           claims_on_label?: string[] | null
+          cohort?: string | null
           created_at?: string | null
           current_price?: number | null
           date_first_available?: string | null
@@ -1499,6 +1501,7 @@ export type Database = {
           category_tree?: Json | null
           claims?: string | null
           claims_on_label?: string[] | null
+          cohort?: string | null
           created_at?: string | null
           current_price?: number | null
           date_first_available?: string | null

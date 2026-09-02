@@ -1358,6 +1358,11 @@ export function EnhancedBenchmarkComparison({
   const [searchQuery, setSearchQuery] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
   const [showOnlyNewWinners, setShowOnlyNewWinners] = useState(false);
+  // Cohort filter (2026-09-03) — established/emerging/context tag from
+  // utils/cohort.js (scout), computed deterministically off Keepa signals.
+  // Independent of "New Winners" above (that's P8's ad-hoc formula-
+  // reference pool); this filters on the real products.cohort column.
+  const [cohortFilter, setCohortFilter] = useState<'all' | 'established' | 'emerging'>('all');
   const [sortBy, setSortBy] = useState<'sales' | 'revenue' | 'age' | 'growth'>('sales');
   const [competitorAnalysisOpen, setCompetitorAnalysisOpen] = useState(false);
   const [conceptPanelOpen, setConceptPanelOpen] = useState(false);
@@ -1440,17 +1445,35 @@ export function EnhancedBenchmarkComparison({
 
   // Get selected products or default to top products, with optional New Winners filter
   const displayedProducts = useMemo(() => {
-    let result = selectedIds.length > 0 
+    let result = selectedIds.length > 0
       ? allProductsSorted.filter(p => selectedIds.includes(p.id))
       : allProductsSorted.slice(0, MAX_COMPETITORS);
-    
+
     // Apply New Winners filter if enabled
     if (showOnlyNewWinners && formulaReferenceAsins.size > 0) {
       result = result.filter(p => formulaReferenceAsins.has(p.asin));
     }
-    
+
+    // Apply cohort filter if enabled
+    if (cohortFilter !== 'all') {
+      result = result.filter(p => p.cohort === cohortFilter);
+    }
+
     return result;
-  }, [selectedIds, allProductsSorted, showOnlyNewWinners, formulaReferenceAsins]);
+  }, [selectedIds, allProductsSorted, showOnlyNewWinners, formulaReferenceAsins, cohortFilter]);
+
+  // Counts for the cohort filter chips — computed off the full sorted list
+  // (not `displayedProducts`, which is already filtered) so the counts
+  // don't collapse to 0/0 once a filter is active.
+  const cohortCounts = useMemo(() => {
+    const base = selectedIds.length > 0
+      ? allProductsSorted.filter(p => selectedIds.includes(p.id))
+      : allProductsSorted;
+    return {
+      established: base.filter(p => p.cohort === 'established').length,
+      emerging: base.filter(p => p.cohort === 'emerging').length,
+    };
+  }, [allProductsSorted, selectedIds]);
 
   const loading = isLoading || productsLoading;
 
@@ -2534,6 +2557,36 @@ export function EnhancedBenchmarkComparison({
                 </TooltipProvider>
               )}
               
+              {/* Cohort Filter (2026-09-03) — Established/Emerging, from
+                  products.cohort (see utils/cohort.js). Independent of the
+                  "New Winners" toggle above. */}
+              {(cohortCounts.established > 0 || cohortCounts.emerging > 0) && (
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    className={cn("h-8 gap-1.5 text-xs", cohortFilter === 'established' ? "pearl-secondary" : "pearl-quiet")}
+                    onClick={() => setCohortFilter(f => f === 'established' ? 'all' : 'established')}
+                    title="Established — years on market, big review base, stable sales"
+                  >
+                    <span className="hidden sm:inline">Established</span>
+                    <Badge variant="secondary" className={cn("ml-0.5 h-5 px-1.5 text-[10px]", cohortFilter === 'established' && "bg-muted text-foreground")}>
+                      {cohortCounts.established}
+                    </Badge>
+                  </button>
+                  <button
+                    type="button"
+                    className={cn("h-8 gap-1.5 text-xs", cohortFilter === 'emerging' ? "pearl-secondary" : "pearl-quiet")}
+                    onClick={() => setCohortFilter(f => f === 'emerging' ? 'all' : 'emerging')}
+                    title="Emerging — young listing, fast review velocity, climbing BSR"
+                  >
+                    <span className="hidden sm:inline">Emerging</span>
+                    <Badge variant="secondary" className={cn("ml-0.5 h-5 px-1.5 text-[10px]", cohortFilter === 'emerging' && "bg-muted text-foreground")}>
+                      {cohortCounts.emerging}
+                    </Badge>
+                  </button>
+                </div>
+              )}
+
               {/* Sort Dropdown */}
               <Select value={sortBy} onValueChange={(value: 'sales' | 'revenue' | 'age' | 'growth') => setSortBy(value)}>
                 <SelectTrigger className="h-8 w-[130px] text-xs">
@@ -2622,7 +2675,15 @@ export function EnhancedBenchmarkComparison({
                               )}
                             </div>
                             <div className="min-w-0 flex-1">
-                              <p className="text-xs font-medium truncate">{product.brand || 'Unknown'}</p>
+                              <div className="flex items-center gap-1.5">
+                                <p className="text-xs font-medium truncate">{product.brand || 'Unknown'}</p>
+                                {product.cohort === 'established' && (
+                                  <span className="text-[9px] font-semibold px-1 py-px rounded-full border border-chart-4/30 text-chart-4 bg-chart-4/10 shrink-0">Est.</span>
+                                )}
+                                {product.cohort === 'emerging' && (
+                                  <span className="text-[9px] font-semibold px-1 py-px rounded-full border border-chart-2/30 text-chart-2 bg-chart-2/10 shrink-0">Emg.</span>
+                                )}
+                              </div>
                               <p className="text-[10px] text-muted-foreground truncate">{product.title?.substring(0, 40)}...</p>
                               <div className="flex items-center gap-2 mt-0.5">
                                 <span className="text-[10px] text-muted-foreground">${product.price != null ? Number(product.price).toFixed(2) : '—'}</span>
@@ -3329,6 +3390,19 @@ export function EnhancedBenchmarkComparison({
                               <span className="text-[11px] font-semibold text-primary shrink-0 inline-flex items-center gap-0.5">
                                 <Zap className="w-3 h-3" />
                                 New
+                              </span>
+                            )}
+                            {/* Cohort chip (2026-09-03) — see utils/cohort.js. 'context'/null
+                                intentionally shown as nothing, not a chip — it means
+                                "no signal either way," not a third category worth a badge. */}
+                            {product.cohort === 'established' && (
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full border border-chart-4/30 text-chart-4 bg-chart-4/10 shrink-0">
+                                Established
+                              </span>
+                            )}
+                            {product.cohort === 'emerging' && (
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full border border-chart-2/30 text-chart-2 bg-chart-2/10 shrink-0">
+                                Emerging
                               </span>
                             )}
                           </div>

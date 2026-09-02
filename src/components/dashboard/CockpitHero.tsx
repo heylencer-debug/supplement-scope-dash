@@ -26,6 +26,7 @@ import {
 import { Search, ChevronsUpDown, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PHASE_META, PipelineStatus } from "@/components/dashboard/PipelineStatus";
+import { BrandLoader } from "@/components/ui/brand-loader";
 import { OcrCoveragePanel } from "@/components/dashboard/OcrCoveragePanel";
 import { usePipelineStatus } from "@/hooks/usePipelineStatus";
 import { useActiveScoutJobs } from "@/hooks/useScoutJobs";
@@ -255,10 +256,7 @@ function PipelineMicroGrid({ categoryId, categoryName, open, onExpand }: { categ
                 <span className="text-[10px] font-bold text-muted-foreground tracking-wide shrink-0">P{phase.phase}</span>
                 <span className="text-[11px] font-medium text-foreground truncate">{meta?.shortLabel}</span>
                 {statusKind === "running" && (
-                  <span className="relative flex h-1.5 w-1.5 shrink-0 ml-auto">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[hsl(var(--brand-neon))] opacity-75" />
-                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[hsl(var(--brand-neon))]" />
-                  </span>
+                  <BrandLoader size={12} label="Running" className="shrink-0 ml-auto" />
                 )}
               </div>
               <span className={cn("text-[10px] font-medium tabular-nums", statusClass)}>{statusText}</span>

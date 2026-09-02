@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   ClipboardCopy,
   Clock,
+  FlaskConical,
   Library,
   Loader2,
   Package,
@@ -19,6 +20,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { PearlButton } from "@/components/ui/pearl-button";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
   useRecentCategories,
@@ -26,11 +31,14 @@ import {
   type CategoryWithImages,
 } from "@/hooks/useCategoryAnalyses";
 import { useDeleteCategory } from "@/hooks/useDeleteCategory";
-import { useSubmitScoutJob, useActiveScoutJobs } from "@/hooks/useScoutJobs";
+import { useSubmitScoutJob, useActiveScoutJobs, useRerunFromPhase } from "@/hooks/useScoutJobs";
+import { useAiUsageCost } from "@/hooks/useAiUsageCost";
+import { humanizeJobError, deriveRetryPhase } from "@/lib/jobErrorMessages";
 import { SCOUT_PHASE_NAMES, type ScoutJobRow } from "@/types/scoutJobs";
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { BrandModal } from "@/components/ui/brand-modal";
+import { cn } from "@/lib/utils";
 
 const PENDING_ANALYSES_KEY = "pending_analyses";
 const LIBRARY_PAGE_SIZE = 9;
@@ -46,7 +54,10 @@ const SUGGESTED_KEYWORDS = [
 ];
 
 const jobStatusMeta: Record<ScoutJobRow["status"], { label: string; icon: typeof Clock; className: string }> = {
-  queued: { label: "Queued", icon: Clock, className: "bg-chart-2/10 text-chart-2 border-chart-2/20" },
+  // Flask icon (2026-09-02) — the "starting up" amber treatment, distinct
+  // from the spinning "Starting"/"Running" states below, so a fresh click
+  // is visibly registered even before a Cloud Run execution claims it.
+  queued: { label: "Queued", icon: FlaskConical, className: "bg-chart-2/10 text-chart-2 border-chart-2/20" },
   claimed: { label: "Starting", icon: Loader2, className: "bg-chart-2/10 text-chart-2 border-chart-2/20" },
   running: { label: "Running", icon: Loader2, className: "bg-primary/10 text-primary border-primary/20" },
   complete: { label: "Complete", icon: CheckCircle2, className: "bg-chart-4/10 text-chart-4 border-chart-4/20" },
@@ -135,19 +146,108 @@ function StatusChip({ cat, isSignedOff }: { cat: CategoryWithImages; isSignedOff
   );
 }
 
+/**
+ * RetryFromFailureButton — the Library card's one-click recovery action
+ * (2026-09-02 UX pass), so a failed run can be retried without navigating
+ * into the category dashboard and finding the right per-phase icon. Only
+ * ever mounted for cards whose latest job actually errored (see
+ * CategoryCard below), so the extra useAiUsageCost query this needs for the
+ * cost estimate stays scoped to just the failed handful, not every card in
+ * the grid. Reuses the SAME useRerunFromPhase mutation (and therefore the
+ * SAME keyword-resolution + base-run scope-inheritance fixes) the dashboard
+ * button uses — no parallel implementation to drift out of sync.
+ */
+function RetryFromFailureButton({
+  cat,
+  onQueued,
+}: {
+  cat: CategoryWithImages;
+  onQueued: () => void;
+}) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const rerun = useRerunFromPhase();
+  const { data: aiCost } = useAiUsageCost(cat.id);
+  const retryPhase = deriveRetryPhase({
+    error: cat.job_error,
+    current_phase: cat.job_current_phase,
+    from_phase: cat.job_from_phase,
+  });
+  const estimatedCost = (aiCost?.breakdown ?? [])
+    .filter((r) => {
+      const n = parseInt(r.phase.replace(/^P/i, ""), 10);
+      return Number.isFinite(n) && n >= retryPhase;
+    })
+    .reduce((sum, r) => sum + (r.cost_usd || 0), 0);
+
+  return (
+    <>
+      <PearlButton
+        className="!text-[11px] !px-2.5 !py-1"
+        onClick={(e) => {
+          e.stopPropagation();
+          setConfirmOpen(true);
+        }}
+      >
+        Retry from P{retryPhase}
+      </PearlButton>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Retry from P{retryPhase} — {SCOUT_PHASE_NAMES[retryPhase] ?? `Phase ${retryPhase}`}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-left">
+                <p>
+                  Picks up at P{retryPhase} for "{stripLabel(cat.name)}" — earlier phases are left
+                  untouched. If there still isn't enough data to continue, we'll automatically stop
+                  early again instead of spending on a run that can't finish.
+                </p>
+                <p className="font-medium text-foreground">
+                  {estimatedCost > 0
+                    ? `Estimated cost: ~$${estimatedCost.toFixed(2)} (based on what this category has cost before for this step onward)`
+                    : "No cost history for this range yet — this step may not use paid AI calls, or this category hasn't run before."}
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={(e) => e.stopPropagation()}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={rerun.isPending}
+              onClick={(e) => {
+                e.stopPropagation();
+                rerun.mutate({ categoryId: cat.id, fromPhase: retryPhase });
+                setConfirmOpen(false);
+                onQueued();
+              }}
+            >
+              {rerun.isPending ? "Queuing…" : "Retry"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
 interface CategoryCardProps {
   cat: CategoryWithImages;
   isSignedOff: boolean;
   onOpen: (categoryName: string) => void;
   onDelete: (e: React.MouseEvent, cat: CategoryWithImages) => void;
   onCopyAsins: (e: React.MouseEvent, categoryId: string) => void;
+  onRetryQueued: () => void;
   deletePending: boolean;
 }
 
-function CategoryCard({ cat, isSignedOff, onOpen, onDelete, onCopyAsins, deletePending }: CategoryCardProps) {
+function CategoryCard({ cat, isSignedOff, onOpen, onDelete, onCopyAsins, onRetryQueued, deletePending }: CategoryCardProps) {
   const images = cat.product_images ?? [];
   const overflowCount = Math.max(0, (cat.total_products ?? 0) - images.length);
   const scoreLabel = cat.opportunity_score != null ? `${cat.opportunity_score.toFixed(1)}/10` : "—";
+  const isFailed = cat.job_status === "error";
+  const humanizedError = isFailed ? humanizeJobError(cat.job_error) : null;
 
   return (
     <div
@@ -190,6 +290,18 @@ function CategoryCard({ cat, isSignedOff, onOpen, onDelete, onCopyAsins, deleteP
           </Badge>
         )}
       </div>
+
+      {/* Friendly failure line + one-click retry (2026-09-02) — plain-language
+          title only here (space is tight); the full explanation + technical
+          details live on the dashboard's PipelineStatus banner. */}
+      {isFailed && humanizedError && (
+        <div className="mt-1.5 flex items-center justify-between gap-2">
+          <p className="text-[11px] text-destructive/90 line-clamp-1">{humanizedError.title}</p>
+          <div onClick={(e) => e.stopPropagation()} className="shrink-0">
+            <RetryFromFailureButton cat={cat} onQueued={onRetryQueued} />
+          </div>
+        </div>
+      )}
 
       <p className="mt-2 text-xs text-muted-foreground tabular-nums">
         {(cat.total_products || 0).toLocaleString()} products · {scoreLabel}
@@ -236,6 +348,20 @@ export default function NewAnalysis() {
   const [fullAnalysis, setFullAnalysis] = useState(false);
   const submitScoutJob = useSubmitScoutJob();
   const { data: activeJobs } = useActiveScoutJobs();
+
+  // Scroll-to/flash the Live Strip on a successful queue click (2026-09-02
+  // UX fix) — a toast alone was too easy to miss ("that's not very UX
+  // friendly" feedback after the user's first real "Rerun from P3" click).
+  // Used by RetryFromFailureButton on Library cards below; PipelineStatus's
+  // own dashboard-page rerun doesn't need this — it renders its own inline
+  // "Queued — starting up…" banner instead, since there's no strip on that page.
+  const stripRef = useRef<HTMLDivElement>(null);
+  const [stripFlash, setStripFlash] = useState(false);
+  const scrollToStripAndFlash = () => {
+    stripRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setStripFlash(true);
+    window.setTimeout(() => setStripFlash(false), 1600);
+  };
 
   // Library: "Load more" instead of numbered pagination, same underlying
   // useRecentCategories hook — bumping its limit re-queries for more rows.
@@ -435,8 +561,17 @@ export default function NewAnalysis() {
         </div>
       </section>
 
-      {/* LIVE STRIP */}
-      <div className="w-full rounded-xl border border-border/60 bg-card px-4 py-2.5 overflow-x-auto scrollbar-hide">
+      {/* LIVE STRIP — ref + flash ring so a retry click elsewhere on this page
+          (a failed Library card's "Retry from P<n>") can scroll here and
+          draw the eye, in case the toast alone is too quick to notice
+          (2026-09-02 UX fix, direct user feedback). */}
+      <div
+        ref={stripRef}
+        className={cn(
+          "w-full rounded-xl border border-border/60 bg-card px-4 py-2.5 overflow-x-auto scrollbar-hide transition-shadow duration-300",
+          stripFlash && "ring-2 ring-chart-2 ring-offset-2 ring-offset-background"
+        )}
+      >
         {activeJobs && activeJobs.length > 0 ? (
           <div className="flex items-center gap-4 text-[13px] w-max">
             {activeJobs.map((job) => {
@@ -447,6 +582,12 @@ export default function NewAnalysis() {
                 job.total_phases && job.total_phases >= (job.current_phase ?? 0) ? job.total_phases : 12;
               const phaseLabel =
                 job.current_phase_name ?? (job.current_phase ? SCOUT_PHASE_NAMES[job.current_phase] : null);
+              // Queued-but-unclaimed gets its own amber/flask treatment,
+              // distinct from the green "in progress" pulse — a fresh click
+              // must look visibly different from "nothing changed" the
+              // instant it lands, not just once a Cloud Run execution claims
+              // it a minute or two later.
+              const isQueued = job.status === "queued";
 
               return (
                 <button
@@ -455,21 +596,31 @@ export default function NewAnalysis() {
                   onClick={() => handleAnalysisClick(job.keyword)}
                   className="flex items-center gap-2 shrink-0 rounded-full px-1.5 py-0.5 transition-colors hover:bg-muted/60"
                 >
-                  <span className="relative flex h-[7px] w-[7px] shrink-0">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-chart-2 opacity-75" />
-                    <span className="relative inline-flex h-[7px] w-[7px] rounded-full bg-chart-2" />
-                  </span>
+                  {isQueued ? (
+                    <FlaskConical className="h-3.5 w-3.5 shrink-0 text-chart-2 animate-pulse" />
+                  ) : (
+                    <span className="relative flex h-[7px] w-[7px] shrink-0">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-chart-2 opacity-75" />
+                      <span className="relative inline-flex h-[7px] w-[7px] rounded-full bg-chart-2" />
+                    </span>
+                  )}
                   <span className="font-semibold text-foreground">{stripLabel(job.keyword)}</span>
                   {job.cheap_mode && (
                     <span className="rounded border border-chart-2/30 bg-chart-2/10 px-1 py-px text-[9px] font-bold uppercase tracking-wide text-chart-2">
                       Test
                     </span>
                   )}
-                  {phaseLabel && <span className="text-muted-foreground">· {phaseLabel}</span>}
-                  {job.current_phase != null && (
-                    <span className="text-muted-foreground tabular-nums">
-                      ({job.current_phase}/{totalPhases})
-                    </span>
+                  {isQueued ? (
+                    <span className="text-chart-2 font-medium">Queued — starting up…</span>
+                  ) : (
+                    <>
+                      {phaseLabel && <span className="text-muted-foreground">· {phaseLabel}</span>}
+                      {job.current_phase != null && (
+                        <span className="text-muted-foreground tabular-nums">
+                          ({job.current_phase}/{totalPhases})
+                        </span>
+                      )}
+                    </>
                   )}
                   {formatSubProgress(job.phase_progress) && (
                     <span className="text-muted-foreground/80 tabular-nums text-[11px]">
@@ -524,6 +675,7 @@ export default function NewAnalysis() {
                   onOpen={handleAnalysisClick}
                   onDelete={handleDeleteClick}
                   onCopyAsins={handleCopyAsins}
+                  onRetryQueued={scrollToStripAndFlash}
                   deletePending={deleteCategory.isPending}
                 />
               ))}

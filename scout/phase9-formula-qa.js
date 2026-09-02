@@ -342,6 +342,29 @@ For each active ingredient in the FINAL FORMULA BRIEF:
 - Taste, texture, and tolerability complaints must be solved via the excipient and manufacturing system — NOT by adding more actives
 - Never add an active ingredient to solve a problem that is a formulation or manufacturing issue
 
+### 6. BASELINE/EDGE CONSISTENCY CHECK (2026-09-03)
+If either FORMULA A or FORMULA B includes a "PROVEN BASELINE" (section 1B)
+and "EMERGING EDGE" (section 1C) split — table-stakes decisions sourced
+ONLY from the established-cohort evidence pool, vs novel bets sourced ONLY
+from the emerging-cohort pool — audit every "edge" item against every
+"baseline" item:
+- An edge bet is FINE if it is additive (a new ingredient/format/claim that
+  doesn't touch a baseline decision) or if it explicitly supersedes a
+  baseline decision WITH a stated reason (e.g. "the established 300mg dose
+  is below the clinical floor published in [study] — edge brands correctly
+  moved to 500mg").
+- An edge bet is a VIOLATION if it silently contradicts a baseline
+  table-stake with no stated reason (e.g. baseline says "all established
+  winners use chelated magnesium" but the final formula picked an edge
+  brand's magnesium oxide with no rationale given).
+- Every violation found MUST be listed in the "## BASELINE/EDGE
+  CONSISTENCY CHECK" section of your deliverable below — do not silently
+  resolve it by picking one side without saying so in that section.
+- If neither draft includes a Section 1B/1C split (an older brief format,
+  or a category where the established/emerging cohort pools were empty),
+  state that explicitly in that section and skip the rest of this rule —
+  do not invent a baseline/edge split that isn't in the source material.
+
 ---
 
 ## YOUR DELIVERABLE â€" produce this exact markdown structure:
@@ -396,6 +419,14 @@ Serving Size: 2 Gummies | Servings Per Container: 45
 | # | Issue | Ingredient/Element | Problem | Fix |
 |---|---|---|---|---|
 | 1 | ... | ... | ... | ... |
+
+## BASELINE/EDGE CONSISTENCY CHECK
+(Per HARD ENFORCEMENT RULE 6 above — only if the drafts include a Section
+1B/1C baseline/edge split; otherwise write "N/A — no baseline/edge split in
+either draft" and skip the table)
+| # | Edge Bet | Baseline It Touches | Contradiction? | Resolution / Stated Reason |
+|---|---|---|---|---|
+[One row per edge decision that overlaps a baseline decision. Contradiction column: YES (unexplained conflict — a violation) or NO (additive, or explained). Every YES here is a real finding — do not omit it to keep the brief looking clean.]
 
 ## WARNINGS âš ï¸
 (Important but not blocking)

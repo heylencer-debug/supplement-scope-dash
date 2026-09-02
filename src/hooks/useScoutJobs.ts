@@ -369,7 +369,22 @@ export function useRerunFromPhase() {
         .order("created_at", { ascending: false })
         .limit(1);
       if (priorErr) throw new Error("Could not resolve this category's original phase scope — try again in a moment.");
-      const inheritedScope = priorJobs?.[0]?.only_phases ?? null;
+      let inheritedScope = priorJobs?.[0]?.only_phases ?? null;
+
+      // 2026-09-03 fix: inheritance only makes sense while the rerun phase
+      // lies WITHIN the base run's scope. "Rerun from P9" on a research-scope
+      // category (inherited "1,2,3,4,5,6,7,8") would otherwise intersect to an
+      // EMPTY phase set (run-pipeline filters only_phases to >= from_phase) and
+      // queue a job that runs nothing. A rerun from beyond the base scope is a
+      // formula-chain-style continuation — drop the inherited cap and let
+      // from_phase govern, exactly like useGenerateFormulaBrief's proven
+      // { from_phase: 9, only_phases: null } shape.
+      if (inheritedScope) {
+        const maxInherited = Math.max(
+          ...inheritedScope.split(",").map((p: string) => parseInt(p.trim(), 10)).filter((n: number) => !Number.isNaN(n))
+        );
+        if (params.fromPhase > maxInherited) inheritedScope = null;
+      }
 
       const insertPayload: ScoutJobInsert = {
         keyword,

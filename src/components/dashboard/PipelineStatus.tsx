@@ -12,6 +12,8 @@ import { SCOUT_PHASE_NAMES } from "@/types/scoutJobs";
 import { humanizeJobError, deriveRetryPhase } from "@/lib/jobErrorMessages";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PearlButton } from "@/components/ui/pearl-button";
+import { BrandLoader } from "@/components/ui/brand-loader";
+import { ProcessingLoader } from "@/components/ui/processing-loader";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -174,16 +176,21 @@ export function PipelineStatus({ categoryId, keyword }: PipelineStatusProps) {
         </div>
       )}
 
-      {/* Live badge when a phase is running */}
+      {/* Live badge when a phase is running — brand ProcessingLoader (the
+          "journey" marquee) replaces the old ping-dot. Phases 9-13 are the
+          formula chain proper, but the same run/wait shape applies to
+          P1-P8 too, so this is unconditional on phase number. */}
       {runningCount > 0 && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-chart-2/10 border border-chart-2/20 text-xs text-chart-2 font-medium">
-          <span className="relative flex h-2 w-2 shrink-0">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-chart-2 opacity-75" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-chart-2" />
-          </span>
-          Running{activeJob?.current_phase_name ? `: ${activeJob.current_phase_name}` : ""}
-          {activeJob?.phase_progress?.total ? ` — ${activeJob.phase_progress.done}/${activeJob.phase_progress.total}` : ""}
-          {" "}· auto-refreshing every 30s
+        <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-chart-2/10 border border-chart-2/20">
+          <ProcessingLoader
+            size="inline"
+            message={`Running${activeJob?.current_phase_name ? `: ${activeJob.current_phase_name}` : ""}`}
+            detail={
+              (activeJob?.phase_progress?.total
+                ? `${activeJob.phase_progress.done}/${activeJob.phase_progress.total} · `
+                : "") + "auto-refreshing every 30s"
+            }
+          />
         </div>
       )}
 
@@ -267,12 +274,7 @@ export function PipelineStatus({ categoryId, keyword }: PipelineStatusProps) {
                   <span className="text-[10px] font-bold text-muted-foreground tracking-wide">P{phase.phase}</span>
                 </div>
                 {isDone    && <CheckCircle2 className="h-3.5 w-3.5 text-chart-4 shrink-0" />}
-                {isRunning && (
-                  <span className="relative flex h-2.5 w-2.5 shrink-0">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-chart-2 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-chart-2" />
-                  </span>
-                )}
+                {isRunning && <BrandLoader size={14} label="Running" className="shrink-0" />}
                 {phase.status === "not_started" && <Circle className="h-3 w-3 text-muted-foreground/40 shrink-0" />}
                 {isPending && <Clock className="h-3 w-3 text-muted-foreground/30 shrink-0" />}
               </div>

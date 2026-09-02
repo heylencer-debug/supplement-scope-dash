@@ -22,6 +22,7 @@ import { FormulaVersionsPanel } from "@/components/manufacturer/FormulaVersionsP
 import { FactoryHandoffCard } from "@/components/manufacturer/FactoryHandoffCard";
 import { PortalFeedbackDisclosure } from "@/components/manufacturer/PortalFeedbackDisclosure";
 import { DataCompletenessChecklist } from "@/components/dashboard/DataCompletenessChecklist";
+import { DelayedBrandLoader } from "@/components/ui/delayed-brand-loader";
 
 import {
   ResponsiveContainer,
@@ -402,7 +403,18 @@ export default function Dashboard() {
   const isInitialLoading = categoryLoading || (analysisLoading && !hasAnalysis && !hasProducts);
   
   if (isInitialLoading && categoryName) {
-    return <DashboardSkeleton />;
+    return (
+      <div className="space-y-4">
+        {/* Brand loading banner — reserved space avoids a layout jump when
+            it appears (delayed 220ms so a warm-cache/fast load never
+            flashes it); the shape-preserving skeleton below stays as-is. */}
+        <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
+          <DelayedBrandLoader size={20} />
+          Loading {categoryName}…
+        </div>
+        <DashboardSkeleton />
+      </div>
+    );
   }
 
   if (!categoryName) {

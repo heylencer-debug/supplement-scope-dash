@@ -5,13 +5,14 @@
  */
 
 import { useState } from "react";
-import { Trophy, CheckCircle2, FlaskConical, AlertCircle, Loader2, Maximize2 } from "lucide-react";
+import { Trophy, CheckCircle2, FlaskConical, AlertCircle, Maximize2 } from "lucide-react";
 import { CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Panel } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { useFormulaBrief } from "@/hooks/useFormulaBrief";
+import { BrandLoader } from "@/components/ui/brand-loader";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { DocumentModal } from "@/components/ui/document-modal";
@@ -153,7 +154,7 @@ export function P9BenchmarkOverview({ categoryId, activeVersionContent, activeVe
   if (isLoading) {
     return (
       <div className="flex items-center gap-2 p-6 text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin" />
+        <BrandLoader size={16} label="Loading" />
         Loading formula brief...
       </div>
     );

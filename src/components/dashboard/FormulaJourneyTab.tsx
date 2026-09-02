@@ -28,6 +28,8 @@ import { Panel } from "@/components/ui/panel";
 import { cn } from "@/lib/utils";
 import { useFormulaJourney, type JourneyStage, type JourneyStageState } from "@/hooks/useFormulaJourney";
 import type { CanonicalFormulaSource } from "@/lib/canonicalFormula";
+import { BrandLoader } from "@/components/ui/brand-loader";
+import { DelayedBrandLoader } from "@/components/ui/delayed-brand-loader";
 import { FormulaBriefTab } from "@/components/dashboard/FormulaBriefTab";
 import { FormulaQATab } from "@/components/dashboard/FormulaQATab";
 import { FormulaValidationTab } from "@/components/dashboard/FormulaValidationTab";
@@ -67,7 +69,8 @@ function StateBadge({ state }: { state: JourneyStageState }) {
   }
   if (state === "current") {
     return (
-      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[hsl(var(--brand-ink))] text-[hsl(var(--brand-neon))]">
+      <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[hsl(var(--brand-ink))] text-[hsl(var(--brand-neon))]">
+        <BrandLoader size={11} label="In progress" />
         In Progress
       </span>
     );
@@ -111,7 +114,12 @@ export function FormulaJourneyTab({ categoryId, categoryName, activeVersionInfo,
   };
 
   if (isLoading) {
-    return <div className="text-sm text-muted-foreground py-12 text-center">Loading formula journey…</div>;
+    return (
+      <div className="flex flex-col items-center gap-3 py-12 text-sm text-muted-foreground">
+        <DelayedBrandLoader size={40} />
+        Loading formula journey…
+      </div>
+    );
   }
 
   const cleanCategoryName = (categoryName || "Formula").replace(/^=+/, "").trim();

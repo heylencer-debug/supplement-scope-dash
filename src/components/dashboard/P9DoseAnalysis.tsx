@@ -4,11 +4,12 @@
  * Fully category-specific — no hardcoded ingredients.
  */
 
-import { Pill, CheckCircle2, XCircle, AlertCircle, Loader2, FlaskConical } from "lucide-react";
+import { Pill, CheckCircle2, XCircle, AlertCircle, FlaskConical } from "lucide-react";
 import { CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Panel } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
 import { useFormulaBrief } from "@/hooks/useFormulaBrief";
+import { BrandLoader } from "@/components/ui/brand-loader";
 
 interface P9DoseAnalysisProps {
   categoryId: string;
@@ -20,7 +21,7 @@ export function P9DoseAnalysis({ categoryId }: P9DoseAnalysisProps) {
   if (isLoading) {
     return (
       <div className="flex items-center gap-2 p-6 text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin" />
+        <BrandLoader size={16} label="Loading" />
         Loading dose analysis...
       </div>
     );

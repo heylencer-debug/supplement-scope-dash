@@ -38,6 +38,7 @@ import { SCOUT_PHASE_NAMES, type ScoutJobRow } from "@/types/scoutJobs";
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { BrandModal } from "@/components/ui/brand-modal";
+import { DelayedBrandLoader } from "@/components/ui/delayed-brand-loader";
 import { cn } from "@/lib/utils";
 
 const PENDING_ANALYSES_KEY = "pending_analyses";
@@ -655,10 +656,19 @@ export default function NewAnalysis() {
         </h2>
 
         {categoriesLoading && !recentCategories ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <Skeleton key={i} className="h-32 w-full rounded-xl" />
-            ))}
+          <div className="space-y-3">
+            {/* Brand loading line — reserved space, delayed 220ms so a
+                warm-cache load never flashes it; the card-shaped skeleton
+                grid below stays as-is. */}
+            <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
+              <DelayedBrandLoader size={20} />
+              Loading your library…
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <Skeleton key={i} className="h-32 w-full rounded-xl" />
+              ))}
+            </div>
           </div>
         ) : uniqueCategories.length === 0 ? (
           <p className="text-muted-foreground text-center py-10 text-sm">

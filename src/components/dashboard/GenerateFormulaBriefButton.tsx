@@ -13,8 +13,9 @@
  * whatever display name a caller passes in.
  */
 import { useState } from "react";
-import { Loader2, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { PearlButton } from "@/components/ui/pearl-button";
+import { BrandLoader } from "@/components/ui/brand-loader";
 import { supabase } from "@/integrations/supabase/client";
 import { useGenerateFormulaBrief } from "@/hooks/useScoutJobs";
 import { toast } from "@/hooks/use-toast";
@@ -56,7 +57,7 @@ export function GenerateFormulaBriefButton({ categoryId, className, label = "Gen
 
   return (
     <PearlButton onClick={handleClick} disabled={busy} className={className}>
-      {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <Sparkles className="w-3.5 h-3.5 mr-1.5" />}
+      {busy ? <BrandLoader size={14} className="mr-1.5" label="Starting" /> : <Sparkles className="w-3.5 h-3.5 mr-1.5" />}
       {label}
     </PearlButton>
   );

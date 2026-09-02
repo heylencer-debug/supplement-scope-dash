@@ -172,13 +172,18 @@ async function callClaudeSonnetQAOnce(prompt, maxTokens, model = ANALYSIS_MODEL,
 async function callClaudeSonnetQA(prompt, maxTokens = 64000, model = ANALYSIS_MODEL) {
   let { content, finishReason } = await callClaudeSonnetQAOnce(prompt, maxTokens, model);
   let len = (content || '').length;
-  // AUTO-CONTINUATION (2026-08-29): 64k is the MODEL's output ceiling, so a
-  // big report can hit finish_reason=length with real content (seen live:
-  // electrolyte QA adjudicator at exactly 64,000 tok). This is NOT a retry —
-  // nothing is discarded or re-generated; the partial answer becomes context
-  // and the model continues exactly where it stopped (max 2 extra segments).
+  // AUTO-CONTINUATION (2026-08-29, segment cap raised 2→5 on 2026-09-04):
+  // 64k is the MODEL's output ceiling, so a big report can hit
+  // finish_reason=length with real content (seen live: electrolyte QA
+  // adjudicator at exactly 64,000 tok). This is NOT a retry — nothing is
+  // discarded or re-generated; the partial answer becomes context and the
+  // model continues exactly where it stopped. Segment cap raised for the
+  // tri-formula QA deliverable (three complete adjudicated formulas + a
+  // per-formula dose/manufacturability breakdown instead of one) — a
+  // 2-segment ceiling sized for the single-formula era would truncate the
+  // Edge/Blend formulas or their dose tables on a real run.
   let segments = 0;
-  while (finishReason === 'length' && len > 500 && segments < 2) {
+  while (finishReason === 'length' && len > 500 && segments < 5) {
     segments++;
     console.log(`  ↪ output hit the model's token ceiling at ${len} chars — continuing generation (segment ${segments + 1})...`);
     const contMsgs = [
@@ -342,12 +347,14 @@ For each active ingredient in the FINAL FORMULA BRIEF:
 - Taste, texture, and tolerability complaints must be solved via the excipient and manufacturing system — NOT by adding more actives
 - Never add an active ingredient to solve a problem that is a formulation or manufacturing issue
 
-### 6. BASELINE/EDGE CONSISTENCY CHECK (2026-09-03)
+### 6. BASELINE/EDGE CONSISTENCY CHECK (2026-09-03, scoped to EDGE/BLEND on 2026-09-04)
 If either FORMULA A or FORMULA B includes a "PROVEN BASELINE" (section 1B)
 and "EMERGING EDGE" (section 1C) split — table-stakes decisions sourced
 ONLY from the established-cohort evidence pool, vs novel bets sourced ONLY
 from the emerging-cohort pool — audit every "edge" item against every
-"baseline" item:
+"baseline" item. This check applies to the EDGE (2B) and RECOMMENDED BLEND
+(2C) formulas ONLY — the PROVEN (2A) formula by definition contains no
+edge bets, so there is nothing to audit there:
 - An edge bet is FINE if it is additive (a new ingredient/format/claim that
   doesn't touch a baseline decision) or if it explicitly supersedes a
   baseline decision WITH a stated reason (e.g. "the established 300mg dose
@@ -374,20 +381,35 @@ from the emerging-cohort pool — audit every "edge" item against every
 ## FINAL FORMULA BRIEF
 (Write this FIRST - complete, production-ready manufacturing spec synthesizing Formula A + Formula B + QA corrections. This is what goes to the CMO. Full detail required - match the depth of the input briefs.)
 
+WARNING: THREE COMPLETE FORMULAS REQUIRED below, not one. Adjudicate BOTH Formula A and Formula B into three independently complete, QA-corrected formulas -- do not just adjudicate a single "winner" formula. Every HARD ENFORCEMENT RULE above (dose floors, form hierarchy, lean formula, manufacturability, citations, pain points) applies to EACH of the three independently -- a rule violation in one formula does not excuse the same violation in another.
+
 ### Executive Summary
 [2-3 sentences: market opportunity, who it is for, key differentiator vs the category top competitors]
 
-### Recommended Formula - Per Serving (${SERVING_LABEL})
+### FORMULA -- PROVEN (Established Consensus)
+*"Proven -- what the established winners agree on." Conservative, cant-be-wrong -- adjudicated strictly from whichever of Formula A/Bs own "Proven"/"Baseline"-sourced rows survive QA, plus clinical floors. Zero edge bets.*
 | Ingredient | Amount | Form / Grade | Role | Why This Dose |
 |---|---|---|---|---|
 [${FORM_CONSTRAINT}]
 
+### FORMULA -- EDGE (Established Floor + Emerging Bets)
+*"Edge -- what the new winners are betting on." Established doses are the safety floor (never below Proven above) -- QA-corrected emerging bets layered on top, each keeping its risk note.*
+| Ingredient | Amount | Form / Grade | Role | Why This Dose | Risk Note |
+|---|---|---|---|---|---|
+[${FORM_CONSTRAINT}. Risk Note column: one-brand-bet-vs-multi-brand-trend, carried through from Section 1C / the source draft(s).]
+
+### FORMULA -- RECOMMENDED BLEND (Provenance-Labeled Hybrid -- CANONICAL, SHIPS TODAY)
+*"Recommended -- our blend of both." This is THE formula -- every downstream section below (Excipients, Supplement Facts Panel, Certifications, Flavor, Variants, Pricing, Claims) describes THIS formula only.*
+| Ingredient | Amount | Form / Grade | Role | Why This Dose | Provenance |
+|---|---|---|---|---|---|
+[${FORM_CONSTRAINT}. Provenance column: baseline / edge / clinical floor -- same convention as P8 Section 2C.]
+
 ### Excipients & Manufacturing Notes
-[Pectin, sweeteners, acids, flavors, colors - with specific CMO instructions]
+[Pectin, sweeteners, acids, flavors, colors - with specific CMO instructions. Applies to the Recommended Blend above.]
 
 ### Supplement Facts Panel (label-ready, FDA-compliant)
 Serving Size: 2 Gummies | Servings Per Container: 45
-[All ingredients with amounts and %DV]
+[All ingredients with amounts and %DV -- Recommended Blend only]
 
 ### Certifications Required
 | Certification | Priority | Reason |
@@ -412,40 +434,62 @@ Serving Size: 2 Gummies | Servings Per Container: 45
 ## QA VERDICT
 **Overall:** [APPROVED / APPROVED WITH ADJUSTMENTS / NEEDS MAJOR REVISION]
 **QA Score:** X/10
-**Summary:** 2-3 sentences â€" did P8 AI over-engineer this? What's the critical finding?
+**Summary:** 2-3 sentences -- did P8 AI over-engineer this? Whats the critical finding?
 
-## CRITICAL ISSUES â›"
-(Issues that MUST be fixed before manufacturing)
-| # | Issue | Ingredient/Element | Problem | Fix |
-|---|---|---|---|---|
-| 1 | ... | ... | ... | ... |
+## COMPARATIVE VERDICT -- WHEN TO LAUNCH WHICH
+(New 2026-09-04 section -- required)
+| Formula | Best Launch Scenario | Biggest Risk | QA Score |
+|---|---|---|---|
+| Proven | [e.g. risk-averse launch, thin working capital, first SKU in category] | [usually low -- thats the point] | X/10 |
+| Edge | [e.g. differentiation-led launch, willing to bet on a trend] | [name the specific bet(s) that could fail] | X/10 |
+| Recommended Blend | [the default answer -- why this is what ships TODAY] | [the residual risk this blend still carries] | X/10 |
+
+One paragraph: if DOVIVE could only launch ONE of these three, which and why -- and under what changed conditions (funding, risk tolerance, timeline) would the answer change to a different one.
+
+## CRITICAL ISSUES
+(Issues that MUST be fixed before manufacturing -- tag each with which formula(s) it applies to: Proven / Edge / Blend / All)
+| # | Formula | Issue | Ingredient/Element | Problem | Fix |
+|---|---|---|---|---|---|
+| 1 | ... | ... | ... | ... | ... |
 
 ## BASELINE/EDGE CONSISTENCY CHECK
-(Per HARD ENFORCEMENT RULE 6 above — only if the drafts include a Section
-1B/1C baseline/edge split; otherwise write "N/A — no baseline/edge split in
-either draft" and skip the table)
-| # | Edge Bet | Baseline It Touches | Contradiction? | Resolution / Stated Reason |
-|---|---|---|---|---|
-[One row per edge decision that overlaps a baseline decision. Contradiction column: YES (unexplained conflict — a violation) or NO (additive, or explained). Every YES here is a real finding — do not omit it to keep the brief looking clean.]
+(Per HARD ENFORCEMENT RULE 6 above -- applies to the EDGE and RECOMMENDED
+BLEND formulas only; the PROVEN formula contains no edge bets by
+definition. Only if the drafts include a Section 1B/1C baseline/edge
+split; otherwise write "N/A -- no baseline/edge split in either draft" and
+skip the table)
+| # | Formula (Edge/Blend) | Edge Bet | Baseline It Touches | Contradiction? | Resolution / Stated Reason |
+|---|---|---|---|---|---|
+[One row per edge decision that overlaps a baseline decision, in either the Edge or Recommended Blend formula. Contradiction column: YES (unexplained conflict -- a violation) or NO (additive, or explained). Every YES here is a real finding -- do not omit it to keep the brief looking clean.]
 
-## WARNINGS âš ï¸
+## WARNINGS
 (Important but not blocking)
 | # | Warning | Detail | Recommendation |
 |---|---|---|---|
 
-## DOSE ANALYSIS TABLE
-(Every active ingredient â€" is the dose right?)
+## DOSE ANALYSIS -- PROVEN
+(Every active ingredient in the PROVEN formula -- is the dose right?)
 | Ingredient | Proposed Dose | Clinical Effective Range | Market Avg | Verdict | Notes |
 |---|---|---|---|---|---|
 
-## MANUFACTURABILITY CHECK
-| Factor | Assessment | Risk | Action |
-|---|---|---|---|
-| Active load per gummy | ... | ... | ... |
-| Heat-sensitive ingredients | ... | ... | ... |
-| Cost per serving (est.) | ... | ... | ... |
-| MOQ feasibility | ... | ... | ... |
-| Gummy texture impact | ... | ... | ... |
+## DOSE ANALYSIS -- EDGE
+(Every active ingredient in the EDGE formula, including every emerging bet)
+| Ingredient | Proposed Dose | Clinical Effective Range | Market Avg | Verdict | Notes |
+|---|---|---|---|---|---|
+
+## DOSE ANALYSIS -- RECOMMENDED BLEND
+(Every active ingredient in the RECOMMENDED BLEND formula -- the canonical spec)
+| Ingredient | Proposed Dose | Clinical Effective Range | Market Avg | Verdict | Notes |
+|---|---|---|---|---|---|
+
+## MANUFACTURABILITY CHECK -- ALL THREE FORMULAS
+| Factor | Proven | Edge | Recommended Blend | Action |
+|---|---|---|---|---|
+| Active load per gummy | ... | ... | ... | ... |
+| Heat-sensitive ingredients | ... | ... | ... | ... |
+| Cost per serving (est.) | ... | ... | ... | ... |
+| MOQ feasibility | ... | ... | ... | ... |
+| Gummy texture impact | ... | ... | ... | ... |
 
 ## COMPETITOR HEAD-TO-HEAD COMPARISON
 (One section per competitor â€" be specific)
@@ -517,7 +561,10 @@ After the table:
 |---|---|---|---|
 
 ## ADJUSTED FORMULA SPECIFICATION
-(Complete revised formula â€" production ready)
+(Complete revised formula â€" production ready. This MUST be the same
+formula as "FORMULA -- RECOMMENDED BLEND" above under FINAL FORMULA BRIEF
+-- the canonical formula that ships today. Do not introduce a fourth,
+different formula here.)
 
 ### Per Serving (${SERVING_LABEL})
 | Ingredient | Amount | Form/Grade | Justification |
@@ -554,8 +601,14 @@ Be brutally honest. If P8 over-engineered the formula with 16 ingredients when t
 1. "## ADJUSTED FORMULA SPECIFICATION" - exact heading, two ## symbols
 2. "## FINAL FORMULA BRIEF" - exact heading, must appear BEFORE ## COMPETITOR_NOTES_JSON
 3. "## COMPETITOR_NOTES_JSON" - exact heading with valid JSON object
+4. Inside "## FINAL FORMULA BRIEF": THREE formula subsections with these
+   EXACT headings, in this order: "### FORMULA -- PROVEN (Established
+   Consensus)", "### FORMULA -- EDGE (Established Floor + Emerging Bets)",
+   "### FORMULA -- RECOMMENDED BLEND (Provenance-Labeled Hybrid --
+   CANONICAL, SHIPS TODAY)" -- each with a complete ingredient table. These
+   are machine-parsed into separate UI tabs; do not rename or merge them.
 
-All three sections are required. If any is missing, pipeline data will not save correctly.`;
+All sections above are required. If any is missing, pipeline data will not save correctly.`;
 }
 
 // â"€â"€â"€ Parse competitor notes from QA output â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
@@ -1177,18 +1230,56 @@ async function run() {
     console.log(`  WARNING: Final Formula Brief section not found in QA output`);
   }
 
+  // ── Tri-formula extraction (2026-09-04) ───────────────────────────────────
+  // Pulls the three "### FORMULA -- X" subsections out of the Final Formula
+  // Brief so the UI can render Proven/Edge/Recommended as separate tabs
+  // instead of one long markdown blob. Tolerant of dash style (--, –, —)
+  // and heading-level drift, since models don't always reproduce the exact
+  // markdown requested. Never throws — returns nulls on an older/legacy
+  // brief that predates this format, so the graceful-fallback UI path
+  // (single-formula card) stays reachable.
+  function extractFormulaVariant(text, label, nextLabels) {
+    if (!text) return null;
+    const dash = '[-\\u2013\\u2014]+';
+    const next = nextLabels.length
+      ? `(?:\\n#{2,4}\\s*FORMULA\\s*${dash}\\s*(?:${nextLabels.join('|')})|\\n##\\s|$)`
+      : '(?:\\n##\\s|$)';
+    const re = new RegExp(`#{2,4}\\s*FORMULA\\s*${dash}\\s*${label}[^\\n]*\\n([\\s\\S]*?)${next}`, 'i');
+    return text.match(re)?.[1]?.trim() || null;
+  }
+  const formulaVariants = finalFormulaBrief ? {
+    proven: extractFormulaVariant(finalFormulaBrief, 'PROVEN', ['EDGE', 'RECOMMENDED']),
+    edge: extractFormulaVariant(finalFormulaBrief, 'EDGE', ['RECOMMENDED']),
+    // Recommended intentionally captures through the rest of the Final
+    // Formula Brief (Excipients/Supplement Facts/Certs/Flavor/Variants/
+    // Pricing/Claims) — that downstream context genuinely describes the
+    // Recommended Blend, the one shipping to manufacturing.
+    recommended: extractFormulaVariant(finalFormulaBrief, 'RECOMMENDED', []),
+  } : null;
+  if (formulaVariants) {
+    console.log(`  Formula variants: proven=${formulaVariants.proven ? 'ok' : 'MISSING'} edge=${formulaVariants.edge ? 'ok' : 'MISSING'} recommended=${formulaVariants.recommended ? 'ok' : 'MISSING'}`);
+  }
+
   // ── Adjusted formula: standalone section OR extracted from brief ─────────────
+  // Canonical single-formula extraction for every legacy downstream
+  // consumer (formula-validator, manufacturer-chat corpus, formula_brief_
+  // versions, ManufacturerPortal) — must resolve to the RECOMMENDED BLEND
+  // (2026-09-04: that formula is now canonical), never Proven or Edge.
   const adjustedFormulaMatch = qaReport.match(/## ADJUSTED FORMULA SPECIFICATION([\s\S]*?)(?:\n## |$)/);
-  const adjustedFormulaFromBrief = finalFormulaBrief
-    ? finalFormulaBrief.match(/### Recommended Formula[\s\S]*?(?=\n### |$)/)?.[0]?.trim() || null
-    : null;
+  const adjustedFormulaFromBrief = formulaVariants?.recommended
+    || (finalFormulaBrief ? finalFormulaBrief.match(/### Recommended Formula[\s\S]*?(?=\n### |$)/)?.[0]?.trim() || null : null);
   const adjustedFormula = adjustedFormulaMatch?.[1]?.trim() || adjustedFormulaFromBrief || null;
   if (adjustedFormula) {
-    const src = adjustedFormulaMatch ? 'standalone section' : 'extracted from Final Formula Brief';
+    const src = adjustedFormulaMatch ? 'standalone section' : 'extracted from Final Formula Brief (Recommended Blend)';
     console.log(`  Adjusted formula: ${Math.round(adjustedFormula.length / 1000)}k chars OK (${src})`);
   } else {
     console.log(`  WARNING: Adjusted formula not found`);
   }
+
+  // ── Comparative verdict (2026-09-04, new required section) ───────────────
+  const comparativeVerdictMatch = qaReport.match(/## COMPARATIVE VERDICT[^\n]*\n([\s\S]*?)(?:\n## |$)/i);
+  const comparativeVerdict = comparativeVerdictMatch?.[1]?.trim() || null;
+  console.log(`  Comparative verdict: ${comparativeVerdict ? Math.round(comparativeVerdict.length / 1000) + 'k chars OK' : 'MISSING'}`);
 
   const adjustmentsMatch = qaReport.match(/## FORMULA ADJUSTMENTS\s*\n[\s\S]*?\n(\|[\s\S]*?)(?:\n## )/);
   const adjustmentsTable = adjustmentsMatch?.[1]?.trim() || null;
@@ -1209,6 +1300,15 @@ async function run() {
     qa_verdict: verdict,
     adjusted_formula: adjustedFormula,
     final_formula_brief: finalFormulaBrief,
+    // 2026-09-04: additive tri-formula fields. `adjusted_formula`/
+    // `final_formula_brief` above stay the canonical single-formula shape
+    // every existing downstream consumer (formula-validator,
+    // manufacturer-chat corpus, formula_brief_versions, ManufacturerPortal)
+    // already reads — nothing about their shape changed, they just resolve
+    // to the Recommended Blend now. These new fields ride along for the
+    // tri-formula UI; null on any brief generated before this shipped.
+    formula_variants: formulaVariants,
+    comparative_verdict: comparativeVerdict,
     adjustments_table: adjustmentsTable,
     formula_validation: validationResult,
     qa_generated_at: new Date().toISOString(),

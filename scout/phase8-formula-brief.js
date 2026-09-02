@@ -101,8 +101,15 @@ async function callGrok42(prompt, maxTokens = 64000) {
   let { content, finishReason } = await doCall(maxTokens);
   // Auto-continuation on model output ceiling (see continueTruncated below —
   // doCall's shape differs, so the same stitch loop is inlined here).
+  // Segment cap raised 2→5 (tri-formula brief, 2026-09-04): Section 2 now
+  // requires THREE complete formulas instead of one — target length nearly
+  // tripled (3-4k words → 6.5-9.5k words), so a single-formula-era 2-segment
+  // ceiling would truncate the 2B/2C formulas on a real run. 64k tokens is
+  // still the per-call output ceiling (unchanged, near the model's own max);
+  // this only widens how many continuation calls are allowed to stitch a
+  // longer document together.
   let segments = 0;
-  while (finishReason === 'length' && (content || '').length > 500 && segments < 2) {
+  while (finishReason === 'length' && (content || '').length > 500 && segments < 5) {
     segments++;
     console.log(`  ↪ Draft A hit the model's token ceiling at ${content.length} chars — continuing generation (segment ${segments + 1})...`);
     const next = await doCall(maxTokens, [
@@ -1285,9 +1292,37 @@ single-brand bet, treat as higher-risk upside, not a safe assumption".]
 
 ---
 
-## 2. FORMULA COMPOSITION
+## 2. FORMULA COMPOSITION — THREE COMPLETE, INDEPENDENT FORMULAS REQUIRED
 
-### Master Formula (Per Serving)
+You must produce THREE full, independently complete formulas below (2A, 2B,
+2C) — not one formula with footnotes. Each of the three needs its OWN
+complete ingredient tables (Primary/Secondary/Tertiary Actives + Functional
+Excipients), its own Formula Summary, its own Ingredient Selection
+Rationale, and its own Clinical Citations table. Do not shortcut any of the
+three by saying "same as 2A" — write out every table in full every time,
+even where amounts repeat.
+
+- **2A. PROVEN** = the conservative, can't-be-wrong formula. Every active
+  and every dose must trace to the ESTABLISHED COHORT evidence pool above.
+  Zero emerging bets. If the established pool is thin for this category,
+  fall back to clinical-floor doses only — never invent an established
+  consensus that isn't in the data.
+- **2B. EDGE** = the challenger. Established-cohort doses are the SAFETY
+  FLOOR (never go below what 2A already proved out) — then layer on the
+  EMERGING COHORT's bets: novel ingredients, forms, or claims the emerging
+  winners are trying. Every edge bet keeps its one-brand-bet-vs-multi-brand-
+  trend risk note from Section 1C.
+- **2C. RECOMMENDED BLEND** = what DOVIVE actually ships today. The
+  provenance-labeled hybrid of 2A and 2B — pick the specific baseline/edge/
+  clinical-floor decision for every ingredient and say so via the
+  Provenance column, same convention as before. THIS is the canonical
+  formula every downstream document (label, manufacturer spec, physical
+  specifications in Sections 3-10 below) is built from.
+
+The shared FORMULATION STRATEGY below applies to building all three —
+apply it independently to each, using the right evidence pool per formula
+(2A = established only, 2B = established floor + emerging bets, 2C = your
+best blended judgment call).
 
 FORMULATION STRATEGY:
 1. STEP 1: AUDIT COMPETITOR FORMS — for each active ingredient across all top-20 competitors, record: (a) which form they use, (b) what dose they use. Identify the most common form AND the most bioavailable form. If they differ, default to the most bioavailable form for DOVIVE.
@@ -1316,10 +1351,108 @@ FORMULATION STRATEGY:
    * **Incompatibilities**: Flag known ingredient-ingredient interactions (e.g., calcium blocks iron absorption — separate if both present; fat-soluble vitamins require lipid carrier in gummies).
    If the dosage form is NOT a gummy, apply the equivalent constraints for that form (capsule fill weight limits, tablet compression issues, powder flowability, etc.).
 
+─────────────────────────────────────────────────────────────────────────
+### 2A. FORMULA — PROVEN (Established Consensus)
+*"Proven — what the established winners agree on." Conservative, can't-be-wrong. Zero emerging bets — every row traces to the ESTABLISHED COHORT pool or a bare clinical floor.*
+─────────────────────────────────────────────────────────────────────────
+
 #### PRIMARY ACTIVE INGREDIENTS:
 | Ingredient | Amount per Serving | Form/Standardization | Function | Clinical Evidence | vs #1 Rationale | Provenance |
 |------------|-------------------|---------------------|----------|-------------------|-----------------|------------|
-[EVERY primary active with EXACT mg/mcg/IU. For Clinical Evidence: cite the specific study (author/year, population size, dose used, outcome measured) that justifies this dose. If no human RCT exists at this dose, say so explicitly. Provenance: "baseline — <consensus, e.g. all established winners cluster here>" or "edge — <risk note, e.g. 2 of 3 emerging brands>" or "clinical floor — not a competitive signal, this is the published minimum effective dose" — every row must carry one of these three, tying back to sections 1B/1C above.]
+[EVERY primary active with EXACT mg/mcg/IU. Provenance for every row in THIS formula must be "baseline — <consensus>" or "clinical floor — <published minimum>" only — never "edge" here.]
+
+#### SECONDARY ACTIVE INGREDIENTS:
+| Ingredient | Amount per Serving | Form/Standardization | Function | Clinical Evidence | Provenance |
+|------------|-------------------|---------------------|----------|-------------------|------------|
+[ALL supporting ingredients, baseline/clinical-floor provenance only.]
+
+#### TERTIARY ACTIVES (Differentiation):
+| Ingredient | Amount per Serving | Form/Standardization | Function | Clinical Evidence | Provenance |
+|------------|-------------------|---------------------|----------|-------------------|------------|
+[Differentiating ingredients that are STILL established-cohort consensus — if the only differentiation available is an edge bet, leave this table thin/empty rather than smuggling in an edge ingredient.]
+
+#### FUNCTIONAL EXCIPIENTS:
+| Ingredient | Amount per Serving | Function | Grade/Spec |
+|------------|-------------------|----------|------------|
+[ALL inactive ingredients: base, binders, fillers, flow agents, flavors, preservatives, sweeteners]
+
+##### FORMULA SUMMARY (Proven):
+| Category | Total Weight | % of Formula |
+|----------|--------------|--------------|
+| Primary Actives | X mg | X% |
+| Secondary Actives | X mg | X% |
+| Tertiary Actives | X mg | X% |
+| Excipients | X mg | X% |
+| TOTAL per Serving | X mg | 100% |
+
+##### Ingredient Selection Rationale (Proven):
+Why every dose/form here is safe-and-proven, not aspirational. Removed / Not Included: [ingredients common in competitors excluded and why].
+
+##### Clinical Citations (Proven):
+| Ingredient | Dose Used | Key Study | Population | Outcome | Verdict |
+|------------|-----------|-----------|------------|---------|---------|
+
+##### Manufacturability Checklist (Proven):
+| Check | Status | Notes |
+|-------|--------|-------|
+| Active load per unit (mg) | PASS / FAIL | |
+| Heat/pH/taste/hygroscopic/incompatibility flags | PASS / FLAG | |
+
+─────────────────────────────────────────────────────────────────────────
+### 2B. FORMULA — EDGE (Established Floor + Emerging Bets)
+*"Edge — what the new winners are betting on." Established-cohort doses are the safety floor (never below what 2A proved) — then the emerging cohort's novel ingredients/forms/claims are layered on top, each with its risk note preserved.*
+─────────────────────────────────────────────────────────────────────────
+
+#### PRIMARY ACTIVE INGREDIENTS:
+| Ingredient | Amount per Serving | Form/Standardization | Function | Clinical Evidence | vs #1 Rationale | Provenance |
+|------------|-------------------|---------------------|----------|-------------------|-----------------|------------|
+[Every row where the dose is a 2A baseline dose gets Provenance "baseline — <consensus>". Every row that is a new/upgraded emerging bet gets Provenance "edge — <one-brand-bet-vs-multi-brand-trend risk note, copied/adapted from Section 1C>". No row may silently drop below its 2A baseline dose without an explicit reason.]
+
+#### SECONDARY ACTIVE INGREDIENTS:
+| Ingredient | Amount per Serving | Form/Standardization | Function | Clinical Evidence | Provenance |
+|------------|-------------------|---------------------|----------|-------------------|------------|
+
+#### TERTIARY ACTIVES (Differentiation — this is where most edge bets live):
+| Ingredient | Amount per Serving | Form/Standardization | Function | Clinical Evidence | Provenance |
+|------------|-------------------|---------------------|----------|-------------------|------------|
+[Tertiary/differentiation actives here are almost always "edge" — carry the risk note.]
+
+#### FUNCTIONAL EXCIPIENTS:
+| Ingredient | Amount per Serving | Function | Grade/Spec |
+|------------|-------------------|----------|------------|
+
+##### FORMULA SUMMARY (Edge):
+| Category | Total Weight | % of Formula |
+|----------|--------------|--------------|
+| Primary Actives | X mg | X% |
+| Secondary Actives | X mg | X% |
+| Tertiary Actives | X mg | X% |
+| Excipients | X mg | X% |
+| TOTAL per Serving | X mg | 100% |
+
+##### Ingredient Selection Rationale (Edge):
+Which bets were taken and why the upside justifies the risk; what would have to be true for each bet to pay off.
+
+##### Clinical Citations (Edge):
+| Ingredient | Dose Used | Key Study | Population | Outcome | Verdict |
+|------------|-----------|-----------|------------|---------|---------|
+[For an edge bet with no human RCT at the proposed dose, Verdict must say "NO HUMAN RCT — mechanistic/emerging-market signal only" — never fabricate a study.]
+
+##### Manufacturability Checklist (Edge):
+| Check | Status | Notes |
+|-------|--------|-------|
+| Active load per unit (mg) | PASS / FAIL | |
+| Heat/pH/taste/hygroscopic/incompatibility flags | PASS / FLAG | |
+
+─────────────────────────────────────────────────────────────────────────
+### 2C. FORMULA — RECOMMENDED BLEND (Provenance-Labeled Hybrid — CANONICAL, SHIPS TODAY)
+*"Recommended — our blend of both." This is the formula that becomes the manufacturing spec (Sections 3-10 below are built from THIS formula only). Every row's Provenance is a real decision, not a template — baseline where 2A already wins, edge where the bet is worth taking, clinical floor where neither cohort settled it.*
+─────────────────────────────────────────────────────────────────────────
+
+#### PRIMARY ACTIVE INGREDIENTS:
+| Ingredient | Amount per Serving | Form/Standardization | Function | Clinical Evidence | vs #1 Rationale | Provenance |
+|------------|-------------------|---------------------|----------|-------------------|-----------------|------------|
+[EVERY primary active with EXACT mg/mcg/IU. For Clinical Evidence: cite the specific study (author/year, population size, dose used, outcome measured) that justifies this dose. If no human RCT exists at this dose, say so explicitly. Provenance: "baseline — <consensus>" or "edge — <risk note>" or "clinical floor — <published minimum, not a competitive signal>" — every row must carry one of these three.]
 
 #### SECONDARY ACTIVE INGREDIENTS:
 | Ingredient | Amount per Serving | Form/Standardization | Function | Clinical Evidence | Provenance |
@@ -1336,7 +1469,7 @@ FORMULATION STRATEGY:
 |------------|-------------------|----------|------------|
 [ALL inactive ingredients: base, binders, fillers, flow agents, flavors, preservatives, sweeteners]
 
-### FORMULA SUMMARY:
+##### FORMULA SUMMARY (Recommended Blend):
 | Category | Total Weight | % of Formula |
 |----------|--------------|--------------|
 | Primary Actives | X mg | X% |
@@ -1345,7 +1478,7 @@ FORMULATION STRATEGY:
 | Excipients | X mg | X% |
 | TOTAL per Serving | X mg | 100% |
 
-### Ingredient Selection Rationale:
+##### Ingredient Selection Rationale (Recommended Blend):
 
 Form Upgrades vs Competitors: [For each ingredient where we chose a superior form, state: which competitors use the inferior form, which form we chose, and the clinical/bioavailability reason]
 
@@ -1353,7 +1486,9 @@ Dose Decisions: [For each active, state: competitor dose range, clinical minimum
 
 Removed / Not Included: [List any ingredients common in competitors that we excluded, and why — underdosed, label dressing, redundant function, or exceeds clinical utility]
 
-### Clinical Citations:
+Why This Blend (not pure Proven, not pure Edge): [1-2 paragraphs explaining the specific tradeoffs made row by row]
+
+##### Clinical Citations (Recommended Blend):
 For every active ingredient in the formula, provide the supporting evidence:
 | Ingredient | Dose Used | Key Study | Population | Outcome | Verdict |
 |------------|-----------|-----------|------------|---------|---------|
@@ -1366,7 +1501,7 @@ Consumer Pain Point Solutions:
 
 Synergistic Combinations: [Key ingredient pairs that enhance efficacy]
 
-### Manufacturability Checklist:
+##### Manufacturability Checklist (Recommended Blend):
 | Check | Status | Notes |
 |-------|--------|-------|
 | Active load per unit (mg) | PASS / FAIL | [Total actives ÷ units per serving = X mg/unit vs. limit] |
@@ -1376,9 +1511,18 @@ Synergistic Combinations: [Key ingredient pairs that enhance efficacy]
 | Hygroscopic ingredients | PASS / FLAG | [List any flagged + form recommendation] |
 | Ingredient incompatibilities | PASS / FLAG | [List any absorption conflicts + resolution] |
 
+### FORMULA COMPARISON SUMMARY (2A vs 2B vs 2C)
+| Dimension | Proven (2A) | Edge (2B) | Recommended Blend (2C) |
+|-----------|-------------|-----------|--------------------------|
+| Total actives count | | | |
+| Total active mg per serving | | | |
+| Riskiest bet | N/A | | |
+| Who should launch this | | | |
+
 ---
 
 ## 3. PHYSICAL SPECIFICATIONS
+*Sections 3-10 below describe the RECOMMENDED BLEND (2C) — the canonical formula that ships to manufacturing. If Proven (2A) or Edge (2B) would require a materially different physical spec, note it briefly in Section 3's notes column rather than duplicating every section.*
 
 | Parameter | Specification |
 |-----------|---------------|
@@ -1541,7 +1685,8 @@ END OF FORMULA SPECIFICATION
 âœ… MUST INCLUDE:
 - Complete Executive Summary
 - Section 1B (PROVEN BASELINE) and Section 1C (EMERGING EDGE) — REQUIRED, built strictly from the cohort-tagged evidence pools, not from the ungrouped Top-20 list
-- A "Provenance" column on every Primary/Secondary/Tertiary Actives row (baseline / edge / clinical floor — see Section 2 table instructions)
+- THREE complete, independent formulas — Section 2A (PROVEN), 2B (EDGE), 2C (RECOMMENDED BLEND) — REQUIRED, each with its own full ingredient tables, Formula Summary, Rationale, and Clinical Citations. Do not collapse these into one formula with a footnote.
+- A "Provenance" column on every Primary/Secondary/Tertiary Actives row in EACH of the three formulas (baseline / edge / clinical floor — see Section 2 table instructions)
 - ALL ingredient tables with EVERY ingredient (no "etc." or abbreviations)
 - EXACT amounts for every ingredient (mg, mcg, IU, CFU)
 - Complete raw material specifications
@@ -1561,7 +1706,7 @@ END OF FORMULA SPECIFICATION
 - Supplier qualification procedures
 - CAPA procedures
 
-Target Length: 3,000-4,000 words (focused on FORMULA, not process)`;
+Target Length: 6,500-9,500 words (three complete formulas in Section 2 plus the shared spec sections — focused on FORMULA, not process)`;
 }
 
 // â"€â"€â"€ Save to DB â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
@@ -1812,17 +1957,20 @@ run().catch(e => {
   process.exit(1);
 });
 
-// ─── AUTO-CONTINUATION (2026-08-29) ─────────────────────────────────────────
+// ─── AUTO-CONTINUATION (2026-08-29, segment cap raised 2→5 on 2026-09-04) ──
 // 64k is the MODEL's output ceiling — a big report can hit
 // finish_reason=length with real content (seen live: electrolyte QA
 // adjudicator at exactly 64,000 tok). This is NOT a retry: nothing is
 // discarded or re-generated; the partial answer becomes assistant context
-// and the model continues exactly where it stopped (max 2 extra segments).
+// and the model continues exactly where it stopped. Segment cap raised
+// 2→5 for the tri-formula brief (Section 2 now needs 3 complete formulas
+// instead of 1 — target length nearly tripled) so a longer real document
+// isn't cut short by an era-appropriate-for-single-formula ceiling.
 // Function declaration → hoisted, callable from the wrappers above.
 async function continueTruncated(onceFn, prompt, maxTokens) {
   let { output, finishReason } = await onceFn(prompt, maxTokens);
   let segments = 0;
-  while (finishReason === 'length' && (output || '').length > 500 && segments < 2) {
+  while (finishReason === 'length' && (output || '').length > 500 && segments < 5) {
     segments++;
     console.log(`  ↪ output hit the model's token ceiling at ${output.length} chars — continuing generation (segment ${segments + 1})...`);
     const msgs = [

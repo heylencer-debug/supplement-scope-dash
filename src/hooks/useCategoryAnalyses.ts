@@ -17,6 +17,14 @@ export interface CategoryWithImages extends Category {
   job_cost_usd?: number | null;
   /** 2026-09-01: true when the latest job for this keyword was a cheap-mode test run. */
   job_is_test?: boolean;
+  /** 2026-09-02: raw scout_jobs.error for the latest job, if it ended in error — feeds
+   * humanizeJobError() for the Library card's plain-language failure state. */
+  job_error?: string | null;
+  /** 2026-09-02: latest scout_jobs.current_phase — feeds deriveRetryPhase() for the
+   * card's one-click "Retry from P<n>" action when there's no phase in the error text. */
+  job_current_phase?: number | null;
+  /** 2026-09-02: latest scout_jobs.from_phase — last-resort fallback for deriveRetryPhase(). */
+  job_from_phase?: number | null;
 }
 
 /** Strip spreadsheet-import junk (leading "=", quotes, etc.) — display + name-matching. */
@@ -37,6 +45,11 @@ interface JobSignal {
   status: ScoutJobStatus;
   /** finished_at if the job completed, else updated_at (still honest for in-flight runs). */
   recency: string | null;
+  /** 2026-09-02: raw error text + phase pointers, carried through for the Library
+   * card's friendly failure state + one-click retry (see CategoryWithImages). */
+  error: string | null;
+  current_phase: number | null;
+  from_phase: number | null;
 }
 
 /** Fetch the latest scout_jobs row per normalized keyword. Tolerates the table not existing yet. */
@@ -44,7 +57,7 @@ async function fetchLatestJobByKeyword(): Promise<Map<string, JobSignal>> {
   const map = new Map<string, JobSignal>();
   try {
     const { data, error } = await scoutJobsTable()
-      .select("keyword, status, finished_at, updated_at")
+      .select("keyword, status, finished_at, updated_at, error, current_phase, from_phase")
       .order("updated_at", { ascending: false })
       .limit(500);
 
@@ -57,7 +70,13 @@ async function fetchLatestJobByKeyword(): Promise<Map<string, JobSignal>> {
     for (const j of data || []) {
       const key = normalizeKey(j.keyword);
       if (!key || map.has(key)) continue; // rows already sorted desc — first hit is most recent
-      map.set(key, { status: j.status, recency: j.finished_at || j.updated_at || null });
+      map.set(key, {
+        status: j.status,
+        recency: j.finished_at || j.updated_at || null,
+        error: j.error ?? null,
+        current_phase: j.current_phase ?? null,
+        from_phase: j.from_phase ?? null,
+      });
     }
   } catch (e) {
     console.warn("useRecentCategories: scout_jobs lookup failed", e);
@@ -225,6 +244,9 @@ export function useRecentCategories(limit: number = 20) {
           job_status: job?.status ?? null,
           job_cost_usd: cost?.cost ?? null,
           job_is_test: cost?.isTest ?? false,
+          job_error: job?.error ?? null,
+          job_current_phase: job?.current_phase ?? null,
+          job_from_phase: job?.from_phase ?? null,
           _recency: recency,
         };
       });

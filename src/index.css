@@ -981,36 +981,42 @@
   .check-item.warn .dot { background: hsl(var(--brand-neon-deep)); }
 }
 
-/* BRAND LOADER — single pulsing/spinning pearl shape, replaces getnoodle's
-   image-cycling loader (no flair assets ported into this repo). Keeps the
-   "brand-loader-shape" class name so future asset-based loaders can drop in
-   without touching call sites. Uses background-position (not transform) for
-   the sheen sweep, matching the getnoodle performance convention. */
-@keyframes brand-loader-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+/* BRAND LOADER — image-cycling loader, ported verbatim from getnoodle
+   (2026-09-03) now that the four flair assets it needs (bolt/cross/
+   hourglass/sparkle) are confirmed present in src/assets/flair/. Replaces
+   the earlier stopgap spin+sheen pearl-shape fallback (which never matched
+   the shipped BrandLoader.tsx component — that component renders <img>
+   shapes, not a background gradient, so the old CSS here was silently
+   inert/mismatched). Each shape pops in, holds, and fades before the next
+   arrives — a sequence, not a spin. */
+@keyframes brand-pop {
+  0%   { opacity: 0; transform: scale(0.62) rotate(-10deg); }
+  4%   { opacity: 0.5; transform: scale(0.92) rotate(-4deg); }
+  9%   { opacity: 1; transform: scale(1.07) rotate(2deg); }
+  14%  { opacity: 1; transform: scale(0.98) rotate(0deg); }
+  21%  { opacity: 1; transform: scale(1) rotate(0deg); }
+  27%  { opacity: 0.45; transform: scale(0.94) rotate(4deg); }
+  31%  { opacity: 0; transform: scale(0.72) rotate(9deg); }
+  100% { opacity: 0; transform: scale(0.62) rotate(-10deg); }
 }
-@keyframes brand-loader-sheen {
-  0% { background-position: -40% 0; }
-  100% { background-position: 140% 0; }
-}
+
 .brand-loader-shape {
-  display: block;
-  width: 100%;
-  height: 100%;
-  border-radius: 30%;
-  background: hsl(var(--brand-electric));
-  background-image: linear-gradient(
-    100deg,
-    transparent 30%,
-    rgba(255, 255, 255, 0.35) 50%,
-    transparent 70%
-  );
-  background-size: 220% 100%;
-  box-shadow: var(--pearl-shadow-sm);
-  animation:
-    brand-loader-spin 1.4s linear infinite,
-    brand-loader-sheen 1.4s linear infinite;
+  animation: brand-pop 2.6s cubic-bezier(0.33, 1, 0.68, 1) infinite;
+  transform-origin: center;
+  opacity: 0;
+}
+
+/* Reduced motion gets one shape, standing still and fully visible — the
+   surrounding copy already says the page is working. */
+@media (prefers-reduced-motion: reduce) {
+  .brand-loader-shape {
+    animation: none;
+    opacity: 0;
+    transform: none;
+  }
+  .brand-loader-shape:first-child {
+    opacity: 1;
+  }
 }
 
 /* Side-panel pearl height scope — ported from getnoodle's "THE TWO HEIGHT

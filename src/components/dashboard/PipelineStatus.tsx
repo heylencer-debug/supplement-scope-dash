@@ -6,16 +6,18 @@
 
 import { useState } from "react";
 import { usePipelineStatus } from "@/hooks/usePipelineStatus";
-import { useActiveScoutJobs, useRerunFromPhase } from "@/hooks/useScoutJobs";
+import { useLatestJobForKeyword, useRerunFromPhase } from "@/hooks/useScoutJobs";
 import { useAiUsageCost } from "@/hooks/useAiUsageCost";
 import { SCOUT_PHASE_NAMES } from "@/types/scoutJobs";
+import { humanizeJobError, deriveRetryPhase } from "@/lib/jobErrorMessages";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PearlButton } from "@/components/ui/pearl-button";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  CheckCircle2, Circle, Clock, AlertCircle, RefreshCw, RotateCcw,
+  CheckCircle2, Circle, Clock, AlertCircle, RefreshCw, RotateCcw, FlaskConical, XCircle,
   ShoppingCart, BarChart3, MessageSquare, ScanText, Search,
   Dna, TrendingUp, Package, ClipboardList, CheckSquare, BarChart, Shield, Stamp,
   type LucideIcon,
@@ -63,11 +65,22 @@ export function PipelineStatus({ categoryId, keyword }: PipelineStatusProps) {
   // "the data looks partial" (partial data is normal for capped phases like
   // reviews/OCR and for old categories; the widget used to pulse RUNNING
   // forever on finished categories because of that heuristic).
-  const { data: activeJobs } = useActiveScoutJobs();
-  const normKw = (s: string | null | undefined) => (s || "").replace(/^[=\s]+/, "").trim().toLowerCase();
-  const activeJob = (activeJobs ?? []).find(
-    (j) => normKw(j.keyword) === normKw(keyword) && (j.status === "running" || j.status === "claimed")
-  );
+  //
+  // 2026-09-02 UX fix: sourced from useLatestJobForKeyword (any status), not
+  // useActiveScoutJobs (running/claimed only) — the latter meant a
+  // freshly-queued rerun produced ZERO visible change here until a Cloud Run
+  // execution actually claimed it, which is exactly the "not very UX
+  // friendly" gap the user hit on their first real "Rerun from P3" click.
+  // `activeJob` keeps its EXACT prior meaning (running/claimed) so every
+  // existing render path below (the phase grid, the "Running" badge) is
+  // unchanged; `latestJob` adds the queued/error visibility on top.
+  const { data: latestJob } = useLatestJobForKeyword(keyword);
+  const activeJob = latestJob && (latestJob.status === "running" || latestJob.status === "claimed") ? latestJob : undefined;
+  const isQueued = latestJob?.status === "queued";
+  // Any in-flight state (queued/claimed/running) — hides the per-phase rerun
+  // icons AND the failure banner's retry action so a click can't race a job
+  // that's already on its way.
+  const hasInFlightJob = isQueued || !!activeJob;
 
   // "Rerun from here" (2026-09-02) — per-phase continuation via from_phase,
   // same pattern as "Generate formula brief" generalized to any phase. Cost
@@ -149,6 +162,18 @@ export function PipelineStatus({ categoryId, keyword }: PipelineStatusProps) {
         </div>
       </div>
 
+      {/* "Queued — starting up…" (2026-09-02) — the click just landed and a
+          Cloud Run execution hasn't claimed it yet. Distinct amber/flask
+          treatment from the green "Running" badge below so a successful
+          click is VISIBLY successful the instant it happens, not just once
+          claim() fires (which can take a minute or two). */}
+      {isQueued && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-chart-2/10 border border-chart-2/20 text-xs text-chart-2 font-medium">
+          <FlaskConical className="h-3.5 w-3.5 shrink-0 animate-pulse" />
+          Queued — starting up… usually claims within a minute or two.
+        </div>
+      )}
+
       {/* Live badge when a phase is running */}
       {runningCount > 0 && (
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-chart-2/10 border border-chart-2/20 text-xs text-chart-2 font-medium">
@@ -161,6 +186,52 @@ export function PipelineStatus({ categoryId, keyword }: PipelineStatusProps) {
           {" "}· auto-refreshing every 30s
         </div>
       )}
+
+      {/* Friendly failure banner (2026-09-02) — only when the LAST run for
+          this keyword ended in error and nothing newer is queued/running
+          (latestJob is, by definition, the single most recent row — if it's
+          "error", that terminal state is current). Plain-language title +
+          one-sentence explanation up front, raw scout_jobs.error tucked
+          behind "Technical details", and a one-click "Retry from P<n>" that
+          reuses the SAME confirm dialog + cost estimate as the per-phase
+          rerun icons below. */}
+      {latestJob?.status === "error" && !hasInFlightJob && (() => {
+        const humanized = humanizeJobError(latestJob.error);
+        const retryPhase = deriveRetryPhase(latestJob);
+        return (
+          <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 space-y-2.5">
+            <div className="flex items-start gap-2">
+              <XCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0 space-y-1">
+                <p className="text-sm font-semibold text-foreground">
+                  {humanized?.title ?? "This run stopped early"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {humanized?.description ?? "See technical details below for exactly what happened."}
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-3 pl-6">
+              <PearlButton
+                className="!text-[11px] !px-3 !py-1.5"
+                onClick={() => setRerunPhase(retryPhase)}
+              >
+                Retry from P{retryPhase}
+              </PearlButton>
+              {humanized?.raw && (
+                <details className="text-[11px] text-muted-foreground">
+                  <summary className="cursor-pointer select-none hover:text-foreground">
+                    Technical details
+                  </summary>
+                  <p className="mt-1.5 max-w-md font-mono text-[10px] leading-relaxed text-muted-foreground/80 whitespace-pre-wrap break-words">
+                    {humanized.raw}
+                  </p>
+                </details>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Phase cards — 2 rows of 6 on desktop (P1-P11), 2 cols on mobile */}
       <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
@@ -236,7 +307,7 @@ export function PipelineStatus({ categoryId, keyword }: PipelineStatusProps) {
                 )}>
                   {cfg.label}
                 </span>
-                {!isPending && !activeJob && (
+                {!isPending && !hasInFlightJob && (
                   <button
                     type="button"
                     onClick={() => setRerunPhase(phase.phase)}
@@ -267,17 +338,17 @@ export function PipelineStatus({ categoryId, keyword }: PipelineStatusProps) {
             <AlertDialogDescription asChild>
               <div className="space-y-2 text-left">
                 <p>
-                  Re-runs P{rerunPhase}{rerunPhase && rerunPhase < 13 ? `–P13` : ""} for "{keyword}" against this
-                  SAME category — earlier phases are left untouched, and the structural
-                  gates that stop a run against incomplete underlying data still apply.
+                  Picks up at P{rerunPhase}{rerunPhase && rerunPhase < 13 ? `–P13` : ""} for "{keyword}" — earlier
+                  phases are left untouched. If there still isn't enough data to continue, we'll
+                  automatically stop early again instead of spending on a run that can't finish.
                 </p>
                 <p className="font-medium text-foreground">
                   {rerunPhase !== null && estimateRerunCost(rerunPhase) > 0
-                    ? `Estimated AI cost: ~$${estimateRerunCost(rerunPhase).toFixed(2)} (based on this category's own past spend for P${rerunPhase}+)`
-                    : "No prior AI spend recorded for this range yet — these may be non-AI scrape/sync phases, or this category has no cost history."}
+                    ? `Estimated cost: ~$${estimateRerunCost(rerunPhase).toFixed(2)} (based on what this category has cost before for this step onward)`
+                    : "No cost history for this range yet — this step may not use paid AI calls, or this category hasn't run before."}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Actual cost can differ (product count, model routing) — this is an estimate, not a guarantee.
+                  Actual cost can vary a little — this is an estimate, not a guarantee.
                 </p>
               </div>
             </AlertDialogDescription>

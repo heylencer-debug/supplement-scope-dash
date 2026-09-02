@@ -30,7 +30,7 @@ import { useFormulaJourney, type JourneyStage, type JourneyStageState } from "@/
 import type { CanonicalFormulaSource } from "@/lib/canonicalFormula";
 import { BrandLoader } from "@/components/ui/brand-loader";
 import { DelayedBrandLoader } from "@/components/ui/delayed-brand-loader";
-import { FormulaBriefTab } from "@/components/dashboard/FormulaBriefTab";
+import { FormulaBriefTab, TriFormulaView } from "@/components/dashboard/FormulaBriefTab";
 import { FormulaQATab } from "@/components/dashboard/FormulaQATab";
 import { FormulaValidationTab } from "@/components/dashboard/FormulaValidationTab";
 import { GenerateFormulaBriefButton } from "@/components/dashboard/GenerateFormulaBriefButton";
@@ -160,7 +160,20 @@ export function FormulaJourneyTab({ categoryId, categoryName, activeVersionInfo,
             )}
 
             <div className="border-t border-border/60 pt-3.5">
-              <MarkdownDoc content={canonicalFormula.inlineExcerpt} />
+              {/* 2026-09-04: tri-formula tabs (Proven/Edge/Recommended) when
+                  P9 produced formula_variants — Recommended preselected,
+                  since it's still the canonical formula. Falls back to the
+                  single inline excerpt exactly as before on any brief that
+                  predates this (variants undefined). */}
+              {canonicalFormula.variants ? (
+                <TriFormulaView
+                  variants={canonicalFormula.variants}
+                  signoff={canonicalFormula.perFormulaSignoff}
+                  comparativeVerdict={canonicalFormula.comparativeVerdict}
+                />
+              ) : (
+                <MarkdownDoc content={canonicalFormula.inlineExcerpt} />
+              )}
             </div>
           </div>
         </div>

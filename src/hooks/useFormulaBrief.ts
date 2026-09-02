@@ -37,6 +37,28 @@ export interface FormulaBriefData {
     };
     qa_report?: string;
     final_formula_brief?: string;
+    // 2026-09-04: tri-formula fields — additive, null/absent on any brief
+    // generated before this shipped (FormulaBriefTab falls back to the
+    // single-formula render when formula_variants is absent).
+    formula_variants?: {
+      proven: string | null;
+      edge: string | null;
+      recommended: string | null;
+    } | null;
+    comparative_verdict?: string | null;
+    final_signoff?: {
+      opus_review: string;
+      verdict: string;
+      corrections_applied: boolean;
+      generated_at: string;
+      model: string;
+      per_formula?: {
+        proven?: { verdict: string; review?: string | null };
+        edge?: { verdict: string; review?: string | null };
+        recommended?: { verdict: string; review?: string | null };
+      };
+      comparative_note?: string | null;
+    } | null;
     formula_validation?: {
       valid: boolean;
       errors: string[];

@@ -30,6 +30,21 @@ export interface CanonicalFormula {
   verdict?: string;
   /** ISO timestamp — only set when source === "signoff". */
   generatedAt?: string;
+  // 2026-09-04: tri-formula fields (Proven/Edge/Recommended Blend), present
+  // whenever P9 wrote `ingredients.formula_variants` — independent of which
+  // maturity tier above resolved (signoff/qa_adjusted/brief), since P9
+  // always runs before P13. Absent (undefined) on any pre-tri-formula
+  // brief, so callers render the single `inlineExcerpt`/`fullDocument` as
+  // they always have — the graceful-fallback path.
+  variants?: { proven: string | null; edge: string | null; recommended: string | null };
+  /** Per-formula P13 sign-off verdicts — only populated when source === "signoff" AND variants exist. */
+  perFormulaSignoff?: {
+    proven?: { verdict: string };
+    edge?: { verdict: string };
+    recommended?: { verdict: string };
+  };
+  /** P9's "## COMPARATIVE VERDICT — WHEN TO LAUNCH WHICH" section, verbatim markdown. */
+  comparativeVerdict?: string | null;
 }
 
 const EMPTY: CanonicalFormula = {
@@ -38,6 +53,32 @@ const EMPTY: CanonicalFormula = {
   fullDocument: "",
   inlineExcerpt: "",
 };
+
+// 2026-09-04: attaches tri-formula fields to whichever maturity tier
+// resolved below — deterministic (no heading-regex matching against the
+// tri-formula P13 structure, which no longer emits a single "## 2. FINAL
+// FORMULA" heading). Recommended Blend replaces inlineExcerpt when variants
+// exist, since it's the canonical formula either way.
+function attachVariants(result: CanonicalFormula, ingredients: Record<string, unknown>): CanonicalFormula {
+  const variantsRaw = ingredients.formula_variants as
+    | { proven?: string | null; edge?: string | null; recommended?: string | null }
+    | null
+    | undefined;
+  if (!variantsRaw || !(variantsRaw.proven || variantsRaw.edge || variantsRaw.recommended)) return result;
+  const variants = {
+    proven: variantsRaw.proven || null,
+    edge: variantsRaw.edge || null,
+    recommended: variantsRaw.recommended || null,
+  };
+  const signoff = ingredients.final_signoff as { per_formula?: CanonicalFormula["perFormulaSignoff"] } | null | undefined;
+  return {
+    ...result,
+    variants,
+    perFormulaSignoff: result.source === "signoff" ? signoff?.per_formula : undefined,
+    comparativeVerdict: (ingredients.comparative_verdict as string | null) || undefined,
+    inlineExcerpt: variants.recommended || result.inlineExcerpt,
+  };
+}
 
 const INLINE_EXCERPT_FALLBACK_CHARS = 4000;
 
@@ -82,25 +123,25 @@ export function getCanonicalFormula(
     | undefined;
   if (signoff && (signoff.opus_review?.length ?? 0) > 500) {
     const fullDocument = signoff.opus_review as string;
-    return {
+    return attachVariants({
       source: "signoff",
       maturityLabel: "Signed off",
       fullDocument,
       inlineExcerpt: extractInlineExcerpt(fullDocument),
       verdict: signoff.verdict,
       generatedAt: signoff.generated_at,
-    };
+    }, ingredients);
   }
 
   // 2. QA-adjusted formula — P9 adjudicator's corrected spec, pre sign-off.
   const adjustedFormula = ingredients.adjusted_formula as string | null | undefined;
   if (adjustedFormula && adjustedFormula.trim().length > 0) {
-    return {
+    return attachVariants({
       source: "qa_adjusted",
       maturityLabel: "QA-adjusted — sign-off pending",
       fullDocument: adjustedFormula,
       inlineExcerpt: extractInlineExcerpt(adjustedFormula),
-    };
+    }, ingredients);
   }
 
   // 3. Draft brief — the pre-QA formula brief (final_formula_brief preferred,
@@ -109,12 +150,12 @@ export function getCanonicalFormula(
     (ingredients.final_formula_brief as string | null | undefined) ||
     (ingredients.ai_generated_brief as string | null | undefined);
   if (brief && brief.trim().length > 0) {
-    return {
+    return attachVariants({
       source: "brief",
       maturityLabel: "Draft brief — QA pending",
       fullDocument: brief,
       inlineExcerpt: extractInlineExcerpt(brief),
-    };
+    }, ingredients);
   }
 
   return EMPTY;

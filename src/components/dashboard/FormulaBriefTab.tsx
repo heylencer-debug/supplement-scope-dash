@@ -11,6 +11,7 @@ import { Panel } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   AlertCircle, FlaskConical, Target, ShieldCheck, Package,
   DollarSign, AlertTriangle, Zap, Star, ChevronRight, Download, FileText, Maximize2,
@@ -237,14 +238,129 @@ function SectionCard({ icon: Icon, title, description, children, accent }: {
   );
 }
 
+// ─── Tri-formula view (2026-09-04) ─────────────────────────────────────────────
+// Renders P9's three adjudicated formulas — Proven / Edge / Recommended Blend
+// — as Pearl-consistent segmented tabs, Recommended preselected (it's the
+// canonical formula every downstream document already uses). Falls back to
+// nothing (caller keeps rendering the single-blob markdown) whenever
+// `formula_variants` is absent — i.e. any brief generated before this
+// shipped renders exactly as it always has.
+
+export interface FormulaVariants {
+  proven: string | null;
+  edge: string | null;
+  recommended: string | null;
+}
+
+export interface PerFormulaSignoff {
+  proven?: { verdict: string; review?: string | null };
+  edge?: { verdict: string; review?: string | null };
+  recommended?: { verdict: string; review?: string | null };
+}
+
+function SignoffVerdictBadge({ verdict }: { verdict?: string }) {
+  if (!verdict || verdict === "UNKNOWN") return null;
+  const isApproved = verdict === "APPROVED";
+  const isCorrections = verdict === "APPROVED WITH CORRECTIONS";
+  const isRejected = verdict === "REJECTED";
+  return (
+    <span
+      className={cn(
+        "text-[9px] font-semibold px-1.5 py-0.5 rounded-full border shrink-0",
+        isApproved && "border-chart-4/30 text-chart-4 bg-chart-4/10",
+        isCorrections && "border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/10",
+        isRejected && "border-destructive/30 text-destructive bg-destructive/10",
+      )}
+    >
+      {verdict}
+    </span>
+  );
+}
+
+const FORMULA_TAB_META = {
+  recommended: { label: "Recommended", subtitle: "Our blend of both", emoji: "✅" },
+  proven: { label: "Proven", subtitle: "What the established winners agree on", emoji: "🛡️" },
+  edge: { label: "Edge", subtitle: "What the new winners are betting on", emoji: "🚀" },
+} as const;
+
+export function TriFormulaView({
+  variants,
+  signoff,
+  comparativeVerdict,
+}: {
+  variants: FormulaVariants;
+  signoff?: PerFormulaSignoff | null;
+  comparativeVerdict?: string | null;
+}) {
+  const order: Array<keyof typeof FORMULA_TAB_META> = ["recommended", "proven", "edge"];
+  const tabs = order
+    .map((id) => ({ id, ...FORMULA_TAB_META[id], content: variants[id], verdict: signoff?.[id]?.verdict }))
+    .filter((t) => !!t.content);
+
+  if (tabs.length === 0) return null;
+
+  return (
+    <div className="space-y-3">
+      {comparativeVerdict && (
+        <div className="p-3 rounded-lg border border-border bg-muted/30">
+          <p className="text-xs font-semibold text-foreground mb-1">Comparative verdict — when to launch which</p>
+          <div className="text-xs text-muted-foreground [&_table]:text-[11px]">
+            {renderMarkdown(comparativeVerdict)}
+          </div>
+        </div>
+      )}
+      <Tabs defaultValue="recommended" className="w-full">
+        {/* Mobile fix: 3 tabs' full label+subtitle text doesn't fit a 390px
+            viewport without clipping — scroll horizontally instead of
+            compressing/cutting text (same pattern already used for wide
+            markdown tables in this file). Desktop still shows all 3 at
+            full width via sm:flex/sm:w-full. */}
+        <TabsList className="flex w-max sm:w-full h-auto p-1 gap-1 overflow-x-auto max-w-full">
+          {tabs.map((t) => (
+            <TabsTrigger
+              key={t.id}
+              value={t.id}
+              className="sm:flex-1 flex flex-col items-center gap-0.5 py-2 px-2.5 text-center h-auto min-w-[128px] shrink-0 data-[state=active]:shadow-sm"
+            >
+              <span className="flex items-center gap-1.5 text-xs font-semibold whitespace-nowrap">
+                <span>{t.emoji}</span>
+                {t.label}
+                <SignoffVerdictBadge verdict={t.verdict} />
+              </span>
+              <span className="text-[10px] text-muted-foreground font-normal leading-tight">{t.subtitle}</span>
+            </TabsTrigger>
+          ))}
+        </TabsList>
+        {tabs.map((t) => (
+          <TabsContent key={t.id} value={t.id} className="mt-3 space-y-1 max-h-[900px] overflow-y-auto pr-1">
+            {renderMarkdown(t.content!)}
+          </TabsContent>
+        ))}
+      </Tabs>
+    </div>
+  );
+}
+
 // ─── Expandable Formula Card ──────────────────────────────────────────────────
 
 function FormulaCard({ card, categoryName, generatedAt, onManufacturerPDF }: {
-  card: { id: string; emoji: string; title: string; subtitle: string; badge: string; borderColor: string; bgColor: string; badgeColor: string; content: string; downloadContent?: string; downloadLabel?: string };
+  card: {
+    id: string; emoji: string; title: string; subtitle: string; badge: string;
+    borderColor: string; bgColor: string; badgeColor: string; content: string;
+    downloadContent?: string; downloadLabel?: string;
+    // Tri-formula (2026-09-04) — when present, the card renders Proven/Edge/
+    // Recommended segmented tabs instead of one markdown blob, both inline
+    // and in the full-document viewer. `content`/`downloadContent` above stay
+    // the full combined text so PDF export/print is unaffected either way.
+    variants?: FormulaVariants;
+    perFormulaSignoff?: PerFormulaSignoff | null;
+    comparativeVerdict?: string | null;
+  };
   categoryName?: string;
   generatedAt?: string;
   onManufacturerPDF?: () => void;
 }) {
+  const hasVariants = !!(card.variants && (card.variants.proven || card.variants.edge || card.variants.recommended));
   const [open, setOpen] = useState(false);
   const [docOpen, setDocOpen] = useState(false);
   // Display ref — scoped to this card's visible content
@@ -293,7 +409,11 @@ function FormulaCard({ card, categoryName, generatedAt, onManufacturerPDF }: {
         subtitle={card.subtitle}
         chips={generatedAt ? [{ label: "Generated", value: new Date(generatedAt).toLocaleDateString() }] : undefined}
       >
-        <MarkdownDoc content={card.content} />
+        {hasVariants ? (
+          <TriFormulaView variants={card.variants!} signoff={card.perFormulaSignoff} comparativeVerdict={card.comparativeVerdict} />
+        ) : (
+          <MarkdownDoc content={card.content} />
+        )}
       </DocumentModal>
 
       {/* Expanded content */}
@@ -312,8 +432,12 @@ function FormulaCard({ card, categoryName, generatedAt, onManufacturerPDF }: {
             </Button>
           </div>
           {/* Visible content */}
-          <div ref={cardRef} className="space-y-1 max-h-[900px] overflow-y-auto pr-1">
-            {renderMarkdown(card.content)}
+          <div ref={cardRef} className={hasVariants ? undefined : "space-y-1 max-h-[900px] overflow-y-auto pr-1"}>
+            {hasVariants ? (
+              <TriFormulaView variants={card.variants!} signoff={card.perFormulaSignoff} comparativeVerdict={card.comparativeVerdict} />
+            ) : (
+              renderMarkdown(card.content)
+            )}
           </div>
           {/* Hidden full-package div for download (off-screen) */}
           {card.downloadContent && (
@@ -409,6 +533,17 @@ export function FormulaBriefTab({ categoryId, categoryName }: Props) {
   // Final Formula card shows full brief when available, falls back to adjustments
   const finalFormulaContent = finalFormulaBrief || adjustedFormula;
 
+  // Tri-formula fields (2026-09-04) — additive, null on any brief generated
+  // before this shipped. `hasVariants` gates the tab UI; when false the
+  // "final" card falls back to the single-blob markdown exactly as before.
+  const formulaVariantsRaw = f?.formula_variants as { proven?: string | null; edge?: string | null; recommended?: string | null } | null | undefined;
+  const formulaVariants: FormulaVariants | undefined = formulaVariantsRaw
+    ? { proven: formulaVariantsRaw.proven || null, edge: formulaVariantsRaw.edge || null, recommended: formulaVariantsRaw.recommended || null }
+    : undefined;
+  const comparativeVerdict = (f?.comparative_verdict as string) || undefined;
+  const finalSignoff = f?.final_signoff as { per_formula?: PerFormulaSignoff; verdict?: string } | undefined;
+  const perFormulaSignoff = finalSignoff?.per_formula || null;
+
   // Pull QA analysis sections for combined download
   const comprehensiveComparison = (f?.comprehensive_comparison as string) || undefined;
   const flavorQA = (f?.flavor_qa as string) || undefined;
@@ -453,11 +588,13 @@ export function FormulaBriefTab({ categoryId, categoryName }: Props) {
       finalFormulaContent && {
         id: 'final',
         emoji: '✅',
-        title: 'Final Formula — QA Approved',
+        title: formulaVariants ? 'Final Formulas — Proven / Edge / Recommended' : 'Final Formula — QA Approved',
         // qaVerdict.verdict is AI-generated text that sometimes wraps itself in
         // markdown bold ("**APPROVED WITH ADJUSTMENTS**") — this subtitle line
         // is plain text (no markdown renderer), so strip the literal ** marks.
-        subtitle: (finalFormulaBrief ? 'Complete brief · ' : 'Adjustments only · ') + 'Claude Opus 5 adjudication · ' + (qaVerdict?.verdict?.replace(/\*\*/g, '') || 'Reviewed'),
+        subtitle: formulaVariants
+          ? 'Three adjudicated formulas · Claude Opus 5 adjudication · ' + (qaVerdict?.verdict?.replace(/\*\*/g, '') || 'Reviewed')
+          : (finalFormulaBrief ? 'Complete brief · ' : 'Adjustments only · ') + 'Claude Opus 5 adjudication · ' + (qaVerdict?.verdict?.replace(/\*\*/g, '') || 'Reviewed'),
         badge: qaVerdict?.score ? `${qaVerdict.score}/10` : 'QA',
         borderColor: 'border-green-500/40',
         bgColor: 'bg-green-500/5',
@@ -466,6 +603,9 @@ export function FormulaBriefTab({ categoryId, categoryName }: Props) {
         // Download includes ALL P10 analysis: brief + verdict + comparison + flavor QA
         downloadContent: fullP10Package,
         downloadLabel: '⬇ Download Full P10 Package',
+        variants: formulaVariants,
+        perFormulaSignoff,
+        comparativeVerdict,
       },
       !grokBrief && !claudeBrief && legacyBrief && {
         id: 'legacy',

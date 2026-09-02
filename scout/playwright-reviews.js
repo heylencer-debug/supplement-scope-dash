@@ -256,22 +256,41 @@ async function runBrightDataFallback(zeroReviewRows) {
   for (let i = 0; i < zeroReviewRows.length; i += CHUNK) {
     const chunk = zeroReviewRows.slice(i, i + CHUNK);
     const asins = chunk.map(r => r.asin);
-    try {
-      const byAsin = await brightData.fetchAmazonReviews(asins);
-      for (const row of chunk) {
-        const reviews = byAsin.get(row.asin) || [];
-        if (!reviews.length) continue;
-        try {
-          const saved = await saveReviews(row.asin, row.keyword || KEYWORD_FILTER, reviews);
-          totalSaved += saved;
-          asinsWithReviews++;
-          console.log(`  ✓ [${row.asin}] ${saved} reviews saved via Bright Data`);
-        } catch (err) {
-          console.error(`  → Save failed for ${row.asin}: ${err.message}`);
-        }
+    // One retry on transient "snapshot still running" failures (2026-09-02):
+    // bdTriggerAndAwait's 180s deadline is sometimes too short for a full
+    // 20-ASIN reviews batch — Bright Data's own error text literally says
+    // "try again in a minute" — but with zero retry the ENTIRE chunk was
+    // silently dropped. Because zeroReviewRows preserves BSR-rank order
+    // (toScrape iterates ASINs in rank order), the dropped chunk is always
+    // the TOP-RANKED / best-selling ASINs — the worst possible ones to lose,
+    // since they're exactly what the final verifier's top20 gates weight
+    // most heavily. Confirmed live on "sugar free electrolytes"
+    // (2026-09-02): batch 1 (top 20 by rank) timed out at 180s and was
+    // dropped entirely, batch 2 (bottom 10) succeeded 2m7s later via the
+    // same snapshot pipeline — it just needed a bit more patience, not a
+    // permanent failure. A retry re-triggers a fresh snapshot + fresh 180s
+    // deadline.
+    let byAsin = null;
+    for (let attempt = 1; attempt <= 2 && !byAsin; attempt++) {
+      try {
+        byAsin = await brightData.fetchAmazonReviews(asins);
+      } catch (err) {
+        console.error(`  ✗ Bright Data batch failed (${asins.length} ASINs, attempt ${attempt}/2): ${err.message}`);
+        if (attempt < 2) console.log('  ↻ retrying chunk once...');
       }
-    } catch (err) {
-      console.error(`  ✗ Bright Data batch failed (${asins.length} ASINs): ${err.message}`);
+    }
+    if (!byAsin) continue;
+    for (const row of chunk) {
+      const reviews = byAsin.get(row.asin) || [];
+      if (!reviews.length) continue;
+      try {
+        const saved = await saveReviews(row.asin, row.keyword || KEYWORD_FILTER, reviews);
+        totalSaved += saved;
+        asinsWithReviews++;
+        console.log(`  ✓ [${row.asin}] ${saved} reviews saved via Bright Data`);
+      } catch (err) {
+        console.error(`  → Save failed for ${row.asin}: ${err.message}`);
+      }
     }
   }
   console.log(`\n✅ Bright Data reviews fallback done. ${asinsWithReviews}/${zeroReviewRows.length} ASINs got reviews (${totalSaved} total).`);

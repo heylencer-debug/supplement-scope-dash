@@ -56,11 +56,44 @@ async function main() {
 
   const DASH_CAT_ID = await lookupCategoryId(KEYWORD);
 
-  // 1. Load all OCR records for this keyword
+  // 2026-09-02: READ-SIDE MIRROR OF THE aca2339 WRITE-LEAK FIX — dovive_ocr
+  // is UNIQUE(asin, image_index) BY DESIGN, shared across every session that
+  // ever scraped that product image, with `keyword` set FIRST-WRITER-WINS
+  // (aca2339, 2026-09-01) so a sibling session's re-OCR never clobbers the
+  // ORIGINAL session's attribution. But that means a fresh session ("#N")
+  // re-processing an ASIN a SIBLING session already OCR'd gets fresh,
+  // correct data written to the row — while the row's `keyword` column
+  // silently stays pinned to the sibling's session label. Fetching here by
+  // `.eq('keyword', KEYWORD)` (the old code) therefore missed every
+  // ASIN-overlapping row THIS session just paid to re-OCR, even though the
+  // content was completely valid. Confirmed live on "electrolyte powder #4"
+  // (2026-09-01/02): P4 spent real money OCR'ing/text-extracting all 40
+  // products (40/40 saved), but only 15 dovive_ocr rows still carried this
+  // session's exact keyword tag, syncing just 4/40 nutrients_count into
+  // DASH — which then failed the P4 verifier gate on data that had, in
+  // reality, just been freshly and correctly extracted. Fixed the same way
+  // migrate-keepa-to-dash.js already does it for the identical
+  // dovive_keepa case: resolve THIS session's ASIN list from
+  // dovive_research (genuinely UNIQUE(asin, keyword), safe to filter by
+  // keyword) first, then fetch dovive_ocr BY ASIN — never by its unreliable
+  // `keyword` column.
+  const { data: researchRows, error: researchErr } = await DOVIVE
+    .from('dovive_research')
+    .select('asin')
+    .eq('keyword', KEYWORD);
+  if (researchErr) { console.error('dovive_research fetch error:', researchErr.message); return; }
+  const keywordAsins = (researchRows || []).map(r => r.asin);
+  if (!keywordAsins.length) {
+    console.log('No ASINs found in dovive_research for this keyword.');
+    return;
+  }
+  console.log(`Found ${keywordAsins.length} ASINs in dovive_research for "${KEYWORD}"`);
+
+  // 1. Load all OCR records for these ASINs (not by dovive_ocr.keyword — see above)
   const { data: ocrRows, error: ocrErr } = await DOVIVE
     .from('dovive_ocr')
     .select('asin,serving_size,servings_per_container,supplement_facts,certifications,health_claims')
-    .eq('keyword', KEYWORD);
+    .in('asin', keywordAsins);
 
   if (ocrErr) { console.error('OCR fetch error:', ocrErr.message); return; }
   console.log(`Fetched ${ocrRows.length} OCR records`);

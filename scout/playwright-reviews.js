@@ -106,8 +106,26 @@ async function getAsins() {
   return rows;
 }
 
-async function getScrapedAsins() {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/dovive_reviews?select=asin`, {
+// 2026-09-02: SESSION-ISOLATION FIX — dovive_reviews is plain append-only
+// INSERT (no upsert/conflict target — aca2339's audit confirmed it never
+// clobbers a sibling session's rows), so this used to fetch scraped ASINs
+// GLOBALLY across every keyword/session ever run. For a fresh "#N" session
+// with heavy ASIN overlap against sibling sessions (e.g. "electrolyte
+// powder #4" vs #1/#2/#3), that meant every overlapping ASIN a SIBLING
+// session had already reviewed was treated as "already have reviews" and
+// excluded from THIS session's toScrape list — so THIS session never wrote
+// its OWN dovive_reviews rows for those ASINs, undercounting
+// migrate-reviews-to-dash.js's keyword-scoped read and the P3 verifier gate
+// (both correctly `.eq('keyword', KEYWORD)`-scoped to this session, per the
+// eca3061 lesson) even though review content genuinely exists elsewhere.
+// Scoped to the SAME exact session keyword used to build the candidate ASIN
+// list (getAsins()) whenever one is set — global-mode (`node
+// playwright-reviews.js` with no keyword arg) keeps the old unscoped
+// behavior, matching getAsins()'s own KEYWORD_FILTER-conditional pattern.
+async function getScrapedAsins(keyword) {
+  let url = `${SUPABASE_URL}/rest/v1/dovive_reviews?select=asin`;
+  if (keyword) url += `&keyword=eq.${encodeURIComponent(keyword)}`;
+  const res = await fetch(url, {
     headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
   });
   if (!res.ok) return new Set();
@@ -267,7 +285,7 @@ async function main() {
   console.log(`   Max ASINs: ${MAX_ASINS} | Max pages/ASIN: ${MAX_PAGES_PER_ASIN}`);
 
   const asinRows = await getAsins();
-  const scrapedAsins = await getScrapedAsins();
+  const scrapedAsins = await getScrapedAsins(KEYWORD_FILTER);
   const toScrape = asinRows.filter(r => !scrapedAsins.has(r.asin)).slice(0, MAX_ASINS);
 
   console.log(`   Found ${asinRows.length} ASINs | Already have reviews: ${scrapedAsins.size} | To scrape: ${toScrape.length}`);

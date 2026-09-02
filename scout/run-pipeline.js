@@ -767,6 +767,31 @@ async function runFinalVerifier(categoryId, scopePhases = null) {
   return { pass: failures.length === 0, failures, metrics: { total, runTotal, runAsinsCount: runAsins.length, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, top20P3, top20P4 } };
 }
 
+// ─── Mid-run structural gates (2026-09-02) ─────────────────────────────────
+// A phase completing without throwing only means the SCRIPT ran to
+// completion — it says nothing about whether the underlying data actually
+// cleared the completeness bar the FINAL verifier will require at the very
+// end. Two real incidents on "electrolyte powder #4" (2026-09-01/02) show
+// the cost of only finding that out at the end: (1) a fresh research-scope
+// run (P1-P8) legitimately landed P4 at 4/40 (top20 3/20) but still burned
+// P5-P8 AI spend before the final verifier caught it; (2) a from_phase:9
+// "Generate formula brief" continuation job inherited that SAME broken
+// P1-P8 data (from_phase:9 never re-runs P1-P8) and burned $2.16 on the
+// entire formula chain (P9-P13) before failing on the exact same stale P4
+// number. These gates re-run runFinalVerifier() — the SAME function, SAME
+// thresholds, never a separate/looser bar — scoped to just the phases that
+// SHOULD already be structurally sufficient at each checkpoint, right
+// before the next phase gets meaningfully more expensive: before P5 (Deep
+// Research — the first per-product AI phase) and before P9 (Formula
+// Brief — the whole dual-AI formula chain, P9-P13). Applies regardless of
+// how the run was invoked (fresh full run, --phases subset, or a
+// from_phase:9 continuation) — it checks the CATEGORY'S CURRENT REAL DATA,
+// not "did this run's own phase list happen to include the earlier phase."
+const MID_RUN_GATES = {
+  5: [1, 2, 3, 4],
+  9: [1, 2, 3, 4, 5, 6, 7, 8],
+};
+
 async function run() {
   console.log(`\n${'═'.repeat(60)}`);
   console.log(`🔍 SCOUT PIPELINE — "${KEYWORD}"`);
@@ -842,6 +867,26 @@ async function run() {
         await notify(`🚫 Scout STOPPED at P${phase.num} for "${KEYWORD}"\n\nP${prevResult.phase} failed: ${prevResult.error?.slice(0,200)}\n\nFix P${prevResult.phase} then retry.`);
         results.push({ phase: phase.num, name: phase.name, status: 'blocked', msg: `P${prevResult.phase} not complete` });
         break;
+      }
+    }
+
+    // ── Mid-run structural gate ────────────────────────────────
+    // See MID_RUN_GATES / the comment above for why this exists. Checked
+    // BEFORE runPhaseWithRetry so a gate failure never burns a phase
+    // attempt or the retry backoff.
+    if (categoryId && MID_RUN_GATES[phase.num]) {
+      const gate = await runFinalVerifier(categoryId, MID_RUN_GATES[phase.num]);
+      if (!gate.pass) {
+        const msg = `🚫 Structural gate FAIL before P${phase.num} (${phase.name}) — underlying data doesn't clear the same bar the final verifier requires:\n${gate.failures.join(' | ')}\n\nFix the earlier phase(s) first — not running P${phase.num}+ against incomplete data.`;
+        console.error(`\n${'═'.repeat(60)}`);
+        console.error(msg);
+        console.error(`${'═'.repeat(60)}\n`);
+        await notify(`🚫 Scout STOPPED before P${phase.num} for "${KEYWORD}" — structural gate FAIL\n${gate.failures.join(' | ')}`);
+        results.push({ phase: phase.num, name: phase.name, status: 'blocked', msg: `Structural gate FAIL: ${gate.failures.join(' | ')}` });
+        await updateJobStatus({ status: 'error', error: `Structural gate FAIL before P${phase.num}: ${gate.failures.join(' | ')}`.slice(0, 2000), finished_at: new Date().toISOString() });
+        await rollupJobCost();
+        process.exitCode = 2;
+        return; // skip the end-of-loop final verifier — this IS the terminal failure reason
       }
     }
 

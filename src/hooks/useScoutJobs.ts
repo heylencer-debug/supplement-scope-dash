@@ -391,6 +391,13 @@ export function useRerunFromPhase() {
         status: "queued",
         from_phase: params.fromPhase,
         only_phases: inheritedScope,
+        // 2026-09-03 fix: a RERUN must actually re-run. Without force, every
+        // phase's "output already exists" skip check fires and the job
+        // completes in minutes having regenerated nothing (live-observed:
+        // a from_phase:9 rerun finished with zero P9-P13 AI calls because
+        // the prior chain's outputs were still present). force → cloud-worker
+        // passes --force → phases regenerate over existing output.
+        force: true,
       };
 
       const { data: job, error: insertError } = await scoutJobsTable()

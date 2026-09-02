@@ -172,7 +172,7 @@ async function callClaudeSonnetQAOnce(prompt, maxTokens, model = ANALYSIS_MODEL,
 async function callClaudeSonnetQA(prompt, maxTokens = 64000, model = ANALYSIS_MODEL) {
   let { content, finishReason } = await callClaudeSonnetQAOnce(prompt, maxTokens, model);
   let len = (content || '').length;
-  // AUTO-CONTINUATION (2026-08-29, segment cap raised 2→5 on 2026-09-04):
+  // AUTO-CONTINUATION (2026-08-29, segment cap raised 2→5 on 2026-09-03):
   // 64k is the MODEL's output ceiling, so a big report can hit
   // finish_reason=length with real content (seen live: electrolyte QA
   // adjudicator at exactly 64,000 tok). This is NOT a retry — nothing is
@@ -347,7 +347,7 @@ For each active ingredient in the FINAL FORMULA BRIEF:
 - Taste, texture, and tolerability complaints must be solved via the excipient and manufacturing system — NOT by adding more actives
 - Never add an active ingredient to solve a problem that is a formulation or manufacturing issue
 
-### 6. BASELINE/EDGE CONSISTENCY CHECK (2026-09-03, scoped to EDGE/BLEND on 2026-09-04)
+### 6. BASELINE/EDGE CONSISTENCY CHECK (2026-09-03, scoped to EDGE/BLEND on 2026-09-03)
 If either FORMULA A or FORMULA B includes a "PROVEN BASELINE" (section 1B)
 and "EMERGING EDGE" (section 1C) split — table-stakes decisions sourced
 ONLY from the established-cohort evidence pool, vs novel bets sourced ONLY
@@ -437,7 +437,7 @@ Serving Size: 2 Gummies | Servings Per Container: 45
 **Summary:** 2-3 sentences -- did P8 AI over-engineer this? Whats the critical finding?
 
 ## COMPARATIVE VERDICT -- WHEN TO LAUNCH WHICH
-(New 2026-09-04 section -- required)
+(New 2026-09-03 section -- required)
 | Formula | Best Launch Scenario | Biggest Risk | QA Score |
 |---|---|---|---|
 | Proven | [e.g. risk-averse launch, thin working capital, first SKU in category] | [usually low -- thats the point] | X/10 |
@@ -1230,7 +1230,7 @@ async function run() {
     console.log(`  WARNING: Final Formula Brief section not found in QA output`);
   }
 
-  // ── Tri-formula extraction (2026-09-04) ───────────────────────────────────
+  // ── Tri-formula extraction (2026-09-03) ───────────────────────────────────
   // Pulls the three "### FORMULA -- X" subsections out of the Final Formula
   // Brief so the UI can render Proven/Edge/Recommended as separate tabs
   // instead of one long markdown blob. Tolerant of dash style (--, –, —)
@@ -1264,7 +1264,7 @@ async function run() {
   // Canonical single-formula extraction for every legacy downstream
   // consumer (formula-validator, manufacturer-chat corpus, formula_brief_
   // versions, ManufacturerPortal) — must resolve to the RECOMMENDED BLEND
-  // (2026-09-04: that formula is now canonical), never Proven or Edge.
+  // (2026-09-03: that formula is now canonical), never Proven or Edge.
   const adjustedFormulaMatch = qaReport.match(/## ADJUSTED FORMULA SPECIFICATION([\s\S]*?)(?:\n## |$)/);
   const adjustedFormulaFromBrief = formulaVariants?.recommended
     || (finalFormulaBrief ? finalFormulaBrief.match(/### Recommended Formula[\s\S]*?(?=\n### |$)/)?.[0]?.trim() || null : null);
@@ -1276,7 +1276,7 @@ async function run() {
     console.log(`  WARNING: Adjusted formula not found`);
   }
 
-  // ── Comparative verdict (2026-09-04, new required section) ───────────────
+  // ── Comparative verdict (2026-09-03, new required section) ───────────────
   const comparativeVerdictMatch = qaReport.match(/## COMPARATIVE VERDICT[^\n]*\n([\s\S]*?)(?:\n## |$)/i);
   const comparativeVerdict = comparativeVerdictMatch?.[1]?.trim() || null;
   console.log(`  Comparative verdict: ${comparativeVerdict ? Math.round(comparativeVerdict.length / 1000) + 'k chars OK' : 'MISSING'}`);
@@ -1300,7 +1300,7 @@ async function run() {
     qa_verdict: verdict,
     adjusted_formula: adjustedFormula,
     final_formula_brief: finalFormulaBrief,
-    // 2026-09-04: additive tri-formula fields. `adjusted_formula`/
+    // 2026-09-03: additive tri-formula fields. `adjusted_formula`/
     // `final_formula_brief` above stay the canonical single-formula shape
     // every existing downstream consumer (formula-validator,
     // manufacturer-chat corpus, formula_brief_versions, ManufacturerPortal)

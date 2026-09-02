@@ -101,7 +101,7 @@ async function callGrok42(prompt, maxTokens = 64000) {
   let { content, finishReason } = await doCall(maxTokens);
   // Auto-continuation on model output ceiling (see continueTruncated below —
   // doCall's shape differs, so the same stitch loop is inlined here).
-  // Segment cap raised 2→5 (tri-formula brief, 2026-09-04): Section 2 now
+  // Segment cap raised 2→5 (tri-formula brief, 2026-09-03): Section 2 now
   // requires THREE complete formulas instead of one — target length nearly
   // tripled (3-4k words → 6.5-9.5k words), so a single-formula-era 2-segment
   // ceiling would truncate the 2B/2C formulas on a real run. 64k tokens is
@@ -1957,7 +1957,7 @@ run().catch(e => {
   process.exit(1);
 });
 
-// ─── AUTO-CONTINUATION (2026-08-29, segment cap raised 2→5 on 2026-09-04) ──
+// ─── AUTO-CONTINUATION (2026-08-29, segment cap raised 2→5 on 2026-09-03) ──
 // 64k is the MODEL's output ceiling — a big report can hit
 // finish_reason=length with real content (seen live: electrolyte QA
 // adjudicator at exactly 64,000 tok). This is NOT a retry: nothing is

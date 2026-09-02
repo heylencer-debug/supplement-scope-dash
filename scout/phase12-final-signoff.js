@@ -116,7 +116,7 @@ async function callOpusOnce(prompt, maxTokens, messagesOverride = null) {
 
 // Auto-continuation on the model's output ceiling (established pattern —
 // NOT a retry: partial answer becomes context, generation continues).
-// Segment cap raised 2→5 on 2026-09-04: the sign-off deliverable now
+// Segment cap raised 2→5 on 2026-09-03: the sign-off deliverable now
 // covers THREE formulas (Proven/Edge/Recommended Blend) instead of one,
 // each with its own verdict + corrected formula table + corrections list.
 async function callOpus(prompt, maxTokens = 64000) {
@@ -144,7 +144,7 @@ async function callOpus(prompt, maxTokens = 64000) {
 
 function real(t) { return typeof t === 'string' && t.trim().length > 500 && !t.trim().startsWith('[ERROR'); }
 
-// 2026-09-04: tolerant per-formula section extraction from the tri-formula
+// 2026-09-03: tolerant per-formula section extraction from the tri-formula
 // sign-off output (heading-level/case drift tolerant, same pattern used by
 // P9's extractFormulaVariant).
 function extractSignoffBlock(text, label, nextLabels) {
@@ -160,7 +160,7 @@ function parseBlockVerdict(block) {
   return m ? m[1] : 'UNKNOWN';
 }
 
-// 2026-09-04: dispatches to the tri-formula sign-off when P9 produced
+// 2026-09-03: dispatches to the tri-formula sign-off when P9 produced
 // `ingredients.formula_variants` (Proven/Edge/Recommended Blend), else
 // falls back UNCHANGED to the legacy single-formula sign-off — an older
 // brief generated before the tri-formula upgrade renders exactly as it
@@ -216,7 +216,7 @@ The final list of structure/function claims that survive DSHEA review, each with
 Be decisive and specific. Plain language. Every number must trace to the inputs above.`;
 }
 
-// Tri-formula sign-off (2026-09-04): P9 adjudicated three complete formulas
+// Tri-formula sign-off (2026-09-03): P9 adjudicated three complete formulas
 // (Proven/Edge/Recommended Blend) — each needs its own verdict, since they
 // may legitimately differ (e.g. Proven APPROVED outright while Edge is
 // APPROVED WITH CORRECTIONS because one emerging-bet ingredient needed a
@@ -328,7 +328,7 @@ async function run() {
   const review = await callOpus(prompt, 64000);
   if (!review) throw new Error('Sign-off came back empty after retry.');
 
-  // 2026-09-04: per-formula verdict parsing when P9 produced three
+  // 2026-09-03: per-formula verdict parsing when P9 produced three
   // formulas — a legacy/older brief without formula_variants keeps the
   // EXACT single-verdict parse it always had (no `per_formula` field at
   // all), so nothing about how an old brief renders changes.

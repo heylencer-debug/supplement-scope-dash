@@ -160,7 +160,7 @@ export function FormulaJourneyTab({ categoryId, categoryName, activeVersionInfo,
             )}
 
             <div className="border-t border-border/60 pt-3.5">
-              {/* 2026-09-04: tri-formula tabs (Proven/Edge/Recommended) when
+              {/* 2026-09-03: tri-formula tabs (Proven/Edge/Recommended) when
                   P9 produced formula_variants — Recommended preselected,
                   since it's still the canonical formula. Falls back to the
                   single inline excerpt exactly as before on any brief that

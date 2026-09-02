@@ -1,5 +1,154 @@
 # Scout pipeline — Cloud Run Job deploy notes
 
+## 2026-09-03: Tri-formula formula brief — Proven / Edge / Recommended Blend (extends 2026-09-03 cohort split)
+
+**User-approved task**: "yes I need two complete formulas, or 3 maybe Old,
+New, and Mixed" — extends the cohort-separation work (established/emerging,
+commits `3675f9e..d9b5cf7`) from a single provenance-tagged formula into
+THREE complete, independently full formulas per brief.
+
+**P8 (`phase8-formula-brief.js`)** — Section 2 restructured from one
+"FORMULA COMPOSITION" block into three parallel formulas, each with its own
+Primary/Secondary/Tertiary Actives tables, Functional Excipients, Formula
+Summary, Ingredient Selection Rationale, and Clinical Citations:
+- **2A. PROVEN** ("Old") — strictly established-cohort consensus, zero
+  emerging bets, Provenance column limited to baseline/clinical-floor.
+- **2B. EDGE** ("New") — established doses as a safety floor, emerging
+  cohort's bets layered on top, each keeping its one-brand-bet-vs-multi-
+  brand-trend risk note from Section 1C.
+- **2C. RECOMMENDED BLEND** ("Mixed") — the provenance-labeled hybrid,
+  CANONICAL — Sections 3-10 (physical spec, packaging, label, variants)
+  describe this formula only, the one that ships to manufacturing.
+The 1B/1C cohort-tagged evidence sections stay as shared grounding above
+all three. Target length raised 3-4k words → 6.5-9.5k words.
+
+**P9 (`phase9-formula-qa.js`)** — adjudicates all three independently: the
+"## FINAL FORMULA BRIEF" deliverable now contains three formula
+subsections ("### FORMULA -- PROVEN/EDGE/RECOMMENDED BLEND", each with its
+own ingredient table), three separate DOSE ANALYSIS tables (one per
+formula), and one MANUFACTURABILITY CHECK table with a column per formula.
+The 2026-09-03 baseline/edge consistency guard (Rule 6) is now explicitly
+scoped to Edge and Recommended Blend only — Proven has no edge bets by
+definition. New "## COMPARATIVE VERDICT — WHEN TO LAUNCH WHICH" section
+(best launch scenario / biggest risk / QA score per formula, plus a
+single-choice recommendation paragraph). New parsed+persisted fields:
+`ingredients.formula_variants = { proven, edge, recommended }` (markdown
+chunks, tolerant regex extraction) and `ingredients.comparative_verdict`.
+**Backward compat preserved exactly**: `adjusted_formula` now resolves via
+`formula_variants.recommended` first (falls back to the old "###
+Recommended Formula" heading extraction for any legacy/degraded output),
+and the standalone "## ADJUSTED FORMULA SPECIFICATION" section is
+instructed to mirror the Recommended Blend exactly — every existing reader
+of `adjusted_formula`/`final_formula_brief` (formula-validator.js,
+manufacturer-chat corpus, `formula_brief_versions`, ManufacturerPortal)
+needed ZERO code changes.
+
+**P13 (`phase12-final-signoff.js`)** — new `buildTriFormulaPrompt()` used
+whenever `ingredients.formula_variants.recommended` is real content;
+`buildLegacyPrompt()` (byte-identical to the pre-existing prompt) used
+otherwise — an older brief that predates this ships gets the EXACT legacy
+single-formula sign-off, unchanged. Tri-formula deliverable: three
+independent `## PROVEN/EDGE/RECOMMENDED BLEND — SIGN-OFF` blocks (verdict +
+corrected formula table + corrections applied per formula — they may
+differ, e.g. Proven APPROVED outright while Edge needs a dose correction
+for an emerging-bet ingredient), then a single "## APPROVED LABEL CLAIMS"
++ "## GO-TO-FACTORY NOTE" scoped to the Recommended Blend only (the one
+formula that actually ships), plus a "## THREE-FORMULA COMPARATIVE NOTE".
+New `final_signoff.per_formula = { proven, edge, recommended }` (each
+`{ verdict, review }`) and `final_signoff.comparative_note` — additive;
+top-level `verdict`/`opus_review`/`corrections_applied` still resolve to
+the Recommended Blend, so `src/lib/canonicalFormula.ts` and every other
+existing reader of `final_signoff` needed zero changes beyond the new
+optional fields.
+
+**Token budgets** (per explicit instruction — outputs roughly triple):
+continuation segment cap raised 2→5 in `phase8-formula-brief.js`
+(`callGrok42`'s inline loop + `continueTruncated`, used by
+`callClaudeSonnet`), `phase9-formula-qa.js` (`callClaudeSonnetQA`, used by
+both Call 1 the QA adjudicator and Call 2), and `phase12-final-signoff.js`
+(`callOpus`). Per-call `max_tokens` (64000) is unchanged — it's already
+near the model's own output ceiling per the existing 2026-08-29 design
+comment ("64k is the MODEL's output ceiling... this is NOT a retry"); the
+fix is allowing more continuation segments to stitch a 3x-longer real
+document together, not raising the per-call cap past the model's limit.
+The `[ERROR: truncated/empty]` marker and retry-once-on-near-empty
+protections are untouched in all three files.
+
+**UI (`src/components/dashboard/FormulaBriefTab.tsx`,
+`src/components/dashboard/FormulaJourneyTab.tsx`,
+`src/lib/canonicalFormula.ts`, `src/hooks/useFormulaBrief.ts`)** — new
+exported `TriFormulaView` component (Pearl-consistent segmented tabs:
+"✅ Recommended — Our blend of both" preselected, "🛡️ Proven — What the
+established winners agree on", "🚀 Edge — What the new winners are betting
+on"), each tab showing its own ingredient table + a per-formula sign-off
+verdict badge (APPROVED / APPROVED WITH CORRECTIONS / REJECTED, color-
+coded) once P13 has run. Wired into BOTH real render paths: FormulaBriefTab
+'s "Final Formula" card (inline expander + full-document modal) and
+FormulaJourneyTab's "The Formula" top panel (the zero-click canonical
+answer every user actually sees first) via `canonicalFormula.ts`'s new
+`attachVariants()` helper, which reads `formula_variants`/
+`comparative_verdict`/`final_signoff.per_formula` onto whichever maturity
+tier resolves (signoff > qa_adjusted > brief) — independent of tier, so
+the tri-formula tabs appear even before P13 runs (just without sign-off
+badges yet). **Graceful fallback**: every one of these falls back to the
+exact old single-formula markdown render when `formula_variants` is
+absent, so old briefs render byte-identical to before. Mobile fix: the 3
+tabs' full label+subtitle text doesn't fit 390px without clipping — the
+tab strip scrolls horizontally there (same `overflow-x-auto` pattern
+already used for wide markdown tables), full-width on desktop.
+
+**Verification**: `npx tsc --noEmit -p tsconfig.app.json` clean throughout.
+`node -c` clean on all three touched scout/*.js files. Offline mock test
+harness (no live API calls) validated: (1) the tri-formula section
+extraction regexes against realistic sample P9/P13 output — proven/edge/
+recommended chunks correctly isolated with no cross-bleed, comparative
+verdict and per-formula sign-off blocks correctly parsed, verdict parsing
+correct for all three formulas; (2) a continuation-loop simulation proving
+the segment cap raise (2→5) actually prevents truncation on a
+5-call/3000-char mock document that the OLD 2-segment cap would have left
+silently truncated (`finish_reason` still `'length'` when the old loop
+exits) — this is the project's historical truncation bug class, confirmed
+closed for the larger tri-formula outputs. Playwright screenshots (1440 +
+390px, scout's own playwright devDependency, real running app via
+`npm run dev` on :5183) against a route-intercepted mock `formula_briefs`
+row on the real "sugar free electrolytes" category (no real tri-formula
+brief exists yet — deliberately not triggered, see below): confirmed the
+Comparative Verdict box, Recommended/Proven/Edge tab switching with
+correct per-formula ingredient tables (Provenance column on Recommended,
+Risk Note column on Edge), per-formula sign-off badges, the "Signed off ✓"
+maturity chip, and the mobile horizontal-scroll tab strip all render
+correctly with zero regressions to the surrounding page.
+
+**Deploy**: 2 logical commits (`c282228` scout pipeline P8/P9/P13,
+`9d9e590` frontend UI), fetch+rebase (clean, up to date, no conflicts),
+pushed to `main`. Cloud Run image rebuilt (`gcloud builds submit`, digest
+`sha256:617fc93f7e7e64998b9ebf24a959e478780903182714fd4899ad05cb8a3e4e72`)
+and `dovive-scout` Cloud Run Job updated to `:latest`. Per instruction, **no
+paid pipeline run was triggered** this session — the session classifier
+also blocks agents from doing so.
+
+**Cost estimate for the first real tri-formula run — do NOT quote the old
+~$2 figure.** The prior P9-only "Rerun from P9" estimate (~$2, per the
+2026-09-03 cohort-split entry, based on "sugar free electrolytes"'s own
+past P9+ spend) was priced for the SINGLE-formula era. This run's output
+target roughly triples (P8's Section 2 alone: 3-4k words → 6.5-9.5k words;
+P9 adds 2 more full dose-analysis tables + a new comparative-verdict
+section; P13 adds 2 more full sign-off blocks) and now depends on
+continuation segments up to 5x instead of 2x on both the draft (P8) and
+adjudication (P9) calls if the model hits its per-call ceiling on this
+category's real competitor density. A realistic estimate is
+**~$5-8 for the P9+ (Formula QA → Sign-off) chain** on this category
+(roughly 2.5-4x the old ~$2 figure) — the dashboard's own "Rerun from
+here" dialog computes a LIVE estimate from this category's actual past
+`ai_usage_log` spend at the moment of the click, which will be more
+accurate than this pre-run estimate once at least one real tri-formula run
+has populated the ledger with real P8/P9/P13 costs at the new lengths.
+
+Left off: the "sugar free electrolytes" category needs a real "Rerun from
+P9 — Formula Brief" click to produce the FIRST real (non-mocked)
+tri-formula brief — the pipeline code is deployed and correct, but this
+session deliberately did not trigger any paid run.
+
 ## 2026-09-01: cheap-mode finale triage — P4 retry-heuristic fix, cleanup, verifier sanity-check
 
 **Trigger**: the prior session's cheap-mode verification run (`scout_job

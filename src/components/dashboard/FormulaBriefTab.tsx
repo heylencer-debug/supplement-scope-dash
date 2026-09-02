@@ -238,7 +238,7 @@ function SectionCard({ icon: Icon, title, description, children, accent }: {
   );
 }
 
-// ─── Tri-formula view (2026-09-04) ─────────────────────────────────────────────
+// ─── Tri-formula view (2026-09-03) ─────────────────────────────────────────────
 // Renders P9's three adjudicated formulas — Proven / Edge / Recommended Blend
 // — as Pearl-consistent segmented tabs, Recommended preselected (it's the
 // canonical formula every downstream document already uses). Falls back to
@@ -348,7 +348,7 @@ function FormulaCard({ card, categoryName, generatedAt, onManufacturerPDF }: {
     id: string; emoji: string; title: string; subtitle: string; badge: string;
     borderColor: string; bgColor: string; badgeColor: string; content: string;
     downloadContent?: string; downloadLabel?: string;
-    // Tri-formula (2026-09-04) — when present, the card renders Proven/Edge/
+    // Tri-formula (2026-09-03) — when present, the card renders Proven/Edge/
     // Recommended segmented tabs instead of one markdown blob, both inline
     // and in the full-document viewer. `content`/`downloadContent` above stay
     // the full combined text so PDF export/print is unaffected either way.
@@ -533,7 +533,7 @@ export function FormulaBriefTab({ categoryId, categoryName }: Props) {
   // Final Formula card shows full brief when available, falls back to adjustments
   const finalFormulaContent = finalFormulaBrief || adjustedFormula;
 
-  // Tri-formula fields (2026-09-04) — additive, null on any brief generated
+  // Tri-formula fields (2026-09-03) — additive, null on any brief generated
   // before this shipped. `hasVariants` gates the tab UI; when false the
   // "final" card falls back to the single-blob markdown exactly as before.
   const formulaVariantsRaw = f?.formula_variants as { proven?: string | null; edge?: string | null; recommended?: string | null } | null | undefined;

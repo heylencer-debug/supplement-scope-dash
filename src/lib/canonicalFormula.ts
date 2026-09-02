@@ -30,7 +30,7 @@ export interface CanonicalFormula {
   verdict?: string;
   /** ISO timestamp — only set when source === "signoff". */
   generatedAt?: string;
-  // 2026-09-04: tri-formula fields (Proven/Edge/Recommended Blend), present
+  // 2026-09-03: tri-formula fields (Proven/Edge/Recommended Blend), present
   // whenever P9 wrote `ingredients.formula_variants` — independent of which
   // maturity tier above resolved (signoff/qa_adjusted/brief), since P9
   // always runs before P13. Absent (undefined) on any pre-tri-formula
@@ -54,7 +54,7 @@ const EMPTY: CanonicalFormula = {
   inlineExcerpt: "",
 };
 
-// 2026-09-04: attaches tri-formula fields to whichever maturity tier
+// 2026-09-03: attaches tri-formula fields to whichever maturity tier
 // resolved below — deterministic (no heading-regex matching against the
 // tri-formula P13 structure, which no longer emits a single "## 2. FINAL
 // FORMULA" heading). Recommended Blend replaces inlineExcerpt when variants

@@ -37,7 +37,7 @@ export interface FormulaBriefData {
     };
     qa_report?: string;
     final_formula_brief?: string;
-    // 2026-09-04: tri-formula fields — additive, null/absent on any brief
+    // 2026-09-03: tri-formula fields — additive, null/absent on any brief
     // generated before this shipped (FormulaBriefTab falls back to the
     // single-formula render when formula_variants is absent).
     formula_variants?: {

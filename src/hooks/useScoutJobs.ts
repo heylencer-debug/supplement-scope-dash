@@ -14,6 +14,23 @@ import { RESEARCH_SCOPE_PHASES, FORMULA_CHAIN_FROM_PHASE } from "@/types/scoutJo
 const scoutJobsTable = () => (supabase.from as unknown as (table: string) => any)("scout_jobs");
 
 /**
+ * A double-submit guard hit ("this keyword already has a job in flight") is
+ * NOT a failure — it means the click already worked once and the system is
+ * doing the right thing by refusing to queue a duplicate. 2026-09-02 UX fix
+ * (direct user feedback: "that's not very UX friendly"): every onError below
+ * checks for this specific error type so it can render an informational
+ * toast (no red/destructive treatment, no "Failed to..." title) instead of
+ * lumping it in with genuine failures (a real DB error, a missing keyword,
+ * etc.), which DO stay destructive.
+ */
+class DoubleSubmitError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "DoubleSubmitError";
+  }
+}
+
+/**
  * Submit a new keyword to the cloud Scout pipeline queue.
  *
  * The `scout_jobs` INSERT is the source of truth — a queued row means the
@@ -60,7 +77,11 @@ export function useSubmitScoutJob() {
         return true;
       });
       if (inflightHit) {
-        throw new Error(`"${inflightHit.keyword}" is already ${inflightHit.status} — wait for it or cancel it first.`);
+        throw new DoubleSubmitError(
+          inflightHit.status === "queued"
+            ? `"${inflightHit.keyword}" is already queued — it'll start shortly. See the live strip below.`
+            : `"${inflightHit.keyword}" is already running — see the live strip below for progress.`
+        );
       }
 
       // SESSION ISOLATION: if this keyword already has a workspace (any
@@ -140,13 +161,17 @@ export function useSubmitScoutJob() {
       } else {
         toast({
           title: "Analysis queued",
-          description: "Queued — cloud trigger pending setup. It will run once the Cloud Run cutover finishes.",
+          description: "Queued — it's saved and will start automatically once our backend is ready for it.",
         });
       }
     },
     onError: (error: Error) => {
+      if (error instanceof DoubleSubmitError) {
+        toast({ title: "Already in progress", description: error.message });
+        return;
+      }
       toast({
-        title: "Failed to queue analysis",
+        title: "Couldn't queue this analysis",
         description: error.message,
         variant: "destructive",
       });
@@ -189,7 +214,9 @@ export function useGenerateFormulaBrief() {
         return true;
       });
       if (activeInflight.length > 0) {
-        throw new Error(`"${keyword}" already has a job ${activeInflight[0].status} — wait for it to finish first.`);
+        throw new DoubleSubmitError(
+          `"${keyword}" already has a run ${activeInflight[0].status} — see the progress bar, no need to queue another.`
+        );
       }
 
       const insertPayload: ScoutJobInsert = {
@@ -222,12 +249,16 @@ export function useGenerateFormulaBrief() {
         title: "Formula brief queued",
         description: triggerOk
           ? "Generating the formula brief, QA, benchmarking, compliance, and sign-off — this'll show in the live strip."
-          : "Queued — cloud trigger pending, will run on the next sweep.",
+          : "Queued — it'll start automatically within a few minutes.",
       });
     },
     onError: (error: Error) => {
+      if (error instanceof DoubleSubmitError) {
+        toast({ title: "Already in progress", description: error.message });
+        return;
+      }
       toast({
-        title: "Failed to queue formula brief",
+        title: "Couldn't queue the formula brief",
         description: error.message,
         variant: "destructive",
       });
@@ -294,7 +325,11 @@ export function useRerunFromPhase() {
         return true;
       });
       if (activeInflight.length > 0) {
-        throw new Error(`"${keyword}" already has a job ${activeInflight[0].status} — wait for it to finish first.`);
+        throw new DoubleSubmitError(
+          activeInflight[0].status === "queued"
+            ? `"${keyword}" is already queued — it'll start shortly, see the progress bar.`
+            : `"${keyword}" is already running — see the progress bar above.`
+        );
       }
 
       // Inherit the ORIGINAL run's phase scope (2026-09-02 fix) — a
@@ -364,15 +399,19 @@ export function useRerunFromPhase() {
     onSuccess: ({ triggerOk, fromPhase }) => {
       queryClient.invalidateQueries({ queryKey: ["scout_jobs"] });
       toast({
-        title: `Rerunning from P${fromPhase}`,
+        title: `Retrying from P${fromPhase}`,
         description: triggerOk
-          ? "Queued — this'll show in the live strip and the phase tracker above."
-          : "Queued — cloud trigger pending, will run on the next sweep.",
+          ? "Queued — you'll see it in the live strip and the progress bar in a moment."
+          : "Queued — it'll start automatically within a few minutes.",
       });
     },
     onError: (error: Error) => {
+      if (error instanceof DoubleSubmitError) {
+        toast({ title: "Already in progress", description: error.message });
+        return;
+      }
       toast({
-        title: "Failed to queue rerun",
+        title: "Couldn't queue the retry",
         description: error.message,
         variant: "destructive",
       });

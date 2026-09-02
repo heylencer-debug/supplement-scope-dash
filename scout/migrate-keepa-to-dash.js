@@ -11,6 +11,7 @@
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const { resolveCategory } = require('./utils/category-resolver');
+const { classifyCohort } = require('./utils/cohort');
 
 const DOVIVE = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 const DASH = createClient(
@@ -44,18 +45,34 @@ async function run() {
 
   const DASH_CAT_ID = await lookupCategoryId(KEYWORD);
 
-  // 1. Get all ASINs in supplement-scope-dash for this category
+  // 1. Get all ASINs in supplement-scope-dash for this category.
+  // `rating_count` (2026-09-03) — the cohort classifier's review-count
+  // signal. Deliberately sourced from DASH `products.rating_count` (P1
+  // Bright Data scrape), NOT `dovive_keepa.review_count`
+  // (`stats.current[16]` in keepa-phase2.js's parseKeepa()) — a live check
+  // against real market leaders (Nuun/Liquid I.V./LMNT) found the Keepa
+  // field stuck at ~45-48 for nearly every ASIN regardless of actual
+  // review count (Liquid I.V.'s real ~106k reviews vs Keepa's reported 46),
+  // which would have silently zeroed out the whole ESTABLISHED cohort.
+  // `products.rating_count` is untouched by this migration's own patch
+  // below, so it still holds the real P1-scraped figure. The Keepa field
+  // itself is a separate, pre-existing data-quality bug — flagged, not
+  // fixed here (out of scope for cohort tagging).
   const { data: dashProducts, error: dashErr } = await DASH
     .from('products')
-    .select('id, asin')
+    .select('id, asin, rating_count')
     .eq('category_id', DASH_CAT_ID);
 
   if (dashErr) throw dashErr;
   console.log(`Found ${dashProducts.length} products in supplement-scope-dash`);
 
   const asinToId = {};
+  const asinToRatingCount = {};
   for (const p of dashProducts) {
-    if (p.asin) asinToId[p.asin] = p.id;
+    if (p.asin) {
+      asinToId[p.asin] = p.id;
+      asinToRatingCount[p.asin] = p.rating_count;
+    }
   }
 
   // 2. Get ASINs for this keyword from dovive_research (source of truth for keyword→ASIN mapping)
@@ -70,10 +87,13 @@ async function run() {
   }
   console.log(`Found ${keywordAsins.length} ASINs in dovive_research for "${KEYWORD}"`);
 
-  // 3. Get Keepa data by ASIN (not keyword — keyword field may be null)
+  // 3. Get Keepa data by ASIN (not keyword — keyword field may be null).
+  // listed_since/release_date/review_count are the cohort classifier's raw
+  // signals (see utils/cohort.js) — pulled here because this is already the
+  // cheap, no-AI-cost, per-ASIN Keepa read the cohort tagging piggybacks on.
   const { data: keepaRows, error: keepaErr } = await DOVIVE
     .from('dovive_keepa')
-    .select('asin, monthly_sales_est, price_usd, bsr_current, bsr_history_30d, bsr_history_90d, bsr_drops_30d, bsr_drops_90d, monthly_sold_history')
+    .select('asin, monthly_sales_est, price_usd, bsr_current, bsr_history_30d, bsr_history_90d, bsr_drops_30d, bsr_drops_90d, monthly_sold_history, listed_since, release_date, review_count')
     .in('asin', keywordAsins);
 
   if (keepaErr) throw keepaErr;
@@ -82,6 +102,7 @@ async function run() {
   let updated = 0;
   let skipped = 0;
   let errors = 0;
+  const cohortCounts = { established: 0, emerging: 0, context: 0 };
 
   for (const k of keepaRows) {
     const dashId = asinToId[k.asin];
@@ -96,11 +117,24 @@ async function run() {
       ? Math.round(k.monthly_sales_est * k.price_usd)
       : null;
 
+    // Deterministic, no-AI-cost cohort tag — see utils/cohort.js for the
+    // full rationale + env-tunable thresholds. reviewCount comes from
+    // products.rating_count (see the select above), not dovive_keepa's own
+    // review_count field.
+    const { cohort } = classifyCohort({
+      listedSince: k.listed_since,
+      releaseDate: k.release_date,
+      reviewCount: asinToRatingCount[k.asin],
+      monthlySalesEst: k.monthly_sales_est,
+      bsrHistory30d: k.bsr_history_30d,
+    });
+
     const patch = {
       monthly_sales: k.monthly_sales_est,
       monthly_revenue: monthlyRevenue,
       bsr_30_days_avg: bsr30avg,
       bsr_90_days_avg: bsr90avg,
+      cohort,
       historical_data: {
         bsr_history_30d: k.bsr_history_30d,
         bsr_history_90d: k.bsr_history_90d,
@@ -122,6 +156,7 @@ async function run() {
       errors++;
     } else {
       updated++;
+      cohortCounts[cohort] = (cohortCounts[cohort] || 0) + 1;
       if (updated % 20 === 0) console.log(`  ${updated} updated...`);
     }
   }
@@ -130,6 +165,7 @@ async function run() {
   console.log(`Updated: ${updated}`);
   console.log(`Skipped (ASIN not in dash): ${skipped}`);
   console.log(`Errors: ${errors}`);
+  console.log(`Cohort — established: ${cohortCounts.established} · emerging: ${cohortCounts.emerging} · context: ${cohortCounts.context}`);
 }
 
 run().catch(console.error);

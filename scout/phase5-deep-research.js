@@ -831,29 +831,84 @@ function parseResearchOutput(rawText, product, pool, meta) {
 }
 
 // ─── Fetch products from Supabase (both pools kept, counts trimmed) ───────────
+//
+// 2026-09-03 (cohort alignment): Pool A/B used to run an independent ad-hoc
+// heuristic ("best BSR overall" / "<500 reviews + real revenue") that
+// approximated but never actually matched `products.cohort`
+// (established/emerging/context — see utils/cohort.js), computed
+// deterministically from Keepa signals earlier in the pipeline (P2's
+// migrate-keepa-to-dash.js). Two parallel notions of "established vs
+// emerging" is exactly what the P8 brief-split (baseline vs edge) would
+// have inherited confusion from. Now Pool A/B PREFER the cohort tag —
+// `cohort='established'`/`'emerging'` ordered by bsr_current — and only
+// fall back to the old heuristic to fill any remaining slots when a
+// category doesn't have enough tagged products yet (e.g. cohort backfill
+// hasn't run, or the category genuinely has few products meeting the
+// established/emerging thresholds). This keeps P5 working exactly as
+// before on data that predates cohort tagging, while aligning with it going
+// forward.
+const PRODUCT_SELECT = `asin, brand, title, bsr_current, price, monthly_revenue, monthly_sales,
+             rating_value, rating_count, supplement_facts_raw, other_ingredients,
+             claims_on_label, feature_bullets_text, marketing_analysis, review_analysis, cohort`;
 
 async function getProducts(categoryId) {
-  const { data: top10 } = await DASH.from('products')
-    .select(`asin, brand, title, bsr_current, price, monthly_revenue, monthly_sales,
-             rating_value, rating_count, supplement_facts_raw, other_ingredients,
-             claims_on_label, feature_bullets_text, marketing_analysis, review_analysis`)
+  // Pool A — established cohort first, ordered by bsr_current
+  const { data: establishedRows } = await DASH.from('products')
+    .select(PRODUCT_SELECT)
     .eq('category_id', categoryId)
+    .eq('cohort', 'established')
     .not('bsr_current', 'is', null)
     .order('bsr_current', { ascending: true })
     .limit(P5_TOP_COUNT);
 
-  const { data: newBrands } = await DASH.from('products')
-    .select(`asin, brand, title, bsr_current, price, monthly_revenue, monthly_sales,
-             rating_value, rating_count, supplement_facts_raw, other_ingredients,
-             claims_on_label, feature_bullets_text, marketing_analysis, review_analysis`)
+  let top10 = establishedRows || [];
+  if (top10.length < P5_TOP_COUNT) {
+    // Fallback fill — old "best BSR overall" heuristic, excluding anything
+    // already selected above.
+    const { data: fallback } = await DASH.from('products')
+      .select(PRODUCT_SELECT)
+      .eq('category_id', categoryId)
+      .not('bsr_current', 'is', null)
+      .order('bsr_current', { ascending: true })
+      .limit(P5_TOP_COUNT + top10.length);
+    const haveAsins = new Set(top10.map((p) => p.asin));
+    for (const p of fallback || []) {
+      if (top10.length >= P5_TOP_COUNT) break;
+      if (!haveAsins.has(p.asin)) { top10.push(p); haveAsins.add(p.asin); }
+    }
+  }
+
+  // Pool B — emerging cohort first, ordered by bsr_current
+  const { data: emergingRows } = await DASH.from('products')
+    .select(PRODUCT_SELECT)
     .eq('category_id', categoryId)
+    .eq('cohort', 'emerging')
     .not('bsr_current', 'is', null)
-    .lt('rating_count', 500)
-    .gt('monthly_revenue', 0)
     .order('bsr_current', { ascending: true })
     .limit(P5_NEW_COUNT);
 
-  return { top10: top10 || [], newBrands: newBrands || [] };
+  let newBrands = emergingRows || [];
+  if (newBrands.length < P5_NEW_COUNT) {
+    // Fallback fill — old "<500 reviews + real revenue" heuristic, excluding
+    // anything already in Pool A or already selected above.
+    const top10Asins = new Set(top10.map((p) => p.asin));
+    const { data: fallback } = await DASH.from('products')
+      .select(PRODUCT_SELECT)
+      .eq('category_id', categoryId)
+      .not('bsr_current', 'is', null)
+      .lt('rating_count', 500)
+      .gt('monthly_revenue', 0)
+      .order('bsr_current', { ascending: true })
+      .limit(P5_NEW_COUNT + newBrands.length);
+    const haveAsins = new Set(newBrands.map((p) => p.asin));
+    for (const p of fallback || []) {
+      if (newBrands.length >= P5_NEW_COUNT) break;
+      if (haveAsins.has(p.asin) || top10Asins.has(p.asin)) continue;
+      newBrands.push(p); haveAsins.add(p.asin);
+    }
+  }
+
+  return { top10, newBrands };
 }
 
 // ─── Check already researched ──────────────────────────────────────────────────

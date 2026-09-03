@@ -203,4 +203,50 @@ export function countFormulaVariants(
   return [variants.proven, variants.edge, variants.recommended].filter(Boolean).length;
 }
 
+// 2026-09-03 follow-up ("send the 3 formulas to the manufacturer"): assembles
+// a SINGLE markdown document containing all three adjudicated formulas — for
+// the factory handoff and any other surface that needs to send Proven/Edge/
+// Recommended together instead of forcing a pick-one choice. Consumed by
+// both the Preview (MarkdownDoc, which renders standard markdown headings
+// fine via react-markdown) and generateManufacturerPDF's mdToHTML converter,
+// so this is the ONE place the "all 3" document shape is defined — no
+// drift between what a user previews and what prints.
+export interface AllThreeFormulasSignoff {
+  proven?: { verdict: string };
+  edge?: { verdict: string };
+  recommended?: { verdict: string };
+}
+
+const ALL_THREE_ORDER: Array<{ key: keyof RawFormulaVariants; title: string }> = [
+  { key: "proven", title: "Proven" },
+  { key: "edge", title: "Edge" },
+  { key: "recommended", title: "Recommended Blend" },
+];
+
+export function buildAllThreeFormulasMarkdown(
+  variants: RawFormulaVariants,
+  signoff?: AllThreeFormulasSignoff | null,
+  comparativeVerdict?: string | null
+): string {
+  const parts: string[] = [
+    "## HANDOFF: ALL 3 FORMULAS\n\nThis handoff contains three candidate formulas — **Proven** / **Edge** / **Recommended** — for the manufacturer to quote and compare side by side. Each formula below is complete and independently producible; the comparative verdict at the end explains when to launch which.",
+  ];
+
+  for (const { key, title } of ALL_THREE_ORDER) {
+    const content = variants[key];
+    if (!content) continue;
+    parts.push(`---\n\n# FORMULA — ${title.toUpperCase()}\n\n${content}`);
+    const verdict = signoff?.[key]?.verdict;
+    if (verdict) {
+      parts.push(`**Sign-off verdict (${title}):** ${verdict}`);
+    }
+  }
+
+  if (comparativeVerdict) {
+    parts.push(`---\n\n## COMPARATIVE VERDICT — WHEN TO LAUNCH WHICH\n\n${comparativeVerdict}`);
+  }
+
+  return parts.join("\n\n");
+}
+
 export default getCanonicalFormula;

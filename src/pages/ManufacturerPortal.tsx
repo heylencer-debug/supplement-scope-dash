@@ -15,8 +15,9 @@ import { FormulaViewer } from "@/components/FormulaViewer";
 import { ActivityTimeline, type TimelineComment, type TimelineVersion } from "@/components/ActivityTimeline";
 import { Paperclip, X, FileText, Image } from "lucide-react";
 import { displayFormulaLabel } from "@/lib/formulaLabels";
-import { extractFormulaVariantsFromText, countFormulaVariants, type RawFormulaVariants } from "@/lib/canonicalFormula";
+import { extractFormulaVariantsFromText, countFormulaVariants, buildAllThreeFormulasMarkdown, type RawFormulaVariants } from "@/lib/canonicalFormula";
 import { TriFormulaView, type PerFormulaSignoff } from "@/components/dashboard/FormulaBriefTab";
+import { generateManufacturerPDF } from "@/lib/manufacturerPDF";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -592,32 +593,53 @@ export default function ManufacturerPortal() {
                             >
                               {isExpanded ? "Hide Formula" : "View Formula"}
                             </Button>
-                            <PDFDownloadLink
-                              document={
-                                <FormulaPDF
-                                  categoryName={selectedCategory?.name ?? ""}
-                                  versionLabel={v.label}
-                                  formulaText={v.formula_text}
-                                  date={formatDate(v.created_at)}
-                                  qaScore={v.qa_score}
-                                  fdaScore={v.fda_score}
-                                  qaVerdict={v.qa_verdict}
-                                  manufacturerName={session?.manufacturer_name}
-                                />
-                              }
-                              fileName={`DOVIVE-${(selectedCategory?.name ?? "Formula").replace(/\s+/g, "-")}-${v.label}.pdf`}
-                            >
-                              {({ loading: pdfLoading }) => (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="text-xs h-7 gap-1"
-                                  disabled={pdfLoading}
-                                >
-                                  {pdfLoading ? "Preparing…" : "⬇ Download PDF"}
-                                </Button>
-                              )}
-                            </PDFDownloadLink>
+                            {countFormulaVariants(v.variants) >= 2 ? (
+                              // Tri-formula version: mirror the Dashboard's Factory
+                              // Handoff "All 3 Formulas" build (same generateManufacturerPDF
+                              // composer + buildAllThreeFormulasMarkdown assembly) — cover
+                              // note, each formula as its own titled section with its
+                              // sign-off verdict, then the comparative verdict at the end —
+                              // instead of the react-pdf single-document dump.
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-xs h-7 gap-1"
+                                onClick={() => generateManufacturerPDF({
+                                  categoryName: selectedCategory?.name || "Formula",
+                                  positioning: `All three candidate formulas (Proven / Edge / Recommended) for ${session?.manufacturer_name ?? "the manufacturer"} to quote and compare.`,
+                                  finalFormulaBrief: buildAllThreeFormulasMarkdown(v.variants!, v.signoff, v.comparativeVerdict),
+                                })}
+                              >
+                                ⬇ Download PDF (All 3)
+                              </Button>
+                            ) : (
+                              <PDFDownloadLink
+                                document={
+                                  <FormulaPDF
+                                    categoryName={selectedCategory?.name ?? ""}
+                                    versionLabel={v.label}
+                                    formulaText={v.formula_text}
+                                    date={formatDate(v.created_at)}
+                                    qaScore={v.qa_score}
+                                    fdaScore={v.fda_score}
+                                    qaVerdict={v.qa_verdict}
+                                    manufacturerName={session?.manufacturer_name}
+                                  />
+                                }
+                                fileName={`DOVIVE-${(selectedCategory?.name ?? "Formula").replace(/\s+/g, "-")}-${v.label}.pdf`}
+                              >
+                                {({ loading: pdfLoading }) => (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-xs h-7 gap-1"
+                                    disabled={pdfLoading}
+                                  >
+                                    {pdfLoading ? "Preparing…" : "⬇ Download PDF"}
+                                  </Button>
+                                )}
+                              </PDFDownloadLink>
+                            )}
                             <Button
                               variant={isCommentActive ? "default" : "ghost"}
                               size="sm"

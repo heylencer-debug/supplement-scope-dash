@@ -20,8 +20,9 @@ import {
 import { ActivityTimeline, type TimelineComment, type TimelineVersion } from "@/components/ActivityTimeline";
 import { ManufacturerChat } from "@/components/manufacturer/ManufacturerChat";
 import { displayFormulaLabel } from "@/lib/formulaLabels";
-import { extractFormulaVariantsFromText, countFormulaVariants, type RawFormulaVariants } from "@/lib/canonicalFormula";
+import { extractFormulaVariantsFromText, countFormulaVariants, buildAllThreeFormulasMarkdown, type RawFormulaVariants } from "@/lib/canonicalFormula";
 import { TriFormulaView, type PerFormulaSignoff } from "@/components/dashboard/FormulaBriefTab";
+import { generateManufacturerPDF } from "@/lib/manufacturerPDF";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -774,27 +775,49 @@ export default function ManufacturerPortalInternal() {
                         </Button>
                       )}
                       {activeItem.formula_brief_content && (
-                        <PDFDownloadLink
-                          document={
-                            <FormulaPDF
-                              categoryName={selectedCat?.name ?? ""}
-                              versionLabel={activeItem.label}
-                              formulaText={activeItem.formula_brief_content}
-                              date={new Date(activeItem.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                              qaScore={activeItem.qa_score ?? null}
-                              fdaScore={activeItem.fda_score ?? null}
-                              qaVerdict={activeItem.qa_verdict ?? null}
-                            />
-                          }
-                          fileName={`DOVIVE-${(selectedCat?.name ?? "Formula").replace(/\s+/g, "-")}-${activeItem.label}.pdf`}
-                        >
-                          {({ loading }) => (
-                            <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5 rounded-xl" disabled={loading}>
-                              <FileText className="w-3.5 h-3.5" />
-                              {loading ? "Preparing…" : "Download PDF"}
-                            </Button>
-                          )}
-                        </PDFDownloadLink>
+                        countFormulaVariants(activeItem.variants) >= 2 ? (
+                          // Tri-formula version: mirror FactoryHandoffCard's "All 3
+                          // Formulas" build (same generateManufacturerPDF composer +
+                          // buildAllThreeFormulasMarkdown assembly) instead of the
+                          // react-pdf single-document dump — cover note, each formula
+                          // as its own titled section with its sign-off verdict, then
+                          // the comparative verdict at the end.
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 text-xs gap-1.5 rounded-xl"
+                            onClick={() => generateManufacturerPDF({
+                              categoryName: selectedCat?.name || "Formula",
+                              positioning: "All three candidate formulas (Proven / Edge / Recommended) for the manufacturer to quote and compare.",
+                              finalFormulaBrief: buildAllThreeFormulasMarkdown(activeItem.variants!, activeItem.signoff, activeItem.comparativeVerdict),
+                            })}
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            Download PDF (All 3)
+                          </Button>
+                        ) : (
+                          <PDFDownloadLink
+                            document={
+                              <FormulaPDF
+                                categoryName={selectedCat?.name ?? ""}
+                                versionLabel={activeItem.label}
+                                formulaText={activeItem.formula_brief_content}
+                                date={new Date(activeItem.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                                qaScore={activeItem.qa_score ?? null}
+                                fdaScore={activeItem.fda_score ?? null}
+                                qaVerdict={activeItem.qa_verdict ?? null}
+                              />
+                            }
+                            fileName={`DOVIVE-${(selectedCat?.name ?? "Formula").replace(/\s+/g, "-")}-${activeItem.label}.pdf`}
+                          >
+                            {({ loading }) => (
+                              <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5 rounded-xl" disabled={loading}>
+                                <FileText className="w-3.5 h-3.5" />
+                                {loading ? "Preparing…" : "Download PDF"}
+                              </Button>
+                            )}
+                          </PDFDownloadLink>
+                        )
                       )}
                     </div>
                     <div className="bg-secondary/30 rounded-xl p-6 border border-border/50">

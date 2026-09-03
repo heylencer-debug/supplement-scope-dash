@@ -161,4 +161,46 @@ export function getCanonicalFormula(
   return EMPTY;
 }
 
+// 2026-09-03 follow-up: text-based tri-formula extraction for surfaces that
+// only have a raw markdown blob (e.g. a `formula_brief_versions` snapshot,
+// or the Manufacturer Portal's `formula_brief_content`/`formula_text`
+// strings) instead of the structured `ingredients.formula_variants` column.
+// Mirrors `scout/phase9-formula-qa.js`'s `extractFormulaVariant()` regex
+// exactly (same dash-tolerant, heading-level-tolerant pattern) so a document
+// containing the "### FORMULA -- PROVEN/EDGE/RECOMMENDED BLEND" subsections
+// splits identically wherever it's read from. Returns null when none of the
+// three headings are found — callers keep rendering the flat document.
+export interface RawFormulaVariants {
+  proven: string | null;
+  edge: string | null;
+  recommended: string | null;
+}
+
+function extractVariantSection(text: string, label: string, nextLabels: string[]): string | null {
+  if (!text) return null;
+  const dash = "[-\\u2013\\u2014]+";
+  const next = nextLabels.length
+    ? `(?:\\n#{2,4}\\s*FORMULA\\s*${dash}\\s*(?:${nextLabels.join("|")})|\\n##\\s|$)`
+    : "(?:\\n##\\s|$)";
+  const re = new RegExp(`#{2,4}\\s*FORMULA\\s*${dash}\\s*${label}[^\\n]*\\n([\\s\\S]*?)${next}`, "i");
+  return text.match(re)?.[1]?.trim() || null;
+}
+
+export function extractFormulaVariantsFromText(text: string | null | undefined): RawFormulaVariants | null {
+  if (!text) return null;
+  const proven = extractVariantSection(text, "PROVEN", ["EDGE", "RECOMMENDED"]);
+  const edge = extractVariantSection(text, "EDGE", ["RECOMMENDED"]);
+  const recommended = extractVariantSection(text, "RECOMMENDED", []);
+  if (!proven && !edge && !recommended) return null;
+  return { proven, edge, recommended };
+}
+
+/** Number of populated variant slots — drives the "N formulas" badge. */
+export function countFormulaVariants(
+  variants: { proven?: string | null; edge?: string | null; recommended?: string | null } | null | undefined
+): number {
+  if (!variants) return 0;
+  return [variants.proven, variants.edge, variants.recommended].filter(Boolean).length;
+}
+
 export default getCanonicalFormula;

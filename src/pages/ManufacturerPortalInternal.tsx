@@ -20,6 +20,8 @@ import {
 import { ActivityTimeline, type TimelineComment, type TimelineVersion } from "@/components/ActivityTimeline";
 import { ManufacturerChat } from "@/components/manufacturer/ManufacturerChat";
 import { displayFormulaLabel } from "@/lib/formulaLabels";
+import { extractFormulaVariantsFromText, countFormulaVariants, type RawFormulaVariants } from "@/lib/canonicalFormula";
+import { TriFormulaView, type PerFormulaSignoff } from "@/components/dashboard/FormulaBriefTab";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -53,6 +55,14 @@ interface UnifiedVersion {
   // Pipeline-specific
   emoji?: string;
   subtitle?: string;
+  // 2026-09-03 follow-up (tri-formula in the Manufacturer portal): structured
+  // when available (`ingredients.formula_variants` on the compliance/qa-final
+  // pipeline entries), else a text-extraction fallback run against
+  // `formula_brief_content` itself — covers `formula_brief_versions`
+  // snapshots, which only ever store the raw markdown string.
+  variants?: RawFormulaVariants | null;
+  signoff?: PerFormulaSignoff | null;
+  comparativeVerdict?: string | null;
 }
 
 interface MfrComment {
@@ -225,6 +235,7 @@ export default function ManufacturerPortalInternal() {
             change_summary: v.change_summary,
             comment_labels: [`v${v.version_number}`],
             source: "version",
+            variants: extractFormulaVariantsFromText(v.formula_brief_content),
           });
         }
       }
@@ -232,6 +243,12 @@ export default function ManufacturerPortalInternal() {
       // Pipeline briefs from formula_briefs.ingredients (same as Dashboard tab)
       if (briefData) {
         const ing = briefData.ingredients as any;
+        const variantsRaw = ing?.formula_variants as { proven?: string | null; edge?: string | null; recommended?: string | null } | null | undefined;
+        const variants: RawFormulaVariants | null = variantsRaw && (variantsRaw.proven || variantsRaw.edge || variantsRaw.recommended)
+          ? { proven: variantsRaw.proven || null, edge: variantsRaw.edge || null, recommended: variantsRaw.recommended || null }
+          : null;
+        const signoff = (ing?.final_signoff?.per_formula as PerFormulaSignoff | undefined) || null;
+        const comparativeVerdict = (ing?.comparative_verdict as string | undefined) || null;
         if (ing?.ai_generated_brief_grok) {
           const promotedVersion = promotedPipelineVersions.get("grok");
           all.push({
@@ -298,6 +315,7 @@ export default function ManufacturerPortalInternal() {
             source: "pipeline",
             emoji: "⚖️",
             subtitle: "Initial formula brief from market analysis pipeline",
+            variants, signoff, comparativeVerdict,
           });
         }
         if (ing?.final_formula_brief) {
@@ -315,6 +333,7 @@ export default function ManufacturerPortalInternal() {
             source: "pipeline",
             emoji: "✅",
             subtitle: `${ing?.qa_verdict?.verdict || 'Reviewed'} · Score: ${ing?.qa_verdict?.score || '—'}/10`,
+            variants, signoff, comparativeVerdict,
           });
         }
       }
@@ -535,6 +554,11 @@ export default function ManufacturerPortalInternal() {
                       {item.source === "version" && <GitBranch className="w-3.5 h-3.5 text-primary/60 flex-shrink-0" />}
                       {item.source === "pipeline" && item.emoji && <span className="text-sm flex-shrink-0">{item.emoji}</span>}
                       <span className="text-[13px] font-bold text-foreground truncate">{displayFormulaLabel(item.label)}</span>
+                      {countFormulaVariants(item.variants) >= 2 && (
+                        <span className="text-[9px] px-1.5 py-0.5 bg-primary/10 text-primary rounded-full font-bold shrink-0">
+                          {countFormulaVariants(item.variants)} formulas
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
                       {item.is_active && (
@@ -774,7 +798,15 @@ export default function ManufacturerPortalInternal() {
                       )}
                     </div>
                     <div className="bg-secondary/30 rounded-xl p-6 border border-border/50">
-                      <SectionText text={activeItem.formula_brief_content} fallback="No formula content available." />
+                      {countFormulaVariants(activeItem.variants) >= 2 ? (
+                        <TriFormulaView
+                          variants={activeItem.variants!}
+                          signoff={activeItem.signoff}
+                          comparativeVerdict={activeItem.comparativeVerdict}
+                        />
+                      ) : (
+                        <SectionText text={activeItem.formula_brief_content} fallback="No formula content available." />
+                      )}
                     </div>
 
                     <DocumentModal
@@ -788,7 +820,15 @@ export default function ManufacturerPortalInternal() {
                         { label: "Created", value: formatDate(activeItem.created_at) },
                       ]}
                     >
-                      <MarkdownDoc content={activeItem.formula_brief_content} />
+                      {countFormulaVariants(activeItem.variants) >= 2 ? (
+                        <TriFormulaView
+                          variants={activeItem.variants!}
+                          signoff={activeItem.signoff}
+                          comparativeVerdict={activeItem.comparativeVerdict}
+                        />
+                      ) : (
+                        <MarkdownDoc content={activeItem.formula_brief_content} />
+                      )}
                     </DocumentModal>
                   </div>
                 )}

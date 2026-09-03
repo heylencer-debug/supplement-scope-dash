@@ -926,7 +926,7 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-4 items-start">
               <FormulaVersionsPanel categoryId={category.id} keyword={categoryName} />
               <div className="space-y-4">
-                <FactoryHandoffCard categoryId={category.id} />
+                <FactoryHandoffCard categoryId={category.id} categoryName={categoryName} />
                 <PortalFeedbackDisclosure categoryId={category.id} />
               </div>
             </div>

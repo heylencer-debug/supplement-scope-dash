@@ -23,6 +23,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { DocumentModal } from "@/components/ui/document-modal";
 import { MarkdownDoc } from "@/lib/markdownDoc";
 import { cn } from "@/lib/utils";
+import { extractFormulaVariantsFromText, countFormulaVariants, type RawFormulaVariants } from "@/lib/canonicalFormula";
+import { TriFormulaView, type PerFormulaSignoff } from "@/components/dashboard/FormulaBriefTab";
 
 interface FormulaVersionsPanelProps {
   categoryId: string;
@@ -45,6 +47,16 @@ interface PipelineBrief {
   subtitle: string;
   content: string;
   created_at: string | null;
+  // 2026-09-03 follow-up (tri-formula in Manufacturer tab): structured
+  // Proven/Edge/Recommended split, read straight off `ingredients.
+  // formula_variants` (P9) when this pipeline brief IS the tri-formula
+  // "## FINAL FORMULA BRIEF" document (compliance/qa-final). Absent on any
+  // brief generated before 2026-09-03 — `rows` below falls back to a
+  // text-based extraction so older/manual snapshots still badge correctly
+  // if they happen to contain the same subsection headings.
+  variants?: RawFormulaVariants | null;
+  signoff?: PerFormulaSignoff | null;
+  comparativeVerdict?: string | null;
 }
 
 /** change_summary is sometimes AI-generated text that self-wraps in
@@ -79,6 +91,17 @@ interface DisplayRow {
   onSetActive: () => void;
   onDelete: (() => void) | null;
   isPending: boolean;
+  // 2026-09-03 follow-up: tri-formula split for this row's document —
+  // structured `variants` when the pipeline brief carried
+  // `ingredients.formula_variants` directly, else a text-extraction fallback
+  // run against `content` itself (covers `formula_brief_versions` snapshots,
+  // which only ever store the raw markdown string). Either way, "a brief
+  // version is one document containing all three" stays true — this never
+  // splits a version into separate rows, it only detects when THIS row's
+  // document happens to contain all three and lets the viewer render tabs.
+  variants: RawFormulaVariants | null;
+  signoff?: PerFormulaSignoff | null;
+  comparativeVerdict?: string | null;
 }
 
 export function FormulaVersionsPanel({ categoryId, keyword }: FormulaVersionsPanelProps) {
@@ -121,13 +144,23 @@ export function FormulaVersionsPanel({ categoryId, keyword }: FormulaVersionsPan
       } else if (ing?.ai_generated_brief) {
         briefs.push({ id: "legacy", label: "AI Generated Brief", emoji: "🧠", subtitle: "Initial AI brief", content: ing.ai_generated_brief, created_at: data.created_at });
       }
+      // 2026-09-03 follow-up: tri-formula fields — structured on
+      // `ingredients.formula_variants` whenever this brief's Final Formula
+      // Brief is the Proven/Edge/Recommended Blend document (P9). Null on
+      // any brief generated before that shipped.
+      const variantsRaw = ing?.formula_variants as { proven?: string | null; edge?: string | null; recommended?: string | null } | null | undefined;
+      const variants: RawFormulaVariants | null = variantsRaw && (variantsRaw.proven || variantsRaw.edge || variantsRaw.recommended)
+        ? { proven: variantsRaw.proven || null, edge: variantsRaw.edge || null, recommended: variantsRaw.recommended || null }
+        : null;
+      const signoff = (ing?.final_signoff?.per_formula as PerFormulaSignoff | undefined) || null;
+      const comparativeVerdict = (ing?.comparative_verdict as string | undefined) || null;
       const complianceContent = ing?.final_formula_brief || ing?.adjusted_formula;
       if (complianceContent) {
-        briefs.push({ id: "compliance", label: "Compliance", emoji: "⚖️", subtitle: "Initial formula brief from market analysis pipeline", content: complianceContent, created_at: data.created_at });
+        briefs.push({ id: "compliance", label: "Compliance", emoji: "⚖️", subtitle: "Initial formula brief from market analysis pipeline", content: complianceContent, created_at: data.created_at, variants, signoff, comparativeVerdict });
       }
       if (ing?.final_formula_brief) {
         const verdictText = (ing?.qa_verdict?.verdict || "Reviewed").replace(/\*\*/g, "");
-        briefs.push({ id: "qa-final", label: "QA Approved Final", emoji: "✅", subtitle: `${verdictText} · Score: ${ing?.qa_verdict?.score || "—"}/10`, content: ing.final_formula_brief, created_at: data.created_at });
+        briefs.push({ id: "qa-final", label: "QA Approved Final", emoji: "✅", subtitle: `${verdictText} · Score: ${ing?.qa_verdict?.score || "—"}/10`, content: ing.final_formula_brief, created_at: data.created_at, variants, signoff, comparativeVerdict });
       }
       return briefs.length > 0 ? briefs : null;
     },
@@ -267,6 +300,10 @@ export function FormulaVersionsPanel({ categoryId, keyword }: FormulaVersionsPan
         }
       },
       isPending: false,
+      // No structured `formula_variants` column on `formula_brief_versions`
+      // rows (they only ever store the plain markdown snapshot) — text
+      // extraction is the only way to detect a tri-formula document here.
+      variants: extractFormulaVariantsFromText(v.formula_brief_content),
     }));
 
     const pipelineRows: DisplayRow[] = visiblePipelineBriefs.map((pb) => ({
@@ -279,6 +316,9 @@ export function FormulaVersionsPanel({ categoryId, keyword }: FormulaVersionsPan
       onSetActive: () => setActiveMutation.mutate({ pipelineBrief: { id: pb.id, label: pb.label, content: pb.content } }),
       onDelete: null,
       isPending: false,
+      variants: pb.variants ?? extractFormulaVariantsFromText(pb.content),
+      signoff: pb.signoff,
+      comparativeVerdict: pb.comparativeVerdict,
     }));
 
     return [...versionRows, ...pipelineRows].sort((a, b) => {
@@ -322,6 +362,14 @@ export function FormulaVersionsPanel({ categoryId, keyword }: FormulaVersionsPan
                 {row.isActive && (
                   <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-chart-4/30 text-chart-4 bg-chart-4/10">
                     Active
+                  </span>
+                )}
+                {countFormulaVariants(row.variants) >= 2 && (
+                  <span
+                    className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-primary/30 text-primary bg-primary/10"
+                    title="This document contains Proven, Edge, and Recommended Blend formulas"
+                  >
+                    {countFormulaVariants(row.variants)} formulas
                   </span>
                 )}
               </div>
@@ -376,7 +424,15 @@ export function FormulaVersionsPanel({ categoryId, keyword }: FormulaVersionsPan
         title={viewingRow ? viewingRow.title : "Formula Brief"}
         subtitle={keyword}
       >
-        <MarkdownDoc content={viewingRow?.content ?? "No content available"} />
+        {viewingRow && countFormulaVariants(viewingRow.variants) >= 2 ? (
+          <TriFormulaView
+            variants={viewingRow.variants!}
+            signoff={viewingRow.signoff}
+            comparativeVerdict={viewingRow.comparativeVerdict}
+          />
+        ) : (
+          <MarkdownDoc content={viewingRow?.content ?? "No content available"} />
+        )}
       </DocumentModal>
     </div>
   );

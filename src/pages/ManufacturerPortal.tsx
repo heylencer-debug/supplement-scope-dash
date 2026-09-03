@@ -15,6 +15,8 @@ import { FormulaViewer } from "@/components/FormulaViewer";
 import { ActivityTimeline, type TimelineComment, type TimelineVersion } from "@/components/ActivityTimeline";
 import { Paperclip, X, FileText, Image } from "lucide-react";
 import { displayFormulaLabel } from "@/lib/formulaLabels";
+import { extractFormulaVariantsFromText, countFormulaVariants, type RawFormulaVariants } from "@/lib/canonicalFormula";
+import { TriFormulaView, type PerFormulaSignoff } from "@/components/dashboard/FormulaBriefTab";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -172,6 +174,14 @@ export default function ManufacturerPortal() {
     qa_score: string | null;
     fda_score: string | null;
     fda_status: string | null;
+    // 2026-09-03 follow-up (tri-formula on the public manufacturer portal):
+    // structured when available (compliance/qa-final pipeline entries carry
+    // `ingredients.formula_variants`), else a text-extraction fallback run
+    // against `formula_text` itself (covers `formula_brief_versions`
+    // snapshots).
+    variants?: RawFormulaVariants | null;
+    signoff?: PerFormulaSignoff | null;
+    comparativeVerdict?: string | null;
   }
 
   const [versions, setVersions] = useState<UnifiedVersion[]>([]);
@@ -308,12 +318,19 @@ export default function ManufacturerPortal() {
           change_summary: v.change_summary,
           comment_labels: [`v${v.version_number}`],
           qa_verdict: null, qa_score: null, fda_score: null, fda_status: null,
+          variants: extractFormulaVariantsFromText(v.formula_brief_content ?? ""),
         });
       }
 
       // Pipeline versions from formula_briefs.ingredients
       if (briefData) {
         const ing = briefData.ingredients as any;
+        const variantsRaw = ing?.formula_variants as { proven?: string | null; edge?: string | null; recommended?: string | null } | null | undefined;
+        const variants: RawFormulaVariants | null = variantsRaw && (variantsRaw.proven || variantsRaw.edge || variantsRaw.recommended)
+          ? { proven: variantsRaw.proven || null, edge: variantsRaw.edge || null, recommended: variantsRaw.recommended || null }
+          : null;
+        const signoff = (ing?.final_signoff?.per_formula as PerFormulaSignoff | undefined) || null;
+        const comparativeVerdict = (ing?.comparative_verdict as string | undefined) || null;
         const qaReport = (ing?.qa_report as string) ?? "";
         const qaVerdictM = qaReport.match(/\*\*Overall:\*\*\s*(.+)/)
           || qaReport.match(/Overall:\s*(APPROVED[^.\n]*|NEEDS MAJOR REVISION[^.\n]*)/i)
@@ -339,11 +356,11 @@ export default function ManufacturerPortal() {
         const complianceContent = ing?.final_formula_brief || ing?.adjusted_formula;
         if (complianceContent) {
           const promotedVersion = promotedPipelineVersions.get("compliance");
-          all.push({ id: "compliance", label: "⚖️ Compliance", created_at: briefData.created_at ?? "", formula_text: complianceContent, change_summary: "Initial formula brief from market analysis pipeline", comment_labels: promotedVersion ? ["⚖️ Compliance", `v${promotedVersion.version_number}`] : ["⚖️ Compliance"], qa_verdict: qaVerdict, qa_score: qaScore, fda_score: fdaScore, fda_status: fdaStatus });
+          all.push({ id: "compliance", label: "⚖️ Compliance", created_at: briefData.created_at ?? "", formula_text: complianceContent, change_summary: "Initial formula brief from market analysis pipeline", comment_labels: promotedVersion ? ["⚖️ Compliance", `v${promotedVersion.version_number}`] : ["⚖️ Compliance"], qa_verdict: qaVerdict, qa_score: qaScore, fda_score: fdaScore, fda_status: fdaStatus, variants, signoff, comparativeVerdict });
         }
         if (ing?.final_formula_brief) {
           const promotedVersion = promotedPipelineVersions.get("qa-final");
-          all.push({ id: "qa-final", label: "✅ QA Approved Final", created_at: briefData.created_at ?? "", formula_text: ing.final_formula_brief, change_summary: `${ing?.qa_verdict?.verdict || "Reviewed"} · Score: ${ing?.qa_verdict?.score || "—"}/10`, comment_labels: promotedVersion ? ["✅ QA Approved Final", `v${promotedVersion.version_number}`] : ["✅ QA Approved Final"], qa_verdict: qaVerdict, qa_score: qaScore, fda_score: fdaScore, fda_status: fdaStatus });
+          all.push({ id: "qa-final", label: "✅ QA Approved Final", created_at: briefData.created_at ?? "", formula_text: ing.final_formula_brief, change_summary: `${ing?.qa_verdict?.verdict || "Reviewed"} · Score: ${ing?.qa_verdict?.score || "—"}/10`, comment_labels: promotedVersion ? ["✅ QA Approved Final", `v${promotedVersion.version_number}`] : ["✅ QA Approved Final"], qa_verdict: qaVerdict, qa_score: qaScore, fda_score: fdaScore, fda_status: fdaStatus, variants, signoff, comparativeVerdict });
         }
       }
 
@@ -553,6 +570,11 @@ export default function ManufacturerPortal() {
                             <span className="font-semibold text-foreground text-sm">{displayFormulaLabel(v.label)}</span>
                             <span className="text-xs text-muted-foreground">{formatDate(v.created_at)}</span>
                             {verdictBadge(v.qa_verdict)}
+                            {countFormulaVariants(v.variants) >= 2 && (
+                              <Badge className="text-xs bg-primary/10 text-primary border-primary/20">
+                                {countFormulaVariants(v.variants)} formulas
+                              </Badge>
+                            )}
                           </div>
                           <div className="flex items-center gap-4 mt-1.5 text-xs text-muted-foreground">
                             {v.qa_score && <span>QA Score: <strong className="text-foreground/90">{v.qa_score}/10</strong></span>}
@@ -616,7 +638,15 @@ export default function ManufacturerPortal() {
 
                           {isExpanded && (
                             <div className="mt-4 p-5 rounded-lg bg-muted/40 border border-border max-h-[600px] overflow-y-auto">
-                              <FormulaViewer text={v.formula_text} />
+                              {countFormulaVariants(v.variants) >= 2 ? (
+                                <TriFormulaView
+                                  variants={v.variants!}
+                                  signoff={v.signoff}
+                                  comparativeVerdict={v.comparativeVerdict}
+                                />
+                              ) : (
+                                <FormulaViewer text={v.formula_text} />
+                              )}
                             </div>
                           )}
                         </CardContent>

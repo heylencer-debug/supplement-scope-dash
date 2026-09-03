@@ -6,19 +6,85 @@
  * in the tab's header (unchanged); this card is status + a way into the
  * full manufacturer portal (comments, publishing, chat) at /manufacturer-portal,
  * where the promote/publish controls for a manufacturer session actually live.
+ *
+ * 2026-09-03 follow-up (tri-formula handoff selector): when the category's
+ * canonical formula has a Proven/Edge/Recommended split (useFormulaJourney's
+ * `canonicalFormula.variants`, same source TriFormulaView reads elsewhere),
+ * this card also lets the user pick WHICH formula the factory handoff
+ * document is built around — defaults to Recommended (the one every other
+ * downstream document already treats as canonical). The chosen variant's
+ * name is stamped into both the preview and the downloaded PDF so there's
+ * no ambiguity about which formula a manufacturer received. Entirely
+ * frontend: `generateManufacturerPDF` is a client-side markdown→HTML→print
+ * composer (src/lib/manufacturerPDF.ts), no AI call and no backend/edge
+ * function involved. Graceful fallback: on a legacy (non-tri-formula) brief
+ * the selector doesn't render and Preview/Download just use the single
+ * canonical document, exactly as the handoff concept already implied.
  */
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Factory, ArrowUpRight, Check } from "lucide-react";
+import { Factory, ArrowUpRight, Check, Eye, Download } from "lucide-react";
 import { useFormulaJourney } from "@/hooks/useFormulaJourney";
 import { cn } from "@/lib/utils";
+import { DocumentModal } from "@/components/ui/document-modal";
+import { MarkdownDoc } from "@/lib/markdownDoc";
+import { Button } from "@/components/ui/button";
+import { generateManufacturerPDF } from "@/lib/manufacturerPDF";
 
 interface FactoryHandoffCardProps {
   categoryId: string;
+  categoryName?: string;
 }
 
-export function FactoryHandoffCard({ categoryId }: FactoryHandoffCardProps) {
-  const { stages, isLoading } = useFormulaJourney(categoryId);
+type VariantKey = "recommended" | "proven" | "edge";
+
+const VARIANT_META: Record<VariantKey, { label: string; description: string }> = {
+  recommended: { label: "Recommended Blend", description: "Our blend of both — the formula that ships" },
+  proven: { label: "Proven", description: "What the established winners agree on" },
+  edge: { label: "Edge", description: "What the new winners are betting on" },
+};
+
+export function FactoryHandoffCard({ categoryId, categoryName }: FactoryHandoffCardProps) {
+  const { stages, canonicalFormula, isLoading } = useFormulaJourney(categoryId);
   const factoryStage = stages.find((s) => s.id === "factory");
+  const [selectedVariant, setSelectedVariant] = useState<VariantKey>("recommended");
+  const [previewOpen, setPreviewOpen] = useState(false);
+
+  const variants = canonicalFormula.variants;
+  const hasVariants = !!(variants && (variants.proven || variants.edge || variants.recommended));
+  const hasFormula = !!canonicalFormula.source;
+
+  // The document the handoff is built around: the selected variant's
+  // content when a tri-formula split exists (falling back to whichever
+  // variant is actually populated), else the single canonical document.
+  const resolvedVariant: VariantKey | null = hasVariants
+    ? (variants![selectedVariant] ? selectedVariant : (["recommended", "proven", "edge"] as VariantKey[]).find((k) => variants![k]) ?? null)
+    : null;
+  const variantContent = resolvedVariant ? variants![resolvedVariant] : canonicalFormula.fullDocument;
+  const variantLabel = resolvedVariant ? VARIANT_META[resolvedVariant].label : null;
+
+  // Handoff content is prefixed with an explicit "which formula is this"
+  // banner — visible in both the preview modal and the PDF — so the choice
+  // is never ambiguous once this document leaves the dashboard.
+  const handoffContent = variantContent
+    ? (variantLabel
+        ? `## HANDOFF FORMULA: ${variantLabel}\n\n_This factory handoff document is built around the **${variantLabel}** formula${hasVariants ? " (one of three adjudicated formulas — Proven / Edge / Recommended Blend)" : ""}._\n\n---\n\n${variantContent}`
+        : variantContent)
+    : null;
+
+  const signoffVerdict = resolvedVariant ? canonicalFormula.perFormulaSignoff?.[resolvedVariant]?.verdict : canonicalFormula.verdict;
+
+  function handleDownloadPDF() {
+    if (!handoffContent) return;
+    generateManufacturerPDF({
+      categoryName: categoryName || "Formula",
+      positioning: variantLabel
+        ? `Factory handoff document — built around the ${variantLabel} formula.`
+        : undefined,
+      finalFormulaBrief: handoffContent,
+      qaVerdict: signoffVerdict ? { score: null, verdict: signoffVerdict, summary: `Sign-off verdict for ${variantLabel ?? "this formula"}` } : null,
+    });
+  }
 
   return (
     <div className="rounded-[var(--radius)] border border-border bg-card shadow-sm overflow-hidden">
@@ -30,6 +96,11 @@ export function FactoryHandoffCard({ categoryId }: FactoryHandoffCardProps) {
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm font-semibold text-foreground">Factory Handoff</span>
+              {hasVariants && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-primary/30 text-primary bg-primary/10">
+                  3 formulas
+                </span>
+              )}
               {!isLoading && factoryStage && (
                 <span
                   className={cn(
@@ -50,6 +121,81 @@ export function FactoryHandoffCard({ categoryId }: FactoryHandoffCardProps) {
           </div>
         </div>
       </div>
+
+      {/* Formula selector — only when this category has a real Proven/Edge/
+          Recommended split. Recommended stays preselected on every remount
+          (no persistence) so the default handoff always matches what every
+          other document already treats as canonical. */}
+      {hasFormula && (
+        <div className="px-4 pb-3 border-t border-border pt-3">
+          {hasVariants && (
+            <>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+                Handoff formula
+              </p>
+              <div className="flex gap-1 mb-2">
+                {(["recommended", "proven", "edge"] as VariantKey[]).map((key) => {
+                  const disabled = !variants![key];
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => setSelectedVariant(key)}
+                      className={cn(
+                        "flex-1 text-[11px] font-medium px-2 py-1.5 rounded-md border transition-colors truncate",
+                        selectedVariant === key && !disabled
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border text-muted-foreground hover:bg-muted",
+                        disabled && "opacity-40 cursor-not-allowed"
+                      )}
+                      title={VARIANT_META[key].description}
+                    >
+                      {VARIANT_META[key].label}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-muted-foreground mb-2">
+                {variantLabel ? VARIANT_META[selectedVariant].description : "No formula content yet"}
+              </p>
+            </>
+          )}
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 gap-1.5 text-[11px] flex-1"
+              disabled={!handoffContent}
+              onClick={() => setPreviewOpen(true)}
+            >
+              <Eye className="w-3 h-3" />
+              Preview
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 gap-1.5 text-[11px] flex-1"
+              disabled={!handoffContent}
+              onClick={handleDownloadPDF}
+            >
+              <Download className="w-3 h-3" />
+              Download PDF
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <DocumentModal
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+        title={`Factory Handoff${variantLabel ? ` — ${variantLabel}` : ""}`}
+        subtitle={categoryName}
+        chips={signoffVerdict ? [{ label: "Sign-off", value: signoffVerdict }] : undefined}
+      >
+        <MarkdownDoc content={handoffContent ?? "No formula content available yet."} />
+      </DocumentModal>
+
       <Link
         to="/manufacturer-portal"
         className="flex items-center justify-between gap-2 px-4 py-2.5 border-t border-border text-xs text-primary hover:bg-primary/5 transition-colors"

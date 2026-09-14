@@ -60,7 +60,13 @@ const supabase        = createClient(process.env.SUPABASE_URL, process.env.SUPAB
 // See file header — no network egress here to verify the exact dated Gemini
 // Flash slug, so default to OpenRouter's "latest" alias. Override with
 // OCR_MODEL once confirmed.
-const ANALYSIS_MODEL  = process.env.OCR_MODEL || process.env.ANALYSIS_MODEL || 'google/gemini-flash-latest';
+// 2026-09-15: fixed — the bare alias 400'd on every call ("...is not a valid
+// model ID"), 20/20 products failed this run before the fix. Confirmed live
+// against GET https://openrouter.ai/api/v1/models that OpenRouter's alias
+// slugs need a leading `~` (id/canonical_slug are both
+// `~google/gemini-flash-latest`, currently redirecting to
+// google/gemini-3.8-flash) — see the matching fix in phase4-text-extract.js.
+const ANALYSIS_MODEL  = process.env.OCR_MODEL || process.env.ANALYSIS_MODEL || '~google/gemini-flash-latest';
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 

@@ -41,7 +41,15 @@ const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY;
 // this sandbox has no network egress to openrouter.ai to verify the exact
 // dated slug (e.g. gemini-3.x-flash) at write time. Override with P4_MODEL
 // once the exact slug is confirmed from a machine with network access.
-const ANALYSIS_MODEL = process.env.P4_MODEL || process.env.ANALYSIS_MODEL || 'google/gemini-flash-latest';
+// 2026-09-15: the alias above was silently 400-ing on every single call
+// ("google/gemini-flash-latest is not a valid model ID") — confirmed live
+// against GET https://openrouter.ai/api/v1/models that OpenRouter now
+// requires a leading `~` on redirect/alias slugs (the model's own `id` and
+// `canonical_slug` fields are both `~google/gemini-flash-latest`, currently
+// pointing at google/gemini-3.8-flash); the bare slug without `~` no longer
+// resolves. Every product in this run's P4 pass failed 40/40 on this exact
+// error before the fix.
+const ANALYSIS_MODEL = process.env.P4_MODEL || process.env.ANALYSIS_MODEL || '~google/gemini-flash-latest';
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 

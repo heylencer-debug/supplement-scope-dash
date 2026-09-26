@@ -38,6 +38,7 @@ const { createClient } = require('@supabase/supabase-js');
 const { resolveCategory } = require('./utils/category-resolver');
 const { prepareReviews, buildProductEvidence } = require('./utils/review-synthesis');
 const { fetchProductSyntheses } = require('./utils/review-synthesis-store');
+const { reuseAsinsFromEnv, reuseKeywordsFromEnv, reuseMaxAgeDays, siblingReviewNeed, mergeSiblingReviews } = require('./utils/reuse-asins');
 
 const DOVIVE = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 const DASH = createClient(
@@ -175,7 +176,7 @@ async function run() {
   while (true) {
     const { data, error } = await DOVIVE
       .from('dovive_reviews')
-      .select('id, asin, rating, title, body, reviewer_name, review_date, verified_purchase, helpful_votes, rid:raw_json->raw->>review_id, rheader:raw_json->raw->>review_header, rdate:raw_json->raw->>review_posted_date, rverified:raw_json->raw->>is_verified')
+      .select('id, asin, rating, title, body, reviewer_name, review_date, verified_purchase, helpful_votes, scraped_at, rid:raw_json->raw->>review_id, rheader:raw_json->raw->>review_header, rdate:raw_json->raw->>review_posted_date, rverified:raw_json->raw->>is_verified')
       .eq('keyword', KEYWORD)
       .range(page * pageSize, (page + 1) * pageSize - 1);
 
@@ -188,11 +189,54 @@ async function run() {
 
   console.log(`Fetched ${allReviews.length} reviews total`);
 
-  // 3. Group reviews by ASIN
+  // 3. Group reviews by ASIN. A READ-FIRST re-scrape (SCOUT_RESCRAPE_ASINS)
+  // inserts fresh rows next to the stale ones for the same ASIN — the same
+  // review can then appear twice, so collapse exact duplicates.
+  // Keyed on Amazon's review id when the row carries one (Bright Data rows
+  // keep it in raw_json; their title/review_date COLUMNS are null, so a
+  // column-only key would collapse every same-star review of an ASIN into
+  // one) — the text key is only the fallback for id-less rows.
   const byAsin = {};
+  const seenReview = new Set();
   for (const r of allReviews) {
+    const key = r.rid
+      ? `${r.asin}|rid:${r.rid}`
+      : `${r.asin}|${r.reviewer_name || ''}|${r.review_date || r.rdate || ''}|${r.rating}|${(r.title || r.rheader || r.body || '').slice(0, 80)}`;
+    if (seenReview.has(key)) continue;
+    seenReview.add(key);
     if (!byAsin[r.asin]) byAsin[r.asin] = [];
     byAsin[r.asin].push(r);
+  }
+
+  // READ-FIRST cross-session reuse (run-pipeline.js sets SCOUT_REUSE_KEYWORDS
+  // only when plan-scope.js decided P3 is a family reuse / top-up). For every
+  // product in THIS session's category that has no reviews under THIS
+  // session's keyword — or that the plan listed in SCOUT_REUSE_ASINS because
+  // this session's own reviews are stale and a sibling's are fresh — READ the
+  // reviews of the single freshest sibling session (only if fresher than this
+  // session's own), so no review is counted twice. Nothing is copied into
+  // dovive_reviews: the raw rows stay attributed to the session that paid.
+  const reuseKeywords = reuseKeywordsFromEnv().filter(k => k.toLowerCase() !== KEYWORD.toLowerCase());
+  if (reuseKeywords.length) {
+    const need = siblingReviewNeed(Object.keys(asinToId), byAsin, reuseAsinsFromEnv());
+    const maxAge = reuseMaxAgeDays();
+    const cutoff = maxAge ? new Date(Date.now() - maxAge * 86400000).toISOString() : null;
+    const sibling = [];
+    for (let i = 0; i < need.length; i += 100) {
+      for (let from = 0; ; from += pageSize) {
+        let q = DOVIVE.from('dovive_reviews')
+          .select('id, asin, keyword, rating, title, body, reviewer_name, review_date, verified_purchase, helpful_votes, scraped_at, rid:raw_json->raw->>review_id, rheader:raw_json->raw->>review_header, rdate:raw_json->raw->>review_posted_date, rverified:raw_json->raw->>is_verified')
+          .or(reuseKeywords.map(k => `keyword.ilike.${JSON.stringify(k)}`).join(',')) // case-insensitive, as the pipeline matches labels
+          .in('asin', need.slice(i, i + 100));
+        if (cutoff) q = q.gte('scraped_at', cutoff);
+        const { data, error } = await q.range(from, from + pageSize - 1);
+        if (error) throw error;
+        sibling.push(...(data || []));
+        if (!data || data.length < pageSize) break;
+      }
+    }
+    const reusedAsins = mergeSiblingReviews(byAsin, sibling);
+    console.log(`READ-FIRST reuse: ${reusedAsins} ASINs read from sibling sessions (${reuseKeywords.join(', ')})${cutoff ? `, scraped since ${cutoff.slice(0, 10)}` : ''}`);
   }
 
   const asinsWithReviews = Object.keys(byAsin);

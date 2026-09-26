@@ -129,4 +129,45 @@ Use the brand's official website and major retailers as your primary sources. Be
   }
 }
 
-module.exports = { researchBrand, getPerplexityKey, PERPLEXITY_MODEL };
+/**
+ * Search-style call (P5b web research, 2026-09-27): Perplexity's Search API
+ * (POST https://api.perplexity.ai/search) returns ranked results with
+ * title / url / snippet / date and NO synthesized answer — exactly what a
+ * source list needs, and cheaper than a Sonar chat call. Pricing per
+ * docs.perplexity.ai/getting-started/pricing (read 2026-09-27): $5 per 1,000
+ * requests (standard). The response carries no usage/cost, so the flat price
+ * is returned as `cost_usd` for the caller to record via recordAiUsage.
+ *
+ * Returns { ok, status, results: [{title,url,snippet,date,last_updated}], cost_usd,
+ *           creditsExhausted?, error? }. NEVER throws.
+ */
+const PERPLEXITY_SEARCH_PRICE_USD = Number(process.env.PERPLEXITY_SEARCH_PRICE_USD || 0.005);
+
+async function searchWeb(query, { maxResults = 10, domainFilter = null, fetchImpl = fetch, timeoutMs = 30000 } = {}) {
+  const key = getPerplexityKey();
+  if (!key) return { ok: false, status: 0, results: [], cost_usd: 0, error: 'PERPLEXITY_API_KEY not set' };
+  const body = { query, max_results: Math.max(1, Math.min(20, maxResults)) };
+  if (Array.isArray(domainFilter) && domainFilter.length) body.search_domain_filter = domainFilter.slice(0, 20);
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), timeoutMs);
+  try {
+    const res = await fetchImpl('https://api.perplexity.ai/search', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: ctl.signal,
+    });
+    const text = await res.text();
+    if (res.status === 402) return { ok: false, status: 402, results: [], cost_usd: 0, creditsExhausted: true, error: 'Perplexity credits exhausted (402)' };
+    if (!res.ok) return { ok: false, status: res.status, results: [], cost_usd: 0, error: text.slice(0, 300) };
+    let j;
+    try { j = JSON.parse(text); } catch { return { ok: false, status: res.status, results: [], cost_usd: PERPLEXITY_SEARCH_PRICE_USD, error: 'non-JSON response' }; }
+    return { ok: true, status: res.status, results: Array.isArray(j.results) ? j.results : [], raw: j, cost_usd: PERPLEXITY_SEARCH_PRICE_USD };
+  } catch (err) {
+    return { ok: false, status: 0, results: [], cost_usd: 0, error: err.name === 'AbortError' ? `timeout after ${timeoutMs}ms` : err.message };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+module.exports = { researchBrand, searchWeb, getPerplexityKey, PERPLEXITY_MODEL, PERPLEXITY_SEARCH_PRICE_USD };

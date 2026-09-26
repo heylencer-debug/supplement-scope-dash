@@ -34,9 +34,9 @@ The candidate set is the target session's own P1 ASINs, if it has any. Otherwise
 
 | Decision | Meaning | What run-pipeline does (`honor` mode) |
 |---|---|---|
-| `reuse` (source `session`) | This session already holds the data. It is fresh (within the window) and complete (at or above the phase's bar). | Skips the phase (`status: skipped`). |
-| `reuse` (source `family`) | A sibling session holds it fresh, and this phase can read it across sessions. | Runs only the no-cost migrate step: P2 `migrate-keepa-to-dash.js`, P3 `migrate-reviews-to-dash.js`, P4 `migrate-ocr-to-dash.js`. |
-| `top-up` | Part of the data is fresh; the rest is missing or stale. `work.list` names the missing ASINs. | Runs the phase. P3 and P4 get `SCOUT_REUSE_ASINS`, so the producers skip ASINs that are fresh in a sibling. |
+| `reuse` (source `session`) | This session already holds the data, fresh (within the window) on the candidate set, **and the final verifier's own bar for that phase already passes** (see below). | Skips the phase (`status: skipped`). |
+| `reuse` (source `family`) | This session has a DASH category, a readable copy elsewhere is fresh, and the verifier's bar is **projected** to pass once that copy is synced in. | Runs only the no-cost migrate step: P2 `migrate-keepa-to-dash.js`, P3 `migrate-reviews-to-dash.js`, P4 `migrate-ocr-to-dash.js`. |
+| `top-up` | Part of the data is fresh; the rest is missing or stale, or the verifier's bar does not (safely) pass yet. `work.list` names the missing ASINs. | Runs the phase. P3 and P4 get `SCOUT_REUSE_ASINS` (a readable copy elsewhere is fresh; skip it) and `SCOUT_RESCRAPE_ASINS` (this session holds only a stale copy and nothing fresh exists; redo it). |
 | `refresh` | Everything present is older than the window. For a category-level phase (P7, P9–P13) it can also mean that an upstream phase changes this run. | Runs the phase. |
 | `scrape` | Nothing usable exists. For AI phases this means "generate". | Runs the phase. |
 
@@ -46,16 +46,37 @@ Freshness windows in days. Defaults: P1 14, P2 7, P3 30, P4 90, P5 60, P6 60, P7
 - `SCOUT_FRESHNESS_DAYS='{"P3":45,"P4":120}'`
 - `--fresh P3=45,P4=120` (the CLI wins over both)
 
-The completeness bars in `DEFAULT_RULES` mirror the final verifier: P2 90%, P3 50% of the top 40 with at least 80% of the top 10, P4 75%, P5 75% of the top 10, P6 and P8 90%. That way a `reuse` skip cannot leave the verifier failing.
+**Skipping is decided by the final verifier's own bars, not by top-40 coverage.** `utils/verifier-bars.js` holds the measurements and the thresholds, and `runFinalVerifier` (and so the mid-run gates before P5 and P9) now calls the same `measureVerifierMetrics` + `evaluateBars`. The inventory measures this session with that code, so the plan and the verifier cannot disagree:
+
+| Phase | Verifier bar (this session) | Measured over |
+|---|---|---|
+| P1 | live run ASINs ≥ 60% of scraped run ASINs | `dovive_research` for this exact label ∩ this category |
+| P2 | `monthly_sales` on ≥ 90% | the live run ASINs (e.g. 131 for ashwagandha), not the top 40 |
+| P3 | `review_analysis` on ≥ 50%, **or** top-20 ≥ 15 **and** this session's **own** `dovive_reviews` rows ≥ 200 | live run ASINs; top-20 by `bsr_current`. Sibling-read reviews never count toward the 200. |
+| P4 | `nutrients_count > 0` on ≥ 80%, or top-20 ≥ 15 | the **whole** category |
+| P5 | ≥ min(target, max(6, ⌈0.75 × target⌉)) rows with content (target = `P5_TOP_COUNT` + `P5_NEW_COUNT`) | this exact label |
+| P6 | `marketing_analysis` on ≥ 90% | the **whole** category |
+| P8 | `packaging_intelligence` on ≥ 90% | the live run ASINs |
+| P7, P9–P13 | the deliverable exists (P11/P12: draft **and** validation; P13: review) | the category's `formula_briefs` row (`.single()`) |
+
+Two more conditions sit on top of the bar:
+
+- **A top-20-only pass is fragile.** If P3 or P4 passes *only* on its top-20 path, and P2 is not itself being skipped, this run's Keepa refresh re-ranks `bsr_current`. A single ASIN moving is then enough to fail the P5 gate, with no P3/P4 run left to fill the gap. So such a phase becomes a `top-up`, not a `reuse`. This is the live ashwagandha case: P3 29/131, top-20 15/20.
+- **The freshness floors in `DEFAULT_RULES` still apply** (P3 50% of the top 40 with 80% of the top 10, and so on). They are an extra condition on the candidate set. They never replace the bar.
+
+**Freshness comes only from the raw rows.** That means `dovive_research.scraped_at`, `dovive_keepa.parsed_at`, `dovive_reviews.scraped_at`, `dovive_ocr.processed_at`, `dovive_phase5_research.researched_at`, the phases' own `analyzed_at` / `generated_at` stamps, and, for P9 only, the brief row's `created_at` (P9 re-inserts the row). It never comes from `products.*_updated_at` or `formula_briefs.updated_at`: migrate scripts stamp those with `now()` even when they sync a sibling's old rows. A missing timestamp counts as unknown, and unknown counts as stale.
 
 A category-level phase is reused only when three things hold: this session has it, it is fresh, and **every upstream phase is also a session reuse**. A sibling sync counts as an input change.
 
 ### How run-pipeline.js uses it
 
 1. The plan is built at start, printed, and written to `scout_jobs.plan` when `SCOUT_JOB_ID` is set.
-2. It is **rebuilt after P1**, because a new session only gets its own ASIN set and DASH category once P1 has run. The after-P1 plan is the one that decides P2 onwards.
-3. It is honoured by default. It is advisory (printed but not acted on) with `--force`, with `--no-reuse`, with `SCOUT_PLAN_MODE=advisory`, and on hand-scoped runs (`--phases …` or `--from Pn>1`) unless `SCOUT_PLAN_MODE=honor` is set. `SCOUT_PLAN_MODE=off` skips the inventory entirely.
-4. It fails open. If the inventory cannot be read, every phase runs exactly as before. The mid-run structural gates (before P5 and P9) and the final verifier are unchanged, so a wrong plan cannot bypass them.
+2. It is **rebuilt after P1**, because a new session only gets its own ASIN set and DASH category once P1 has run. The after-P1 plan is the one that decides P2 onwards. **If that rebuild fails or times out, the job continues with no plan** (every phase runs as before). It never falls back to the start plan, which was built before the session had a category. Before P1 no phase can be a `reuse`: without a category there is nothing for the verifier to measure.
+3. Timing: the plan is built only **after** the job is marked `running`. The reads are bounded by `SCOUT_PLAN_TIMEOUT_MS` (default 90000); a timeout counts as a failure, and the job fails open.
+4. It is honoured by default. It is advisory (printed but not acted on) with `--force`, with `--no-reuse`, with `SCOUT_PLAN_MODE=advisory`, and on hand-scoped runs (`--phases …` or `--from Pn>1`) unless `SCOUT_PLAN_MODE=honor` is set. `SCOUT_PLAN_MODE=off` skips the inventory entirely.
+
+   **Current behaviour for dashboard research-scope jobs:** these jobs submit `only_phases` 1–8. `cloud-worker.js` turns that into `--phases 1,…,8`, so **they run in advisory mode**: the plan is printed and stored, but every phase still runs. To have such jobs honour the plan, set `SCOUT_PLAN_MODE=honor` in the environment the pipeline runs with (the Cloud Run job's env vars, or the shell for a local run). With that set, `--phases` / `--from` runs honour it too.
+5. It fails open. If the inventory cannot be read, every phase runs exactly as before. The mid-run structural gates (before P5 and P9) and the final verifier are unchanged, so a wrong plan cannot bypass them.
 
 ### How top-up composes with the scripts' own skips
 
@@ -63,8 +84,8 @@ A category-level phase is reused only when three things hold: this session has i
 |---|---|---|
 | P1 `human-bsr.js` | Detail pages already stored for (asin, **same keyword**). | Nothing: this file is out of scope for this change. |
 | P2 `keepa-phase2.js` | None; it always re-fetches. | Family `reuse` runs `migrate-keepa-to-dash.js` only, which reads `dovive_keepa` by ASIN. A `top-up` runs the full phase, because Keepa has no ASIN-subset flag. |
-| P3 `playwright-reviews.js` | ASINs that already have reviews **for this keyword**. | Also skips `SCOUT_REUSE_ASINS`. `migrate-reviews-to-dash.js` reads those ASINs' reviews from the freshest sibling session in `SCOUT_REUSE_KEYWORDS` (case-insensitive, within `SCOUT_REUSE_MAX_AGE_DAYS`). Nothing is copied. |
-| P4 `phase4-text-extract.js`, `ocr-phase4.js` | ASINs already processed **for this keyword**. | Also skips `SCOUT_REUSE_ASINS`. `dovive_ocr` is UNIQUE(asin, image_index), and `migrate-ocr-to-dash.js` already reads by ASIN, so sibling facts land without a new vision pass. |
+| P3 `playwright-reviews.js` | ASINs that already have reviews **for this keyword**. | Also skips `SCOUT_REUSE_ASINS`, which holds only copies that are fresh within the window. Re-scrapes `SCOUT_RESCRAPE_ASINS`, which this session holds only stale with no fresh copy anywhere. `migrate-reviews-to-dash.js` reads reviews from the single freshest sibling session in `SCOUT_REUSE_KEYWORDS` (case-insensitive, within `SCOUT_REUSE_MAX_AGE_DAYS`). It does this for ASINs with no reviews in this session, and for listed ASINs whose copy here is older than the sibling's. It also collapses duplicate reviews left by a re-scrape. Nothing is copied. |
+| P4 `phase4-text-extract.js`, `ocr-phase4.js` | ASINs already processed **for this keyword**. | Also skips `SCOUT_REUSE_ASINS` and redoes `SCOUT_RESCRAPE_ASINS`. `dovive_ocr` is UNIQUE(asin, image_index), and `migrate-ocr-to-dash.js` already reads by ASIN, so sibling facts land without a new vision pass. |
 | P5 `phase5-deep-research.js` | Done (asin, pool) pairs **for this keyword**. | Runs as today; its top-up is its own skip. |
 | P6 `phase6-product-intelligence.js` | Products in this category that already have `product_intelligence.analyzed_at`. | Runs as today. |
 | P8 `phase7-packaging-intelligence.js` | None; it re-analyses its top-N every run. | Runs as today, so a P8 `top-up` redoes the whole top-N. The plan still reports the gap. |
@@ -73,9 +94,9 @@ A category-level phase is reused only when three things hold: this session has i
 
 Cross-session reuse is implemented only where it can be done **by reading**:
 
-- **P2**: `dovive_keepa` is keyed by ASIN.
-- **P3**: the reviews migrate reads the sibling keyword.
-- **P4**: `dovive_ocr` is keyed by ASIN.
+- **P2**: `dovive_keepa` is keyed by ASIN. The plan reports this as "by ASIN (any session)", because the row may have been written by any keyword's run, even one outside the family.
+- **P3**: the reviews migrate reads the sibling keyword. This is the only keyword-keyed reuse, so it is the only phase that passes `SCOUT_REUSE_KEYWORDS`.
+- **P4**: `dovive_ocr` is keyed by ASIN, and is reported the same way as P2.
 
 It is **not** wired for the phases below. The plan says so in each reason ("… cannot read across sessions"), and each one still runs.
 

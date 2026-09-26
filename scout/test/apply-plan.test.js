@@ -48,3 +48,49 @@ test('no plan / scrape decision → the original phase object, untouched', () =>
   const plan = planFor(fx.emptyKeyword());
   assert.equal(applyScopePlan(p, plan, { mode: 'honor' }).phase, p);
 });
+
+// ─── review round 1 ─────────────────────────────────────────────────────────
+const { planAfterPhase } = require('../utils/apply-plan');
+const { withTimeout } = require('../inventory');
+const fs = require('fs');
+const path = require('path');
+
+test('F2: a failed after-P1 rebuild yields NO plan (fail open), never the start plan', async () => {
+  const start = planFor(fx.fragmented()); // built before "#6" had a DASH category
+  assert.equal(await planAfterPhase(1, start, async () => { throw new Error('boom'); }), null);
+  assert.equal(await planAfterPhase(1, start, async () => null), null);
+  const rebuilt = planFor(fx.fragmented({ afterP1: true }));
+  assert.equal(await planAfterPhase(1, start, async (stage) => (stage === 'after-P1' ? rebuilt : null)), rebuilt);
+  assert.equal(await planAfterPhase(2, start, async () => { throw new Error('not called'); }), start);
+  assert.equal(await planAfterPhase(1, null, async () => { throw new Error('not called'); }), null);
+  // and run-pipeline uses it without a `|| scopePlan` fallback
+  const src = fs.readFileSync(path.join(__dirname, '..', 'run-pipeline.js'), 'utf8');
+  assert.match(src, /scopePlan = await planAfterPhase\(phase\.num, scopePlan, buildScopePlan\);/);
+  assert.doesNotMatch(src, /buildScopePlan\('after-P1'\)\)\s*\|\|\s*scopePlan/);
+});
+
+test('F7: reuse env vars are restored to their prior values, not deleted', async () => {
+  const plan = planFor(fx.fragmented({ afterP1: true }));
+  const env = { SCOUT_REUSE_KEYWORDS: 'operator-set', UNRELATED: 'x' };
+  let during = null;
+  const r = applyScopePlan(fakePhase(3, []), plan, { mode: 'honor', keyword: 'k', env, runScript: async () => { during = env.SCOUT_REUSE_KEYWORDS; } });
+  await r.phase.run();
+  assert.equal(during, 'electrolyte powder #4');
+  assert.deepEqual(env, { SCOUT_REUSE_KEYWORDS: 'operator-set', UNRELATED: 'x' });
+});
+
+test('F4: a stale-in-session top-up hands the producers SCOUT_RESCRAPE_ASINS', async () => {
+  const plan = planFor(fx.staleOwnReviews());
+  const env = {}; let seen = null;
+  const phase = { num: 3, name: 'P3', run: async () => { seen = { reuse: env.SCOUT_REUSE_ASINS.split(',').length, rescrape: env.SCOUT_RESCRAPE_ASINS.split(',').length }; } };
+  await applyScopePlan(phase, plan, { mode: 'honor', keyword: 'biotin gummies', env }).phase.run();
+  assert.deepEqual(seen, { reuse: 10, rescrape: 30 });
+  assert.deepEqual(env, {});
+});
+
+test('F11: inventory reads are bounded by a timeout, and the plan is built after the job is marked running', async () => {
+  await assert.rejects(withTimeout(new Promise(() => {}), 20), /timed out after 20ms/);
+  assert.equal(await withTimeout(Promise.resolve(7), 20), 7);
+  const src = fs.readFileSync(path.join(__dirname, '..', 'run-pipeline.js'), 'utf8');
+  assert.ok(src.indexOf("await updateJobStatus({ status: 'running'") < src.indexOf("await buildScopePlan('start')"));
+});

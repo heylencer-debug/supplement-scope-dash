@@ -20,6 +20,7 @@ function applyScopePlan(phase, plan, { mode = 'honor', keyword, runScript, env =
   const vars = {};
   if (d.reuseAsins?.length) vars.SCOUT_REUSE_ASINS = d.reuseAsins.join(',');
   if (d.reuseSessions?.length) vars.SCOUT_REUSE_KEYWORDS = d.reuseSessions.join(',');
+  if (d.rescrapeAsins?.length) vars.SCOUT_RESCRAPE_ASINS = d.rescrapeAsins.join(',');
   if (Object.keys(vars).length && plan.freshnessDays?.[`P${phase.num}`]) {
     vars.SCOUT_REUSE_MAX_AGE_DAYS = String(plan.freshnessDays[`P${phase.num}`]);
   }
@@ -31,10 +32,27 @@ function applyScopePlan(phase, plan, { mode = 'honor', keyword, runScript, env =
     note,
     env: vars,
     phase: { ...phase, run: async () => {
-      Object.assign(env, vars); // inherited by runScript's spawn()
-      try { await inner(); } finally { for (const k of Object.keys(vars)) delete env[k]; }
+      // Set for exactly this phase (inherited by runScript's spawn()), then put
+      // back whatever was there before — an operator may have exported one.
+      const prior = Object.fromEntries(Object.keys(vars).map(k => [k, Object.prototype.hasOwnProperty.call(env, k) ? env[k] : undefined]));
+      Object.assign(env, vars);
+      try { await inner(); } finally {
+        for (const [k, v] of Object.entries(prior)) { if (v === undefined) delete env[k]; else env[k] = v; }
+      }
     } },
   };
 }
 
-module.exports = { applyScopePlan };
+/**
+ * After P1 the session's ASIN set and DASH category exist for the first time,
+ * so the plan is rebuilt. If that rebuild fails (or times out) the result is
+ * NO plan — never the start plan, which was built before this session had a
+ * category (every ASIN looked syncable, candidates came from a sibling) and
+ * would send P3/P4 into sync-only runs against another session's set.
+ */
+async function planAfterPhase(phaseNum, currentPlan, rebuild) {
+  if (phaseNum !== 1 || !currentPlan) return currentPlan;
+  try { return (await rebuild('after-P1')) || null; } catch { return null; }
+}
+
+module.exports = { applyScopePlan, planAfterPhase };

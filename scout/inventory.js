@@ -29,6 +29,7 @@ const {
   PHASE_META, normalizeKeyword, stripSession, sessionNumber, familyNames, isFamilyLabel, familyPrefixes,
 } = require('./utils/phase-map');
 const { resolveCategory } = require('./utils/category-resolver');
+const { resolveRunAsins, measureVerifierMetrics, evaluateBars } = require('./utils/verifier-bars');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const TOP_N = 40;
@@ -99,12 +100,20 @@ async function fetchRaw({ keyword, db, dash = db, aliases = [], autoAliases = tr
   if (!labels.includes(target)) labels.push(target); // own session (may not exist yet)
   const related = allLabels.filter(l => !isFamilyLabel(l, nameSet));
 
-  // 2) Resolve each label → category with the pipeline's OWN resolver, so the
-  //    inventory sees exactly the category the phase scripts would write to.
+  // 2) Resolve each label → category with the pipeline's OWN resolver AND the
+  //    pipeline's own input: the target exactly as submitted (KEYWORD), a
+  //    sibling by the spelling stored in categories.search_term (the resolver's
+  //    first step is an exact, case-sensitive match), else as stored in raw rows.
+  const spellings = (label) => label === target ? [keyword]
+    : uniq([...catRows.map(c => c.search_term), ...kwRows.map(r => r.keyword)].filter(x => normalizeKeyword(x) === label));
   const categories = [];
   for (const label of labels) {
     try {
-      const cat = await resolveCategory(dash, label);
+      let cat = null; let lastErr = null;
+      for (const spelled of spellings(label)) {
+        try { cat = await resolveCategory(dash, spelled); break; } catch (e) { lastErr = e; }
+      }
+      if (!cat) throw lastErr || new Error(`No category candidates found for '${label}'`);
       const row = catRows.find(c => c.id === cat.id) || {};
       categories.push({ label, id: cat.id, name: cat.name, method: cat.method, created_at: row.created_at || null, is_test: !!row.is_test });
     } catch (e) {
@@ -112,6 +121,18 @@ async function fetchRaw({ keyword, db, dash = db, aliases = [], autoAliases = tr
     }
   }
   const catIds = uniq(categories.map(c => c.id));
+
+  // 2b) This session's verifier view, measured by the verifier's OWN code
+  //     (utils/verifier-bars.js) so a planned `reuse` can never be a phase the
+  //     final verifier / mid-run gates would fail.
+  const ownCat = categories.find(c => c.label === target) || null;
+  let verifier = null;
+  if (ownCat) {
+    const run = await resolveRunAsins({ DOVIVE: db, DASH: dash, keyword, categoryId: ownCat.id, warn: (m) => warnings.push(m.trim()) });
+    const measured = await measureVerifierMetrics({ DOVIVE: db, DASH: dash, keyword, categoryId: ownCat.id, runAsins: run.live, runAsinsAll: run.all });
+    const ownRA = await fetchAll(() => dash.from('products').select('asin').eq('category_id', ownCat.id).not('review_analysis', 'is', null));
+    verifier = { runAsins: run, measured, ownReviewAnalysis: uniq(ownRA.map(r => r.asin)) };
+  }
   // Raw tables store the label verbatim (case as submitted) and the pipeline
   // matches with ilike, so query every original-case spelling we saw.
   const rawLabels = uniq([...catRows.map(c => c.search_term), ...kwRows.map(r => r.keyword), keyword]
@@ -131,9 +152,7 @@ async function fetchRaw({ keyword, db, dash = db, aliases = [], autoAliases = tr
   const products = catIds.length ? await fetchChunked(catIds, ids => dash.from('products')
     .select([
       'asin', 'parent_asin', 'category_id', 'title', 'brand', 'bsr_current', 'rank', 'monthly_sales', 'cohort',
-      'nutrients_count', 'last_updated', 'updated_at', 'review_analysis_updated_at', 'marketing_analysis_updated_at',
-      'ra_n:review_analysis->analysis_metadata->>total_reviews_analyzed',
-      'ra_pos:review_analysis->sentiment_distribution->>positive',
+      'nutrients_count', 'last_updated',
       'pi_at:marketing_analysis->product_intelligence->>analyzed_at',
       'pk_at:marketing_analysis->packaging_intelligence->>analyzed_at',
     ].join(',')).in('category_id', ids), 20) : [];
@@ -142,6 +161,9 @@ async function fetchRaw({ keyword, db, dash = db, aliases = [], autoAliases = tr
   const asins = uniq([...research.map(r => r.asin), ...products.map(p => p.asin)]);
   const keepa = await fetchChunked(asins, a => db.from('dovive_keepa')
     .select('asin,keyword,parsed_at,monthly_sales_est').in('asin', a));
+  // (products.*_updated_at columns are deliberately NOT read: migrate scripts
+  //  stamp them with now() even when they sync a SIBLING's old rows, so they
+  //  say nothing about how fresh the underlying data is.)
   const ocr = await fetchChunked(asins, a => db.from('dovive_ocr')
     .select('asin,keyword,image_index,processed_at,first_fact:supplement_facts->0->>name').in('asin', a));
 
@@ -176,7 +198,7 @@ async function fetchRaw({ keyword, db, dash = db, aliases = [], autoAliases = tr
   } catch (e) { warnings.push(`ai_usage_log unreadable: ${e.message}`); }
 
   return {
-    keyword, names, labels, related, categories,
+    keyword, names, labels, related, categories, verifier,
     research, reviews, p5, packaging, products, keepa, ocr, briefs: briefFlags, usage,
   };
 }
@@ -251,16 +273,28 @@ function assembleInventory(raw, { now = new Date(), topN = TOP_N, topK = TOP_K, 
   const keepaBy = byAsin(raw.keepa);
   const ocrBy = byAsin(raw.ocr.filter(o => o.first_fact));
 
-  const entry = (parts) => {
-    // parts: [{ at, session }] from every source that holds the data
+  // Freshness comes ONLY from the raw rows the data was built from (or the
+  // phase's own analyzed_at stamp for P6/P8): never from products.*_updated_at,
+  // which migrate scripts set to now() even when they sync a sibling's old rows.
+  // A missing raw timestamp means "unknown", and unknown is treated as stale.
+  //   at        freshest timestamp anywhere (family, or by ASIN for P2/P4)
+  //   own       THIS session holds the artefact the way the verifier counts it
+  //   ownAt     timestamp of THIS session's copy (null = unknown = stale)
+  //   siblingAt freshest copy THIS session could read without scraping
+  //             (P2/P4: any session, the tables are keyed by ASIN; P3: sibling
+  //             sessions' own review rows; others: informational only)
+  const BY_ASIN = 'by ASIN (any session)';
+  const ownReviewAnalysis = new Set(raw.verifier?.ownReviewAnalysis || []);
+  const entry = ({ parts, own, ownAt, siblingAt, extra = {} }) => {
     const valid = parts.filter(p => p && (p.at || p.session));
-    if (!valid.length) return null;
-    const own = valid.filter(p => p.own);
+    if (!valid.length && !own) return null;
     return {
       at: maxIso(valid.map(p => p.at)),
-      sessions: uniq(valid.map(p => p.session)),
-      own: own.length > 0,
-      ownAt: own.length ? maxIso(own.map(p => p.at)) || maxIso(valid.map(p => p.at)) : null,
+      sessions: uniq([...valid.map(p => p.session), own ? ownLabel : null]),
+      own: !!own,
+      ownAt: own ? (ownAt || null) : null,
+      siblingAt: siblingAt || null,
+      ...extra,
     };
   };
 
@@ -272,33 +306,56 @@ function assembleInventory(raw, { now = new Date(), topN = TOP_N, topK = TOP_K, 
     const oc = ocrBy.get(asin) || [];
     const rv = reviewsBy.get(asin) || [];
     const p5r = p5By.get(asin) || [];
+    const isOwn = (kw) => labelOf(kw) === ownLabel;
     const keepaAt = maxIso(kp.map(k => k.parsed_at));
+    const keepaSalesAt = maxIso(kp.filter(k => k.monthly_sales_est != null).map(k => k.parsed_at));
     const ocrAt = maxIso(oc.map(o => o.processed_at));
+    const otherCats = prods.filter(p => p !== ownProd);
 
-    // reviews per session
-    const rvBySession = new Map();
-    for (const r of rv) { const l = labelOf(r.keyword); rvBySession.set(l, maxIso(rvBySession.get(l), r.scraped_at)); }
-
-    const hasRA = (p) => p.ra_n != null || p.ra_pos != null || !!p.review_analysis_updated_at;
     return {
       // P1 counts as "own" only once the product also landed in this session's
       // DASH category (the verifier's P1-migration check reads DASH, not raw).
-      P1: entry(res.map(r => ({ at: r.scraped_at, session: labelOf(r.keyword), own: labelOf(r.keyword) === ownLabel && !!ownProd }))),
-      P2: entry([
-        ...kp.map(k => ({ at: k.parsed_at, session: k.keyword ? labelOf(k.keyword) : null, own: false })),
-        ...prods.filter(p => p.monthly_sales != null).map(p => ({ at: keepaAt || p.updated_at, session: catLabel(p.category_id), own: p === ownProd })),
-      ]),
-      P3: entry([
-        ...[...rvBySession].map(([l, at]) => ({ at, session: l, own: false })),
-        ...prods.filter(hasRA).map(p => ({ at: rvBySession.get(catLabel(p.category_id)) || p.review_analysis_updated_at || null, session: catLabel(p.category_id), own: p === ownProd })),
-      ]),
-      P4: entry([
-        ...oc.map(o => ({ at: o.processed_at, session: o.keyword ? labelOf(o.keyword) : null, own: false })),
-        ...prods.filter(p => (p.nutrients_count || 0) > 0).map(p => ({ at: ocrAt || p.updated_at, session: catLabel(p.category_id), own: p === ownProd })),
-      ]),
-      P5: entry(p5r.map(r => ({ at: r.researched_at, session: labelOf(r.keyword), own: labelOf(r.keyword) === ownLabel }))),
-      P6: entry(prods.filter(p => p.pi_at).map(p => ({ at: p.pi_at, session: catLabel(p.category_id), own: p === ownProd }))),
-      P8: entry(prods.filter(p => p.pk_at).map(p => ({ at: p.pk_at, session: catLabel(p.category_id), own: p === ownProd }))),
+      P1: entry({
+        parts: res.map(r => ({ at: r.scraped_at, session: labelOf(r.keyword) })),
+        own: !!ownProd && res.some(r => isOwn(r.keyword)),
+        ownAt: maxIso(res.filter(r => isOwn(r.keyword)).map(r => r.scraped_at)),
+        siblingAt: maxIso(res.filter(r => !isOwn(r.keyword)).map(r => r.scraped_at)),
+      }),
+      P2: entry({
+        parts: kp.map(k => ({ at: k.parsed_at, session: BY_ASIN })),
+        own: !!ownProd && ownProd.monthly_sales != null,
+        ownAt: keepaAt,
+        siblingAt: keepaSalesAt, // migrate-keepa only lands monthly_sales when Keepa had an estimate
+        extra: { sales: !!keepaSalesAt },
+      }),
+      P3: entry({
+        parts: rv.map(r => ({ at: r.scraped_at, session: labelOf(r.keyword) })),
+        own: ownReviewAnalysis.has(asin),
+        ownAt: maxIso(rv.filter(r => isOwn(r.keyword)).map(r => r.scraped_at)),
+        siblingAt: maxIso(rv.filter(r => !isOwn(r.keyword)).map(r => r.scraped_at)),
+      }),
+      P4: entry({
+        parts: oc.map(o => ({ at: o.processed_at, session: BY_ASIN })),
+        own: !!ownProd && (ownProd.nutrients_count || 0) > 0,
+        ownAt: ocrAt,
+        siblingAt: ocrAt,
+      }),
+      P5: entry({
+        parts: p5r.map(r => ({ at: r.researched_at, session: labelOf(r.keyword) })),
+        own: p5r.some(r => isOwn(r.keyword)),
+        ownAt: maxIso(p5r.filter(r => isOwn(r.keyword)).map(r => r.researched_at)),
+        siblingAt: maxIso(p5r.filter(r => !isOwn(r.keyword)).map(r => r.researched_at)),
+      }),
+      P6: entry({
+        parts: prods.filter(p => p.pi_at).map(p => ({ at: p.pi_at, session: catLabel(p.category_id) })),
+        own: !!ownProd?.pi_at, ownAt: ownProd?.pi_at,
+        siblingAt: maxIso(otherCats.map(p => p.pi_at)),
+      }),
+      P8: entry({
+        parts: prods.filter(p => p.pk_at).map(p => ({ at: p.pk_at, session: catLabel(p.category_id) })),
+        own: !!ownProd?.pk_at, ownAt: ownProd?.pk_at,
+        siblingAt: maxIso(otherCats.map(p => p.pk_at)),
+      }),
     };
   };
 
@@ -315,7 +372,7 @@ function assembleInventory(raw, { now = new Date(), topN = TOP_N, topK = TOP_K, 
       top40: top40.includes(asin), top10: top10.includes(asin),
       inOwnCategory: !!ownCat && prods.some(p => p.category_id === ownCat.id),
       sessions: uniq([...res.map(r => labelOf(r.keyword)), ...prods.map(p => catLabel(p.category_id))]),
-      lastUpdated: maxIso(prods.map(p => p.last_updated || p.updated_at)),
+      lastUpdated: maxIso(prods.map(p => p.last_updated)), // informational only — never used as freshness
       phases: phaseEntriesFor(asin),
     };
   }
@@ -332,12 +389,14 @@ function assembleInventory(raw, { now = new Date(), topN = TOP_N, topK = TOP_K, 
     };
   };
   const catPhaseDef = {
-    P7: b => b.has_mi && (b.mi_at || b.updated_at),
+    // generated_at stamps only — formula_briefs.updated_at moves whenever ANY
+    // later phase writes the row, so it says nothing about this phase's age.
+    P7: b => b.has_mi && (b.mi_at || true),
     P9: b => b.has_brief && (b.gen_at || b.created_at),
-    P10: b => b.has_qa && (b.qa_at || b.updated_at),
-    P11: b => b.has_cb && (b.cb_at || b.updated_at),
-    P12: b => b.has_fc && (b.fc_at || b.updated_at),
-    P13: b => b.has_fs && (b.fs_at || b.updated_at),
+    P10: b => b.has_qa && (b.qa_at || true),
+    P11: b => b.has_cb && (b.cb_at || true),
+    P12: b => b.has_fc && (b.fc_at || true),
+    P13: b => b.has_fs && (b.fs_at || true),
   };
   const phases = {};
   for (const m of PHASE_META) {
@@ -391,17 +450,36 @@ function assembleInventory(raw, { now = new Date(), topN = TOP_N, topK = TOP_K, 
     generatedAt: now.toISOString(),
     targetExists: !!(ownSession && (ownSession.p1Asins > 0 || ownSession.categoryId)),
     ownCategoryId: ownCat?.id || null,
+    categoryAsins: ownAsins,
+    // The final verifier's own measurements for THIS session + its bars
+    // (utils/verifier-bars.js). plan-scope.js refuses `reuse` unless these pass.
+    verifier: raw.verifier ? {
+      runAsins: raw.verifier.runAsins,
+      measured: raw.verifier.measured,
+      bars: evaluateBars(raw.verifier.measured).byPhase,
+    } : null,
     sessions, relatedKeywords: raw.related,
     candidates: { source, basis, top40, top10, universe: uniq(raw.research.map(r => r.asin)).length },
     phases, products, costHistory, warnings,
   };
 }
 
-async function buildInventory({ keyword, db, dash, aliases = [], autoAliases = true, now = new Date(), topN = TOP_N, topK = TOP_K }) {
+const DEFAULT_TIMEOUT_MS = 90000;
+
+/** Rejects after `ms` — a hung read must never hold a job (the pipeline fails open on it). */
+function withTimeout(promise, ms, what = 'inventory reads') {
+  if (!ms || ms <= 0) return promise;
+  let t;
+  const timeout = new Promise((_, reject) => { t = setTimeout(() => reject(new Error(`${what} timed out after ${ms}ms`)), ms); });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(t));
+}
+
+async function buildInventory({ keyword, db, dash, aliases = [], autoAliases = true, now = new Date(), topN = TOP_N, topK = TOP_K,
+  timeoutMs = Number(process.env.SCOUT_PLAN_TIMEOUT_MS) || DEFAULT_TIMEOUT_MS }) {
   if (!keyword) throw new Error('buildInventory: keyword is required');
   if (!db) throw new Error('buildInventory: db (supabase client) is required');
   const warnings = [];
-  const raw = await fetchRaw({ keyword, db, dash: dash || db, aliases, autoAliases, warnings });
+  const raw = await withTimeout(fetchRaw({ keyword, db, dash: dash || db, aliases, autoAliases, warnings }), timeoutMs);
   return assembleInventory(raw, { now, topN, topK, warnings });
 }
 
@@ -428,6 +506,14 @@ function formatInventory(inv) {
     } else {
       L.push(`${pad(`${m.key} ${m.name}`, 30)}${pad(`${p.have} sess`, 20)}${pad(p.own ? 'yes' : 'no', 8)}${pad(day(p.freshest), 12)}${pad(p.staleDays ?? '—', 7)}${p.sourceSessions.join(', ') || '—'}`);
     }
+  }
+  if (inv.verifier) {
+    const m = inv.verifier.measured;
+    L.push('', `Final verifier, this session (run ASINs ${m.runAsinsCount}/${m.runAsinsAllCount} live, category ${m.total}, own raw reviews ${m.reviewRowsTotal}):`);
+    L.push('  ' + Object.entries(inv.verifier.bars).map(([k, b]) => `${k} ${b.pass ? `ok${b.via ? ` (${b.via})` : ''}` : 'FAIL'}`).join(' · '));
+    for (const [k, b] of Object.entries(inv.verifier.bars)) if (!b.pass) L.push(`  ${k}: ${b.msg}`);
+  } else {
+    L.push('', 'Final verifier: no DASH category for this session yet (nothing to measure until P1).');
   }
   const ch = Object.entries(inv.costHistory);
   if (ch.length) L.push('', `AI cost ledger for this family: ${ch.map(([k, v]) => `${k} $${v.usd} (${v.sessions} sess)`).join(' · ')}`);
@@ -473,4 +559,4 @@ if (require.main === module) {
   main().catch(e => { console.error(`inventory failed: ${e.message}`); process.exit(1); });
 }
 
-module.exports = { buildInventory, fetchRaw, assembleInventory, formatInventory, TOP_N, TOP_K };
+module.exports = { buildInventory, fetchRaw, assembleInventory, formatInventory, withTimeout, TOP_N, TOP_K };

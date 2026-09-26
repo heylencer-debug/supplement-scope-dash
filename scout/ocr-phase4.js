@@ -42,7 +42,7 @@ const { withUsageTracking, recordAiUsage } = require('./utils/ai-usage');
 const { parseModelJson } = require('./utils/ocr-utils');
 const { resolveCategory } = require('./utils/category-resolver');
 const { reportProgress } = require('./utils/job-heartbeat');
-const { reuseAsinsFromEnv } = require('./utils/reuse-asins');
+const { reuseAsinsFromEnv, rescrapeAsinsFromEnv } = require('./utils/reuse-asins');
 
 const KEYWORD         = process.argv[2] || 'ashwagandha gummies';
 // 2026-09-01: resolved once in main() below, purely so recordAiUsage() can
@@ -260,6 +260,8 @@ async function main() {
   console.log(`Scoped to top ${topByBsr.length} by BSR (OCR_TOP_N=${OCR_TOP_N})`);
 
   const processed = await getProcessed(KEYWORD);
+  // READ-FIRST plan: facts older than the freshness window with no fresh copy — redo.
+  for (const a of rescrapeAsinsFromEnv()) processed.delete(a);
   // READ-FIRST plan: facts already OCR'd under a sibling session — dovive_ocr
   // is UNIQUE(asin, image_index), so migrate-ocr-to-dash.js (reads by ASIN)
   // lands them in this session without paying for the vision pass again.

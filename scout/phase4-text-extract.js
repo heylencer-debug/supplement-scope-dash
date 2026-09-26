@@ -16,6 +16,8 @@ require('dotenv').config();
 const fetch = require('node-fetch');
 const { createClient } = require('@supabase/supabase-js');
 const { parseModelJson, normalizeFacts, isValidFacts } = require('./utils/ocr-utils');
+const { buildFactsV2 } = require('./utils/label-facts');
+const { createOcrWriter } = require('./utils/ocr-row-write');
 const { withUsageTracking, recordAiUsage } = require('./utils/ai-usage');
 const { resolveCategory } = require('./utils/category-resolver');
 const { reportProgress } = require('./utils/job-heartbeat');
@@ -83,7 +85,18 @@ Extract structured supplement information from this text. Return a JSON object:
   "serving_size": "string or null",
   "servings_per_container": "string or null",
   "supplement_facts": [
-    { "name": "ingredient name", "amount": "amount per serving", "dv_percent": "% DV or null" }
+    {
+      "name": "ingredient name as written, including any '(as …)', '(from …)', extract ratio or standardisation text",
+      "amount": "amount per serving as written, with its unit (e.g. '300 mg'), or null",
+      "dv_percent": "% DV or null",
+      "basis": "per_serving | per_unit | per_day | per_container — ONLY if the text says so (e.g. 'per serving', 'per gummy', 'daily'); else null",
+      "compound": "the source compound written for this ingredient (e.g. 'magnesium glycinate'), or null",
+      "elemental_amount": "elemental amount if written separately, else null",
+      "extract_ratio": "extract ratio if written (e.g. '10:1'), else null",
+      "equivalent_amount": "whole-herb/plant equivalent if written, else null",
+      "standardised_to": "standardisation if written (e.g. '5% withanolides'), else null",
+      "evidence_excerpt": "the exact phrase of the text above this row was read from, verbatim, at most 160 characters"
+    }
   ],
   "other_ingredients": "full list as string or null",
   "health_claims": ["array of health claims and benefits mentioned"],
@@ -93,6 +106,7 @@ Extract structured supplement information from this text. Return a JSON object:
 
 Extract every ingredient and dose mentioned. If no specific doses are mentioned, still list the ingredients.
 Do not include any ingredient not explicitly named in the bullet points above — never invent or infer an ingredient from general supplement-category knowledge.
+Copy what is written. Never compute, convert or infer an amount, basis, compound or ratio: if the text does not say it, use null.
 Return ONLY valid JSON, no markdown.`;
 
   // Small utility extraction — 4000 tokens is sensible for bullet-point text (not a heavy analysis call)
@@ -260,6 +274,8 @@ async function main() {
   }
 
   let saved = 0, skipped = 0, failed = 0;
+  // Migration 013 (facts_v2) is optional: the writer retries once without it.
+  const ocrWriter = createOcrWriter(sb);
 
   for (let i = 0; i < list.length; i++) {
     const p = list[i];
@@ -278,6 +294,7 @@ async function main() {
         console.log(`  ⚪ No structured data found`);
         skipped++;
       } else {
+        const rawText = Array.isArray(p.bullet_points) ? p.bullet_points.join('\n') : p.bullet_points;
         const record = {
           asin: p.asin,
           ...(existingTextExtractAsins.has(p.asin) ? {} : { keyword: KEYWORD }),
@@ -289,16 +306,24 @@ async function main() {
           other_ingredients: extracted.other_ingredients || null,
           health_claims: hasClaims ? extracted.health_claims : null,
           certifications: extracted.certifications?.length ? extracted.certifications : null,
-          raw_text: Array.isArray(p.bullet_points) ? p.bullet_points.join('\n') : p.bullet_points,
+          raw_text: rawText,
+          // v2 rows: listing text is not a facts panel, so a basis is only
+          // recorded where the text states one ("per serving", "per gummy").
+          facts_v2: hasFacts ? buildFactsV2({
+            facts: extracted.supplement_facts,
+            serving_size: extracted.serving_size,
+            servings_per_container: extracted.servings_per_container,
+            raw_text: rawText,
+            is_panel: false,
+            source: { asin: p.asin, image_url: null, image_index: 99 },
+          }) : null,
+          // The listing's own copy is not a package label — nothing to compare.
+          label_product_match: null,
           gpt_model: ANALYSIS_MODEL,
           processed_at: new Date().toISOString()
         };
 
-        const { error: upsertErr } = await sb
-          .from('dovive_ocr')
-          .upsert(record, { onConflict: 'asin,image_index' });
-
-        if (upsertErr) throw new Error(upsertErr.message);
+        await ocrWriter.upsert(record);
 
         console.log(`  ✅ Saved — facts: ${hasFacts ? extracted.supplement_facts.length + ' items' : 'none'} | claims: ${extracted.health_claims?.length || 0} | certs: ${extracted.certifications?.length || 0}`);
         if (extracted.key_ingredients_summary) {

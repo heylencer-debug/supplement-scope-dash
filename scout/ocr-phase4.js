@@ -19,10 +19,17 @@
  * covers ~everything from bullet_points. Per product: scan at most
  * OCR_MAX_IMAGES (default 5) gallery images, and STOP as soon as one comes
  * back with has_supplement_facts=true — no need to keep burning calls once
- * the panel is found. Results here SUPPLEMENT phase4-text-extract.js rows —
- * migrate-ocr-to-dash.js already picks whichever dovive_ocr row (per ASIN)
- * has the most supplement_facts items, so a strong text-extraction result is
- * never clobbered by a weaker image-OCR one.
+ * the panel is found (a panel whose label is ANOTHER product — flavour or brand
+ * mismatch — does not count as found; scanning continues). Results here SUPPLEMENT phase4-text-extract.js rows —
+ * migrate-ocr-to-dash.js resolves each product field from its own best source
+ * (utils/label-sources.js: facts-panel image > text for nutrients, text
+ * wording for certifications, conflicts recorded), and never promotes a
+ * panel whose label_product_match verdict is 'mismatch' (another product).
+ *
+ * 2026-09-27 (migration 013): each row also gets facts_v2 (utils/label-facts.js
+ * — basis, per-unit, elemental vs compound, extract vs equivalent, evidence
+ * line) and label_product_match (utils/label-variant.js — does this label's
+ * flavour/count/brand match the listing and its Keepa variation?).
  *
  * Image source note: this reads dovive_research.images, which the Bright
  * Data fallback (bright-data-amazon.js normaliseProduct) populates the same
@@ -39,7 +46,10 @@ require('dotenv').config();
 const fetch = require('node-fetch');
 const { createClient } = require('@supabase/supabase-js');
 const { withUsageTracking, recordAiUsage } = require('./utils/ai-usage');
-const { parseModelJson } = require('./utils/ocr-utils');
+const { parseModelJson, normalizeFacts } = require('./utils/ocr-utils');
+const { buildFactsV2 } = require('./utils/label-facts');
+const { checkLabelProductMatch, loadKeepaVariants } = require('./utils/label-variant');
+const { createOcrWriter } = require('./utils/ocr-row-write');
 const { resolveCategory } = require('./utils/category-resolver');
 const { reportProgress } = require('./utils/job-heartbeat');
 const { reuseAsinsFromEnv, rescrapeAsinsFromEnv } = require('./utils/reuse-asins');
@@ -102,18 +112,36 @@ Product: ${title}
 Extract ALL text visible in this image and return a JSON object with these fields:
 {
   "has_supplement_facts": boolean,
-  "serving_size": "string or null",
+  "serving_size": "string or null, exactly as printed (e.g. '2 Gummies', '1 Scoop (22g)')",
   "servings_per_container": "string or null",
   "supplement_facts": [
-    { "name": "nutrient/ingredient name", "amount": "amount per serving", "dv_percent": "% DV or null" }
+    {
+      "name": "nutrient/ingredient name exactly as printed, INCLUDING any '(as …)', '(from …)', extract ratio or standardisation text",
+      "amount": "amount per serving exactly as printed, with its unit (e.g. '300 mg', '25 mcg (1000 IU)', '1.7mg (1 gummy) / 3.4mg (2 gummies)')",
+      "dv_percent": "% DV or null",
+      "basis": "per_serving | per_unit | per_day | per_container — ONLY if the label states it (e.g. an 'Amount Per Serving' header, 'per gummy'); else null",
+      "compound": "the source compound printed for this row (e.g. 'magnesium glycinate'), or null",
+      "elemental_amount": "the elemental amount if the label prints it separately (e.g. 'Providing Elemental Magnesium 70.8 mg' → '70.8 mg'), else null",
+      "extract_ratio": "extract ratio if printed (e.g. '10:1'), else null",
+      "equivalent_amount": "whole-herb/plant equivalent if printed (e.g. 'equivalent to 500 mg of root' → '500 mg'), else null",
+      "standardised_to": "standardisation if printed (e.g. '5% withanolides'), else null",
+      "evidence_excerpt": "the exact line of label text this row was read from, verbatim, at most 160 characters"
+    }
   ],
   "other_ingredients": "full list as string or null",
   "health_claims": ["array of health claims/benefits shown"],
   "certifications": ["Non-GMO", "Organic", "GMP", "NSF", "Vegan", etc],
+  "label_identity": {
+    "brand": "brand name printed on the package, or null",
+    "product_name": "product name printed on the package, or null",
+    "flavor": "flavor printed on the package, or null",
+    "count": "container count printed on the package (e.g. '60 Gummies'), or null"
+  },
   "raw_text": "all visible text concatenated"
 }
 
-If no supplement facts panel is visible, still extract any product claims, ingredients, or certifications visible.
+Copy what is printed. Never compute, convert or infer a value: if the label does not print it, use null.
+If no supplement facts panel is visible, still extract any product claims, ingredients, certifications or package identity visible.
 Return ONLY valid JSON, no markdown.`;
 
   // Plain OpenAI-shape chat request works for Gemini on OpenRouter. Vision
@@ -195,11 +223,11 @@ Return ONLY valid JSON, no markdown.`;
 }
 
 // ── Save to Supabase ──────────────────────────────────────────
+// Migration 013 (facts_v2, label_product_match) is optional: the writer
+// retries once without those columns and stops sending them.
+const ocrWriter = createOcrWriter(supabase);
 async function saveOCR(record) {
-  const { error } = await supabase
-    .from('dovive_ocr')
-    .upsert(record, { onConflict: 'asin,image_index' });
-  if (error) throw new Error('Save error: ' + error.message);
+  await ocrWriter.upsert(record);
 }
 
 // ── Get already processed ASINs ───────────────────────────────
@@ -249,7 +277,7 @@ async function main() {
   // products only.
   const { data: products, error } = await supabase
     .from('dovive_research')
-    .select('asin, title, keyword, images, main_image, bsr')
+    .select('asin, title, brand, keyword, images, main_image, bsr')
     .ilike('keyword', KEYWORD)
     .not('images', 'is', null)
     .order('bsr', { ascending: true, nullsFirst: false });
@@ -303,7 +331,10 @@ async function main() {
     }
   }
 
-  let saved = 0, skipped = 0, totalTokens = 0;
+  // Keepa's own variation attributes (flavour, size) for the label check —
+  // read-only, fail-open (an empty map just means the title alone is used).
+  const keepaVariants = await loadKeepaVariants(supabase, listAsins);
+  let saved = 0, skipped = 0, totalTokens = 0, labelMismatches = 0;
 
   for (let i = 0; i < list.length; i++) {
     const product = list[i];
@@ -353,6 +384,31 @@ async function main() {
         // Save each image result — `keyword` only set on genuine first-write
         // for this (asin, image_index) pair (see existingOcrKeys above).
         const ocrKeywordField = existingOcrKeys.has(`${product.asin}::${imgIdx}`) ? {} : { keyword: KEYWORD };
+        // Legacy column keeps its { name, amount, dv_percent } shape; the v2
+        // hints the prompt now asks for go to facts_v2 only.
+        const legacyFacts = normalizeFacts(result.supplement_facts);
+        const factsV2 = legacyFacts.length ? buildFactsV2({
+          facts: result.supplement_facts,
+          serving_size: result.serving_size,
+          servings_per_container: result.servings_per_container,
+          raw_text: result.raw_text,
+          is_panel: !!result.has_supplement_facts,
+          source: { asin: product.asin, image_url: imageUrl, image_index: imgIdx },
+        }) : null;
+        const identity = result.label_identity || {};
+        const labelMatch = legacyFacts.length ? checkLabelProductMatch({
+          asin: product.asin,
+          title: product.title,
+          brand: product.brand,
+          label: { ...identity, raw_text: result.raw_text, serving_size: result.serving_size, servings_per_container: result.servings_per_container },
+          keepa: keepaVariants.get(product.asin) || null,
+        }) : null;
+        if (labelMatch && labelMatch.verdict === 'mismatch') {
+          labelMismatches++;
+          console.log(`\n  ⚠ [P4 label check/${product.asin}] image ${imgIdx} looks like another product — ${labelMatch.why} (kept in dovive_ocr, not promoted; scanning on)`);
+        } else if (labelMatch && labelMatch.verdict === 'match_by_serving') {
+          console.log(`\n  ⓘ [P4 label check/${product.asin}] image ${imgIdx}: ${labelMatch.why}`);
+        }
         await saveOCR({
           asin:                  product.asin,
           ...ocrKeywordField,
@@ -360,7 +416,9 @@ async function main() {
           image_index:           imgIdx,
           serving_size:          result.serving_size || null,
           servings_per_container: result.servings_per_container || null,
-          supplement_facts:      result.supplement_facts?.length ? result.supplement_facts : null,
+          supplement_facts:      legacyFacts.length ? legacyFacts : null,
+          facts_v2:              factsV2,
+          label_product_match:   labelMatch,
           other_ingredients:     result.other_ingredients || null,
           health_claims:         result.health_claims?.length ? result.health_claims : null,
           certifications:        result.certifications?.length ? result.certifications : null,
@@ -369,10 +427,14 @@ async function main() {
           processed_at:          new Date().toISOString()
         });
 
-        if (result.has_supplement_facts && !bestResult) {
+        // Stop at the first facts panel that belongs to THIS product (cost
+        // control). A panel whose label is another product (flavour/brand
+        // mismatch) is saved but not used — keep scanning for the right one,
+        // still within OCR_MAX_IMAGES. A pack-size sibling's panel
+        // (match_by_serving) is the same product per serving: stop there.
+        if (result.has_supplement_facts && !bestResult && !(labelMatch && labelMatch.verdict === 'mismatch')) {
           bestResult = result;
           bestImageIdx = imgIdx;
-          // Stop scanning this product — facts panel found (cost control).
           break;
         }
 
@@ -405,6 +467,7 @@ async function main() {
   await reportProgress(list.length, list.length); // final heartbeat — always fires regardless of throttle
 
   console.log(`\n✅ Done. ${saved} products processed | ${skipped} skipped | ~${totalTokens} total tokens`);
+  if (labelMismatches) console.log(`   ⚠ ${labelMismatches} facts panel(s) did not match their listing's product/variation — see the label-check lines above`);
   console.log(`   Estimated cost: ~$${(totalTokens * 0.000005).toFixed(3)}`);
 }
 

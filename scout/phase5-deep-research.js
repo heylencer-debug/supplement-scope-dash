@@ -193,7 +193,7 @@ async function fetchGroundingData(asin, keyword) {
       .select('title, brand, description, bullet_points, price, rating, review_count, bsr')
       .eq('asin', asin).ilike('keyword', keyword).limit(1).maybeSingle(),
     DOVIVE.from('dovive_ocr')
-      .select('supplement_facts, other_ingredients, health_claims, certifications')
+      .select('supplement_facts, other_ingredients, health_claims, certifications, label_product_match')
       .eq('asin', asin).order('image_index', { ascending: true }).limit(8),
     DOVIVE.from('dovive_reviews')
       .select('rating, title, body, verified_purchase, helpful_votes')
@@ -205,7 +205,18 @@ async function fetchGroundingData(asin, keyword) {
   ]);
 
   const research = researchRes.data || null;
-  const ocrRows  = ocrRes.data || [];
+  // Migration 013 (label verification): a panel whose label is ANOTHER product
+  // (label_product_match.verdict 'mismatch' — brand/flavour) must not ground
+  // this ASIN's research. Before 013 the column is absent and the read is the
+  // same as it always was.
+  let ocrData = ocrRes.data;
+  if (ocrRes.error) {
+    const legacy = await DOVIVE.from('dovive_ocr')
+      .select('supplement_facts, other_ingredients, health_claims, certifications')
+      .eq('asin', asin).order('image_index', { ascending: true }).limit(8);
+    ocrData = legacy.data;
+  }
+  const ocrRows  = (ocrData || []).filter((r) => !(r.label_product_match && r.label_product_match.verdict === 'mismatch'));
   const reviews  = reviewsRes.data || [];
   const keepa    = keepaRes.data || null;
 

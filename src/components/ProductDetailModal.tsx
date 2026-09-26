@@ -25,6 +25,8 @@ import { ReviewEvidence } from "@/components/reviews/ReviewEvidence";
 import type { ProductReviewEvidence } from "@/hooks/useReviewSynthesis";
 import { useProductMarketingAssets, type MarketingAssetsProductRow } from "@/hooks/useMarketingAssets";
 import { ProductMarketingAssets } from "@/components/marketing-assets/MarketingAssets";
+import { LabelEvidence } from "@/components/product/LabelEvidence";
+import { readLabelEvidence } from "@/lib/labelEvidence";
 
 // Single clean active treatment (smoke pill, no border-b + focus-ring
 // double outline) for the product-detail tab strip. Kept as one shared
@@ -320,6 +322,8 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
   const marketingAnalysis = product.marketing_analysis as MarketingAnalysis | null;
   const reviewAnalysis = product.review_analysis as ReviewAnalysis | null;
   const allNutrients = product.all_nutrients as unknown as Nutrient[] | null;
+  // Migration 013 columns (not in the generated types until it is applied).
+  const labelEvidence = readLabelEvidence(product);
   const proprietaryBlends = product.proprietary_blends as unknown as ProprietaryBlend[] | null;
 
   // Normalize specifications: DB may be either an array [{name,value}] OR an object map.
@@ -1531,6 +1535,12 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                   <EmptyLine>No formula data extracted for this product.</EmptyLine>
                 )}
               </DocSection>
+
+              {labelEvidence && (
+                <DocSection title="Label Evidence">
+                  <LabelEvidence evidence={labelEvidence} />
+                </DocSection>
+              )}
 
               {product.feature_bullets_text && (
                 <DocSection title="Feature Bullets">

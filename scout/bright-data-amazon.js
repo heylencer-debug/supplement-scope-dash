@@ -183,32 +183,58 @@ function normaliseProduct(p) {
     price,
     bsRank: typeof p?.bs_rank === 'number' ? p.bs_rank : (typeof p?.root_bs_rank === 'number' ? p.root_bs_rank : null),
     category: typeof p?.bs_category === 'string' ? p.bs_category : null,
-    sponsored: !!(p?.sponsored ?? p?.sponsered),
+    sponsored: isTrue(p?.sponsored) || isTrue(p?.sponsered),
     raw: p,
   };
 }
 
 /**
- * Keyword search + product hydration, mirroring the getnoodle edge function's
- * `mode: 'keyword'` path. Returns an array of normalized products in Amazon
- * search-result order, each carrying `searchRank` (1-based position) and the
- * full raw Bright Data record under `.raw` for downstream `raw_json` storage.
+ * Bright Data reports `sponsored` as a boolean on some records and as a STRING
+ * on others; `!!"false"` is true, which is how every Bright Data fallback row
+ * ever stored ended up is_sponsored=true (361/361, read-only check
+ * 2026-09-26). Only a real true / "true" / 1 counts.
+ */
+function isTrue(v) {
+  return v === true || v === 1 || (typeof v === 'string' && /^(true|1|yes|sponsored)$/i.test(v.trim()));
+}
+
+// The real shape of the search record's sponsored field has never been
+// observed (only hydrated product records are stored). Log it once per run —
+// typeof + distinct values — so the first live fallback settles it.
+let _sponsoredShapeLogged = false;
+function logSponsoredShape(records) {
+  if (_sponsoredShapeLogged || !records.length) return;
+  _sponsoredShapeLogged = true;
+  const seen = new Map();
+  for (const r of records) {
+    for (const k of ['sponsored', 'sponsered']) {
+      const v = r?.[k];
+      const key = `${k}:${typeof v}:${JSON.stringify(v)}`;
+      seen.set(key, (seen.get(key) || 0) + 1);
+    }
+  }
+  console.log(`[bright-data] search-record sponsored field shapes: ${[...seen].map(([k, n]) => `${k}×${n}`).join(', ')}`);
+}
+
+/**
+ * Keyword search only (no hydration) — the ASINs a search surfaced, in SERP
+ * order, sponsored placements included and flagged. human-bsr.js calls this
+ * once per query from utils/query-variants.js and unions the results with
+ * utils/serp-pool.js before hydrating the pool.
  *
  * @param {string} keyword
- * @param {{ locale?: string, limit?: number, pages?: number }} opts
+ * @param {{ locale?: string, pages?: number }} opts
  */
-async function searchAmazonByKeyword(keyword, opts = {}) {
+async function discoverAsinsByKeyword(keyword, opts = {}) {
   const apiKey = getApiKey();
   if (!apiKey) throw new Error('BRIGHTDATA_API_KEY / BRIGHTDATA not set');
-
   const locale = String(opts.locale || 'US').toUpperCase();
-  const limit = Math.max(1, Math.min(Number(opts.limit) || 20, 50));
   const pages = Math.max(1, Math.min(Number(opts.pages) || 3, 3));
 
-  // Step 1: keyword discovery via Search dataset.
   const searchInput = [{ keyword, url: searchUrl(keyword, locale), pages_to_search: pages }];
   const searchRecords = await bdScrape(SEARCH_DATASET, searchInput, apiKey);
   console.log(`[bright-data] search "${keyword}" ${locale} pages=${pages} → ${searchRecords.length} records`);
+  logSponsoredShape(searchRecords);
 
   const seen = new Set();
   const discovered = [];
@@ -222,32 +248,64 @@ async function searchAmazonByKeyword(keyword, opts = {}) {
     discovered.push({
       asin: a,
       position: discovered.length + 1,
-      sponsored: !!(r?.sponsored ?? r?.sponsered),
+      sponsored: isTrue(r?.sponsored) || isTrue(r?.sponsered),
       title,
       raw: r,
     });
   }
+  return discovered;
+}
+
+/**
+ * Hydrate ASINs to full product data (media, bullets, specs) via the Products
+ * dataset, returned in the order given. Batched (40 per call) so an ~80-ASIN
+ * pool stays inside one call's sync/snapshot budget.
+ *
+ * @param {string[]} asins
+ * @param {{ locale?: string, batchSize?: number }} opts
+ */
+async function hydrateAsins(asins, opts = {}) {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error('BRIGHTDATA_API_KEY / BRIGHTDATA not set');
+  const locale = String(opts.locale || 'US').toUpperCase();
+  const batchSize = Math.max(1, Math.min(Number(opts.batchSize) || 40, 50));
+  const products = [];
+  for (let i = 0; i < asins.length; i += batchSize) {
+    const chunk = asins.slice(i, i + batchSize);
+    const rawProducts = await bdScrape(PRODUCTS_DATASET, chunk.map((a) => ({ url: productUrl(a, locale) })), apiKey);
+    products.push(...rawProducts
+      .filter((p) => p && typeof p === 'object' && !p.error && (p.title || p.asin || p.url))
+      .map((p) => normaliseProduct(p)));
+  }
+  const orderIndex = new Map(asins.map((a, i) => [a, i]));
+  products.sort((a, b) => (orderIndex.get(a.asin) ?? Number.MAX_SAFE_INTEGER) - (orderIndex.get(b.asin) ?? Number.MAX_SAFE_INTEGER));
+  return products;
+}
+
+/**
+ * Keyword search + product hydration, mirroring the getnoodle edge function's
+ * `mode: 'keyword'` path. Returns an array of normalized products in Amazon
+ * search-result order, each carrying `searchRank` (1-based position) and the
+ * full raw Bright Data record under `.raw` for downstream `raw_json` storage.
+ *
+ * @param {string} keyword
+ * @param {{ locale?: string, limit?: number, pages?: number }} opts
+ */
+async function searchAmazonByKeyword(keyword, opts = {}) {
+  const locale = String(opts.locale || 'US').toUpperCase();
+  const limit = Math.max(1, Math.min(Number(opts.limit) || 20, 50));
+  const discovered = await discoverAsinsByKeyword(keyword, { locale, pages: opts.pages });
 
   const asins = discovered.slice(0, limit).map((d) => d.asin);
   if (!asins.length) {
     throw new Error(`No products found for "${keyword}" on Amazon ${locale} via Bright Data.`);
   }
-
-  // Step 2: hydrate ASINs to full product data (media, bullets, specs) via Products dataset.
-  const hydrateInput = asins.map((a) => ({ url: productUrl(a, locale) }));
-  const rawProducts = await bdScrape(PRODUCTS_DATASET, hydrateInput, apiKey);
-  const products = rawProducts
-    .filter((p) => p && typeof p === 'object' && !p.error && (p.title || p.asin || p.url))
-    .map((p) => normaliseProduct(p));
-
+  const products = await hydrateAsins(asins, { locale });
   if (!products.length) {
-    const sample = rawProducts?.[0] ? JSON.stringify(rawProducts[0]).slice(0, 300) : 'empty';
-    throw new Error(`Bright Data returned no usable products for ${asins.join(', ')}. Sample: ${sample}`);
+    throw new Error(`Bright Data returned no usable products for ${asins.join(', ')}.`);
   }
 
-  // Restore search order + stamp searchRank/sponsored (hydration completes out of order).
-  const orderIndex = new Map(asins.map((a, i) => [a, i]));
-  products.sort((a, b) => (orderIndex.get(a.asin) ?? Number.MAX_SAFE_INTEGER) - (orderIndex.get(b.asin) ?? Number.MAX_SAFE_INTEGER));
+  // Stamp searchRank/sponsored (hydration completes out of order; hydrateAsins restores it).
   const byAsin = new Map(discovered.map((d) => [d.asin, d]));
   for (const p of products) {
     const d = byAsin.get(p.asin);
@@ -313,11 +371,17 @@ function normaliseReview(r, asinFallback) {
   return {
     asin,
     rating: Number.isFinite(rating) ? rating : null,
-    title: String(r?.review_title ?? r?.title ?? '').trim() || null,
+    // 2026-09-26: the reviews dataset's real field names are review_header,
+    // review_posted_date, is_verified and author_name (checked against every
+    // stored raw_json). The old names below never matched, so every Bright
+    // Data row landed with title=null, review_date=null (date_text was the
+    // SCRAPE `timestamp`) and verified_purchase=false. The old names stay as
+    // fallbacks in case the dataset schema changes back.
+    title: String(r?.review_header ?? r?.review_title ?? r?.title ?? '').trim() || null,
     body: String(r?.review_text ?? r?.body ?? r?.text ?? r?.content ?? '').trim() || null,
-    date_text: r?.review_date ?? r?.date ?? r?.timestamp ?? null,
-    reviewer_name: String(r?.reviewer_name ?? r?.author ?? r?.user_name ?? 'Anonymous').trim(),
-    verified_purchase: Boolean(r?.verified_purchase ?? r?.verified ?? false),
+    date_text: r?.review_posted_date ?? r?.review_date ?? r?.date ?? r?.timestamp ?? null,
+    reviewer_name: String(r?.author_name ?? r?.reviewer_name ?? r?.author ?? r?.user_name ?? 'Anonymous').trim(),
+    verified_purchase: Boolean(r?.is_verified ?? r?.verified_purchase ?? r?.verified ?? false),
     helpful_votes: Number(r?.helpful_count ?? r?.helpful_votes ?? r?.helpful ?? 0) || 0,
     raw: r,
   };
@@ -361,5 +425,9 @@ module.exports = {
   isBrightDataConfigured,
   getApiKey,
   searchAmazonByKeyword,
+  discoverAsinsByKeyword,
+  hydrateAsins,
   fetchAmazonReviews,
+  normaliseReview,
+  isTrue,
 };

@@ -42,6 +42,8 @@ const { withUsageTracking, recordAiUsage } = require('./utils/ai-usage');
 const { parseModelJson } = require('./utils/ocr-utils');
 const { resolveCategory } = require('./utils/category-resolver');
 const { reportProgress } = require('./utils/job-heartbeat');
+const { reuseAsinsFromEnv, rescrapeAsinsFromEnv } = require('./utils/reuse-asins');
+const { loadSelection, applySelection } = require('./utils/selected-competitors');
 
 const KEYWORD         = process.argv[2] || 'ashwagandha gummies';
 // 2026-09-01: resolved once in main() below, purely so recordAiUsage() can
@@ -255,11 +257,24 @@ async function main() {
   if (error) throw new Error(error.message);
   console.log(`\nFound ${products.length} products with images`);
 
-  const topByBsr = products.slice(0, OCR_TOP_N);
-  console.log(`Scoped to top ${topByBsr.length} by BSR (OCR_TOP_N=${OCR_TOP_N})`);
+  // Competitor selection (2026-09-26, migration 011): scope the vision pass
+  // to the selected competitors in selection_rank order (still capped at
+  // OCR_TOP_N); inactive selection → top N by BSR exactly as before.
+  const selection = await loadSelection(supabase, _categoryId);
+  const topByBsr = applySelection(products, selection).slice(0, OCR_TOP_N);
+  console.log(selection.active
+    ? `Scoped to top ${topByBsr.length} selected competitors by selection rank (OCR_TOP_N=${OCR_TOP_N})`
+    : `Scoped to top ${topByBsr.length} by BSR (OCR_TOP_N=${OCR_TOP_N}; competitor selection inactive: ${selection.why})`);
 
   const processed = await getProcessed(KEYWORD);
-  const toProcess = topByBsr.filter(p => !processed.has(p.asin));
+  // READ-FIRST plan: facts older than the freshness window with no fresh copy — redo.
+  for (const a of rescrapeAsinsFromEnv()) processed.delete(a);
+  // READ-FIRST plan: facts already OCR'd under a sibling session — dovive_ocr
+  // is UNIQUE(asin, image_index), so migrate-ocr-to-dash.js (reads by ASIN)
+  // lands them in this session without paying for the vision pass again.
+  const reuseAsins = reuseAsinsFromEnv();
+  if (reuseAsins.size) console.log(`READ-FIRST plan: ${reuseAsins.size} ASINs reused from sibling sessions (not re-OCR'd)`);
+  const toProcess = topByBsr.filter(p => !processed.has(p.asin) && !reuseAsins.has(p.asin));
   console.log(`Already processed: ${processed.size} | To process: ${toProcess.length}`);
 
   const list = TEST_MODE ? toProcess.slice(0, 1) : toProcess;

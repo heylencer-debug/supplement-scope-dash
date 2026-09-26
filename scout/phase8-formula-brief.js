@@ -13,7 +13,12 @@
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const { resolveCategory } = require('./utils/category-resolver');
+const { loadSelection, scopeToSelection } = require('./utils/selected-competitors');
 const { withUsageTracking, extractUsageFromSSE, recordAiUsage } = require('./utils/ai-usage');
+// P3b (2026-09-26): evidence-counted review themes over ALL collected reviews.
+// Preferred over the random 60+60 sample below when a synthesis row exists.
+const { fetchCategorySynthesis } = require('./utils/review-synthesis-store');
+const { briefReviewInput, painPointsFromSynthesis, formatPainPointCount } = require('./utils/review-synthesis');
 
 // Set once run() resolves the category — read by recordAiUsage() calls
 // throughout this file so the cost ledger can be scoped per-category without
@@ -536,7 +541,13 @@ async function compileMarketData(categoryId) {
   // `cohort` (2026-09-03) — established/emerging/context tag from
   // utils/cohort.js, computed deterministically in migrate-keepa-to-dash.js.
   // Feeds the PROVEN BASELINE vs EMERGING EDGE split below.
-  const { data: top20 } = await DASH.from('products')
+  // Competitor selection (2026-09-26, migration 011): when populated, the
+  // comparison set is the selected competitors in selection_rank order
+  // (one per variation family, promo/shared-review checked). Inactive →
+  // top by BSR, unchanged.
+  const selection = await loadSelection(DASH, categoryId);
+  console.log(selection.active ? `  Competitor set: selection (${selection.why})` : `  Competitor set: top by BSR (selection inactive: ${selection.why})`);
+  const { data: top20 } = await scopeToSelection(DASH.from('products')
     .select(`
       asin, brand, title, bsr_current, bsr_30_days_avg, bsr_90_days_avg,
       price, monthly_revenue, monthly_sales, rating_value, rating_count,
@@ -544,7 +555,7 @@ async function compileMarketData(categoryId) {
       claims_on_label, supplement_facts_raw, all_nutrients, other_ingredients,
       proprietary_blends, feature_bullets_text, marketing_analysis, cohort
     `)
-    .eq('category_id', categoryId)
+    .eq('category_id', categoryId), selection)
     .not('bsr_current', 'is', null)
     .order('bsr_current', { ascending: true })
     .limit(50);
@@ -656,10 +667,24 @@ async function compileMarketData(categoryId) {
     .slice(0, 30)
     .map(([claim, count]) => ({ claim, count }));
 
-  const topPainPoints = Object.entries(painPointMap)
+  let topPainPoints = Object.entries(painPointMap)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 40)
     .map(([keyword, mentions]) => ({ keyword, mentions }));
+
+  // P3b synthesis (2026-09-26): when present, pain points come from themes
+  // counted over every collected review (reviews + distinct products +
+  // conflicting reviews) instead of the 5 most-helpful critical TITLES per
+  // product, and the VOC section below shows those themes instead of a random
+  // 60+60 sample. No synthesis row → everything below runs exactly as before.
+  const reviewSynthesis = await fetchCategorySynthesis(DASH, { keyword: KEYWORD, categoryId, reviewsClient: DOVIVE });
+  const reviewInput = briefReviewInput(reviewSynthesis, null);
+  if (reviewInput.mode === 'synthesis') {
+    topPainPoints = painPointsFromSynthesis(reviewSynthesis, 40);
+    console.log(`  P3b review synthesis: ${reviewSynthesis.themes.length} themes — ${reviewInput.ledgerLine}`);
+  } else {
+    console.log('  P3b review synthesis not found — falling back to sampled reviews');
+  }
 
   const commonForms = Object.entries(formMap)
     .sort((a, b) => b[1] - a[1])
@@ -782,7 +807,7 @@ async function compileMarketData(categoryId) {
   let rawReviewText = { positive: [], negative: [] };
   try {
     const allAsins = (top20 || []).map(p => p.asin).filter(Boolean);
-    if (allAsins.length) {
+    if (allAsins.length && reviewInput.mode !== 'synthesis') {
       const { data: rawPos } = await DOVIVE.from('dovive_reviews')
         .select('asin, rating, title, body').in('asin', allAsins)
         .gte('rating', 4).not('body', 'is', null).limit(100);
@@ -812,6 +837,8 @@ async function compileMarketData(categoryId) {
       negative_ingredient_signals: topNegativeIngredients,
       raw_reviews_positive: rawReviewText.positive,
       raw_reviews_negative: rawReviewText.negative,
+      review_evidence_text: reviewInput.evidenceText,
+      review_evidence_source: reviewInput.mode,
       top_performers: (top5 || []).map(p => ({
         ...p,
         nutrients: p.all_nutrients,
@@ -1022,10 +1049,25 @@ ${emergingPool.length ? emergingPool.map(summarizeForPool).join('\n') : 'None me
       ).join('\n')
     : 'Ingredient frequency data not available';
 
+  // Legacy sampled-review VOC — used only when no P3b synthesis exists.
+  const vocSampleSection = `## VOICE OF CUSTOMER — WHAT PEOPLE LOVE (Positive Reviews)
+Real customer quotes from top competitor products. Study what outcomes and ingredients they praise.
+${(cs.raw_reviews_positive && cs.raw_reviews_positive.length) ? cs.raw_reviews_positive.join('\n') : 'Reviews not yet available — run P3 first'}
+
+---
+
+## VOICE OF CUSTOMER — WHAT PEOPLE HATE (Critical Reviews)  
+Real 1-2 star reviews. Study what problems your formula must solve.
+${(cs.raw_reviews_negative && cs.raw_reviews_negative.length) ? cs.raw_reviews_negative.join('\n') : 'Reviews not yet available'}
+`;
+
+  // `p.domain` is set when pain points come from the P3b synthesis; the word
+  // lists still cover the legacy title-based pain points.
   const formPainPoints = cs.top_pain_points.filter(p =>
+    p.domain === 'taste_texture' ||
     ['taste', 'flavor', 'texture', 'dissolve', 'smell', 'size', 'swallow', 'aftertaste', 'chalky', 'gritty', 'bitter']
       .some(w => p.keyword.toLowerCase().includes(w))
-  ).map(p => `- ${p.keyword}: ${p.mentions} mentions`).join('\n') || 'No specific formulation feedback';
+  ).map(p => `- ${p.keyword}: ${formatPainPointCount(p)}`).join('\n') || 'No specific formulation feedback';
 
   // Build flavor intelligence from top competitor data
   const flavorIntelSection = (() => {
@@ -1049,9 +1091,10 @@ ${emergingPool.length ? emergingPool.map(summarizeForPool).join('\n') : 'None me
     });
     // Taste/flavor pain points from reviews
     const tastePains = cs.top_pain_points.filter(p =>
+      p.domain === 'taste_texture' ||
       ['taste', 'flavor', 'texture', 'smell', 'aftertaste', 'chalky', 'gritty', 'bitter', 'sweet', 'sugar']
         .some(w => p.keyword.toLowerCase().includes(w))
-    ).map(p => `- "${p.keyword}": ${p.mentions} review mentions`);
+    ).map(p => `- "${p.keyword}": ${formatPainPointCount(p)}`);
     return [
       '### Competitor Flavor Profiles',
       lines.length ? lines.join('\n') : '- Flavor data not extracted from supplement facts',
@@ -1068,12 +1111,13 @@ ${emergingPool.length ? emergingPool.map(summarizeForPool).join('\n') : 'None me
   })();
 
   const efficacyPainPoints = cs.top_pain_points.filter(p =>
+    p.domain === 'product_efficacy' ||
     ['work', 'effect', 'result', 'notice', 'difference', 'help', 'benefit']
       .some(w => p.keyword.toLowerCase().includes(w))
-  ).map(p => `- ${p.keyword}: ${p.mentions} mentions`).join('\n') || 'No specific efficacy feedback';
+  ).map(p => `- ${p.keyword}: ${formatPainPointCount(p)}`).join('\n') || 'No specific efficacy feedback';
 
   const allPainPoints = cs.top_pain_points.map(p =>
-    `- ${p.keyword}: ${p.mentions} mentions`
+    `- ${p.keyword}${p.domain ? ` [${p.domain}]` : ''}: ${formatPainPointCount(p)}`
   ).join('\n') || 'Pain point data not available';
 
   const claimsAnalysis = cs.top_claims.map((c, i) =>
@@ -1201,16 +1245,10 @@ ${cs.dosage_ranges || 'OCR data not yet available'}
 
 ---
 
-## VOICE OF CUSTOMER — WHAT PEOPLE LOVE (Positive Reviews)
-Real customer quotes from top competitor products. Study what outcomes and ingredients they praise.
-${(cs.raw_reviews_positive && cs.raw_reviews_positive.length) ? cs.raw_reviews_positive.join('\n') : 'Reviews not yet available — run P3 first'}
-
----
-
-## VOICE OF CUSTOMER — WHAT PEOPLE HATE (Critical Reviews)  
-Real 1-2 star reviews. Study what problems your formula must solve.
-${(cs.raw_reviews_negative && cs.raw_reviews_negative.length) ? cs.raw_reviews_negative.join('\n') : 'Reviews not yet available'}
-
+${cs.review_evidence_text ? `## VOICE OF CUSTOMER — EVIDENCE-COUNTED THEMES (all collected reviews, not a sample)
+Every theme below is counted over every collected review. Weigh a theme by its review and product counts; never generalise a theme marked ONE product only to the whole category; where a theme has conflicting reviews, treat it as a split experience, not a verdict.
+${cs.review_evidence_text}
+` : vocSampleSection}
 ---
 
 ## INGREDIENT REVIEW SENTIMENT

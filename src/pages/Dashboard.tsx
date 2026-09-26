@@ -18,6 +18,7 @@ import { FormulaJourneyTab } from "@/components/dashboard/FormulaJourneyTab";
 import { FormulaPassport } from "@/components/dashboard/FormulaPassport";
 import { P9BenchmarkOverview } from "@/components/dashboard/P9BenchmarkOverview";
 import { MarketIntelligenceReport } from "@/components/dashboard/MarketIntelligenceReport";
+import { ReviewEvidenceCard } from "@/components/reviews/ReviewEvidenceCard";
 import { FormulaVersionsPanel } from "@/components/manufacturer/FormulaVersionsPanel";
 import { FactoryHandoffCard } from "@/components/manufacturer/FactoryHandoffCard";
 import { PortalFeedbackDisclosure } from "@/components/manufacturer/PortalFeedbackDisclosure";
@@ -649,6 +650,9 @@ export default function Dashboard() {
           {category?.id && (
             <MarketIntelligenceReport categoryId={category.id} categoryName={categoryName || ""} />
           )}
+
+          {/* P3b review evidence — coverage ledger + counted themes */}
+          {category?.id && <ReviewEvidenceCard categoryId={category.id} keyword={categoryName} />}
 
           {productsLoading && !marketAnalysisData ? (
             <Card><CardContent className="py-12 text-center text-muted-foreground">Loading market data...</CardContent></Card>

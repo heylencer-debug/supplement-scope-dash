@@ -4,7 +4,12 @@
  * Runs P1 → P2 → P3 → P4 → P5 → P6 → P7 → P8 → P9 → P10 for a keyword.
  * P6 = Product Intelligence (per-product AI scoring — powers 9 dashboard sections)
  * P7 = Market Intelligence (category-level Grok report — powers Market tab)
- * Checks existing data before each phase (skip if already done).
+ * READ-FIRST (P0.5): before any phase, inventory.js reads what the keyword
+ * FAMILY already holds (every "#N" session + aliases) and plan-scope.js
+ * decides per phase: reuse (skip, or sync-only from a sibling session) |
+ * top-up | refresh | scrape. The plan is printed, written to scout_jobs.plan,
+ * rebuilt after P1, and honoured unless --force / --no-reuse /
+ * SCOUT_PLAN_MODE=advisory|off. See docs/READ-FIRST.md.
  * Sends Telegram status updates after each phase.
  *
  * Usage:
@@ -13,6 +18,8 @@
  *   node run-pipeline.js --keyword "ashwagandha gummies" --phases P6,P7,P8
  *   node run-pipeline.js --keyword "ashwagandha gummies" --ai   (enables AI for P8)
  *   node run-pipeline.js --keyword "ashwagandha gummies" --force (re-run all phases)
+ *   node run-pipeline.js --keyword "..." --no-reuse    (print the plan, run every phase anyway)
+ *   node run-pipeline.js --keyword "..." --alias "electrolytes powder" --fresh P3=45
  */
 
 require('dotenv').config();
@@ -20,6 +27,8 @@ const { execSync, spawn, spawnSync } = require('child_process');
 const { createClient } = require('@supabase/supabase-js');
 const path = require('path');
 const { resolveCategory } = require('./utils/category-resolver');
+const { resolveRunAsins, measureVerifierMetrics, evaluateBars } = require('./utils/verifier-bars');
+const { loadSelection, scopeToSelection, top20Need } = require('./utils/selected-competitors');
 
 const DASH = createClient(
   process.env.DASH_URL || process.env.SUPABASE_URL,
@@ -328,21 +337,7 @@ async function getCategoryId() {
 // dovive_research for THIS keyword's THIS run. Falls back to the full
 // category set only if the run-ASIN list can't be resolved (keeps the gate
 // from going blind on an edge case rather than silently skipping it).
-let _runAsinsCache = null;
-async function getRunAsins() {
-  if (_runAsinsCache) return _runAsinsCache;
-  try {
-    const { data, error } = await DOVIVE.from('dovive_research').select('asin').eq('keyword', KEYWORD);
-    if (error) throw error;
-    const asins = [...new Set((data || []).map(r => r.asin).filter(Boolean))];
-    _runAsinsCache = asins;
-    return asins;
-  } catch (e) {
-    console.warn(`  ⚠️ getRunAsins() failed (${e.message}) — falling back to whole-category scoping`);
-    _runAsinsCache = [];
-    return [];
-  }
-}
+// (getRunAsins is now the `all` half of resolveRunAsins in utils/verifier-bars.js.)
 
 // 2026-08-29: dovive_research accumulates ASINs across every historical run,
 // but cleanup passes (cleanup-stale-products / dedupe-exact-products) can
@@ -356,24 +351,11 @@ async function getRunAsins() {
 // kept as its own check so the live-denominator can't mask it.
 const _liveRunAsinsCache = new Map();
 async function getLiveRunAsins(categoryId) {
+  // Logic lives in utils/verifier-bars.js (shared with the READ-FIRST plan so
+  // the plan measures exactly what the verifier measures). Cached per
+  // category for the life of the run, as before.
   if (_liveRunAsinsCache.has(categoryId)) return _liveRunAsinsCache.get(categoryId);
-  const all = await getRunAsins();
-  let result = { live: all, all };
-  if (all.length && categoryId) {
-    try {
-      const liveAsins = [];
-      for (let from = 0; ; from += 1000) {
-        const { data, error } = await DASH.from('products').select('asin').eq('category_id', categoryId).range(from, from + 999);
-        if (error) throw error;
-        liveAsins.push(...(data || []).map(r => r.asin));
-        if (!data || data.length < 1000) break;
-      }
-      const liveSet = new Set(liveAsins);
-      result = { live: all.filter(a => liveSet.has(a)), all };
-    } catch (e) {
-      console.warn(`  ⚠️ getLiveRunAsins failed (${e.message}) — falling back to full run-ASIN list`);
-    }
-  }
+  const result = await resolveRunAsins({ DOVIVE, DASH, keyword: KEYWORD, categoryId });
   _liveRunAsinsCache.set(categoryId, result);
   return result;
 }
@@ -411,9 +393,13 @@ async function checkPhaseStatus(phaseNum, categoryId) {
       // playwright-reviews.js orders by rank_position/bsr ascending so the
       // capped batch IS the top-BSR set, making this a real completion
       // signal, not a loophole.
-      const { data: top20 } = await scoped(DASH.from('products')
+      // Competitor selection (migration 011): when populated, the top-20 is
+      // read over the SELECTED competitors (what P3 now scrapes), with the
+      // floor scaled by utils/selected-competitors.js top20Need. Inactive → as before.
+      const selection = await loadSelection(DASH, categoryId);
+      const { data: top20 } = await scoped(scopeToSelection(DASH.from('products')
         .select('review_analysis')
-        .eq('category_id', categoryId)
+        .eq('category_id', categoryId), selection)
         .not('bsr_current', 'is', null)
         .order('bsr_current', { ascending: true })
         .limit(20));
@@ -435,7 +421,7 @@ async function checkPhaseStatus(phaseNum, categoryId) {
       // ('electrolyte powder #2'), making the gate lie about THIS run.
       const { count: reviewRows } = await DOVIVE.from('dovive_reviews').select('*', { count: 'exact', head: true }).ilike('keyword', KEYWORD);
       const doneByCoverage = count >= runTotal * 0.5;
-      const doneByTop20 = top20Done >= 15 && (reviewRows || 0) >= P3_MIN_REVIEWS_TOTAL;
+      const doneByTop20 = top20Done >= top20Need(selection) && (reviewRows || 0) >= P3_MIN_REVIEWS_TOTAL;
       return {
         done: doneByCoverage || doneByTop20,
         count,
@@ -448,9 +434,10 @@ async function checkPhaseStatus(phaseNum, categoryId) {
       const { count } = await DASH.from('products').select('*', { count: 'exact', head: true }).eq('category_id', categoryId).gt('nutrients_count', 0);
 
       // Directive: if full completion isn't possible, top-20 BSR formula coverage is acceptable to proceed.
-      const { data: top20 } = await DASH.from('products')
+      const selection = await loadSelection(DASH, categoryId); // see the P3 gate note
+      const { data: top20 } = await scopeToSelection(DASH.from('products')
         .select('nutrients_count')
-        .eq('category_id', categoryId)
+        .eq('category_id', categoryId), selection)
         .not('bsr_current', 'is', null)
         .order('bsr_current', { ascending: true })
         .limit(20);
@@ -469,7 +456,7 @@ async function checkPhaseStatus(phaseNum, categoryId) {
       // both behaved correctly). 18/20 (90%) reflects "some brands never
       // disclose dosages" while still catching genuinely broken runs (e.g.
       // 5/20 would still fail).
-      const doneByTop20 = top20Done >= 15;
+      const doneByTop20 = top20Done >= top20Need(selection);
       return {
         done: doneByCoverage || doneByTop20,
         count,
@@ -498,8 +485,13 @@ async function checkPhaseStatus(phaseNum, categoryId) {
       return { done: count >= p5Min, count, total: p5Target, msg: `${count}/${p5Target} deep research records WITH content (min ${p5Min})` };
     }
     case 6: {
-      const { count } = await DASH.from('products').select('*', { count: 'exact', head: true }).eq('category_id', categoryId).not('marketing_analysis', 'is', null);
-      return { done: count >= total * 0.9, count, total, msg: `${count}/${total} have P6 intel` };
+      // P6 processes only the SELECTED competitors when a selection exists
+      // (phase6-product-intelligence.js), so its gate counts against the
+      // selection size; inactive selection → whole category, as before.
+      const selection = await loadSelection(DASH, categoryId);
+      const { count } = await scopeToSelection(DASH.from('products').select('*', { count: 'exact', head: true }).eq('category_id', categoryId), selection).not('marketing_analysis', 'is', null);
+      const p6Total = selection.active ? selection.ranks.size : total;
+      return { done: count >= p6Total * 0.9, count, total: p6Total, msg: `${count}/${p6Total}${selection.active ? ' (selected)' : ''} have P6 intel` };
     }
     case 7: {
       // P7 = Market Intelligence (phase6-market-analysis.js)
@@ -574,6 +566,11 @@ const PHASES = [
       await runScript('playwright-reviews.js', [KEYWORD]);
       console.log('\n→ Syncing reviews to dashboard (migrate-reviews-to-dash.js)...');
       await runScript('migrate-reviews-to-dash.js', [KEYWORD]);
+      // P3b — counted review themes over EVERY collected review (2026-09-26).
+      // Exits 0 on its own failures so a P3b hiccup never re-runs the paid
+      // P3 scrape; skips itself when its synthesis is newer than the reviews.
+      console.log('\n→ Review synthesis (phase3b-review-synthesis.js)...');
+      await runScript('phase3b-review-synthesis.js', ['--keyword', KEYWORD, ...(FORCE ? ['--force'] : [])]);
     }
   },
   {
@@ -644,127 +641,15 @@ const PHASES = [
 // 1-8) must NOT fail the verifier for missing P9-P13 formula-chain output —
 // those phases were never asked to run.
 async function runFinalVerifier(categoryId, scopePhases = null) {
-  const inScope = (n) => !scopePhases || scopePhases.includes(n);
-  const { count: total } = await DASH.from('products').select('*', { count: 'exact', head: true }).eq('category_id', categoryId);
-  const q = async (col) => (await DASH.from('products').select('*', { count: 'exact', head: true }).eq('category_id', categoryId).not(col, 'is', null)).count || 0;
-
-  // Run-scoped P2/P3/P8 (see getRunAsins()/checkPhaseStatus comment above —
-  // same root cause + same fix, applied here so the final verifier and the
-  // per-phase gate agree). `total` above is intentionally left as the whole
-  // accumulated category count for P4/P6 (unchanged, out of this task's
-  // explicit scope) and for the top-level `total` reported in metrics.
+  // Measurements and thresholds live in utils/verifier-bars.js so the
+  // READ-FIRST plan can only skip a phase the verifier would already pass.
+  // The calibration notes for every bar (P3 Bright Data ceiling, P4 Goli
+  // top-20 misses, P5 slim target, P11/P12 draft+validation completeness)
+  // moved there verbatim.
   const { live: runAsins, all: runAsinsAll } = await getLiveRunAsins(categoryId);
-  const scopedQ = async (col) => {
-    let query = DASH.from('products').select('*', { count: 'exact', head: true }).eq('category_id', categoryId).not(col, 'is', null);
-    if (runAsins.length) query = query.in('asin', runAsins);
-    return (await query).count || 0;
-  };
-  const runTotal = runAsins.length || total;
-
-  const p2 = await scopedQ('monthly_sales');
-  const p3 = await scopedQ('review_analysis');
-  const p4 = (await DASH.from('products').select('*', { count: 'exact', head: true }).eq('category_id', categoryId).gt('nutrients_count', 0)).count || 0;
-  // P5 data lives in dovive_phase5_research (DOVIVE DB), not in DASH products table.
-  // Gate on rows that actually HAVE content (full_research non-null), not just row
-  // existence — see checkPhaseStatus case 5 comment for the full "P5 too heavy" /
-  // save-strip-bug context.
-  const p5Target = (parseInt(process.env.P5_TOP_COUNT || '5', 10) + parseInt(process.env.P5_NEW_COUNT || '3', 10));
-  const p5Min = Math.min(p5Target, Math.max(6, Math.ceil(p5Target * 0.75)));
-  // Session-isolation fix (2026-09-01): exact match, not a first-word
-  // substring (see checkPhaseStatus's matching comment).
-  const p5 = (await DOVIVE.from('dovive_phase5_research')
-    .select('*', { count: 'exact', head: true })
-    .ilike('keyword', KEYWORD)
-    .not('full_research', 'is', null)).count || 0;
-  const p6 = await q('marketing_analysis');
-  const p8 = await (async () => {
-    let query = DASH.from('products').select('*', { count: 'exact', head: true }).eq('category_id', categoryId).filter('marketing_analysis->packaging_intelligence', 'not.is', null);
-    if (runAsins.length) query = query.in('asin', runAsins);
-    return (await query).count || 0;
-  })();
-
-  let top20Query = DASH.from('products').select('nutrients_count, review_analysis').eq('category_id', categoryId).not('bsr_current', 'is', null).order('bsr_current', { ascending: true }).limit(20);
-  if (runAsins.length) top20Query = top20Query.in('asin', runAsins);
-  const { data: top20 } = await top20Query;
-  const top20P4 = (top20 || []).filter(x => (x.nutrients_count || 0) > 0).length;
-  const top20P3 = (top20 || []).filter(x => x.review_analysis != null).length;
-
-  const { data: fb } = await DASH.from('formula_briefs').select('ingredients').eq('category_id', categoryId).single();
-  const p7 = !!(fb?.ingredients?.market_intelligence?.ai_market_analysis);
-  const p9 = !!(fb?.ingredients?.ai_generated_brief);
-  const p10 = !!(fb?.ingredients?.qa_report);
-  // P11/P12 (2026-08-28): check the deliverable is genuinely complete (real
-  // draft/primary text AND real validation text), not one arbitrary
-  // intermediate field — see isRealModelText() above.
-  const cb11 = fb?.ingredients?.competitive_benchmarking;
-  const p11 = !!cb11 && isRealModelText(cb11.sonnet_draft) && isRealModelText(cb11.opus_validation);
-  const fc12 = fb?.ingredients?.fda_compliance;
-  const p12 = !!fc12 && isRealModelText(fc12.opus_analysis) && isRealModelText(fc12.sonnet_validation);
-
-  const failures = [];
-  // Migration-loss guard: the live-ASIN denominator above cannot be allowed
-  // to mask a migration that dropped most of the run's products (e.g. the
-  // hydration onConflict bug: 3/139 live would otherwise gate as 3/3 = 100%).
-  if (runAsinsAll.length && runAsins.length < runAsinsAll.length * 0.6) {
-    failures.push(`P1 migration incomplete: only ${runAsins.length}/${runAsinsAll.length} scraped ASINs exist in DASH`);
-  }
-  if (inScope(2) && !(p2 >= runTotal * 0.9)) failures.push(`P2 ${p2}/${runTotal} (this run) < 90%`);
-  // P3 top20 CORRECTED 2026-08-28 (coordinator-verified against job config +
-  // logs, superseding the earlier "unset credential" theory): BRIGHTDATA_API_KEY
-  // WAS bound on the Cloud Run job (secretKeyRef -> scout-brightdata-key), and
-  // the run logs confirm the fallback DID engage and complete ("Bright Data
-  // reviews fallback done. 24/30 ASINs got reviews (1426 total)"). The 4
-  // top-20 misses (B0FD3KBQWH, B0B2PKZVBH, B0F55ZNP9P, B095XB8XJT) WERE
-  // processed by the fallback but Bright Data's reviews dataset itself
-  // returned zero records for those specific ASINs. So this is a genuine
-  // per-ASIN Bright Data coverage gap (~80-85% observed), not a fixable
-  // credential/ops issue: Playwright is bot-walled from Cloud Run's
-  // datacenter IPs (the primary path), and Bright Data simply doesn't have
-  // reviews indexed for every SKU. A strict 20/20 gate would fail forever on
-  // any run with a few uncoverable top products. Calibrated to top20 >= 15
-  // (75%, tolerates ~3-5 genuinely uncovered top SKUs) AND total category
-  // reviews >= 200 (a non-trivial volume threshold that still fails hard if
-  // the fallback silently didn't fire at all, e.g. missing/invalid key ->
-  // near-zero reviews overall).
-  const P3_MIN_REVIEWS_TOTAL = 200;
-  // Session-isolation fix (2026-09-01): exact match, not a first-word
-  // substring (see checkPhaseStatus's matching comment) — otherwise a
-  // sibling session's review volume masks a fresh session's real P3 gap.
-  const { count: reviewRowsTotal } = await DOVIVE.from('dovive_reviews').select('*', { count: 'exact', head: true }).ilike('keyword', KEYWORD);
-  if (inScope(3) && !((p3 >= runTotal * 0.5) || (top20P3 >= 15 && (reviewRowsTotal || 0) >= P3_MIN_REVIEWS_TOTAL))) failures.push(`P3 ${p3}/${runTotal} (this run) < 50% and Top20 ${top20P3}/20 (raw reviews=${reviewRowsTotal || 0}, need top20>=15 and raw>=${P3_MIN_REVIEWS_TOTAL})`);
-  // P4 top20 relaxed 20 → 18 (2026-08-28 "ashwagandha gummies" investigation,
-  // 138 products): the 2 top-20 misses (B092H5DCJM, B094T131B4 — both Goli
-  // Ashwagandha & Vitamin D Gummy SKUs) have bullet_points containing only
-  // marketing/certification claims with zero dosage/supplement-facts content;
-  // GPT-4o correctly returned 0 facts. Confirmed real Amazon-side gap, not a
-  // P4 extraction bug — see checkPhaseStatus's case 4 for the full evidence.
-  // Relaxed further 18 → 15 (2026-08-29): electrolyte powder (16/20) and
-  // magnesium (17/20) both failed on top sellers that genuinely publish no
-  // supplement-facts image or dosage bullets (LMNT-style sticks) — same
-  // real-world ceiling class as P3. 15/20 (75%) tolerates that class of real gap while still failing hard on
-  // genuinely broken coverage (e.g. 5/20).
-  if (inScope(4) && !((p4 >= total * 0.8) || (top20P4 >= 15))) failures.push(`P4 ${p4}/${total} and Top20 ${top20P4}/20 (need top20>=15)`);
-  // P5 was deliberately slimmed (2026-08-28, "P5 too heavy" decision) from
-  // Top10+Top10=20 to P5_TOP_COUNT+P5_NEW_COUNT (default 5+3=8 products) —
-  // see phase5-deep-research.js. The old hardcoded `>= 20` gate is stale and
-  // would fail every slim run forever. Now passes when P5 rows WITH REAL
-  // CONTENT (full_research non-null — never just row existence, so the fixed
-  // save-strip bug that used to produce empty rows can't silently satisfy
-  // this gate again) reach >= 75% of the configured target (min 6), tolerating
-  // occasional per-product AI/scrape failures without masking a broken run.
-  if (inScope(5) && !(p5 >= p5Min)) failures.push(`P5 ${p5}/${p5Target} (need >= ${p5Min} with content)`);
-  if (inScope(6) && !(p6 >= total * 0.9)) failures.push(`P6 ${p6}/${total} < 90%`);
-  if (inScope(7) && !p7) failures.push('P7 market_intelligence missing');
-  if (inScope(8) && !(p8 >= runTotal * 0.9)) failures.push(`P8 ${p8}/${runTotal} (this run) < 90%`);
-  if (inScope(9) && !p9) failures.push('P9 ai_generated_brief missing');
-  if (inScope(10) && !p10) failures.push('P10 qa_report missing');
-  if (inScope(11) && !p11) failures.push('P11 competitive_benchmarking missing');
-  if (inScope(12) && !p12) failures.push('P12 fda_compliance missing');
-  const fs13 = fb?.ingredients?.final_signoff;
-  const p13 = !!fs13 && isRealModelText(fs13.opus_review);
-  if (inScope(13) && !p13) failures.push('P13 final_signoff missing');
-
-  return { pass: failures.length === 0, failures, metrics: { total, runTotal, runAsinsCount: runAsins.length, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, top20P3, top20P4 } };
+  const m = await measureVerifierMetrics({ DOVIVE, DASH, keyword: KEYWORD, categoryId, runAsins, runAsinsAll });
+  const { pass, failures } = evaluateBars(m, scopePhases);
+  return { pass, failures, metrics: m };
 }
 
 // ─── Mid-run structural gates (2026-09-02) ─────────────────────────────────
@@ -792,6 +677,52 @@ const MID_RUN_GATES = {
   9: [1, 2, 3, 4, 5, 6, 7, 8],
 };
 
+// ─── READ-FIRST plan (Phase −1 / P0.5) ───────────────────────────────────────
+// Reads only (inventory.js), decides purely (plan-scope.js). Fail-open: if the
+// inventory cannot be built, every phase runs exactly as it did before.
+//   honor    (default) reuse/session → skip; reuse/family → sync step only;
+//            top-up → phase runs with SCOUT_REUSE_ASINS/_KEYWORDS so P3/P4
+//            producers skip sibling-covered ASINs (P5/P6/P8 already skip what
+//            THIS session has done, so their top-up is just "run as today").
+//   advisory print + store the plan, run everything (also forced by --force
+//            and --no-reuse).
+//   off      no inventory at all.
+const { buildInventory, formatInventory } = require('./inventory');
+const { planScope, formatPlan, freshnessFromEnv } = require('./plan-scope');
+const { applyScopePlan, planAfterPhase } = require('./utils/apply-plan');
+// An operator who scoped the run by hand (--phases / --from Pn>1) is usually
+// re-running on purpose, so the plan is advisory there unless
+// SCOUT_PLAN_MODE=honor says otherwise.
+const PLAN_MODE = (process.env.SCOUT_PLAN_MODE === 'off') ? 'off'
+  : (FORCE || process.argv.includes('--no-reuse') || process.env.SCOUT_PLAN_MODE === 'advisory') ? 'advisory'
+  : (process.env.SCOUT_PLAN_MODE === 'honor' || (!ONLY_PHASES && FROM_PHASE <= 1)) ? 'honor' : 'advisory';
+const PLAN_ALIASES = [
+  ...process.argv.flatMap((a, i) => (a === '--alias' && process.argv[i + 1] ? [process.argv[i + 1]] : [])),
+  ...String(process.env.SCOUT_KEYWORD_ALIASES || '').split(',').map(s => s.trim()).filter(Boolean),
+];
+const PLAN_FRESH_CLI = process.argv.includes('--fresh') ? process.argv[process.argv.indexOf('--fresh') + 1] : null;
+
+async function buildScopePlan(stage) {
+  if (PLAN_MODE === 'off') return null;
+  try {
+    const inv = await buildInventory({ keyword: KEYWORD, db: DOVIVE, dash: DASH, aliases: PLAN_ALIASES });
+    const plan = planScope(inv, { freshnessDays: freshnessFromEnv(process.env, PLAN_FRESH_CLI) });
+    Object.assign(plan, {
+      stage, mode: PLAN_MODE,
+      sessions: inv.sessions.map(s => ({ label: s.label, own: s.own, p1Asins: s.p1Asins, dashProducts: s.dashProducts, lastScrapedAt: s.lastScrapedAt })),
+    });
+    console.log(`\n${formatInventory(inv)}\n\n${formatPlan(plan)}\n  mode: ${PLAN_MODE} (${stage})\n`);
+    if (SCOUT_JOB_ID) {
+      const { error } = await DOVIVE.from('scout_jobs').update({ plan, updated_at: new Date().toISOString() }).eq('id', SCOUT_JOB_ID);
+      if (error) console.warn(`⚠ scout_jobs.plan not written (non-fatal — apply migrations/010_scout_jobs_plan.sql): ${error.message}`);
+    }
+    return plan;
+  } catch (e) {
+    console.warn(`⚠ READ-FIRST inventory failed (non-fatal — every phase runs as before): ${e.message}`);
+    return null;
+  }
+}
+
 async function run() {
   console.log(`\n${'═'.repeat(60)}`);
   console.log(`🔍 SCOUT PIPELINE — "${KEYWORD}"`);
@@ -816,6 +747,9 @@ async function run() {
 
   await notify(`🔍 Scout pipeline started for "${KEYWORD}"\nPhases: P${phasesToRun.join(', P')} | ${USE_AI ? 'AI-Enhanced' : 'Rule-Based'}`);
   await updateJobStatus({ status: 'running', started_at: new Date().toISOString(), total_phases: phasesToRun.length });
+  // READ-FIRST plan — built only once the job is 'running' (a hung read can't
+  // strand it in 'claimed'), bounded by SCOUT_PLAN_TIMEOUT_MS, fail-open.
+  let scopePlan = RECOVER_SYNC ? null : await buildScopePlan('start');
 
   // Phase 0: Market Opportunity Scan — runs before the main pipeline when --phase0 is passed with --keyword
   if (RUN_PHASE0) {
@@ -895,7 +829,22 @@ async function run() {
     console.log(`P${phase.num}: ${phase.name}`);
     console.log(`Description: ${phase.description}`);
 
-    // Remove skipping phases based on existing data - always run each phase
+    // READ-FIRST plan decides skip / sync-only / top-up (applyScopePlan above);
+    // without a plan (or with --force / --no-reuse) every phase runs as before.
+    const planned = applyScopePlan(phase, scopePlan, { mode: PLAN_MODE, keyword: KEYWORD, runScript });
+    if (planned.skip) {
+      console.log(`⏭️  ${planned.skip}`);
+      results.push({ phase: phase.num, name: phase.name, status: 'skipped', msg: planned.skip });
+      // A skipped P3 still gets its synthesis: P3b is self-skipping (a
+      // synthesis newer than the reviews costs nothing) and exits 0 on its own
+      // failures, so this never re-runs or blocks the paid scrape.
+      if (phase.num === 3 && !RECOVER_SYNC) {
+        try { await runScript('phase3b-review-synthesis.js', ['--keyword', KEYWORD, ...(FORCE ? ['--force'] : [])]); }
+        catch (e) { console.warn(`⚠ P3b review synthesis after a skipped P3 failed (non-fatal): ${e.message}`); }
+      }
+      continue;
+    }
+    if (planned.note) console.log(`🗺️  ${planned.note}`);
     const status = categoryId ? await checkPhaseStatus(phase.num, categoryId) : { done: false };
 
     if (status.count > 0 && !status.done) {
@@ -913,7 +862,7 @@ async function run() {
     }
 
     try {
-      await runPhaseWithRetry(phase, categoryId);
+      await runPhaseWithRetry(planned.phase, categoryId);
 
       // Re-resolve category if it wasn't found yet (e.g. P1 just created it
       // for the first time on this keyword) — keeps categoryId live for the
@@ -928,6 +877,10 @@ async function run() {
           catch (e) { console.warn(`⚠ Failed to stamp category is_test (non-fatal): ${e.message}`); }
         }
       }
+
+      // P1 just (re)defined this session's ASIN set — re-plan against it. A
+      // failed rebuild means NO plan (fail open), never the stale start plan.
+      scopePlan = await planAfterPhase(phase.num, scopePlan, buildScopePlan);
 
       const elapsed = Math.round((Date.now() - phaseStart) / 1000);
       console.log(`\n✅ P${phase.num} Complete (${elapsed}s)`);

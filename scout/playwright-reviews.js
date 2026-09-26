@@ -34,6 +34,8 @@ chromium.use(stealth());
 const fetch = require('node-fetch');
 const brightData = require('./bright-data-amazon');
 const { reportProgress } = require('./utils/job-heartbeat');
+const { reuseAsinsFromEnv, rescrapeAsinsFromEnv } = require('./utils/reuse-asins');
+const { loadSelectionForKeyword, applySelection } = require('./utils/selected-competitors');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
@@ -79,6 +81,20 @@ async function getAsins() {
     seen.add(r.asin);
     return true;
   });
+
+  // Competitor selection (2026-09-26, migration 011): when this category has
+  // its 40 selected competitors, review exactly those, in selection_rank
+  // order. Otherwise (columns not migrated / selection never ran) fall
+  // through to the top-by-BSR ordering below, unchanged.
+  if (KEYWORD_FILTER) {
+    const selection = await loadSelectionForKeyword(KEYWORD_FILTER);
+    if (selection.active) {
+      const picked = applySelection(rows, selection);
+      console.log(`   ASIN order: competitor selection (${picked.length}/${rows.length} candidates selected)`);
+      return picked;
+    }
+    console.log(`   Competitor selection inactive (${selection.why}) — using top-by-BSR`);
+  }
 
   // Pull bsr_current for these ASINs from the DASH products table and sort
   // by it (nulls last, falling back to scrape-time bsr, then rank_position).
@@ -166,7 +182,9 @@ function parseReviewDate(dateText) {
   // Amazon format: "Reviewed in the United States on August 17, 2025"
   const m = dateText.match(/(\w+ \d+, \d{4})/);
   if (!m) return null;
-  const d = new Date(m[1]);
+  // Parse at noon UTC: `new Date("August 17, 2025")` is LOCAL midnight, and
+  // toISOString() then shifts it to the previous day on any host east of UTC.
+  const d = new Date(`${m[1]} 12:00:00 UTC`);
   return isNaN(d.getTime()) ? null : d.toISOString().split('T')[0];
 }
 
@@ -305,7 +323,17 @@ async function main() {
 
   const asinRows = await getAsins();
   const scrapedAsins = await getScrapedAsins(KEYWORD_FILTER);
-  const toScrape = asinRows.filter(r => !scrapedAsins.has(r.asin)).slice(0, MAX_ASINS);
+  // READ-FIRST plan: reviews this session holds but that are older than the
+  // freshness window (and no sibling has fresh ones) — scrape them again.
+  const rescrape = rescrapeAsinsFromEnv();
+  for (const a of rescrape) scrapedAsins.delete(a);
+  if (rescrape.size) console.log(`   READ-FIRST plan: ${rescrape.size} ASINs have only stale reviews — re-scraping`);
+  // READ-FIRST plan (run-pipeline.js → plan-scope.js): ASINs whose reviews are
+  // already fresh in a SIBLING session of this keyword family. Not re-scraped;
+  // migrate-reviews-to-dash.js reads them from that session (SCOUT_REUSE_KEYWORDS).
+  const reuseAsins = reuseAsinsFromEnv();
+  if (reuseAsins.size) console.log(`   READ-FIRST plan: ${reuseAsins.size} ASINs reused from sibling sessions (not re-scraped)`);
+  const toScrape = asinRows.filter(r => !scrapedAsins.has(r.asin) && !reuseAsins.has(r.asin)).slice(0, MAX_ASINS);
 
   console.log(`   Found ${asinRows.length} ASINs | Already have reviews: ${scrapedAsins.size} | To scrape: ${toScrape.length}`);
 

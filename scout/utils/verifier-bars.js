@@ -14,6 +14,8 @@
  *   evaluateBars           = the thresholds runFinalVerifier applies (pure)
  */
 
+const { loadSelection, scopeToSelection, top20Need } = require('./selected-competitors');
+
 const BARS = Object.freeze({
   P1_MIGRATION_MIN: 0.6,     // live run ASINs / scraped run ASINs
   P2_MIN: 0.9,               // of runTotal
@@ -67,6 +69,12 @@ async function resolveRunAsins({ DOVIVE, DASH, keyword, categoryId, warn = conso
 
 async function measureVerifierMetrics({ DOVIVE, DASH, keyword, categoryId, runAsins, runAsinsAll, env = process.env }) {
   const { count: total } = await DASH.from('products').select('*', { count: 'exact', head: true }).eq('category_id', categoryId);
+  // Competitor selection (migration 011): when populated, P3/P4's top-20 and
+  // P6's coverage are measured over the SELECTED competitors (what those
+  // phases now process) instead of top-20-by-BSR / the whole category.
+  // Inactive selection → every query below is exactly as before.
+  const selection = await loadSelection(DASH, categoryId);
+  const selectionSize = selection.active ? selection.ranks.size : 0;
   const q = async (col) => (await DASH.from('products').select('*', { count: 'exact', head: true }).eq('category_id', categoryId).not(col, 'is', null)).count || 0;
   const scopedQ = async (col) => {
     let query = DASH.from('products').select('*', { count: 'exact', head: true }).eq('category_id', categoryId).not(col, 'is', null);
@@ -83,14 +91,17 @@ async function measureVerifierMetrics({ DOVIVE, DASH, keyword, categoryId, runAs
     .select('*', { count: 'exact', head: true })
     .ilike('keyword', keyword)
     .not('full_research', 'is', null)).count || 0;
-  const p6 = await q('marketing_analysis');
+  const p6 = selection.active
+    ? ((await scopeToSelection(DASH.from('products').select('*', { count: 'exact', head: true }).eq('category_id', categoryId).not('marketing_analysis', 'is', null), selection)).count || 0)
+    : await q('marketing_analysis');
+  const p6Total = selection.active ? selectionSize : total;
   const p8 = await (async () => {
     let query = DASH.from('products').select('*', { count: 'exact', head: true }).eq('category_id', categoryId).filter('marketing_analysis->packaging_intelligence', 'not.is', null);
     if (runAsins.length) query = query.in('asin', runAsins);
     return (await query).count || 0;
   })();
 
-  let top20Query = DASH.from('products').select('asin, nutrients_count, review_analysis').eq('category_id', categoryId).not('bsr_current', 'is', null).order('bsr_current', { ascending: true }).limit(20);
+  let top20Query = scopeToSelection(DASH.from('products').select('asin, nutrients_count, review_analysis').eq('category_id', categoryId), selection).not('bsr_current', 'is', null).order('bsr_current', { ascending: true }).limit(20);
   if (runAsins.length) top20Query = top20Query.in('asin', runAsins);
   const { data: top20 } = await top20Query;
   const top20P4 = (top20 || []).filter(x => (x.nutrients_count || 0) > 0).length;
@@ -105,7 +116,8 @@ async function measureVerifierMetrics({ DOVIVE, DASH, keyword, categoryId, runAs
 
   return {
     total, runTotal, runAsinsCount: runAsins.length, runAsinsAllCount: runAsinsAll.length,
-    p2, p3, p4, p5, p5Target, p5Min, p6, p8,
+    p2, p3, p4, p5, p5Target, p5Min, p6, p6Total, p8,
+    selectionActive: selection.active, selectionSize, top20Need: top20Need(selection),
     p7: !!(fb?.ingredients?.market_intelligence?.ai_market_analysis),
     p9: !!(fb?.ingredients?.ai_generated_brief),
     p10: !!(fb?.ingredients?.qa_report),
@@ -200,19 +212,25 @@ function evaluateBars(m, scopePhases = null) {
   if (!p1Pass) failures.push(byPhase.P1.msg);
 
   add(2, m.p2 >= m.runTotal * B.P2_MIN, `P2 ${m.p2}/${m.runTotal} (this run) < 90%`);
+  // Top-20 floor: 15 (B.P3_TOP20_MIN / B.P4_TOP20_MIN), or 75% of a smaller
+  // competitor selection — a category can legitimately select fewer than 20
+  // and the floor never pads it (utils/selected-competitors.js top20Need).
+  const need3 = m.selectionActive ? Math.min(B.P3_TOP20_MIN, m.top20Need) : B.P3_TOP20_MIN;
+  const need4 = m.selectionActive ? Math.min(B.P4_TOP20_MIN, m.top20Need) : B.P4_TOP20_MIN;
   const p3Cov = m.p3 >= m.runTotal * B.P3_MIN;
-  const p3Top = m.top20P3 >= B.P3_TOP20_MIN && (m.reviewRowsTotal || 0) >= B.P3_MIN_REVIEWS_TOTAL;
+  const p3Top = m.top20P3 >= need3 && (m.reviewRowsTotal || 0) >= B.P3_MIN_REVIEWS_TOTAL;
   add(3, p3Cov || p3Top,
-    `P3 ${m.p3}/${m.runTotal} (this run) < 50% and Top20 ${m.top20P3}/20 (raw reviews=${m.reviewRowsTotal || 0}, need top20>=15 and raw>=${B.P3_MIN_REVIEWS_TOTAL})`);
+    `P3 ${m.p3}/${m.runTotal} (this run) < 50% and Top20 ${m.top20P3}/20 (raw reviews=${m.reviewRowsTotal || 0}, need top20>=${need3} and raw>=${B.P3_MIN_REVIEWS_TOTAL})`);
   const p4Cov = m.p4 >= m.total * B.P4_MIN;
-  const p4Top = m.top20P4 >= B.P4_TOP20_MIN;
-  add(4, p4Cov || p4Top, `P4 ${m.p4}/${m.total} and Top20 ${m.top20P4}/20 (need top20>=15)`);
+  const p4Top = m.top20P4 >= need4;
+  add(4, p4Cov || p4Top, `P4 ${m.p4}/${m.total} and Top20 ${m.top20P4}/20 (need top20>=${need4})`);
   // Which path carried the pass: a pass that rests only on the top-20 path
   // depends on BSR ranking, which a Keepa refresh (P2) changes mid-run.
   byPhase.P3.via = p3Cov ? 'coverage' : p3Top ? 'top20' : null;
   byPhase.P4.via = p4Cov ? 'coverage' : p4Top ? 'top20' : null;
   add(5, m.p5 >= m.p5Min, `P5 ${m.p5}/${m.p5Target} (need >= ${m.p5Min} with content)`);
-  add(6, m.p6 >= m.total * B.P6_MIN, `P6 ${m.p6}/${m.total} < 90%`);
+  const p6Total = m.p6Total ?? m.total;
+  add(6, m.p6 >= p6Total * B.P6_MIN, `P6 ${m.p6}/${p6Total}${m.selectionActive ? ' (selected)' : ''} < 90%`);
   add(7, !!m.p7, 'P7 market_intelligence missing');
   add(8, m.p8 >= m.runTotal * B.P8_MIN, `P8 ${m.p8}/${m.runTotal} (this run) < 90%`);
   add(9, !!m.p9, 'P9 ai_generated_brief missing');

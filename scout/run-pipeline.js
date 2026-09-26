@@ -28,6 +28,7 @@ const { createClient } = require('@supabase/supabase-js');
 const path = require('path');
 const { resolveCategory } = require('./utils/category-resolver');
 const { resolveRunAsins, measureVerifierMetrics, evaluateBars } = require('./utils/verifier-bars');
+const { loadSelection, scopeToSelection, top20Need } = require('./utils/selected-competitors');
 
 const DASH = createClient(
   process.env.DASH_URL || process.env.SUPABASE_URL,
@@ -392,9 +393,13 @@ async function checkPhaseStatus(phaseNum, categoryId) {
       // playwright-reviews.js orders by rank_position/bsr ascending so the
       // capped batch IS the top-BSR set, making this a real completion
       // signal, not a loophole.
-      const { data: top20 } = await scoped(DASH.from('products')
+      // Competitor selection (migration 011): when populated, the top-20 is
+      // read over the SELECTED competitors (what P3 now scrapes), with the
+      // floor scaled by utils/selected-competitors.js top20Need. Inactive → as before.
+      const selection = await loadSelection(DASH, categoryId);
+      const { data: top20 } = await scoped(scopeToSelection(DASH.from('products')
         .select('review_analysis')
-        .eq('category_id', categoryId)
+        .eq('category_id', categoryId), selection)
         .not('bsr_current', 'is', null)
         .order('bsr_current', { ascending: true })
         .limit(20));
@@ -416,7 +421,7 @@ async function checkPhaseStatus(phaseNum, categoryId) {
       // ('electrolyte powder #2'), making the gate lie about THIS run.
       const { count: reviewRows } = await DOVIVE.from('dovive_reviews').select('*', { count: 'exact', head: true }).ilike('keyword', KEYWORD);
       const doneByCoverage = count >= runTotal * 0.5;
-      const doneByTop20 = top20Done >= 15 && (reviewRows || 0) >= P3_MIN_REVIEWS_TOTAL;
+      const doneByTop20 = top20Done >= top20Need(selection) && (reviewRows || 0) >= P3_MIN_REVIEWS_TOTAL;
       return {
         done: doneByCoverage || doneByTop20,
         count,
@@ -429,9 +434,10 @@ async function checkPhaseStatus(phaseNum, categoryId) {
       const { count } = await DASH.from('products').select('*', { count: 'exact', head: true }).eq('category_id', categoryId).gt('nutrients_count', 0);
 
       // Directive: if full completion isn't possible, top-20 BSR formula coverage is acceptable to proceed.
-      const { data: top20 } = await DASH.from('products')
+      const selection = await loadSelection(DASH, categoryId); // see the P3 gate note
+      const { data: top20 } = await scopeToSelection(DASH.from('products')
         .select('nutrients_count')
-        .eq('category_id', categoryId)
+        .eq('category_id', categoryId), selection)
         .not('bsr_current', 'is', null)
         .order('bsr_current', { ascending: true })
         .limit(20);
@@ -450,7 +456,7 @@ async function checkPhaseStatus(phaseNum, categoryId) {
       // both behaved correctly). 18/20 (90%) reflects "some brands never
       // disclose dosages" while still catching genuinely broken runs (e.g.
       // 5/20 would still fail).
-      const doneByTop20 = top20Done >= 15;
+      const doneByTop20 = top20Done >= top20Need(selection);
       return {
         done: doneByCoverage || doneByTop20,
         count,
@@ -479,8 +485,13 @@ async function checkPhaseStatus(phaseNum, categoryId) {
       return { done: count >= p5Min, count, total: p5Target, msg: `${count}/${p5Target} deep research records WITH content (min ${p5Min})` };
     }
     case 6: {
-      const { count } = await DASH.from('products').select('*', { count: 'exact', head: true }).eq('category_id', categoryId).not('marketing_analysis', 'is', null);
-      return { done: count >= total * 0.9, count, total, msg: `${count}/${total} have P6 intel` };
+      // P6 processes only the SELECTED competitors when a selection exists
+      // (phase6-product-intelligence.js), so its gate counts against the
+      // selection size; inactive selection → whole category, as before.
+      const selection = await loadSelection(DASH, categoryId);
+      const { count } = await scopeToSelection(DASH.from('products').select('*', { count: 'exact', head: true }).eq('category_id', categoryId), selection).not('marketing_analysis', 'is', null);
+      const p6Total = selection.active ? selection.ranks.size : total;
+      return { done: count >= p6Total * 0.9, count, total: p6Total, msg: `${count}/${p6Total}${selection.active ? ' (selected)' : ''} have P6 intel` };
     }
     case 7: {
       // P7 = Market Intelligence (phase6-market-analysis.js)
@@ -555,6 +566,11 @@ const PHASES = [
       await runScript('playwright-reviews.js', [KEYWORD]);
       console.log('\n→ Syncing reviews to dashboard (migrate-reviews-to-dash.js)...');
       await runScript('migrate-reviews-to-dash.js', [KEYWORD]);
+      // P3b — counted review themes over EVERY collected review (2026-09-26).
+      // Exits 0 on its own failures so a P3b hiccup never re-runs the paid
+      // P3 scrape; skips itself when its synthesis is newer than the reviews.
+      console.log('\n→ Review synthesis (phase3b-review-synthesis.js)...');
+      await runScript('phase3b-review-synthesis.js', ['--keyword', KEYWORD, ...(FORCE ? ['--force'] : [])]);
     }
   },
   {

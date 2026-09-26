@@ -13,6 +13,7 @@
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const { resolveCategory } = require('./utils/category-resolver');
+const { loadSelection, scopeToSelection } = require('./utils/selected-competitors');
 const { withUsageTracking, extractUsageFromSSE, recordAiUsage } = require('./utils/ai-usage');
 
 // Set once run() resolves the category — read by recordAiUsage() calls
@@ -536,7 +537,13 @@ async function compileMarketData(categoryId) {
   // `cohort` (2026-09-03) — established/emerging/context tag from
   // utils/cohort.js, computed deterministically in migrate-keepa-to-dash.js.
   // Feeds the PROVEN BASELINE vs EMERGING EDGE split below.
-  const { data: top20 } = await DASH.from('products')
+  // Competitor selection (2026-09-26, migration 011): when populated, the
+  // comparison set is the selected competitors in selection_rank order
+  // (one per variation family, promo/shared-review checked). Inactive →
+  // top by BSR, unchanged.
+  const selection = await loadSelection(DASH, categoryId);
+  console.log(selection.active ? `  Competitor set: selection (${selection.why})` : `  Competitor set: top by BSR (selection inactive: ${selection.why})`);
+  const { data: top20 } = await scopeToSelection(DASH.from('products')
     .select(`
       asin, brand, title, bsr_current, bsr_30_days_avg, bsr_90_days_avg,
       price, monthly_revenue, monthly_sales, rating_value, rating_count,
@@ -544,7 +551,7 @@ async function compileMarketData(categoryId) {
       claims_on_label, supplement_facts_raw, all_nutrients, other_ingredients,
       proprietary_blends, feature_bullets_text, marketing_analysis, cohort
     `)
-    .eq('category_id', categoryId)
+    .eq('category_id', categoryId), selection)
     .not('bsr_current', 'is', null)
     .order('bsr_current', { ascending: true })
     .limit(50);

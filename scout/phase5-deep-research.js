@@ -61,6 +61,7 @@ require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const { withUsageTracking, recordAiUsage } = require('./utils/ai-usage');
 const { resolveCategory } = require('./utils/category-resolver');
+const { loadSelection, scopeToSelection } = require('./utils/selected-competitors');
 const { launchBrowserContext, launchBrowserAPIOnly } = require('./utils/bright-data-browser');
 const { researchBrand: perplexityResearchBrand, getPerplexityKey } = require('./utils/perplexity');
 
@@ -852,10 +853,15 @@ const PRODUCT_SELECT = `asin, brand, title, bsr_current, price, monthly_revenue,
              claims_on_label, feature_bullets_text, marketing_analysis, review_analysis, cohort`;
 
 async function getProducts(categoryId) {
+  // Competitor selection (2026-09-26, migration 011): when populated, both
+  // pools draw ONLY from the selected competitors, selection_rank first
+  // (bsr_current stays the tie-break). Inactive → unchanged queries.
+  const selection = await loadSelection(DASH, categoryId);
+  console.log(selection.active ? `  Pools drawn from the competitor selection (${selection.why})` : `  Competitor selection inactive (${selection.why}) — pools by BSR`);
+  const productsQuery = () => scopeToSelection(DASH.from('products').select(PRODUCT_SELECT).eq('category_id', categoryId), selection);
+
   // Pool A — established cohort first, ordered by bsr_current
-  const { data: establishedRows } = await DASH.from('products')
-    .select(PRODUCT_SELECT)
-    .eq('category_id', categoryId)
+  const { data: establishedRows } = await productsQuery()
     .eq('cohort', 'established')
     .not('bsr_current', 'is', null)
     .order('bsr_current', { ascending: true })
@@ -865,9 +871,7 @@ async function getProducts(categoryId) {
   if (top10.length < P5_TOP_COUNT) {
     // Fallback fill — old "best BSR overall" heuristic, excluding anything
     // already selected above.
-    const { data: fallback } = await DASH.from('products')
-      .select(PRODUCT_SELECT)
-      .eq('category_id', categoryId)
+    const { data: fallback } = await productsQuery()
       .not('bsr_current', 'is', null)
       .order('bsr_current', { ascending: true })
       .limit(P5_TOP_COUNT + top10.length);
@@ -879,22 +883,38 @@ async function getProducts(categoryId) {
   }
 
   // Pool B — emerging cohort first, ordered by bsr_current
-  const { data: emergingRows } = await DASH.from('products')
-    .select(PRODUCT_SELECT)
-    .eq('category_id', categoryId)
+  const { data: emergingRows } = await productsQuery()
     .eq('cohort', 'emerging')
     .not('bsr_current', 'is', null)
     .order('bsr_current', { ascending: true })
     .limit(P5_NEW_COUNT);
 
   let newBrands = emergingRows || [];
+  // The selection favours established sellers, so it can hold too few
+  // emerging brands for Pool B (hydration powder: 0). Fill from the
+  // category's emerging products OUTSIDE the selection before falling back
+  // to the heuristic below — and say so.
+  if (selection.active && newBrands.length < P5_NEW_COUNT) {
+    const { data: outside } = await DASH.from('products')
+      .select(PRODUCT_SELECT)
+      .eq('category_id', categoryId)
+      .eq('cohort', 'emerging')
+      .not('bsr_current', 'is', null)
+      .order('bsr_current', { ascending: true })
+      .limit(P5_NEW_COUNT + 40);
+    const have = new Set([...newBrands, ...top10].map((p) => p.asin));
+    const before = newBrands.length;
+    for (const p of outside || []) {
+      if (newBrands.length >= P5_NEW_COUNT) break;
+      if (!have.has(p.asin)) { newBrands.push(p); have.add(p.asin); }
+    }
+    if (newBrands.length > before) console.log(`  Pool B: selection held ${before} emerging — added ${newBrands.length - before} emerging product(s) from outside the selection`);
+  }
   if (newBrands.length < P5_NEW_COUNT) {
     // Fallback fill — old "<500 reviews + real revenue" heuristic, excluding
     // anything already in Pool A or already selected above.
     const top10Asins = new Set(top10.map((p) => p.asin));
-    const { data: fallback } = await DASH.from('products')
-      .select(PRODUCT_SELECT)
-      .eq('category_id', categoryId)
+    const { data: fallback } = await productsQuery()
       .not('bsr_current', 'is', null)
       .lt('rating_count', 500)
       .gt('monthly_revenue', 0)

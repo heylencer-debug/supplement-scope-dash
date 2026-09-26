@@ -25,6 +25,7 @@ const { createClient } = require('@supabase/supabase-js');
 const { resolveCategory } = require('./utils/category-resolver');
 const { withUsageTracking, recordAiUsage } = require('./utils/ai-usage');
 const { reportProgress } = require('./utils/job-heartbeat');
+const { loadSelection, applySelection } = require('./utils/selected-competitors');
 const fs = require('fs');
 const path = require('path');
 
@@ -542,12 +543,19 @@ async function run() {
   if (error) throw error;
   console.log(`Fetched: ${products.length} products\n`);
 
+  // Competitor selection (2026-09-26, migration 011): analyse the selected
+  // competitors only (selection_rank order). Market metrics below still use
+  // EVERY product in the category. Inactive selection → all products, as before.
+  const selection = await loadSelection(DASH, CAT_ID);
+  console.log(selection.active ? `Scoped to the competitor selection (${selection.why})\n` : `Competitor selection inactive (${selection.why}) — analysing all products\n`);
+
   // Filter already-done
-  let toProcess = products;
+  let toProcess = applySelection(products, selection);
   if (!FORCE) {
-    toProcess = products.filter(p => !p.marketing_analysis?.product_intelligence?.analyzed_at);
-    if (products.length !== toProcess.length) {
-      console.log(`Skipping ${products.length - toProcess.length} already analyzed → ${toProcess.length} to process\n`);
+    const inScope = toProcess;
+    toProcess = inScope.filter(p => !p.marketing_analysis?.product_intelligence?.analyzed_at);
+    if (inScope.length !== toProcess.length) {
+      console.log(`Skipping ${inScope.length - toProcess.length} already analyzed → ${toProcess.length} to process\n`);
     }
   }
 

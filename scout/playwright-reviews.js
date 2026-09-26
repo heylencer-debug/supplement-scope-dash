@@ -34,6 +34,7 @@ chromium.use(stealth());
 const fetch = require('node-fetch');
 const brightData = require('./bright-data-amazon');
 const { reportProgress } = require('./utils/job-heartbeat');
+const { loadSelectionForKeyword, applySelection } = require('./utils/selected-competitors');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
@@ -79,6 +80,20 @@ async function getAsins() {
     seen.add(r.asin);
     return true;
   });
+
+  // Competitor selection (2026-09-26, migration 011): when this category has
+  // its 40 selected competitors, review exactly those, in selection_rank
+  // order. Otherwise (columns not migrated / selection never ran) fall
+  // through to the top-by-BSR ordering below, unchanged.
+  if (KEYWORD_FILTER) {
+    const selection = await loadSelectionForKeyword(KEYWORD_FILTER);
+    if (selection.active) {
+      const picked = applySelection(rows, selection);
+      console.log(`   ASIN order: competitor selection (${picked.length}/${rows.length} candidates selected)`);
+      return picked;
+    }
+    console.log(`   Competitor selection inactive (${selection.why}) — using top-by-BSR`);
+  }
 
   // Pull bsr_current for these ASINs from the DASH products table and sort
   // by it (nulls last, falling back to scrape-time bsr, then rank_position).

@@ -12,6 +12,9 @@ require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const { resolveCategory } = require('./utils/category-resolver');
 const { classifyCohort } = require('./utils/cohort');
+const { runCompetitorSelection } = require('./select-competitors');
+const { extractKeepaSignals } = require('./utils/keepa-signals');
+const { usableDisplayedReviews } = require('./utils/competitor-selection');
 
 const DOVIVE = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 const DASH = createClient(
@@ -60,7 +63,7 @@ async function run() {
   // fixed here (out of scope for cohort tagging).
   const { data: dashProducts, error: dashErr } = await DASH
     .from('products')
-    .select('id, asin, rating_count')
+    .select('id, asin, rating_count, rating_value')
     .eq('category_id', DASH_CAT_ID);
 
   if (dashErr) throw dashErr;
@@ -68,10 +71,12 @@ async function run() {
 
   const asinToId = {};
   const asinToRatingCount = {};
+  const asinToRating = {};
   for (const p of dashProducts) {
     if (p.asin) {
       asinToId[p.asin] = p.id;
       asinToRatingCount[p.asin] = p.rating_count;
+      asinToRating[p.asin] = p.rating_value;
     }
   }
 
@@ -93,7 +98,11 @@ async function run() {
   // cheap, no-AI-cost, per-ASIN Keepa read the cohort tagging piggybacks on.
   const { data: keepaRows, error: keepaErr } = await DOVIVE
     .from('dovive_keepa')
-    .select('asin, monthly_sales_est, price_usd, bsr_current, bsr_history_30d, bsr_history_90d, bsr_drops_30d, bsr_drops_90d, monthly_sold_history, listed_since, release_date, review_count')
+    // k_parent / k_variations / k_avg90 (2026-09-26, competitor selection):
+    // read through raw_json JSON paths, which exist on every Keepa row ever
+    // saved — NOT the new dovive_keepa columns from migration 011, which a
+    // select would fail on until that migration is applied.
+    .select('asin, monthly_sales_est, price_usd, bsr_current, bsr_history_30d, bsr_history_90d, bsr_drops_30d, bsr_drops_90d, monthly_sold_history, listed_since, release_date, review_count, k_parent:raw_json->>parentAsin, k_variations:raw_json->variations, k_avg90:raw_json->stats->avg90, k_current:raw_json->stats->current')
     .in('asin', keywordAsins);
 
   if (keepaErr) throw keepaErr;
@@ -103,6 +112,7 @@ async function run() {
   let skipped = 0;
   let errors = 0;
   const cohortCounts = { established: 0, emerging: 0, context: 0 };
+  const cohortByAsin = new Map(); // handed to the competitor selection below
 
   for (const k of keepaRows) {
     const dashId = asinToId[k.asin];
@@ -121,13 +131,26 @@ async function run() {
     // full rationale + env-tunable thresholds. reviewCount comes from
     // products.rating_count (see the select above), not dovive_keepa's own
     // review_count field.
-    const { cohort } = classifyCohort({
+    // 2026-09-26: products.rating_count can hold the rating×10 value
+    // keepa-phase2.js used to copy into dovive_research.review_count (756
+    // rows) — a "46" would sink Liquid I.V. out of 'established'. Unusable
+    // counts fall back to Keepa's own stats.current[17].
+    const sig = extractKeepaSignals({ parentAsin: k.k_parent, variations: k.k_variations, stats: { avg90: k.k_avg90, current: k.k_current } });
+    const cohortReviews = usableDisplayedReviews({ displayed: asinToRatingCount[k.asin], ratings: [asinToRating[k.asin], sig.rating], keepaOwn: sig.review_count }).count ?? sig.review_count;
+    const cohortResult = classifyCohort({
       listedSince: k.listed_since,
       releaseDate: k.release_date,
-      reviewCount: asinToRatingCount[k.asin],
+      reviewCount: cohortReviews,
       monthlySalesEst: k.monthly_sales_est,
       bsrHistory30d: k.bsr_history_30d,
     });
+    const { cohort } = cohortResult;
+    cohortByAsin.set(k.asin, cohortResult);
+
+    // Variation family + 90-day price (2026-09-26): feeds the dashboard's
+    // "Parent ASIN" / "Flavor Options (N)" / "90-Day Avg" fields, which
+    // nothing populated before. extractKeepaSignals applies the same
+    // Amazon → New → Buy Box price precedence parseKeepa() uses for price_usd.
 
     const patch = {
       monthly_sales: k.monthly_sales_est,
@@ -135,6 +158,10 @@ async function run() {
       bsr_30_days_avg: bsr30avg,
       bsr_90_days_avg: bsr90avg,
       cohort,
+      ...(sig.parent_asin ? { parent_asin: sig.parent_asin } : {}),
+      // >1 only: a lone self-listing would hide the modal's flavor_options fallback.
+      ...(sig.variation_asins && sig.variation_asins.length > 1 ? { variations_count: sig.variation_asins.length } : {}),
+      ...(sig.price_avg_90d ? { price_90_days_avg: sig.price_avg_90d } : {}),
       historical_data: {
         bsr_history_30d: k.bsr_history_30d,
         bsr_history_90d: k.bsr_history_90d,
@@ -166,6 +193,18 @@ async function run() {
   console.log(`Skipped (ASIN not in dash): ${skipped}`);
   console.log(`Errors: ${errors}`);
   console.log(`Cohort — established: ${cohortCounts.established} · emerging: ${cohortCounts.emerging} · context: ${cohortCounts.context}`);
+
+  // Competitor selection (2026-09-26): pick the 40 established competitors
+  // P3/P4/P5/P8 work from — one per variation family, with a written reason,
+  // promo and shared-review checks. See select-competitors.js. Never fails
+  // the Keepa sync: on any error the downstream phases simply keep their
+  // top-N-by-BSR behaviour.
+  console.log(`\n=== Competitor selection ===`);
+  try {
+    await runCompetitorSelection({ dovive: DOVIVE, dash: DASH, keyword: KEYWORD, categoryId: DASH_CAT_ID, cohortByAsin });
+  } catch (e) {
+    console.error(`  ⚠️ Competitor selection failed (non-fatal — downstream stays on top-N-by-BSR): ${e.message}`);
+  }
 }
 
 run().catch(console.error);

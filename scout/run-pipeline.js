@@ -4,7 +4,12 @@
  * Runs P1 → P2 → P3 → P4 → P5 → P6 → P7 → P8 → P9 → P10 for a keyword.
  * P6 = Product Intelligence (per-product AI scoring — powers 9 dashboard sections)
  * P7 = Market Intelligence (category-level Grok report — powers Market tab)
- * Checks existing data before each phase (skip if already done).
+ * READ-FIRST (P0.5): before any phase, inventory.js reads what the keyword
+ * FAMILY already holds (every "#N" session + aliases) and plan-scope.js
+ * decides per phase: reuse (skip, or sync-only from a sibling session) |
+ * top-up | refresh | scrape. The plan is printed, written to scout_jobs.plan,
+ * rebuilt after P1, and honoured unless --force / --no-reuse /
+ * SCOUT_PLAN_MODE=advisory|off. See docs/READ-FIRST.md.
  * Sends Telegram status updates after each phase.
  *
  * Usage:
@@ -13,6 +18,8 @@
  *   node run-pipeline.js --keyword "ashwagandha gummies" --phases P6,P7,P8
  *   node run-pipeline.js --keyword "ashwagandha gummies" --ai   (enables AI for P8)
  *   node run-pipeline.js --keyword "ashwagandha gummies" --force (re-run all phases)
+ *   node run-pipeline.js --keyword "..." --no-reuse    (print the plan, run every phase anyway)
+ *   node run-pipeline.js --keyword "..." --alias "electrolytes powder" --fresh P3=45
  */
 
 require('dotenv').config();
@@ -792,6 +799,52 @@ const MID_RUN_GATES = {
   9: [1, 2, 3, 4, 5, 6, 7, 8],
 };
 
+// ─── READ-FIRST plan (Phase −1 / P0.5) ───────────────────────────────────────
+// Reads only (inventory.js), decides purely (plan-scope.js). Fail-open: if the
+// inventory cannot be built, every phase runs exactly as it did before.
+//   honor    (default) reuse/session → skip; reuse/family → sync step only;
+//            top-up → phase runs with SCOUT_REUSE_ASINS/_KEYWORDS so P3/P4
+//            producers skip sibling-covered ASINs (P5/P6/P8 already skip what
+//            THIS session has done, so their top-up is just "run as today").
+//   advisory print + store the plan, run everything (also forced by --force
+//            and --no-reuse).
+//   off      no inventory at all.
+const { buildInventory, formatInventory } = require('./inventory');
+const { planScope, formatPlan, freshnessFromEnv } = require('./plan-scope');
+const { applyScopePlan } = require('./utils/apply-plan');
+// An operator who scoped the run by hand (--phases / --from Pn>1) is usually
+// re-running on purpose, so the plan is advisory there unless
+// SCOUT_PLAN_MODE=honor says otherwise.
+const PLAN_MODE = (process.env.SCOUT_PLAN_MODE === 'off') ? 'off'
+  : (FORCE || process.argv.includes('--no-reuse') || process.env.SCOUT_PLAN_MODE === 'advisory') ? 'advisory'
+  : (process.env.SCOUT_PLAN_MODE === 'honor' || (!ONLY_PHASES && FROM_PHASE <= 1)) ? 'honor' : 'advisory';
+const PLAN_ALIASES = [
+  ...process.argv.flatMap((a, i) => (a === '--alias' && process.argv[i + 1] ? [process.argv[i + 1]] : [])),
+  ...String(process.env.SCOUT_KEYWORD_ALIASES || '').split(',').map(s => s.trim()).filter(Boolean),
+];
+const PLAN_FRESH_CLI = process.argv.includes('--fresh') ? process.argv[process.argv.indexOf('--fresh') + 1] : null;
+
+async function buildScopePlan(stage) {
+  if (PLAN_MODE === 'off') return null;
+  try {
+    const inv = await buildInventory({ keyword: KEYWORD, db: DOVIVE, dash: DASH, aliases: PLAN_ALIASES });
+    const plan = planScope(inv, { freshnessDays: freshnessFromEnv(process.env, PLAN_FRESH_CLI) });
+    Object.assign(plan, {
+      stage, mode: PLAN_MODE,
+      sessions: inv.sessions.map(s => ({ label: s.label, own: s.own, p1Asins: s.p1Asins, dashProducts: s.dashProducts, lastScrapedAt: s.lastScrapedAt })),
+    });
+    console.log(`\n${formatInventory(inv)}\n\n${formatPlan(plan)}\n  mode: ${PLAN_MODE} (${stage})\n`);
+    if (SCOUT_JOB_ID) {
+      const { error } = await DOVIVE.from('scout_jobs').update({ plan, updated_at: new Date().toISOString() }).eq('id', SCOUT_JOB_ID);
+      if (error) console.warn(`⚠ scout_jobs.plan not written (non-fatal — apply migrations/010_scout_jobs_plan.sql): ${error.message}`);
+    }
+    return plan;
+  } catch (e) {
+    console.warn(`⚠ READ-FIRST inventory failed (non-fatal — every phase runs as before): ${e.message}`);
+    return null;
+  }
+}
+
 async function run() {
   console.log(`\n${'═'.repeat(60)}`);
   console.log(`🔍 SCOUT PIPELINE — "${KEYWORD}"`);
@@ -813,6 +866,7 @@ async function run() {
   const startTime = Date.now();
   const results = [];
   const phasesToRun = ONLY_PHASES || PHASES.map(p => p.num);
+  let scopePlan = RECOVER_SYNC ? null : await buildScopePlan('start');
 
   await notify(`🔍 Scout pipeline started for "${KEYWORD}"\nPhases: P${phasesToRun.join(', P')} | ${USE_AI ? 'AI-Enhanced' : 'Rule-Based'}`);
   await updateJobStatus({ status: 'running', started_at: new Date().toISOString(), total_phases: phasesToRun.length });
@@ -895,7 +949,15 @@ async function run() {
     console.log(`P${phase.num}: ${phase.name}`);
     console.log(`Description: ${phase.description}`);
 
-    // Remove skipping phases based on existing data - always run each phase
+    // READ-FIRST plan decides skip / sync-only / top-up (applyScopePlan above);
+    // without a plan (or with --force / --no-reuse) every phase runs as before.
+    const planned = applyScopePlan(phase, scopePlan, { mode: PLAN_MODE, keyword: KEYWORD, runScript });
+    if (planned.skip) {
+      console.log(`⏭️  ${planned.skip}`);
+      results.push({ phase: phase.num, name: phase.name, status: 'skipped', msg: planned.skip });
+      continue;
+    }
+    if (planned.note) console.log(`🗺️  ${planned.note}`);
     const status = categoryId ? await checkPhaseStatus(phase.num, categoryId) : { done: false };
 
     if (status.count > 0 && !status.done) {
@@ -913,7 +975,7 @@ async function run() {
     }
 
     try {
-      await runPhaseWithRetry(phase, categoryId);
+      await runPhaseWithRetry(planned.phase, categoryId);
 
       // Re-resolve category if it wasn't found yet (e.g. P1 just created it
       // for the first time on this keyword) — keeps categoryId live for the
@@ -928,6 +990,9 @@ async function run() {
           catch (e) { console.warn(`⚠ Failed to stamp category is_test (non-fatal): ${e.message}`); }
         }
       }
+
+      // P1 just (re)defined this session's ASIN set — re-plan against it.
+      if (phase.num === 1 && scopePlan) scopePlan = (await buildScopePlan('after-P1')) || scopePlan;
 
       const elapsed = Math.round((Date.now() - phaseStart) / 1000);
       console.log(`\n✅ P${phase.num} Complete (${elapsed}s)`);

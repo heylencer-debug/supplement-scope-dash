@@ -22,6 +22,7 @@
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const { resolveCategory } = require('./utils/category-resolver');
+const { reuseKeywordsFromEnv, reuseMaxAgeDays } = require('./utils/reuse-asins');
 
 const DOVIVE = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 const DASH = createClient(
@@ -153,6 +154,46 @@ async function run() {
   for (const r of allReviews) {
     if (!byAsin[r.asin]) byAsin[r.asin] = [];
     byAsin[r.asin].push(r);
+  }
+
+  // READ-FIRST cross-session reuse (run-pipeline.js sets SCOUT_REUSE_KEYWORDS
+  // only when plan-scope.js decided P3 is a family reuse / top-up). For every
+  // product in THIS session's category that has no reviews under THIS
+  // session's keyword, READ the reviews a sibling session of the same keyword
+  // family already scraped — the single freshest sibling per ASIN, so no
+  // review is counted twice. Nothing is copied into dovive_reviews: the raw
+  // rows stay attributed to the session that paid for them.
+  const reuseKeywords = reuseKeywordsFromEnv().filter(k => k.toLowerCase() !== KEYWORD.toLowerCase());
+  if (reuseKeywords.length) {
+    const need = Object.keys(asinToId).filter(a => !byAsin[a]);
+    const maxAge = reuseMaxAgeDays();
+    const cutoff = maxAge ? new Date(Date.now() - maxAge * 86400000).toISOString() : null;
+    const sibling = [];
+    for (let i = 0; i < need.length; i += 100) {
+      for (let from = 0; ; from += pageSize) {
+        let q = DOVIVE.from('dovive_reviews')
+          .select('asin, keyword, rating, title, body, reviewer_name, review_date, verified_purchase, helpful_votes, scraped_at')
+          .or(reuseKeywords.map(k => `keyword.ilike.${JSON.stringify(k)}`).join(',')) // case-insensitive, as the pipeline matches labels
+          .in('asin', need.slice(i, i + 100));
+        if (cutoff) q = q.gte('scraped_at', cutoff);
+        const { data, error } = await q.range(from, from + pageSize - 1);
+        if (error) throw error;
+        sibling.push(...(data || []));
+        if (!data || data.length < pageSize) break;
+      }
+    }
+    const freshestKw = {};
+    for (const r of sibling) {
+      const cur = freshestKw[r.asin];
+      if (!cur || (r.scraped_at || '') > cur.at) freshestKw[r.asin] = { kw: r.keyword, at: r.scraped_at || '' };
+    }
+    let reusedAsins = 0;
+    for (const r of sibling) {
+      if (freshestKw[r.asin]?.kw !== r.keyword) continue;
+      if (!byAsin[r.asin]) { byAsin[r.asin] = []; reusedAsins++; }
+      byAsin[r.asin].push(r);
+    }
+    console.log(`READ-FIRST reuse: ${reusedAsins} ASINs read from sibling sessions (${reuseKeywords.join(', ')})${cutoff ? `, scraped since ${cutoff.slice(0, 10)}` : ''}`);
   }
 
   const asinsWithReviews = Object.keys(byAsin);

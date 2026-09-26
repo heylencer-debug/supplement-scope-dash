@@ -34,6 +34,7 @@ chromium.use(stealth());
 const fetch = require('node-fetch');
 const brightData = require('./bright-data-amazon');
 const { reportProgress } = require('./utils/job-heartbeat');
+const { reuseAsinsFromEnv } = require('./utils/reuse-asins');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
@@ -305,7 +306,12 @@ async function main() {
 
   const asinRows = await getAsins();
   const scrapedAsins = await getScrapedAsins(KEYWORD_FILTER);
-  const toScrape = asinRows.filter(r => !scrapedAsins.has(r.asin)).slice(0, MAX_ASINS);
+  // READ-FIRST plan (run-pipeline.js → plan-scope.js): ASINs whose reviews are
+  // already fresh in a SIBLING session of this keyword family. Not re-scraped;
+  // migrate-reviews-to-dash.js reads them from that session (SCOUT_REUSE_KEYWORDS).
+  const reuseAsins = reuseAsinsFromEnv();
+  if (reuseAsins.size) console.log(`   READ-FIRST plan: ${reuseAsins.size} ASINs reused from sibling sessions (not re-scraped)`);
+  const toScrape = asinRows.filter(r => !scrapedAsins.has(r.asin) && !reuseAsins.has(r.asin)).slice(0, MAX_ASINS);
 
   console.log(`   Found ${asinRows.length} ASINs | Already have reviews: ${scrapedAsins.size} | To scrape: ${toScrape.length}`);
 

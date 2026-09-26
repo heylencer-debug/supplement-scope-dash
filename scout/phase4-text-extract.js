@@ -19,6 +19,7 @@ const { parseModelJson, normalizeFacts, isValidFacts } = require('./utils/ocr-ut
 const { withUsageTracking, recordAiUsage } = require('./utils/ai-usage');
 const { resolveCategory } = require('./utils/category-resolver');
 const { reportProgress } = require('./utils/job-heartbeat');
+const { reuseAsinsFromEnv } = require('./utils/reuse-asins');
 
 // Support both: node phase4-text-extract.js "keyword" AND node phase4-text-extract.js --keyword "keyword"
 const _kwIdx = process.argv.indexOf('--keyword');
@@ -211,7 +212,11 @@ async function main() {
     .eq('image_index', 99);
 
   const alreadyDone = new Set((existing || []).map(r => r.asin));
-  const toProcess = products.filter(p => !alreadyDone.has(p.asin));
+  // READ-FIRST plan: ASINs whose facts already exist (dovive_ocr is keyed by
+  // ASIN, so migrate-ocr-to-dash.js picks them up without re-extraction).
+  const reuseAsins = reuseAsinsFromEnv();
+  if (reuseAsins.size) console.log(`READ-FIRST plan: ${reuseAsins.size} ASINs already have facts in a sibling session — skipped`);
+  const toProcess = products.filter(p => !alreadyDone.has(p.asin) && !reuseAsins.has(p.asin));
 
   const list = TEST_MODE ? toProcess.slice(0, 1) : LIMIT ? toProcess.slice(0, LIMIT) : toProcess;
 

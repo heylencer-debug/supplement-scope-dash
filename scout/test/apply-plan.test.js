@@ -17,7 +17,7 @@ test('reuse/session → skip; advisory mode → never skips', () => {
   assert.equal(a.skip, undefined);
 });
 
-test('reuse/family → only the sync script runs, with the reuse env set for exactly that call', async () => {
+test('reuse/family → only the sync scripts run (migrate, then the self-skipping P3b synthesis), with the reuse env set for exactly those calls', async () => {
   const plan = planFor(fx.fragmented({ afterP1: true }));
   const calls = []; const env = {};
   const r = applyScopePlan(fakePhase(3, calls), plan, {
@@ -26,7 +26,12 @@ test('reuse/family → only the sync script runs, with the reuse env set for exa
   });
   assert.equal(r.skip, undefined);
   await r.phase.run();
-  assert.deepEqual(calls, ['migrate-reviews-to-dash.js electrolyte powder #6 reuse=electrolyte powder #4 n=30 age=30']);
+  assert.deepEqual(calls, [
+    'migrate-reviews-to-dash.js electrolyte powder #6 reuse=electrolyte powder #4 n=30 age=30',
+    // P3b reads the reused sibling rows too (SCOUT_REUSE_KEYWORDS) and skips
+    // itself when its synthesis is already newer than the reviews.
+    'phase3b-review-synthesis.js electrolyte powder #6 reuse=electrolyte powder #4 n=30 age=30',
+  ]);
   assert.deepEqual(env, {}, 'env is cleaned up after the phase');
 });
 

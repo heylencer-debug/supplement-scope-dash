@@ -50,6 +50,14 @@ test('scopeToSelection adds selected filter + rank ordering only when active', (
 
 const { top20Need } = require('../utils/selected-competitors');
 
+test('top20Need accepts a loadSelection() result: active → its size, inactive → the plain top-20 floor (never 0)', () => {
+  const sel = (n) => ({ active: true, why: 'x', ranks: new Map(Array.from({ length: n }, (_, i) => [`B0${i}`, i + 1])) });
+  assert.equal(top20Need(sel(30)), 15);
+  assert.equal(top20Need(sel(12)), 9);
+  assert.equal(top20Need({ active: false, why: 'not migrated', ranks: new Map() }), 15);
+  assert.equal(top20Need({ active: false }), 15);
+});
+
 test('top20Need = min(15, ceil(0.75 × min(20, selection size)))', () => {
   assert.equal(top20Need(40), 15);
   assert.equal(top20Need(20), 15);

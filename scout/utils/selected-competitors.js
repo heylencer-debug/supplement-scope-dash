@@ -81,6 +81,12 @@ function scopeToSelection(query, selection) {
  * @param {number} selectionSize  number of selected competitors (sel.ranks.size)
  */
 function top20Need(selectionSize) {
+  // A `loadSelection()` result is accepted too: active → its size; inactive
+  // → the plain top-20 (floor 15). Handing the object to Number() gave NaN →
+  // 0, which silently waved an empty top-20 through (integration review F1).
+  if (selectionSize && typeof selectionSize === 'object') {
+    selectionSize = selectionSize.active && selectionSize.ranks ? selectionSize.ranks.size : 20;
+  }
   const n = Math.max(0, Math.floor(Number(selectionSize) || 0));
   return Math.min(15, Math.ceil(0.75 * Math.min(20, n)));
 }

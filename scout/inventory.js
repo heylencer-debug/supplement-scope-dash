@@ -29,6 +29,7 @@ const {
   PHASE_META, normalizeKeyword, stripSession, sessionNumber, familyNames, isFamilyLabel, familyPrefixes,
 } = require('./utils/phase-map');
 const { resolveCategory } = require('./utils/category-resolver');
+const { loadSelection } = require('./utils/selected-competitors');
 const { resolveRunAsins, measureVerifierMetrics, evaluateBars } = require('./utils/verifier-bars');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -133,6 +134,16 @@ async function fetchRaw({ keyword, db, dash = db, aliases = [], autoAliases = tr
     const ownRA = await fetchAll(() => dash.from('products').select('asin').eq('category_id', ownCat.id).not('review_analysis', 'is', null));
     verifier = { runAsins: run, measured, ownReviewAnalysis: uniq(ownRA.map(r => r.asin)) };
   }
+  // Competitor selection (migration 011): when this session's category has a
+  // populated selection, the candidate top-40/top-10 below is THAT set in
+  // selection_rank order — it is what P3/P4/P5/P6/P8 process, so coverage is
+  // measured over the same 40 (integration review F2). loadSelection never
+  // throws; before 011 it reports inactive and the BSR ranking is used.
+  let selection = null;
+  if (ownCat) {
+    const sel = await loadSelection(dash, ownCat.id);
+    if (sel.active) selection = { asins: [...sel.ranks.entries()].sort((a, b) => a[1] - b[1]).map(([asin]) => asin), why: sel.why };
+  }
   // Raw tables store the label verbatim (case as submitted) and the pipeline
   // matches with ilike, so query every original-case spelling we saw.
   const rawLabels = uniq([...catRows.map(c => c.search_term), ...kwRows.map(r => r.keyword), keyword]
@@ -198,7 +209,7 @@ async function fetchRaw({ keyword, db, dash = db, aliases = [], autoAliases = tr
   } catch (e) { warnings.push(`ai_usage_log unreadable: ${e.message}`); }
 
   return {
-    keyword, names, labels, related, categories, verifier,
+    keyword, names, labels, related, categories, verifier, selection,
     research, reviews, p5, packaging, products, keepa, ocr, briefs: briefFlags, usage,
   };
 }
@@ -259,8 +270,14 @@ function assembleInventory(raw, { now = new Date(), topN = TOP_N, topK = TOP_K, 
       if (ab !== bb) return ab - bb;
       return (a.rank ?? Infinity) - (b.rank ?? Infinity);
     });
-  const top40 = ranked.slice(0, topN).map(r => r.asin);
-  const top10 = ranked.slice(0, topK).map(r => r.asin);
+  let top40 = ranked.slice(0, topN).map(r => r.asin);
+  let top10 = ranked.slice(0, topK).map(r => r.asin);
+  if (raw.selection?.asins?.length) {
+    // The selected competitors ARE the candidate set (see fetchRaw).
+    top40 = raw.selection.asins.slice(0, topN);
+    top10 = raw.selection.asins.slice(0, topK);
+    basis = `competitor selection (${raw.selection.why})`;
+  }
 
   // ── per-ASIN phase presence ──
   const ownLabel = target;

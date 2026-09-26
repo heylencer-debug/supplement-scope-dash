@@ -835,6 +835,13 @@ async function run() {
     if (planned.skip) {
       console.log(`⏭️  ${planned.skip}`);
       results.push({ phase: phase.num, name: phase.name, status: 'skipped', msg: planned.skip });
+      // A skipped P3 still gets its synthesis: P3b is self-skipping (a
+      // synthesis newer than the reviews costs nothing) and exits 0 on its own
+      // failures, so this never re-runs or blocks the paid scrape.
+      if (phase.num === 3 && !RECOVER_SYNC) {
+        try { await runScript('phase3b-review-synthesis.js', ['--keyword', KEYWORD, ...(FORCE ? ['--force'] : [])]); }
+        catch (e) { console.warn(`⚠ P3b review synthesis after a skipped P3 failed (non-fatal): ${e.message}`); }
+      }
       continue;
     }
     if (planned.note) console.log(`🗺️  ${planned.note}`);

@@ -28,7 +28,7 @@ const PHASE_META = [
   { key: 'P2', num: 2, name: 'Keepa Enrichment', level: 'asin', marker: 'dovive_keepa (asin) → products.monthly_sales',
     familyReuse: true, readBy: 'asin', syncScripts: ['migrate-keepa-to-dash.js'], cost: 'keepa' },
   { key: 'P3', num: 3, name: 'Reviews', level: 'asin', marker: 'dovive_reviews (asin,keyword) → products.review_analysis',
-    familyReuse: true, readBy: 'keyword', syncScripts: ['migrate-reviews-to-dash.js'], cost: 'scrape' },
+    familyReuse: true, readBy: 'keyword', syncScripts: ['migrate-reviews-to-dash.js', 'phase3b-review-synthesis.js'], cost: 'scrape' },
   { key: 'P4', num: 4, name: 'OCR / Formula Extraction', level: 'asin', marker: 'dovive_ocr (asin,image_index) → products.nutrients_count',
     familyReuse: true, readBy: 'asin', syncScripts: ['migrate-ocr-to-dash.js'], cost: 'ai' },
   { key: 'P5', num: 5, name: 'Deep Research', level: 'asin', marker: 'dovive_phase5_research (asin,keyword,pool) with full_research',

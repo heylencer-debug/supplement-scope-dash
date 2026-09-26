@@ -104,7 +104,7 @@ async function resolveRunAsins({ DOVIVE, DASH, keyword, categoryId, warn = conso
   return result;
 }
 
-async function measureVerifierMetrics({ DOVIVE, DASH, keyword, categoryId, runAsins, runAsinsAll, env = process.env }) {
+async function measureVerifierMetrics({ DOVIVE, DASH, keyword, categoryId, runAsins, runAsinsAll, runAsinsPool, env = process.env }) {
   const { count: total } = await DASH.from('products').select('*', { count: 'exact', head: true }).eq('category_id', categoryId);
   // Competitor selection (migration 011): when populated, P3/P4's top-20 and
   // P6's coverage are measured over the SELECTED competitors (what those
@@ -152,7 +152,10 @@ async function measureVerifierMetrics({ DOVIVE, DASH, keyword, categoryId, runAs
   const { count: reviewRowsTotal } = await DOVIVE.from('dovive_reviews').select('*', { count: 'exact', head: true }).ilike('keyword', keyword);
 
   return {
-    total, runTotal, runAsinsCount: runAsins.length, runAsinsAllCount: runAsinsAll.length,
+    // The P1 migration bar compares what P1 scraped with what reached DASH —
+    // the UNCAPPED live set (pool), never the gate-capped one (the cap made
+    // "40/80 scraped ASINs exist in DASH" a false failure, 2026-09-26).
+    total, runTotal, runAsinsCount: (runAsinsPool || runAsins).length, runAsinsAllCount: runAsinsAll.length,
     p2, p3, p4, p5, p5Target, p5Min, p6, p6Total, p8,
     selectionActive: selection.active, selectionSize, top20Need: top20Need(selection),
     p7: !!(fb?.ingredients?.market_intelligence?.ai_market_analysis),

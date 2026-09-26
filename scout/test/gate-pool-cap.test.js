@@ -29,3 +29,11 @@ test('source pin: the Bright Data reviews retry RESUMES a still-running snapshot
   assert.match(bd, /opts\.resumeSnapshotId/);
   assert.match(bd, /BRIGHTDATA_REVIEWS_DEADLINE_MS \|\| '420000'/);
 });
+
+test('the P1 migration bar uses the UNCAPPED pool count, never the gate-capped set', () => {
+  const { evaluateBars } = require('../utils/verifier-bars');
+  const m = { total: 80, runTotal: 40, runAsinsCount: 80, runAsinsAllCount: 80, p2: 40, p3: 30, p4: 70, p5: 8, p5Target: 8, p5Min: 6, p6: 72, p8: 40, p7: true, p9: true, p10: true, p11: true, p12: true, p13: true, top20P3: 20, top20P4: 20, reviewRowsTotal: 1000 };
+  assert.equal(evaluateBars(m).byPhase.P1.pass, true);
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'utils', 'verifier-bars.js'), 'utf8');
+  assert.match(src, /runAsinsCount: \(runAsinsPool \|\| runAsins\)\.length/);
+});

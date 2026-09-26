@@ -130,7 +130,7 @@ async function fetchRaw({ keyword, db, dash = db, aliases = [], autoAliases = tr
   let verifier = null;
   if (ownCat) {
     const run = await resolveRunAsins({ DOVIVE: db, DASH: dash, keyword, categoryId: ownCat.id, warn: (m) => warnings.push(m.trim()) });
-    const measured = await measureVerifierMetrics({ DOVIVE: db, DASH: dash, keyword, categoryId: ownCat.id, runAsins: run.live, runAsinsAll: run.all });
+    const measured = await measureVerifierMetrics({ DOVIVE: db, DASH: dash, keyword, categoryId: ownCat.id, runAsins: run.live, runAsinsAll: run.all, runAsinsPool: run.pool });
     const ownRA = await fetchAll(() => dash.from('products').select('asin').eq('category_id', ownCat.id).not('review_analysis', 'is', null));
     verifier = { runAsins: run, measured, ownReviewAnalysis: uniq(ownRA.map(r => r.asin)) };
   }

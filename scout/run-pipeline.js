@@ -646,8 +646,8 @@ async function runFinalVerifier(categoryId, scopePhases = null) {
   // The calibration notes for every bar (P3 Bright Data ceiling, P4 Goli
   // top-20 misses, P5 slim target, P11/P12 draft+validation completeness)
   // moved there verbatim.
-  const { live: runAsins, all: runAsinsAll } = await getLiveRunAsins(categoryId);
-  const m = await measureVerifierMetrics({ DOVIVE, DASH, keyword: KEYWORD, categoryId, runAsins, runAsinsAll });
+  const { live: runAsins, all: runAsinsAll, pool: runAsinsPool } = await getLiveRunAsins(categoryId);
+  const m = await measureVerifierMetrics({ DOVIVE, DASH, keyword: KEYWORD, categoryId, runAsins, runAsinsAll, runAsinsPool });
   const { pass, failures } = evaluateBars(m, scopePhases);
   return { pass, failures, metrics: m };
 }

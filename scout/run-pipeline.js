@@ -585,7 +585,7 @@ const PHASES = [
   },
   {
     num: 5, name: 'Deep Research', description: 'Top 10 BSR + Top 10 New Brands — Claude Sonnet 5 deep research per product',
-    run: async () => runScript('phase5-deep-research.js', ['--keyword', KEYWORD, ...(FORCE ? ['--force'] : [])])
+    run: async () => { await runScript('phase5-deep-research.js', ['--keyword', KEYWORD, ...(FORCE ? ['--force'] : [])]); await runScript('phase5b-web-research.js', ['--keyword', KEYWORD, ...(FORCE ? ['--force'] : [])]); }
   },
   {
     num: 6, name: 'Product Intelligence', description: 'Per-product AI scoring — powers Formula Landscape, Extract Types, Dosage, Certs, Threat Levels, Top 10 (9 dashboard sections)',

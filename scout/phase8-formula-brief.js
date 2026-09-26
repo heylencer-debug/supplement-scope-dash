@@ -19,6 +19,13 @@ const { withUsageTracking, extractUsageFromSSE, recordAiUsage } = require('./uti
 // Preferred over the random 60+60 sample below when a synthesis row exists.
 const { fetchCategorySynthesis } = require('./utils/review-synthesis-store');
 const { briefReviewInput, painPointsFromSynthesis, formatPainPointCount } = require('./utils/review-synthesis');
+// P5b (2026-09-27): counted, source-labelled web claims. Added to the prompt
+// only when a dovive_web_research row exists; otherwise the prompt is unchanged.
+const { loadWebEvidence } = require('./utils/web-research-store');
+// P7b (2026-09-27): competitor gallery / A+ images read by vision, counted, and
+// claimed benefits checked against the P3b themes. No row → prompt unchanged.
+const { fetchCategoryMarketingAssets } = require('./utils/marketing-assets-store');
+const { formatMarketingAssetsForPrompt } = require('./utils/marketing-assets');
 
 // Set once run() resolves the category — read by recordAiUsage() calls
 // throughout this file so the cost ledger can be scoped per-category without
@@ -685,6 +692,10 @@ async function compileMarketData(categoryId) {
   } else {
     console.log('  P3b review synthesis not found — falling back to sampled reviews');
   }
+  const webEvidence = await loadWebEvidence(DASH, { keyword: KEYWORD, categoryId });
+  const marketingAssets = await fetchCategoryMarketingAssets(DASH, { keyword: KEYWORD, categoryId });
+  const marketingAssetsText = formatMarketingAssetsForPrompt(marketingAssets);
+  if (marketingAssetsText) console.log(`  P7b marketing assets: ${marketingAssets.rollup.products_analyzed} products read by vision (${marketingAssets.status})`);
 
   const commonForms = Object.entries(formMap)
     .sort((a, b) => b[1] - a[1])
@@ -839,6 +850,7 @@ async function compileMarketData(categoryId) {
       raw_reviews_negative: rawReviewText.negative,
       review_evidence_text: reviewInput.evidenceText,
       review_evidence_source: reviewInput.mode,
+      ...(marketingAssetsText ? { marketing_assets_text: marketingAssetsText } : {}),
       top_performers: (top5 || []).map(p => ({
         ...p,
         nutrients: p.all_nutrients,
@@ -865,6 +877,8 @@ async function compileMarketData(categoryId) {
     } : { has_data: false },
     // P5 deep research — top 20 BSR + new brands AI analysis
     p5_deep_research: p5Research,
+    // P5b web evidence — only present when a row exists (prompt unchanged otherwise)
+    ...(webEvidence.text ? { web_evidence_text: webEvidence.text } : {}),
     // P8 full packaging intelligence
     packaging_intelligence: packagingIntel,
     // NEW: Top 20 competitor formulas with full detail
@@ -915,6 +929,9 @@ function buildPrompt(marketData) {
   const top20 = marketData.top20_competitors || [];
   const p5 = marketData.p5_deep_research || [];
   const pkgIntel = marketData.packaging_intelligence || {};
+  const webSection = marketData.web_evidence_text
+    ? `\n\n---\n\n## 🌐 WEB EVIDENCE — REVIEW ARTICLES, COMPARISONS, GUIDES, FORUMS, BRAND PAGES (P5b)\nEach line counts DISTINCT WEBSITES by who is speaking. Only independent sources are evidence; brand-owned, affiliate and sponsored sources are marketing. Syndicated copies and text copied from Amazon listings are already excluded. When a formula or positioning decision leans on a web claim, cite it as "n independent / n brand-owned sources"; never present a brand-owned-only claim as established.\n${marketData.web_evidence_text}`
+    : '';
 
   // ── P5 Deep Research Section ──────────────────────────────────────────────
   const p5Section = p5.length > 0
@@ -1162,7 +1179,7 @@ ${marketIntelSection}
 Per-product deep research covering formula advantages, weaknesses, and market gaps.
 USE THIS to understand WHY top products win and where to attack.
 
-${p5Section}
+${p5Section}${webSection}
 
 ---
 
@@ -1249,7 +1266,12 @@ ${cs.review_evidence_text ? `## VOICE OF CUSTOMER — EVIDENCE-COUNTED THEMES (a
 Every theme below is counted over every collected review. Weigh a theme by its review and product counts; never generalise a theme marked ONE product only to the whole category; where a theme has conflicting reviews, treat it as a split experience, not a verdict.
 ${cs.review_evidence_text}
 ` : vocSampleSection}
----
+${cs.marketing_assets_text ? `---
+
+## COMPETITOR MARKETING ASSETS — WHAT THE LISTINGS ACTUALLY SHOW (vision read of gallery + A+ images, counted)
+Messages below come from the competitors' images, not their bullets. EXPERIENCED benefits are backed by a customer praise theme on the claiming products; MIXED ones have too few or split reviews to judge; CLAIMED ONLY benefits have no review support although the claiming products have reviews; CONTRADICTED benefits draw clearly more complaints than praise on the claiming products. Build DOVIVE's promise on EXPERIENCED benefits and treat CLAIMED ONLY / CONTRADICTED ones as openings to do better, never as proven consumer value.
+${cs.marketing_assets_text}
+` : ''}---
 
 ## INGREDIENT REVIEW SENTIMENT
 Ingredients customers PRAISE: ${cs.positive_ingredient_signals || 'Insufficient data'}

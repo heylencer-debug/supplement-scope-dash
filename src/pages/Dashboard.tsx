@@ -19,6 +19,8 @@ import { FormulaPassport } from "@/components/dashboard/FormulaPassport";
 import { P9BenchmarkOverview } from "@/components/dashboard/P9BenchmarkOverview";
 import { MarketIntelligenceReport } from "@/components/dashboard/MarketIntelligenceReport";
 import { ReviewEvidenceCard } from "@/components/reviews/ReviewEvidenceCard";
+import { WebEvidenceCard } from "@/components/web/WebEvidenceCard";
+import { MarketingAssetsCard } from "@/components/marketing-assets/MarketingAssetsCard";
 import { FormulaVersionsPanel } from "@/components/manufacturer/FormulaVersionsPanel";
 import { FactoryHandoffCard } from "@/components/manufacturer/FactoryHandoffCard";
 import { PortalFeedbackDisclosure } from "@/components/manufacturer/PortalFeedbackDisclosure";
@@ -653,6 +655,11 @@ export default function Dashboard() {
 
           {/* P3b review evidence — coverage ledger + counted themes */}
           {category?.id && <ReviewEvidenceCard categoryId={category.id} keyword={categoryName} />}
+
+          {/* P7b marketing assets — vision read of gallery + A+ images, experienced vs claimed */}
+          {category?.id && <MarketingAssetsCard categoryId={category.id} keyword={categoryName} />}
+          {/* P5b web evidence — sources labelled by owner + counted claims */}
+          {category?.id && <WebEvidenceCard categoryId={category.id} keyword={categoryName} />}
 
           {productsLoading && !marketAnalysisData ? (
             <Card><CardContent className="py-12 text-center text-muted-foreground">Loading market data...</CardContent></Card>

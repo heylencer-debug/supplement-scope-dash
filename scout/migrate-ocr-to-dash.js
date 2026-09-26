@@ -3,6 +3,20 @@
  * Syncs P4 OCR data from dovive_ocr → supplement-scope-dash products table
  * Populates: all_nutrients, nutrients_count, ocr_confidence, servings_per_container, serving_size
  *
+ * 2026-09-27 — per-field source resolution (utils/label-sources.js) replaces
+ * "the row with the most facts wins for every field": facts-panel image > text
+ * extraction for nutrients; serving size from the latest source when they agree,
+ * else the nutrient source's plus a recorded conflict; claims_on_label = the
+ * label images' claims (as before), claims_all_sources = the union with the
+ * listing text, per claim with its sources. A row whose label is ANOTHER
+ * product (label_product_match.verdict = 'mismatch': brand or flavour) is never
+ * promoted; a pack-size sibling's panel (match_by_serving) is. Migration 013
+ * adds products.label_facts / label_sources / label_conflicts /
+ * label_product_match / claims_all_sources / certifications_verified; without it
+ * the legacy columns are written exactly as before and the new ones skipped.
+ * Afterwards verify-certifications.js runs in-process (registry lookups only
+ * with CERT_VERIFY=1).
+ *
  * Confidence score logic:
  *   >= 8 nutrients → 0.92 (high)
  *   5–7 nutrients  → 0.78 (good)
@@ -14,6 +28,11 @@
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const { resolveCategory } = require('./utils/category-resolver');
+const { resolveLabelFields } = require('./utils/label-sources');
+const { runCertificationVerification } = require('./verify-certifications');
+
+const isMissingColumn = (error) => !!error && (error.code === '42703' || error.code === 'PGRST204' || /column .* does not exist|Could not find the .* column/i.test(error.message || ''));
+const MIGRATION_013_PRODUCT_KEYS = ['label_facts', 'label_sources', 'label_conflicts', 'label_product_match', 'claims_all_sources'];
 
 const DOVIVE = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 const DASH = createClient(
@@ -41,14 +60,6 @@ function calcConfidence(facts) {
   return 0.15;
 }
 
-// Pick best OCR record per ASIN: most supplement_facts items
-function pickBest(records) {
-  return records.reduce((best, cur) => {
-    const curCount = (cur.supplement_facts || []).length;
-    const bestCount = (best.supplement_facts || []).length;
-    return curCount > bestCount ? cur : best;
-  });
-}
 
 async function main() {
   console.log(`\n=== OCR Migration: dovive_ocr → supplement-scope-dash ===`);
@@ -89,27 +100,29 @@ async function main() {
   }
   console.log(`Found ${keywordAsins.length} ASINs in dovive_research for "${KEYWORD}"`);
 
-  // 1. Load all OCR records for these ASINs (not by dovive_ocr.keyword — see above)
-  const { data: ocrRows, error: ocrErr } = await DOVIVE
-    .from('dovive_ocr')
-    .select('asin,serving_size,servings_per_container,supplement_facts,certifications,health_claims')
-    .in('asin', keywordAsins);
-
-  if (ocrErr) { console.error('OCR fetch error:', ocrErr.message); return; }
+  // 1. Load all OCR records for these ASINs (not by dovive_ocr.keyword — see above).
+  // Chunked: a 150-ASIN .in() list plus the wider select stays well under URL limits.
+  const BASE_COLS = 'id,asin,image_url,image_index,processed_at,serving_size,servings_per_container,supplement_facts,other_ingredients,certifications,health_claims,raw_text';
+  let v2Cols = true;
+  const ocrRows = [];
+  for (let i = 0; i < keywordAsins.length; i += 100) {
+    const chunk = keywordAsins.slice(i, i + 100);
+    let res = await DOVIVE.from('dovive_ocr').select(v2Cols ? `${BASE_COLS},facts_v2,label_product_match` : BASE_COLS).in('asin', chunk);
+    if (res.error && v2Cols && isMissingColumn(res.error)) {
+      v2Cols = false;
+      console.warn('  ⚠ dovive_ocr has no facts_v2 / label_product_match yet (migration 013) — building v2 rows from the legacy facts in memory');
+      res = await DOVIVE.from('dovive_ocr').select(BASE_COLS).in('asin', chunk);
+    }
+    if (res.error) { console.error('OCR fetch error:', res.error.message); return; }
+    ocrRows.push(...(res.data || []));
+  }
   console.log(`Fetched ${ocrRows.length} OCR records`);
 
-  // Group by ASIN, keep best record per ASIN
+  // Group by ASIN — every row is kept; each product field is resolved from its own best source.
   const byAsin = new Map();
   for (const row of ocrRows) {
-    const existing = byAsin.get(row.asin);
-    if (!existing) {
-      byAsin.set(row.asin, row);
-    } else {
-      // Keep record with more supplement_facts
-      const existingCount = (existing.supplement_facts || []).length;
-      const curCount = (row.supplement_facts || []).length;
-      if (curCount > existingCount) byAsin.set(row.asin, row);
-    }
+    if (!byAsin.has(row.asin)) byAsin.set(row.asin, []);
+    byAsin.get(row.asin).push(row);
   }
   console.log(`Unique ASINs with OCR data: ${byAsin.size}`);
 
@@ -127,12 +140,18 @@ async function main() {
   let updated = 0, skipped = 0, errors = 0;
   const weakRows = [];
 
-  for (const [asin, ocr] of byAsin) {
+  let newCols = true;
+  let conflictProducts = 0;
+  const excludedLog = [];
+
+  for (const [asin, rows] of byAsin) {
     const product = dashByAsin.get(asin);
     if (!product) { skipped++; continue; }
 
     const productId = product.id;
-    const facts = Array.isArray(ocr.supplement_facts) ? ocr.supplement_facts.filter(f => f && f.name) : [];
+    const resolved = resolveLabelFields(rows);
+    if (resolved.excluded.length) excludedLog.push({ asin, title: product.title || '', excluded: resolved.excluded });
+    const facts = resolved.values.nutrients;
     const confidence = calcConfidence(facts);
     const nutrientsCount = facts.length;
 
@@ -148,21 +167,35 @@ async function main() {
       ocr_confidence: confidence,
     };
 
-    // Only set serving info if not already present
-    if (ocr.serving_size) updateData.serving_size = ocr.serving_size;
-    if (ocr.servings_per_container) updateData.servings_per_container = parseInt(ocr.servings_per_container) || null;
-    if (ocr.certifications && Array.isArray(ocr.certifications) && ocr.certifications.length > 0) {
-      updateData.claims_on_label = ocr.certifications;
-    }
+    if (resolved.values.serving_size) updateData.serving_size = resolved.values.serving_size;
+    if (resolved.values.servings_per_container) updateData.servings_per_container = parseInt(resolved.values.servings_per_container) || null;
+    // claims_on_label keeps its meaning: claims printed on the label IMAGES.
+    // The union with the listing text goes to claims_all_sources (migration 013).
+    if (resolved.values.label_claims.length > 0) updateData.claims_on_label = resolved.values.label_claims;
 
-    const { error } = await DASH.from('products').update(updateData).eq('id', productId);
+    const conflicts = resolved.conflicts;
+    if (Object.keys(conflicts).length) conflictProducts++;
+    const newData = {
+      label_facts: resolved.label_facts,
+      label_sources: { ...resolved.sources, ...(resolved.excluded.length ? { excluded: resolved.excluded } : {}) },
+      label_conflicts: conflicts,
+      label_product_match: resolved.product_match,
+      claims_all_sources: resolved.values.claims_all_sources.length ? resolved.values.claims_all_sources : null,
+    };
+
+    let { error } = await DASH.from('products').update(newCols ? { ...updateData, ...newData } : updateData).eq('id', productId);
+    if (error && newCols && isMissingColumn(error) && MIGRATION_013_PRODUCT_KEYS.some((k) => (error.message || '').includes(k))) {
+      newCols = false;
+      console.warn('  ⚠ products has no label_* columns yet (migration 013) — writing the legacy fields only');
+      ({ error } = await DASH.from('products').update(updateData).eq('id', productId));
+    }
     if (error) {
       console.error(`  ✗ ${asin}: ${error.message}`);
       errors++;
     } else {
       updated++;
       if (nutrientsCount === 0) {
-        weakRows.push({ asin, title: product.title || '', bsr: product.bsr_current || null, reason: 'empty_supplement_facts' });
+        weakRows.push({ asin, title: product.title || '', bsr: product.bsr_current || null, reason: resolved.excluded.length ? 'label_mismatch_excluded' : 'empty_supplement_facts' });
       }
       if (updated % 20 === 0) console.log(`  ${updated} updated...`);
     }
@@ -172,7 +205,14 @@ async function main() {
   console.log(`Updated: ${updated} products`);
   console.log(`Skipped (ASIN not in DASH): ${skipped}`);
   console.log(`Errors: ${errors}`);
-  console.log(`\nFields now populated: all_nutrients, nutrients_count, ocr_confidence, serving_size, servings_per_container`);
+  console.log(`\nFields now populated: all_nutrients, nutrients_count, ocr_confidence, serving_size, servings_per_container, claims_on_label${newCols ? ', label_facts, label_sources, label_conflicts, label_product_match, claims_all_sources' : ''}`);
+  console.log(`Products with source conflicts recorded: ${conflictProducts}`);
+  if (excludedLog.length) {
+    console.log(`\n⚠ Labels NOT promoted (brand or flavour says they are another product): ${excludedLog.length} product(s)`);
+    for (const e of excludedLog.slice(0, 30)) {
+      for (const x of e.excluded) console.log(`  - ${e.asin} image ${x.image_index} (row ${x.row_id}): ${x.why} | ${e.title.substring(0, 70)}`);
+    }
+  }
 
   if (weakRows.length) {
     weakRows.sort((a, b) => (a.bsr || 9999999) - (b.bsr || 9999999));
@@ -180,8 +220,16 @@ async function main() {
     console.log(`\n⚠ OCR weak rows (0 nutrients): ${weakRows.length} | top20 affected: ${top20Weak}`);
     console.log('Top weak rows by BSR:');
     weakRows.slice(0, 20).forEach(r => {
-      console.log(`  - ${r.asin} | BSR ${r.bsr ?? 'NA'} | ${r.title.substring(0, 90)}`);
+      console.log(`  - ${r.asin} | BSR ${r.bsr ?? 'NA'} | ${r.reason} | ${r.title.substring(0, 90)}`);
     });
+  }
+
+  // Certification claims → registry status (lookups only with CERT_VERIFY=1).
+  // Fail-open: its own failure never fails the OCR sync.
+  try {
+    await runCertificationVerification({ keyword: KEYWORD, categoryId: DASH_CAT_ID, dash: DASH });
+  } catch (e) {
+    console.warn(`  ⚠ Certification verification skipped: ${e.message}`);
   }
 }
 

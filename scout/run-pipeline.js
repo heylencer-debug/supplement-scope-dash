@@ -585,7 +585,7 @@ const PHASES = [
   },
   {
     num: 5, name: 'Deep Research', description: 'Top 10 BSR + Top 10 New Brands — Claude Sonnet 5 deep research per product',
-    run: async () => runScript('phase5-deep-research.js', ['--keyword', KEYWORD, ...(FORCE ? ['--force'] : [])])
+    run: async () => { await runScript('phase5-deep-research.js', ['--keyword', KEYWORD, ...(FORCE ? ['--force'] : [])]); }
   },
   {
     num: 6, name: 'Product Intelligence', description: 'Per-product AI scoring — powers Formula Landscape, Extract Types, Dosage, Certs, Threat Levels, Top 10 (9 dashboard sections)',
@@ -842,6 +842,16 @@ async function run() {
         try { await runScript('phase3b-review-synthesis.js', ['--keyword', KEYWORD, ...(FORCE ? ['--force'] : [])]); }
         catch (e) { console.warn(`⚠ P3b review synthesis after a skipped P3 failed (non-fatal): ${e.message}`); }
       }
+      // Same for P7b after a skipped P4 (self-skipping when galleries are unchanged)
+      // and P5b after a skipped P5 (self-skipping when its row is fresh).
+      if (phase.num === 4 && !RECOVER_SYNC) {
+        try { await runScript('phase7b-marketing-assets.js', ['--keyword', KEYWORD, ...(FORCE ? ['--force'] : [])]); }
+        catch (e) { console.warn(`⚠ P7b marketing assets after a skipped P4 failed (non-fatal): ${e.message}`); }
+      }
+      if (phase.num === 5 && !RECOVER_SYNC) {
+        try { await runScript('phase5b-web-research.js', ['--keyword', KEYWORD, ...(FORCE ? ['--force'] : [])]); }
+        catch (e) { console.warn(`⚠ P5b web research after a skipped P5 failed (non-fatal): ${e.message}`); }
+      }
       continue;
     }
     if (planned.note) console.log(`🗺️  ${planned.note}`);
@@ -886,6 +896,18 @@ async function run() {
       console.log(`\n✅ P${phase.num} Complete (${elapsed}s)`);
       results.push({ phase: phase.num, name: phase.name, status: 'complete', elapsed });
       await notify(`✅ P${phase.num} Complete: ${phase.name} (${elapsed}s)`);
+      // P7b after P4 (real run or sync-only) — own try, outside the phase
+      // retry, so a P7b problem never trips the phase catch or re-runs OCR.
+      if (phase.num === 4 && !RECOVER_SYNC) {
+        try { await runScript('phase7b-marketing-assets.js', ['--keyword', KEYWORD, ...(FORCE ? ['--force'] : [])]); }
+        catch (e) { console.warn(`⚠ P7b marketing assets after P4 failed (non-fatal): ${e.message}`); }
+      }
+      // P5b after P5, same shape: outside the phase retry so a P5b crash can
+      // never re-run the paid Perplexity research (integration review F4).
+      if (phase.num === 5 && !RECOVER_SYNC) {
+        try { await runScript('phase5b-web-research.js', ['--keyword', KEYWORD, ...(FORCE ? ['--force'] : [])]); }
+        catch (e) { console.warn(`⚠ P5b web research after P5 failed (non-fatal): ${e.message}`); }
+      }
     } catch (err) {
       console.error(`\n❌ P${phase.num} FAILED after ${MAX_PHASE_RETRIES} attempts: ${err.message}`);
       results.push({ phase: phase.num, name: phase.name, status: 'error', error: err.message });

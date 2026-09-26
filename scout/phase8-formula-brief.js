@@ -19,6 +19,10 @@ const { withUsageTracking, extractUsageFromSSE, recordAiUsage } = require('./uti
 // Preferred over the random 60+60 sample below when a synthesis row exists.
 const { fetchCategorySynthesis } = require('./utils/review-synthesis-store');
 const { briefReviewInput, painPointsFromSynthesis, formatPainPointCount } = require('./utils/review-synthesis');
+// P7b (2026-09-27): competitor gallery / A+ images read by vision, counted, and
+// claimed benefits checked against the P3b themes. No row → prompt unchanged.
+const { fetchCategoryMarketingAssets } = require('./utils/marketing-assets-store');
+const { formatMarketingAssetsForPrompt } = require('./utils/marketing-assets');
 
 // Set once run() resolves the category — read by recordAiUsage() calls
 // throughout this file so the cost ledger can be scoped per-category without
@@ -685,6 +689,9 @@ async function compileMarketData(categoryId) {
   } else {
     console.log('  P3b review synthesis not found — falling back to sampled reviews');
   }
+  const marketingAssets = await fetchCategoryMarketingAssets(DASH, { keyword: KEYWORD, categoryId });
+  const marketingAssetsText = formatMarketingAssetsForPrompt(marketingAssets);
+  if (marketingAssetsText) console.log(`  P7b marketing assets: ${marketingAssets.rollup.products_analyzed} products read by vision (${marketingAssets.status})`);
 
   const commonForms = Object.entries(formMap)
     .sort((a, b) => b[1] - a[1])
@@ -839,6 +846,7 @@ async function compileMarketData(categoryId) {
       raw_reviews_negative: rawReviewText.negative,
       review_evidence_text: reviewInput.evidenceText,
       review_evidence_source: reviewInput.mode,
+      ...(marketingAssetsText ? { marketing_assets_text: marketingAssetsText } : {}),
       top_performers: (top5 || []).map(p => ({
         ...p,
         nutrients: p.all_nutrients,
@@ -1249,7 +1257,12 @@ ${cs.review_evidence_text ? `## VOICE OF CUSTOMER — EVIDENCE-COUNTED THEMES (a
 Every theme below is counted over every collected review. Weigh a theme by its review and product counts; never generalise a theme marked ONE product only to the whole category; where a theme has conflicting reviews, treat it as a split experience, not a verdict.
 ${cs.review_evidence_text}
 ` : vocSampleSection}
----
+${cs.marketing_assets_text ? `---
+
+## COMPETITOR MARKETING ASSETS — WHAT THE LISTINGS ACTUALLY SHOW (vision read of gallery + A+ images, counted)
+Messages below come from the competitors' images, not their bullets. EXPERIENCED benefits are backed by a customer praise theme; CLAIMED ONLY benefits have no review support although the claiming products have reviews; CONTRADICTED benefits draw more complaints than praise. Build DOVIVE's promise on EXPERIENCED benefits and treat CLAIMED ONLY / CONTRADICTED ones as openings to do better, never as proven consumer value.
+${cs.marketing_assets_text}
+` : ''}---
 
 ## INGREDIENT REVIEW SENTIMENT
 Ingredients customers PRAISE: ${cs.positive_ingredient_signals || 'Insufficient data'}

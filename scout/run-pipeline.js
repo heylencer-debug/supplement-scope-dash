@@ -581,6 +581,7 @@ const PHASES = [
       await runScript('ocr-phase4.js', [KEYWORD]);
       console.log('\n→ Syncing OCR data to dashboard (migrate-ocr-to-dash.js)...');
       await runScript('migrate-ocr-to-dash.js', [KEYWORD]);
+      await runScript('phase7b-marketing-assets.js', ['--keyword', KEYWORD, ...(FORCE ? ['--force'] : [])]); // P7b: vision read of gallery + A+ images (exits 0 on its own failures)
     }
   },
   {

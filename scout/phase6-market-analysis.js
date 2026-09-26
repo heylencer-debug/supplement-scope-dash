@@ -25,6 +25,11 @@ const { withUsageTracking, recordAiUsage } = require('./utils/ai-usage');
 // preferred over the random 60+60 sample when a synthesis row exists.
 const { fetchCategorySynthesis } = require('./utils/review-synthesis-store');
 const { briefReviewInput } = require('./utils/review-synthesis');
+// P7b (2026-09-27): what competitors actually SHOW on their gallery / A+ images,
+// counted, plus claimed-vs-experienced against the P3b themes. No row → the
+// prompt is byte-identical to before.
+const { fetchCategoryMarketingAssets } = require('./utils/marketing-assets-store');
+const { formatMarketingAssetsForPrompt } = require('./utils/marketing-assets');
 const fs = require('fs');
 const path = require('path');
 
@@ -307,7 +312,7 @@ function buildMarketContext(products) {
 
 // â"€â"€â"€ Build Grok prompt â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
-function buildPrompt(ctx, keyword, rawReviews, reviewEvidenceText = '') {
+function buildPrompt(ctx, keyword, rawReviews, reviewEvidenceText = '', marketingAssetsText = '') {
   const s = ctx.summary;
   const positiveReviewSample = (rawReviews?.positive || []).slice(0, 60)
     .map(r => `[★${r.rating}] "${r.title || ''}" — ${(r.body || '').slice(0, 800)}`).join('\n');
@@ -355,7 +360,11 @@ ${positiveReviewSample || 'No positive reviews found in the database for this ca
 ### Raw Customer Reviews — CRITICAL (Pain Points)
 ${criticalReviewSample || 'No critical reviews found in the database for this category.'}
 `}
-### Price Range Distribution
+${marketingAssetsText ? `### Marketing Assets — what competitors actually SHOW (vision read of listing gallery + A+ images, counted per product)
+Messages are what the images say, not the bullets. "Experienced vs claimed" joins each claimed benefit with the customer review themes above: EXPERIENCED = a praise theme backs it, CLAIMED ONLY = claiming products have reviews but none mention it, CONTRADICTED = complaints outnumber praise. Treat CLAIMED ONLY and CONTRADICTED benefits as positioning risks or openings, never as proven consumer value.
+${marketingAssetsText}
+
+` : ''}### Price Range Distribution
 <$15: ${ctx.priceRanges.under15} | $15-20: ${ctx.priceRanges['15to20']} | $20-25: ${ctx.priceRanges['20to25']} | $25-30: ${ctx.priceRanges['25to30']} | >$30: ${ctx.priceRanges.over30}
 
 ### Price Positioning Tiers
@@ -548,8 +557,13 @@ async function run() {
     console.log(`  ${rawReviews.positive.length} positive / ${rawReviews.critical.length} critical reviews loaded\n`);
   }
 
+  // P7b marketing assets (fail-open: no row → '' → prompt unchanged)
+  const marketingAssets = await fetchCategoryMarketingAssets(DASH, { keyword: KEYWORD, categoryId: CAT_ID });
+  const marketingAssetsText = formatMarketingAssetsForPrompt(marketingAssets);
+  if (marketingAssetsText) console.log(`Using P7b marketing assets: ${marketingAssets.rollup.products_analyzed} products read by vision (${marketingAssets.status})\n`);
+
   // Build prompt
-  const prompt = buildPrompt(ctx, KEYWORD, rawReviews, reviewInput.evidenceText);
+  const prompt = buildPrompt(ctx, KEYWORD, rawReviews, reviewInput.evidenceText, marketingAssetsText);
   console.log(`Calling ${ANALYSIS_MODEL} via OpenRouter... prompt: ${Math.round(prompt.length / 1000)}k chars`);
   const startTime = Date.now();
   const report = await callGrok(prompt, 64000);

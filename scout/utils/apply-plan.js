@@ -27,7 +27,13 @@ function applyScopePlan(phase, plan, { mode = 'honor', keyword, runScript, env =
   const syncOnly = d.decision === 'reuse' && d.source === 'family' && d.syncScripts?.length;
   const note = `READ-FIRST plan: ${syncOnly ? 'reuse from sibling sessions — sync only' : d.decision} — ${d.reason}`;
   if (!syncOnly && !Object.keys(vars).length) return { phase, note };
-  const inner = syncOnly ? async () => { for (const s of d.syncScripts) await runScript(s, [keyword]); } : phase.run;
+  const inner = syncOnly
+    ? async () => {
+      for (const s of d.syncScripts) await runScript(s, [keyword]);
+      // P5b rides after a sync-only P5 (safeguard: the plan never family-reuses P5 today).
+      if (phase.num === 5) await runScript('phase5b-web-research.js', ['--keyword', keyword]);
+    }
+    : phase.run;
   return {
     note,
     env: vars,

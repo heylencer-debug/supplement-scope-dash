@@ -9,6 +9,7 @@
 
 require('dotenv').config();
 const fetch = require('node-fetch');
+const { extractKeepaSignals, reviewCountHistory } = require('./utils/keepa-signals');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
@@ -153,6 +154,11 @@ function parseKeepa(product) {
   const buyboxSeller = stats.buyBoxSellerId || null;
   const fulfillment = stats.buyBoxIsFBA ? 'FBA' : stats.buyBoxIsAmazon ? 'Amazon' : 'FBM';
 
+  // Variation family, promotions and review history (2026-09-26) — the
+  // inputs competitor selection needs (select-competitors.js). Columns come
+  // from migration 011; saveKeepa() drops them if it is not applied yet.
+  const signals = extractKeepaSignals(p);
+
   return {
     asin:              p.asin,
     title:             p.title || null,
@@ -179,7 +185,11 @@ function parseKeepa(product) {
     bsr_drops_90d:     bsrDrops90 || null,
     monthly_sales_est: monthlySalesEst,
     rating:            p.stats?.avg30?.[16] ? p.stats.avg30[16] / 10 : null,
-    review_count:      p.stats?.current?.[16] || null,
+    // 2026-09-26: index 17 is COUNT_REVIEWS; index 16 (what this read
+    // before) is RATING ×10 — every stored review_count was the star rating
+    // (e.g. 47 for a 4.7★ listing with 106k reviews). Confirmed on 808 stored
+    // raw_json rows: stats.current[17] is populated on all of them.
+    review_count:      signals.review_count,
     buybox_seller:     buyboxSeller,
     fulfillment:       fulfillment,
     availability:      stats.buyBoxAvailabilityMessage || null,
@@ -188,12 +198,32 @@ function parseKeepa(product) {
     fbm_offers:        stats.offerCountFBM || null,
     is_sns_eligible:   p.isSNS || false,
     monthly_sold_history: p.monthlySoldHistory?.length ? p.monthlySoldHistory : null,
+    // ── migration 011 columns (see MIGRATION_011_KEYS) ──
+    parent_asin:          signals.parent_asin,
+    variation_asins:      signals.variation_asins,
+    // csv[17] (COUNT_REVIEWS history). Keepa's docs say requests with
+    // `offers=` (as fetchKeepa sends) include the RATING/COUNT_REVIEWS csv
+    // without the extra-token `rating=1` flag — NOT verified live (the stored
+    // raw_json strips csv). If this stays null on real runs, add `&rating=1`
+    // to fetchKeepa (up to +1 token per product).
+    review_count_history_90d: reviewCountHistory(csv, 90),
+    price_avg_90d:        signals.price_avg_90d,
+    coupon:               signals.coupon,
+    coupon_active:        signals.coupon_active,
+    lightning_deal_active: signals.lightning_deal_active,
+    sns_discount_pct:     signals.sns_discount_pct,
   };
 }
 
+// Columns added by scout/migrations/011_competitor_selection.sql. Until it is
+// applied, PostgREST rejects the whole upsert naming any of them (PGRST204),
+// so saveKeepa() retries once without them and stops sending them.
+const MIGRATION_011_KEYS = ['parent_asin', 'variation_asins', 'review_count_history_90d', 'price_avg_90d', 'coupon', 'coupon_active', 'lightning_deal_active', 'sns_discount_pct'];
+let _migration011Applied = true;
+
 // ── Save to dovive_keepa ──────────────────────────────────────
 async function saveKeepa(record) {
-  const res = await fetch(
+  const post = (body) => fetch(
     `${SUPABASE_URL}/rest/v1/dovive_keepa?on_conflict=asin`,
     {
       method: 'POST',
@@ -203,9 +233,21 @@ async function saveKeepa(record) {
         'Content-Type': 'application/json',
         Prefer: 'resolution=merge-duplicates,return=minimal',
       },
-      body: JSON.stringify({ ...record, parsed_at: new Date().toISOString() }),
+      body: JSON.stringify({ ...body, parsed_at: new Date().toISOString() }),
     }
   );
+  const withoutNew = () => { const r = { ...record }; for (const k of MIGRATION_011_KEYS) delete r[k]; return r; };
+  let res = await post(_migration011Applied ? record : withoutNew());
+  if (!res.ok && _migration011Applied) {
+    const text = await res.text();
+    if (/PGRST204|42703|Could not find the .* column|does not exist/i.test(text) && MIGRATION_011_KEYS.some((k) => text.includes(`'${k}'`) || text.includes(`.${k}`))) {
+      _migration011Applied = false;
+      console.warn('  ⚠ dovive_keepa migration 011 columns missing — saving without parent/variation/promo fields (apply scout/migrations/011_competitor_selection.sql)');
+      res = await post(withoutNew());
+    } else {
+      throw new Error(`Save failed: ${res.status} ${text}`);
+    }
+  }
   if (!res.ok) throw new Error(`Save failed: ${res.status} ${await res.text()}`);
 }
 
@@ -233,7 +275,10 @@ async function updateResearch(asin, keyword, parsed) {
     bsr:         parsed.bsr_current || undefined,
     images:      parsed.images?.length ? parsed.images : undefined,
     main_image:  parsed.images?.[0] || undefined,
-    review_count: parsed.review_count || undefined,
+    // review_count deliberately NOT copied (2026-09-26): it used to write
+    // the star rating ×10 over P1's scraped count (see parseKeepa), and even
+    // fixed, Keepa's per-ASIN count is not the count Amazon shows on the
+    // page — P1's figure is what shared-review detection compares.
     rating:      parsed.rating || undefined,
   };
   // Remove undefined keys

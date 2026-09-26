@@ -25,6 +25,8 @@ const brightData = require('./bright-data-amazon');
 const { createClient } = require('@supabase/supabase-js');
 const { resolveCategory } = require('./utils/category-resolver');
 const { reportProgress } = require('./utils/job-heartbeat');
+const { buildQueryVariants } = require('./utils/query-variants');
+const { buildCandidatePool, selectionSignalsFor } = require('./utils/serp-pool');
 
 const SUPABASE_URL  = process.env.SUPABASE_URL;
 const SUPABASE_KEY  = process.env.SUPABASE_KEY;
@@ -42,7 +44,30 @@ const SEARCH_KEYWORD = KEYWORD_LABEL.replace(/\s*#\d+\s*$/, '');
 // validation run). Both paths now share one constant so a run's product
 // count reflects the product's actual "top N by search rank" intent,
 // not an accident of how many organic results Amazon happened to render.
-const P1_PRODUCT_CAP = 40;
+//
+// 2026-09-26 (competitor selection): P1 no longer picks the competitors — it
+// builds the CANDIDATE POOL. It runs several searches per keyword
+// (utils/query-variants.js: the base keyword, "best …", the audience and
+// sugar-free splits — ≤5, no per-category lists), unions them with
+// reciprocal-rank fusion (utils/serp-pool.js), never admits a sponsored
+// placement, and keeps ~80 candidates. The 40 established competitors are
+// chosen AFTER Keepa, once sales, variations and promotions are known
+// (select-competitors.js, run from migrate-keepa-to-dash.js).
+// Why 80, not 60 (dry-run simulation on real categories, 2026-09-26): about
+// a third of listings fold into variation/product-line families, so a
+// 60-ASIN pool left 39–41 eligible families — electrolyte powder #3 selected
+// only 38 — while 80 left 55–56 (≈15 to spare). Cost: P1 page loads go
+// ~44 → ~88 per run (homepage + 3 base + 4 variant SERP pages + 80 detail
+// pages) and Keepa tokens ~2× (offers=20 is the expensive part of each ASIN).
+// The base search's top 40 always get a slot (utils/serp-pool.js).
+const P1_POOL_SIZE = parseInt(process.env.P1_POOL_SIZE || '80', 10);
+const P1_MAX_QUERIES = parseInt(process.env.P1_MAX_QUERIES || '5', 10);
+const P1_BASE_PAGES = 3;
+// Variant searches read page 1 only: the "best …"/audience phrasings matter
+// for what they rank FIRST, and each extra page is another 5–8 s of
+// human-paced browsing (or another Bright Data search record batch).
+const P1_VARIANT_PAGES = parseInt(process.env.P1_VARIANT_PAGES || '1', 10);
+const SEARCH_QUERIES = buildQueryVariants(KEYWORD_LABEL, { maxQueries: P1_MAX_QUERIES });
 
 // ── DASH live sync ────────────────────────────────────────────
 const DASH_URL = process.env.DASH_URL || SUPABASE_URL;
@@ -263,9 +288,16 @@ async function getAlreadyScraped(keyword) {
 }
 
 // ── Upsert to Supabase ────────────────────────────────────────
+// dovive_research.selection_signals comes from migration 011. Until it is
+// applied PostgREST rejects any upsert naming it (PGRST204) — retry once
+// without it and stop sending it, so P1 never fails on a missing column.
+let _selectionSignalsColumn = true;
+const stripSignals = (rows) => rows.map(({ selection_signals, ...rest }) => rest);
+const isMissingSignalsColumn = (text) => /selection_signals/.test(text) && /PGRST204|42703|Could not find|does not exist/i.test(text);
+
 async function upsertProducts(products) {
   if (!products.length) return;
-  const res = await fetch(
+  const post = (rows) => fetch(
     `${SUPABASE_URL}/rest/v1/dovive_research?on_conflict=asin,keyword`,
     {
       method: 'POST',
@@ -275,10 +307,21 @@ async function upsertProducts(products) {
         'Content-Type': 'application/json',
         Prefer: 'resolution=merge-duplicates,return=minimal',
       },
-      body: JSON.stringify(products),
+      body: JSON.stringify(rows),
     }
   );
-  if (!res.ok) throw new Error(`Upsert failed: ${res.status} ${await res.text()}`);
+  let res = await post(_selectionSignalsColumn ? products : stripSignals(products));
+  if (!res.ok) {
+    const text = await res.text();
+    if (_selectionSignalsColumn && isMissingSignalsColumn(text)) {
+      _selectionSignalsColumn = false;
+      console.warn('  ⚠ dovive_research.selection_signals missing — saving without search provenance (apply scout/migrations/011_competitor_selection.sql)');
+      res = await post(stripSignals(products));
+      if (!res.ok) throw new Error(`Upsert failed: ${res.status} ${await res.text()}`);
+    } else {
+      throw new Error(`Upsert failed: ${res.status} ${text}`);
+    }
+  }
 
   const historyRows = products.map(p => ({
     asin: p.asin, keyword: p.keyword, title: p.title, brand: p.brand,
@@ -295,6 +338,28 @@ async function upsertProducts(products) {
     body: JSON.stringify(historyRows),
   });
   if (!res2.ok) console.warn(`History insert warning: ${res2.status}`);
+}
+
+// Pool members already scraped under this keyword (a resumed run) still get
+// THIS run's search provenance, so selection can see which searches found them.
+async function patchSelectionSignals(items) {
+  if (!_selectionSignalsColumn || !items.length) return;
+  for (const it of items) {
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/dovive_research?asin=eq.${it.asin}&keyword=eq.${encodeURIComponent(KEYWORD_LABEL)}`,
+        {
+          method: 'PATCH',
+          headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+          body: JSON.stringify({ selection_signals: selectionSignalsFor(it), is_sponsored: false }),
+        }
+      );
+      if (!res.ok) {
+        const text = await res.text();
+        if (isMissingSignalsColumn(text)) { _selectionSignalsColumn = false; return; }
+      }
+    } catch (_) { /* provenance refresh is best-effort */ }
+  }
 }
 
 // ── Scrape a product detail page with retry ───────────────────
@@ -394,35 +459,65 @@ async function runBrightDataFallback(alreadyScraped) {
   console.log('\n🛰️  Bright Data fallback engaged (BRIGHTDATA_API_KEY/BRIGHTDATA present)...');
   await ensureKeyword(KEYWORD_LABEL); // dovive_keywords — same call as the Playwright path
 
-  const products = await brightData.searchAmazonByKeyword(SEARCH_KEYWORD, { limit: P1_PRODUCT_CAP, pages: 3 });
-  console.log(`  ✓ Bright Data returned ${products.length} products for "${KEYWORD_LABEL}"`);
+  // Same query set + pool rules as the Playwright path: search each phrasing
+  // (discovery only), union, drop sponsored-only, keep ~P1_POOL_SIZE, then
+  // hydrate just the pool. The base search must succeed; a failed variant
+  // search is logged and skipped.
+  const searches = [];
+  for (let qi = 0; qi < SEARCH_QUERIES.length; qi++) {
+    const query = SEARCH_QUERIES[qi];
+    try {
+      const found = await brightData.discoverAsinsByKeyword(query, { pages: qi === 0 ? P1_BASE_PAGES : P1_VARIANT_PAGES });
+      searches.push({ query, items: found.map((d) => ({ asin: d.asin, title: d.title, position: d.position, sponsored: d.sponsored })) });
+    } catch (err) {
+      if (qi === 0) throw err;
+      console.warn(`  ⚠ Bright Data search "${query}" failed (${err.message?.slice(0, 120)}) — continuing with the other searches`);
+    }
+  }
+  const { pool, sponsoredOnly, totalUnique } = buildCandidatePool(searches, { poolSize: P1_POOL_SIZE, baseQuery: SEARCH_QUERIES[0] });
+  console.log(`  ✓ ${searches.length} search(es) → ${totalUnique} organic ASINs (${sponsoredOnly.length} sponsored-only dropped) → pool of ${pool.length}`);
 
-  const toScrape = products.filter(p => p.asin && !alreadyScraped.has(p.asin));
-  const skipped = products.length - toScrape.length;
-  console.log(`  ${toScrape.length} to save | ${skipped} already in DB`);
+  const toHydrate = pool.filter(c => !alreadyScraped.has(c.asin));
+  const skipped = pool.length - toHydrate.length;
+  await patchSelectionSignals(pool.filter(c => alreadyScraped.has(c.asin)));
+  console.log(`  ${toHydrate.length} to save | ${skipped} already in DB`);
+  if (!toHydrate.length) {
+    console.log(`\n✅ Bright Data fallback done. Nothing new to save. (${skipped} skipped — already in DB)`);
+    return;
+  }
+
+  const products = await brightData.hydrateAsins(toHydrate.map(c => c.asin));
+  if (!products.length) throw new Error(`Bright Data returned no usable products for ${toHydrate.length} pool ASINs`);
+  const candByAsin = new Map(toHydrate.map(c => [c.asin, c]));
 
   let saved = 0;
-  for (let i = 0; i < toScrape.length; i++) {
-    const p = toScrape[i];
+  for (let i = 0; i < products.length; i++) {
+    const p = products[i];
+    const c = candByAsin.get(p.asin);
+    if (!c) continue;
+    const rank = c.base_position ?? c.best_position;
     const record = {
       asin:          p.asin,
       keyword:       KEYWORD_LABEL,
-      title:         p.title || '',
+      title:         p.title || c.title || '',
       brand:         p.brand || null,
       description:   null,
       bullet_points: p.bullet_points,
       specs:         p.specs,
       images:        p.images,
       main_image:    p.main_image,
-      bsr:           p.bsRank || p.searchRank || null,
-      rank_position: p.searchRank || null,
+      bsr:           p.bsRank || rank || null,
+      rank_position: rank || null,
       rating:        p.rating,
       review_count:  p.review_count,
       price:         p.price,
       category:      p.category || null,
-      is_sponsored:  !!p.sponsored,
+      // Pool members surfaced organically in at least one search by
+      // construction (serp-pool drops sponsored-only ASINs).
+      is_sponsored:  false,
       source:        'bright-data-fallback-v1',
       raw_json:      p.raw || null,
+      selection_signals: selectionSignalsFor(c),
       scraped_at:    new Date().toISOString(),
     };
     try {
@@ -436,10 +531,101 @@ async function runBrightDataFallback(alreadyScraped) {
 
     // Mid-phase heartbeat (throttled internally to ~10 products/60s) — see
     // scout/utils/job-heartbeat.js. Fail-open, never blocks the fallback.
-    await reportProgress(i + 1, toScrape.length);
+    await reportProgress(i + 1, products.length);
   }
 
-  console.log(`\n✅ Bright Data fallback done. ${saved}/${toScrape.length} new products saved. (${skipped} skipped — already in DB)`);
+  console.log(`\n✅ Bright Data fallback done. ${saved}/${toHydrate.length} new products saved. (${skipped} skipped — already in DB)`);
+}
+
+// ── One Amazon search: type the query, scan up to `maxPages` result pages ──
+// Returns [{ asin, title, position, sponsored }]. Sponsored cards are
+// RECORDED (flagged) rather than skipped, so utils/serp-pool.js can tell a
+// sponsored-only ASIN from one that is an ad in one search and organic in
+// another; they never become candidates either way.
+const SEARCH_BOX_SELECTORS = ['#twotabsearchtextbox', '#nav-search-bar-form input[type="text"]', 'input[name="field-keywords"]'];
+
+async function findSearchBox(page) {
+  for (const sel of SEARCH_BOX_SELECTORS) {
+    const el = await page.$(sel);
+    if (el) return { el, sel };
+  }
+  return null;
+}
+
+async function searchAndCollect(page, context, query, maxPages, keywordTokens) {
+  const box = await findSearchBox(page);
+  if (!box) throw new Error('Search box not found');
+  console.log(`\n→ Searching for "${query}" (up to ${maxPages} page${maxPages === 1 ? '' : 's'})...`);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await sleep(rand(500, 1000));
+  await box.el.scrollIntoViewIfNeeded();
+  await sleep(rand(500, 800));
+  await page.fill(box.sel, '');
+  await page.type(box.sel, query, { delay: rand(60, 130) });
+  await sleep(rand(700, 1200));
+  await page.keyboard.press('Enter');
+  await sleep(rand(4000, 6000));
+  await saveCookies(context);
+  console.log('  Search results:', await page.title());
+
+  const collected = [];
+  for (let pageNum = 1; pageNum <= maxPages; pageNum++) {
+    console.log(`\n→ Scanning page ${pageNum} of "${query}"...`);
+    await humanScroll(page);
+
+    const pageItems = await page.evaluate(({ pNum, tokens }) => {
+      const results = [];
+      const cards = document.querySelectorAll('[data-component-type="s-search-result"]');
+      cards.forEach((card, i) => {
+        const asin = card.getAttribute('data-asin');
+        if (!asin) return;
+        const sponsored = !!card.querySelector('.puis-sponsored-label-text, [aria-label="Sponsored"]');
+        const titleEl = card.querySelector('h2 span, h2 a span');
+        const title = titleEl?.textContent?.trim() || '';
+        const t = title.toLowerCase();
+        if (tokens.length === 0 || tokens.some(w => t.includes(w))) {
+          results.push({ asin, title, position: (pNum - 1) * 48 + i + 1, sponsored });
+        }
+      });
+      return results;
+    }, { pNum: pageNum, tokens: keywordTokens });
+
+    const organic = pageItems.filter(p => !p.sponsored);
+    console.log(`  Found ${organic.length} relevant organic (+${pageItems.length - organic.length} sponsored) on page ${pageNum}`);
+    organic.forEach(p => console.log(`    [${p.asin}] ${p.title.slice(0, 70)}`));
+    collected.push(...pageItems);
+
+    if (pageNum < maxPages) {
+      // Scroll to bottom first to reveal the Next button
+      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+      await sleep(rand(1500, 2500));
+
+      const nextBtn = await page.$('.s-pagination-next:not(.s-pagination-disabled)');
+      if (!nextBtn) { console.log('  No more pages.'); break; }
+
+      // Scroll Next button into view and click it naturally
+      await nextBtn.scrollIntoViewIfNeeded();
+      await sleep(rand(800, 1500));
+      await nextBtn.click();
+
+      // Wait for new page to fully load
+      await page.waitForLoadState('domcontentloaded');
+      await sleep(rand(5000, 8000));
+
+      // Verify we actually got a new results page
+      const newTitle = await page.title();
+      const newCards = await page.evaluate(() =>
+        document.querySelectorAll('[data-component-type="s-search-result"]').length
+      );
+      console.log(`  → Page ${pageNum + 1} loaded: "${newTitle}" | ${newCards} cards`);
+
+      if (newCards === 0) {
+        console.log('  → No results on next page — stopping pagination.');
+        break;
+      }
+    }
+  }
+  return collected;
 }
 
 // ── Playwright gather attempt (homepage → search → collect ASINs) ──
@@ -502,119 +688,44 @@ async function attemptPlaywrightGather(attemptNum, alreadyScraped) {
     await sleep(rand(1500, 3000));
     console.log('  Homepage loaded:', await page.title());
 
-    // Find search box
-    const searchSelectors = ['#twotabsearchtextbox', '#nav-search-bar-form input[type="text"]', 'input[name="field-keywords"]'];
-    let searchBox = null;
-    for (const sel of searchSelectors) {
-      searchBox = await page.$(sel);
-      if (searchBox) { console.log('  Found search box via:', sel); break; }
-    }
-    if (!searchBox) throw new Error('Search box not found');
+    // The search box is (re)located per query inside searchAndCollect().
+    if (!(await findSearchBox(page))) throw new Error('Search box not found');
 
-    // ── Step 2: Search ────────────────────────────────────────────
-    console.log(`\n→ Searching for "${SEARCH_KEYWORD}"...`);
-    await page.evaluate(() => window.scrollTo(0, 0));
-    await sleep(rand(500, 1000));
-    await searchBox.scrollIntoViewIfNeeded();
-    await sleep(rand(500, 800));
-    await page.fill('#twotabsearchtextbox', '');
-    await page.type('#twotabsearchtextbox', SEARCH_KEYWORD, { delay: rand(60, 130) });
-    await sleep(rand(700, 1200));
-    await page.keyboard.press('Enter');
-    await sleep(rand(4000, 6000));
-    await saveCookies(context);
-
-    console.log('  Search results:', await page.title());
-
-    // ── Step 3: Collect ASINs across pages ───────────────────────
-    const allGummies = [];
-
-    for (let pageNum = 1; pageNum <= 3; pageNum++) {
-      console.log(`\n→ Scanning page ${pageNum}...`);
-      await humanScroll(page);
-
-      // Keyword-aware relevance filter (2026-08-28): the collector previously
-      // hardcoded /gumm/i — a leftover from the pipeline's gummies-only origin
-      // that silently discarded EVERY product for non-gummy keywords (e.g.
-      // "hydration powder" → 0 gathered → phases starved). Now: keep a result
-      // if its title contains ANY significant word (>3 chars) of the keyword.
-      // For "ashwagandha gummies" this behaves like before; for any other
-      // category it generalizes. Amazon's own relevance ranking does the rest.
-      const keywordTokens = KEYWORD_LABEL.toLowerCase().split(/\s+/).filter(w => w.length > 3);
-      const pageItems = await page.evaluate(({ pNum, tokens }) => {
-        const results = [];
-        const cards = document.querySelectorAll('[data-component-type="s-search-result"]');
-        cards.forEach((card, i) => {
-          if (card.querySelector('.puis-sponsored-label-text, [aria-label="Sponsored"]')) return;
-          const asin = card.getAttribute('data-asin');
-          if (!asin) return;
-          const titleEl = card.querySelector('h2 span, h2 a span');
-          const title = titleEl?.textContent?.trim() || '';
-          const t = title.toLowerCase();
-          if (tokens.length === 0 || tokens.some(w => t.includes(w))) {
-            results.push({ asin, title, rank: (pNum - 1) * 48 + i + 1 });
-          }
-        });
-        return results;
-      }, { pNum: pageNum, tokens: keywordTokens });
-
-      console.log(`  Found ${pageItems.length} gummies on page ${pageNum}`);
-      pageItems.forEach(p => console.log(`    [${p.asin}] ${p.title.slice(0, 70)}`));
-      allGummies.push(...pageItems);
-
-      if (pageNum < 3) {
-        // Scroll to bottom first to reveal the Next button
-        await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-        await sleep(rand(1500, 2500));
-
-        const nextBtn = await page.$('.s-pagination-next:not(.s-pagination-disabled)');
-        if (!nextBtn) { console.log('  No more pages.'); break; }
-
-        // Scroll Next button into view and click it naturally
-        await nextBtn.scrollIntoViewIfNeeded();
-        await sleep(rand(800, 1500));
-        await nextBtn.click();
-
-        // Wait for new page to fully load
-        await page.waitForLoadState('domcontentloaded');
-        await sleep(rand(5000, 8000));
-
-        // Verify we actually got a new results page
-        const newTitle = await page.title();
-        const newCards = await page.evaluate(() =>
-          document.querySelectorAll('[data-component-type="s-search-result"]').length
-        );
-        console.log(`  → Page ${pageNum + 1} loaded: "${newTitle}" | ${newCards} cards`);
-
-        if (newCards === 0) {
-          console.log('  → No results on next page — stopping pagination.');
-          break;
-        }
+    // ── Step 2+3: run every query, collect organic + sponsored placements ──
+    // The base query reads P1_BASE_PAGES pages (unchanged behaviour); each
+    // variant reads P1_VARIANT_PAGES. Relevance filter (2026-08-28): keep a
+    // result if its title contains ANY significant word (>3 chars) of the
+    // BASE keyword — the variants' extra words ("best", "women") must not
+    // widen what counts as on-topic.
+    const keywordTokens = KEYWORD_LABEL.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+    const searches = [];
+    for (let qi = 0; qi < SEARCH_QUERIES.length; qi++) {
+      const query = SEARCH_QUERIES[qi];
+      try {
+        const items = await searchAndCollect(page, context, query, qi === 0 ? P1_BASE_PAGES : P1_VARIANT_PAGES, keywordTokens);
+        searches.push({ query, items });
+      } catch (err) {
+        if (qi === 0) throw err; // the base search failing is a failed attempt, as before
+        console.warn(`  ⚠ Search "${query}" failed (${err.message?.slice(0, 120)}) — continuing with the other searches`);
       }
+      if (qi < SEARCH_QUERIES.length - 1) await sleep(rand(2500, 5000));
     }
 
-    // Deduplicate
-    const seenAsins = new Set();
-    const dedupedGummies = allGummies.filter(p => {
-      if (seenAsins.has(p.asin)) return false;
-      seenAsins.add(p.asin); return true;
-    });
-
-    // Cap to the TOP N by SERP rank (2026-09-01 fix — see P1_PRODUCT_CAP
-    // above). `rank` was already computed per-card during collection
-    // ((pNum-1)*48 + i + 1), so this is a true top-N-by-search-relevance
-    // slice, not an arbitrary truncation — consistent with the Bright Data
-    // fallback's `limit: 40`.
-    const uniqueGummies = dedupedGummies
-      .slice()
-      .sort((a, b) => a.rank - b.rank)
-      .slice(0, P1_PRODUCT_CAP);
+    // Union the searches into one candidate pool (utils/serp-pool.js):
+    // sponsored-only ASINs are never candidates, ordering is reciprocal-rank
+    // fusion across searches, cut to P1_POOL_SIZE (~80). `rank` keeps its old
+    // meaning — the SERP position, now for the base query when the ASIN
+    // appeared there (else its best position in any query).
+    const { pool, sponsoredOnly, totalUnique } = buildCandidatePool(searches, { poolSize: P1_POOL_SIZE, baseQuery: SEARCH_QUERIES[0] });
+    const uniqueGummies = pool.map(c => ({ asin: c.asin, title: c.title, rank: c.base_position ?? c.best_position, candidate: c }));
+    console.log(`\n  ${searches.length}/${SEARCH_QUERIES.length} searches ok · ${sponsoredOnly.length} sponsored-only ASINs dropped`);
 
     // Filter out already-scraped
     const toScrape = uniqueGummies.filter(p => !alreadyScraped.has(p.asin));
     const skipped  = uniqueGummies.length - toScrape.length;
 
-    console.log(`\nTotal products: ${dedupedGummies.length} unique found | capped to top ${uniqueGummies.length} by rank | ${skipped} already in DB | ${toScrape.length} to scrape`);
+    console.log(`\nTotal products: ${totalUnique} unique organic found | pooled to top ${uniqueGummies.length} by fused rank | ${skipped} already in DB | ${toScrape.length} to scrape`);
+    await patchSelectionSignals(uniqueGummies.filter(p => alreadyScraped.has(p.asin)).map(p => p.candidate));
 
     // Zero-gathered guard (2026-08-28): if the search "succeeded" but yielded
     // NOTHING new and NOTHING was already in the DB, treat it as a FAILED
@@ -670,6 +781,8 @@ async function runDetailScrapeAndSave(context, toScrape, skipped) {
       rating:        detail.rating || null,
       review_count:  detail.reviewCount || null,
       price:         priceNum,
+      is_sponsored:  false, // pool members are organic by construction (utils/serp-pool.js)
+      selection_signals: item.candidate ? selectionSignalsFor(item.candidate) : undefined,
       source:        'human-bsr-v4',
       scraped_at:    new Date().toISOString(),
     };

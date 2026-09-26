@@ -39,6 +39,7 @@ import { useBulkSupplementAnalysis } from "@/hooks/useBulkSupplementAnalysis";
 import { BulkAnalysisProgress } from "@/components/BulkAnalysisProgress";
 import ProductDetailModal from "@/components/ProductDetailModal";
 import BenchmarkComparison from "@/components/dashboard/BenchmarkComparison";
+import { SelectionBadges } from "@/components/dashboard/SelectionBadges";
 import ProductAnalysisPanel from "@/components/product/ProductAnalysisPanel";
 import { toast } from "@/hooks/use-toast";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -631,6 +632,7 @@ export default function ProductExplorer() {
                             <div className="max-w-md">
                               <p className="font-medium text-foreground truncate">{product.title ?? "Untitled"}</p>
                               <p className="text-sm text-muted-foreground">{product.brand ?? "Unknown Brand"}</p>
+                              <SelectionBadges product={product} />
                             </div>
                           </TableCell>
                           <TableCell className="text-right font-medium">

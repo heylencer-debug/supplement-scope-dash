@@ -20,6 +20,7 @@ const { withUsageTracking, recordAiUsage } = require('./utils/ai-usage');
 const { resolveCategory } = require('./utils/category-resolver');
 const { reportProgress } = require('./utils/job-heartbeat');
 const { reuseAsinsFromEnv, rescrapeAsinsFromEnv } = require('./utils/reuse-asins');
+const { loadSelection, applySelection } = require('./utils/selected-competitors');
 
 // Support both: node phase4-text-extract.js "keyword" AND node phase4-text-extract.js --keyword "keyword"
 const _kwIdx = process.argv.indexOf('--keyword');
@@ -218,7 +219,13 @@ async function main() {
   // ASIN, so migrate-ocr-to-dash.js picks them up without re-extraction).
   const reuseAsins = reuseAsinsFromEnv();
   if (reuseAsins.size) console.log(`READ-FIRST plan: ${reuseAsins.size} ASINs already have facts in a sibling session — skipped`);
-  const toProcess = products.filter(p => !alreadyDone.has(p.asin) && !reuseAsins.has(p.asin));
+  // Competitor selection (2026-09-26, migration 011): extract formulas for
+  // the selected competitors only, in selection_rank order; inactive
+  // selection → every product, BSR order, exactly as before. The READ-FIRST
+  // reuse/rescrape lists then apply within that set.
+  const selection = await loadSelection(sb, _categoryId);
+  if (!selection.active) console.log(`   Competitor selection inactive (${selection.why}) — processing all products`);
+  const toProcess = applySelection(products, selection).filter(p => !alreadyDone.has(p.asin) && !reuseAsins.has(p.asin));
 
   const list = TEST_MODE ? toProcess.slice(0, 1) : LIMIT ? toProcess.slice(0, LIMIT) : toProcess;
 

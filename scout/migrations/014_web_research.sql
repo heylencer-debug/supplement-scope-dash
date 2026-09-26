@@ -28,8 +28,10 @@ CREATE TABLE IF NOT EXISTS dovive_web_research (
   -- duplicate_of / duplicate_kind / similarity, extraction (verbatim-quoted
   -- items), a 600-char excerpt. No full page text is stored.
   sources         JSONB NOT NULL DEFAULT '[]'::jsonb,
-  -- The executed search plan with its results (resume: successful queries
-  -- are not re-sent).
+  -- The executed search plan with its results, searched_at /
+  -- last_attempt_at / failed_attempts per query (resume: a success inside
+  -- P5B_FRESH_DAYS is reused; twice-failed waits P5B_RETRY_AFTER_DAYS).
+  -- sources[] carry extracted_at / extraction_failed_attempts likewise.
   search_runs     JSONB NOT NULL DEFAULT '[]'::jsonb,
   -- ingredient_claims / comparison_criteria / strengths / weaknesses: label,
   -- independent_sources, brand_owned_sources, affiliate_sources,
@@ -39,8 +41,10 @@ CREATE TABLE IF NOT EXISTS dovive_web_research (
   -- products_discussed.
   rollup          JSONB NOT NULL DEFAULT '{}'::jsonb,
   -- Claim checks: kind (registry | literature), registry / ingredient,
-  -- lookup or PubMed URLs, status supported | not_found | not_checked,
-  -- evidence_url. 'supported' only after a fetched hit (P5B_VERIFY=1).
+  -- lookup or PubMed URLs, status supported | not_found | not_checked |
+  -- registry_unavailable, evidence_url. 'supported' only after a fetched hit
+  -- (P5B_VERIFY=1); a registry page that did not return its listing format
+  -- is 'registry_unavailable', never 'not_found'.
   verification    JSONB NOT NULL DEFAULT '[]'::jsonb,
   status          TEXT NOT NULL DEFAULT 'complete'
                   CHECK (status IN ('complete', 'partial', 'no_model')),

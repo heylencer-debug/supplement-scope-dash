@@ -37,6 +37,11 @@ export interface WebLedger {
   fetched?: number;
   fetch_failed?: number;
   robots_disallowed?: number;
+  blocked?: number;
+  browser_fetches?: number;
+  extraction_deferred?: number;
+  searches_deferred?: number;
+  partial_reasons?: string[];
   classified?: number;
   extracted?: number;
   extraction_failed?: number;
@@ -61,7 +66,7 @@ export interface WebSource {
   snippet?: string | null;
   intent?: string;
   found_by?: string[];
-  fetch_status?: "fetched" | "failed" | "robots_disallowed" | "skipped" | "not_fetched" | "pending";
+  fetch_status?: "fetched" | "failed" | "blocked" | "robots_disallowed" | "skipped" | "not_fetched" | "pending";
   skip_reason?: string;
   fetch_error?: string;
   page_type?: PageType;
@@ -99,7 +104,7 @@ export interface WebRollup {
   strengths?: RollupRow[];
   weaknesses?: RollupRow[];
   pricing?: { product: string | null; observations: { price_text: string; url: string; domain: string; ownership: Ownership; quote: string }[] }[];
-  products_discussed?: { brand: string | null; product: string | null; asin: string | null; independent_sources: number; brand_owned_sources: number; affiliate_sources: number; total_sources: number }[];
+  products_discussed?: { brand: string | null; product: string | null; asin: string | null; asin_source?: "page" | "brand_match" | null; independent_sources: number; brand_owned_sources: number; affiliate_sources: number; total_sources: number }[];
 }
 
 export interface VerificationTarget {
@@ -108,7 +113,7 @@ export interface VerificationTarget {
   registry?: string | null;
   brand?: string | null;
   ingredient?: string | null;
-  status: "supported" | "not_found" | "not_checked";
+  status: "supported" | "not_found" | "not_checked" | "registry_unavailable";
   evidence_url?: string | null;
   note?: string;
   lookups?: { registry: string; url: string; checkable: boolean }[];

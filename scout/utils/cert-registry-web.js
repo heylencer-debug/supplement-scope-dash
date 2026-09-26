@@ -11,7 +11,10 @@
  *
  * Honesty rule: a target is 'supported' ONLY when a fetched page/API response
  * contains a hit. Anything not fetched is 'not_checked'; a fetched miss is
- * 'not_found'. Registries whose listing pages are not server-rendered (or
+ * 'not_found'; a registry page that did not return its listing format (error
+ * page, redesign) is 'registry_unavailable' — never 'not_found'. A literature
+ * search is only ever run with an OUTCOME term (ingredient alone proves
+ * nothing), and negated claims ("no studies show…") are not targets. Registries whose listing pages are not server-rendered (or
  * whose URL scheme we have not confirmed) are never fetched — they carry a
  * human lookup URL and stay 'not_checked'.
  */
@@ -43,12 +46,27 @@ const CLAIM_PATTERNS = [
   { re: /\b(studies|research|trials?) (show|shows|showed|suggest|suggests|found|find|have shown|demonstrate[sd]?)\b|\bbacked by (science|research|studies)\b|\b(randomi[sz]ed|placebo[- ]controlled|double[- ]blind)\b/i, kind: 'literature', claim_type: 'studied' },
 ];
 
-/** Which verification kinds does a claim sentence call for? (may be several) */
+const STATUSES = ['supported', 'not_found', 'not_checked', 'registry_unavailable'];
+
+// "no studies show", "not clinically proven", "isn't third-party tested", "lack of research"
+const NEGATED = /\b(no|not|never|isn'?t|aren'?t|wasn'?t|without|lacks?|lacking|zero|unproven|few|little)\b[^.!?]{0,20}$/i;
+
+/** First match of `re` in `text` that is not negated by the few words before it. */
+function unnegatedMatch(re, text) {
+  const g = new RegExp(re.source, re.flags.includes('g') ? re.flags : `${re.flags}g`);
+  let m;
+  while ((m = g.exec(text))) {
+    if (!NEGATED.test(text.slice(Math.max(0, m.index - 30), m.index))) return m;
+  }
+  return null;
+}
+
+/** Which verification kinds does a claim sentence call for? (may be several; negated claims excluded) */
 function detectVerifiableClaim(text) {
   const out = [];
   const seen = new Set();
   for (const p of CLAIM_PATTERNS) {
-    const m = p.re.exec(String(text || ''));
+    const m = unnegatedMatch(p.re, String(text || ''));
     if (!m) continue;
     const key = `${p.kind}:${p.registry || p.claim_type || 'any'}`;
     if (seen.has(key)) continue;
@@ -86,12 +104,15 @@ function outcomeTerms(claim, ingredient, max = 2) {
 
 /**
  * PubMed E-utilities esearch for "<ingredient> AND <outcome> AND (RCT OR clinical trial)".
- * Returns { api_url, human_url, term } or null when there is no ingredient.
+ * Returns { api_url, human_url, term, outcomes } or null when there is no
+ * ingredient OR no outcome term — a search on the ingredient alone would
+ * "support" any claim about it.
  */
 function pubmedSearch(ingredient, claim) {
   const ing = String(ingredient || '').trim();
   if (!ing) return null;
   const outcomes = outcomeTerms(claim, ing);
+  if (!outcomes.length) return null;
   const parts = [`"${ing}"[Title/Abstract]`, ...outcomes.map((o) => `${o}[Title/Abstract]`), '(randomized controlled trial[pt] OR clinical trial[pt])'];
   const term = parts.join(' AND ');
   return {
@@ -117,10 +138,12 @@ function parsePubmedResult(json) {
 function parseNsfListing(html, brand) {
   const text = String(html || '').replace(/<[^>]+>/g, ' ').replace(/&[a-z#0-9]+;/gi, ' ').replace(/\s+/g, ' ');
   const m = /Number of matching Products is\s+(\d+)/i.exec(text);
-  const products = m ? Number(m[1]) : 0;
+  // No listing counter → not the listing page we know (error page, redesign, block).
+  if (!m) return { available: false, products: 0, hit: false };
+  const products = Number(m[1]);
   const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
   const brandHit = !!brand && norm(text).includes(norm(brand));
-  return { products, hit: products > 0 && brandHit };
+  return { available: true, products, hit: products > 0 && brandHit };
 }
 
 /**
@@ -142,7 +165,10 @@ async function runVerification(targets, { fetchText, maxChecks = 20, log = () =>
   const out = [];
   for (const t of targets) {
     const r = { ...t };
-    if (t.kind === 'literature' && t.pubmed && checks < maxChecks) {
+    if (t.kind === 'literature' && (!t.pubmed || !(t.pubmed.outcomes || []).length)) {
+      r.status = 'not_checked';
+      r.note = t.ingredient ? 'No outcome to search — an ingredient-only search proves nothing.' : 'No ingredient named — nothing to search.';
+    } else if (t.kind === 'literature' && checks < maxChecks) {
       const res = await get(t.pubmed.api_url);
       if (!res.ok) { r.status = 'not_checked'; r.note = `PubMed request failed (${res.status || res.error || 'error'})`; }
       else {
@@ -151,7 +177,10 @@ async function runVerification(targets, { fetchText, maxChecks = 20, log = () =>
         const { count, ids } = parsePubmedResult(json);
         r.checked_at = new Date().toISOString();
         r.hits = count;
-        if (count > 0 && ids.length) {
+        if (!json || !json.esearchresult) {
+          r.status = 'not_checked';
+          r.note = 'PubMed returned no parseable result — nothing concluded.';
+        } else if (count > 0 && ids.length) {
           r.status = 'supported';
           r.evidence_url = `https://pubmed.ncbi.nlm.nih.gov/${ids[0]}/`;
           r.evidence_ids = ids;
@@ -170,17 +199,34 @@ async function runVerification(targets, { fetchText, maxChecks = 20, log = () =>
       } else {
         let found = null;
         let miss = false;
+        let unavailable = false;
         for (const l of checkable) {
           const res = await get(l.url);
-          if (!res.ok) continue;
+          if (!res.ok) { unavailable = true; continue; }
           const p = parseNsfListing(res.text, t.brand);
+          if (!p.available) { unavailable = true; continue; }
           if (p.hit) { found = { url: l.url, products: p.products, registry: l.registry }; break; }
           miss = true;
         }
         r.checked_at = new Date().toISOString();
-        if (found) { r.status = 'supported'; r.evidence_url = found.url; r.note = `${found.registry} listing shows ${found.products} product(s) for ${t.brand} (brand-level, not this exact product).`; }
-        else if (miss) { r.status = 'not_found'; r.evidence_url = null; r.note = `No ${checkable.map((l) => l.registry).join('/')} listing found for ${t.brand}.`; }
-        else { r.status = 'not_checked'; r.note = 'Registry request failed.'; }
+        const onlyPart = !t.registry; // a generic "third-party tested" claim: only NSF was looked at
+        if (found) {
+          r.status = 'supported';
+          r.evidence_url = found.url;
+          r.note = `${found.registry} listing shows ${found.products} product(s) for ${t.brand} (brand-level, not this exact product).`;
+        } else if (miss && onlyPart) {
+          r.status = 'not_checked';
+          r.evidence_url = null;
+          r.note = `Not in the ${checkable.map((l) => l.registry).join('/')} listing; other testing labs (USP, Informed Sport, private labs) were not looked at.`;
+        } else if (miss) {
+          r.status = 'not_found';
+          r.evidence_url = null;
+          r.note = `No ${checkable.map((l) => l.registry).join('/')} listing found for ${t.brand}.`;
+        } else {
+          r.status = unavailable ? 'registry_unavailable' : 'not_checked';
+          r.evidence_url = null;
+          r.note = 'Registry did not return its listing page (error or changed format) — nothing concluded.';
+        }
       }
     } else if (r.status == null) {
       r.status = 'not_checked';
@@ -193,6 +239,7 @@ async function runVerification(targets, { fetchText, maxChecks = 20, log = () =>
 
 module.exports = {
   REGISTRIES,
+  STATUSES,
   detectVerifiableClaim,
   registryLookup,
   outcomeTerms,

@@ -44,11 +44,29 @@
  * Env: PERPLEXITY_API_KEY, OPENROUTER_API_KEY, P5B_MAX_QUERIES (12), P5B_MAX_PAGES (20),
  *   P5B_FRESH_DAYS (30), P5B_VERIFY (off), P5B_MODEL (else ANALYSIS_MODEL, else
  *   CHEAP_MODE_MODEL under CHEAP_MODE=true, else anthropic/claude-sonnet-5),
- *   P5B_BATCH (4), P5B_PAGE_CHARS (12000), P5B_TOP_BRANDS (10), P5B_BROWSER_FALLBACK (on).
+ *   P5B_BATCH (4), P5B_PAGE_CHARS (12000), P5B_TOP_BRANDS (10), P5B_BROWSER_FALLBACK (on),
+ *   P5B_MAX_BROWSER_PAGES (5), P5B_MAX_TOKENS (6000 per extraction reply),
+ *   P5B_MODEL_TIMEOUT_MS (120000), P5B_RETRY_AFTER_DAYS (7).
  *
- * RESUME: search results and per-page extractions are stored on the row. A
- * re-run of a partial row re-sends only searches that did not succeed and
- * re-extracts only pages without a successful extraction.
+ * BROWSER: plain HTTP first. The Bright Data browser is used only for a
+ * network error or a JavaScript-only shell, at most P5B_MAX_BROWSER_PAGES per
+ * run — NEVER to get past a 401/403/429/451 or a bot wall (that page is
+ * skipped as 'blocked').
+ *
+ * RESUME (per item, by the item's own timestamp): a search or a page
+ * extraction is reused only if it succeeded inside P5B_FRESH_DAYS — a stale
+ * row, complete or partial, is re-researched. A search or page that failed
+ * twice inside P5B_RETRY_AFTER_DAYS is not paid for again until the window
+ * passes (the ledger says so). The row is upserted after the searches and
+ * after every extraction batch, so a crash loses at most one batch.
+ *
+ * STATUS: 'complete' only when every search ran, ≥ 1 page was read, ≥ 1
+ * quoted item was kept and every eligible page was extracted; otherwise
+ * 'partial' with ledger.partial_reasons.
+ *
+ * COST: the printed maximum is the honest ceiling — every batch retried once
+ * and every reply at P5B_MAX_TOKENS. A retry after an unparseable reply asks
+ * for a SHORTER answer instead of resending the identical prompt.
  *
  * FAIL-OPEN: always exits 0. A P5b problem must never make run-pipeline retry
  * the paid P5 before it; consumers fall back to their previous prompts.
@@ -84,6 +102,10 @@ function parseOptions(argv = process.argv.slice(2), env = process.env) {
     topBrands: int(env.P5B_TOP_BRANDS, 10, 1),
     concurrency: 2,
     browserFallback: env.P5B_BROWSER_FALLBACK !== '0',
+    maxBrowserPages: int(env.P5B_MAX_BROWSER_PAGES, 5, 0),
+    maxTokens: int(env.P5B_MAX_TOKENS, 6000, 500),
+    modelTimeoutMs: int(env.P5B_MODEL_TIMEOUT_MS, 120000, 5000),
+    retryAfterDays: int(env.P5B_RETRY_AFTER_DAYS, 7, 0),
     model: env.P5B_MODEL
       || env.ANALYSIS_MODEL
       || (env.CHEAP_MODE === 'true' ? (env.CHEAP_MODE_MODEL || 'google/gemini-3.7-flash') : null)
@@ -180,59 +202,78 @@ async function httpGet(url, { timeoutMs = 15000, maxBytes = 2 * 1024 * 1024, acc
   }
 }
 
-/** Plain fetch first; Bright Data browser (reused helper) only for a blocked page. */
-function makePageFetcher({ browserFallback, log }) {
+/**
+ * Plain HTTP first. The browser (the repo's Bright Data helper) only for a
+ * network error or a JavaScript-only shell, at most `maxBrowserPages` times —
+ * never past a 401/403/429/451 or a bot wall (WR.classifyFetch).
+ * `httpGetImpl` / `launchBrowser` are injectable for tests.
+ */
+function makePageFetcher({ browserFallback = true, maxBrowserPages = 5, log = () => {}, httpGetImpl = httpGet, launchBrowser = null } = {}) {
   let browser = null;
   let browserTried = false;
+  let browserUsed = 0;
+  const launch = launchBrowser || (async () => require('./utils/bright-data-browser').launchBrowserContext({ label: 'P5b fetch', useProxy: true }));
   async function viaBrowser(url) {
     if (!browserTried) {
       browserTried = true;
-      try {
-        const { launchBrowserContext } = require('./utils/bright-data-browser');
-        browser = await launchBrowserContext({ label: 'P5b fetch', useProxy: true });
-      } catch (e) { log(`  (browser fallback unavailable: ${e.message})`); }
+      try { browser = await launch(); } catch (e) { log(`  (browser fallback unavailable: ${e.message})`); }
     }
     if (!browser) return null;
-    const page = await browser.context.newPage();
+    browserUsed++;
+    let page = null;
     try {
+      page = await browser.context.newPage();
       const resp = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
       await page.waitForTimeout(800);
-      return { ok: true, status: resp ? resp.status() : 200, contentType: 'text/html', html: (await page.content()).slice(0, 2 * 1024 * 1024), via: browser.viaBrightData ? 'browser_brightdata' : 'browser_local' };
+      const html = (await page.content()).slice(0, 2 * 1024 * 1024);
+      return { ok: true, status: resp ? resp.status() : 200, contentType: 'text/html', text: html, via: browser.viaBrightData ? 'browser_brightdata' : 'browser_local' };
     } catch (e) {
       return { ok: false, status: 0, error: e.message, via: 'browser' };
     } finally {
-      await page.close().catch(() => {});
+      if (page) await page.close().catch(() => {});
     }
   }
   async function fetchPage(url) {
-    const r = await httpGet(url);
-    const blocked = !r.ok || (r.text && r.text.length < 2000 && /captcha|access denied|are you a robot|cloudflare|enable javascript/i.test(r.text));
-    if (!blocked && /html|xml|text\/plain/i.test(r.contentType || 'text/html')) return { ok: true, status: r.status, contentType: r.contentType, html: r.text, via: 'http' };
-    if (!blocked) return { ok: false, status: r.status, error: `not html (${r.contentType})`, via: 'http' };
-    if (browserFallback && ![404, 410].includes(r.status)) {
-      const b = await viaBrowser(url);
-      if (b && b.ok) return b;
-    }
-    return { ok: false, status: r.status, error: r.error || `HTTP ${r.status}${blocked && r.ok ? ' (bot wall)' : ''}`, via: 'http' };
+    const r = await httpGetImpl(url);
+    const v = WR.classifyFetch(r);
+    if (v.kind === 'ok') return { ok: true, status: r.status, html: r.text, via: 'http' };
+    if (v.kind === 'blocked') return { ok: false, blocked: true, status: r.status, error: `${v.reason} — site refused; not retried through a browser`, via: 'http' };
+    if (!v.browserOk || !browserFallback) return { ok: false, status: r.status, error: v.reason, via: 'http' };
+    if (browserUsed >= maxBrowserPages) return { ok: false, status: r.status, error: `${v.reason}; browser cap reached (P5B_MAX_BROWSER_PAGES=${maxBrowserPages})`, via: 'http', browserCapped: true };
+    const b = await viaBrowser(url);
+    if (!b) return { ok: false, status: r.status, error: `${v.reason}; no browser available`, via: 'http' };
+    const bv = WR.classifyFetch(b);
+    if (bv.kind === 'ok') return { ok: true, status: b.status, html: b.text, via: b.via };
+    return { ok: false, blocked: bv.kind === 'blocked', status: b.status, error: `browser: ${bv.reason || b.error}`, via: b.via };
   }
-  return { fetchPage, close: async () => { if (browser) await browser.close(); } };
+  return { fetchPage, browserUsed: () => browserUsed, close: async () => { if (browser) await browser.close(); } };
 }
 
-function makeOpenRouterCaller({ model, env = process.env, ctx, usageWrites }) {
+function makeOpenRouterCaller({ model, maxTokens = 6000, timeoutMs = 120000, env = process.env, ctx, usageWrites }) {
   const { withUsageTracking, recordAiUsage } = require('./utils/ai-usage');
   return async function callModel(prompt) {
     const key = env.OPENROUTER_API_KEY;
     if (!key) throw new Error('OPENROUTER_API_KEY not set');
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://dovive.com', 'X-Title': 'DOVIVE Scout P5b Web Research' },
-      body: JSON.stringify(withUsageTracking({ model, max_tokens: 12000, temperature: 0, messages: [{ role: 'user', content: prompt }] })),
-    });
-    if (res.status === 402) throw new CreditsExhausted('[ERROR: credits] OpenRouter credits exhausted (402)');
-    const j = await res.json();
-    if (j.error) throw new Error(`OpenRouter: ${j.error.message || JSON.stringify(j.error)}`);
-    usageWrites.push(recordAiUsage({ phase: 'P5b', model, usage: j.usage, categoryId: ctx.categoryId, keyword: ctx.keyword }).catch(() => {}));
-    return { content: j.choices?.[0]?.message?.content || '', cost: typeof j.usage?.cost === 'number' ? j.usage.cost : null };
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), timeoutMs);
+    try {
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://dovive.com', 'X-Title': 'DOVIVE Scout P5b Web Research' },
+        body: JSON.stringify(withUsageTracking({ model, max_tokens: maxTokens, temperature: 0, messages: [{ role: 'user', content: prompt }] })),
+        signal: ctl.signal,
+      });
+      if (res.status === 402) throw new CreditsExhausted('[ERROR: credits] OpenRouter credits exhausted (402)');
+      const j = await res.json();
+      if (j.error) throw new Error(`OpenRouter: ${j.error.message || JSON.stringify(j.error)}`);
+      usageWrites.push(recordAiUsage({ phase: 'P5b', model, usage: j.usage, categoryId: ctx.categoryId, keyword: ctx.keyword }).catch(() => {}));
+      return { content: j.choices?.[0]?.message?.content || '', cost: typeof j.usage?.cost === 'number' ? j.usage.cost : null };
+    } catch (e) {
+      if (e.name === 'AbortError') throw new Error(`OpenRouter timeout after ${timeoutMs}ms`);
+      throw e;
+    } finally {
+      clearTimeout(timer);
+    }
   };
 }
 
@@ -252,6 +293,7 @@ async function pool(items, n, fn) {
 }
 
 const round6 = (x) => Math.round((x || 0) * 1e6) / 1e6;
+const iso = (t) => new Date(t).toISOString();
 
 // ─── Main ──────────────────────────────────────────────────────────────────
 
@@ -267,7 +309,8 @@ async function research(opts, deps) {
   const { keyword } = opts;
   if (!keyword) { log('Usage: node phase5b-web-research.js --keyword "magnesium gummies" [--force] [--dry-run] [--no-model]'); return { aborted: 'no_keyword' }; }
   log(`=== P5b Web Research — "${keyword}" ===`);
-  log(`Caps: ${opts.maxQueries} searches, ${opts.maxPages} pages | model ${opts.noModel ? 'none (--no-model)' : opts.model} | verify ${opts.verify ? 'on' : 'off'}${opts.dryRun ? ' | DRY RUN' : ''}`);
+  log(`Caps: ${opts.maxQueries} searches, ${opts.maxPages} pages, ${opts.maxBrowserPages} browser pages, ${opts.maxTokens} tokens/reply | model ${opts.noModel ? 'none (--no-model)' : opts.model} | verify ${opts.verify ? 'on' : 'off'}${opts.dryRun ? ' | DRY RUN' : ''}`);
+  const window = { freshDays: opts.freshDays, retryAfterDays: opts.retryAfterDays, now: now() };
 
   // 1. Pre-flight — before any paid call.
   let prevRow = null;
@@ -282,10 +325,13 @@ async function research(opts, deps) {
     return { aborted: 'no_client', spent: 0 };
   }
 
-  if (!opts.force && WR.isFresh(prevRow, opts.freshDays, now())) {
+  if (!opts.force && WR.isFresh(prevRow, opts.freshDays, window.now)) {
     log(`  ✅ A complete web-research row from ${prevRow.generated_at} is within ${opts.freshDays} days — skipping (use --force to redo).`);
     if (!opts.dryRun) return { skipped: 'fresh', spent: 0 };
   }
+  // Items from the previous row: reusable only by their OWN timestamps (never with --force).
+  const prevRuns = new Map(((!opts.force && prevRow && prevRow.search_runs) || []).map((r) => [r.query, r]));
+  const prevSources = new Map(((!opts.force && prevRow && prevRow.sources) || []).map((s) => [s.norm_url, s]));
 
   // 2. Category + competitors.
   const ctx = deps.ctx || { keyword, categoryId: null };
@@ -306,11 +352,12 @@ async function research(opts, deps) {
   log(`  Competitors: ${competitors.length} from ${compSource}; ${planBrands.length} brands for queries; ${domains.size} brand sites known from P5; ${marketing.length} Amazon listings for the copy check`);
 
   // 3. Plan (caps enforced here, before any call).
-  const year = new Date(now()).getUTCFullYear();
+  const year = new Date(window.now).getUTCFullYear();
   const plan = WR.buildQueryPlan({ keyword, brands: planBrands, year, max: opts.maxQueries });
   for (const q of plan) log(`   ${q.id} [${q.intent}] ${q.display}`);
-  const estimate = WR.estimateCost({ queries: plan.length, pages: opts.maxPages, pageChars: opts.pageChars, batchSize: opts.batchSize, model: opts.model, pricing: deps.pricing || {} });
-  log(`  Estimate: ${plan.length} searches ($${estimate.search_usd.toFixed(3)}) + ≤ ${opts.maxPages} pages in ${estimate.extraction_calls} extraction calls (${estimate.extraction_usd == null ? 'cost unknown' : `≈ $${estimate.extraction_usd.toFixed(2)}`} on ${opts.model}) ≈ ${estimate.total_usd == null ? '?' : `$${estimate.total_usd.toFixed(2)}`} max`);
+  const estimate = WR.estimateCost({ queries: plan.length, pages: opts.maxPages, pageChars: opts.pageChars, batchSize: opts.batchSize, model: opts.model, pricing: deps.pricing || {}, maxTokens: opts.maxTokens });
+  const usd = (x) => (x == null ? '?' : `$${x.toFixed(2)}`);
+  log(`  Estimate: ${plan.length} searches (${usd(estimate.search_usd)}) + ≤ ${opts.maxPages} pages in ${estimate.extraction_calls} extraction calls on ${opts.model}: typical ≈ ${usd(estimate.typical_usd)}; MAX ${usd(estimate.max_usd)} (every batch retried once, every reply at ${opts.maxTokens} tokens)`);
   if (opts.dryRun) {
     log('  DRY RUN — no search, no page fetch, no model call, nothing written.');
     return { dryRun: true, plan, estimate, searches: 0, fetches: 0, modelCalls: 0 };
@@ -319,30 +366,81 @@ async function research(opts, deps) {
 
   const cost = { search: 0, extraction: 0 };
   const recordUsage = deps.recordUsage || (async () => {});
+  const state = { stage: 'searching', searchRuns: [], sources: [], pages: [], rollup: {}, verification: [], kept: {}, dropped: {}, batchStats: null, creditsStop: null };
 
-  // 4. Search (resume: reuse successful runs of the same query from a partial row).
-  const prevRuns = new Map(((prevRow && !opts.force && prevRow.search_runs) || []).filter((r) => r.ok).map((r) => [r.query, r]));
-  const searchRuns = [];
+  // Row builder + serialized persistence (M5): upsert after searches and after each batch.
+  const buildRow = (status, extraLedger = {}) => {
+    const ledger = WR.buildLedger({ plan, searchRuns: state.searchRuns, sources: state.sources, pages: state.pages, extraction: { batches: state.batchStats, kept: state.kept, dropped: state.dropped }, rollup: state.rollup, cost, model: opts.noModel ? null : opts.model, searchEngine: 'perplexity/search-api', verification: state.verification });
+    Object.assign(ledger, { competitor_source: compSource, estimate, ...extraLedger });
+    if (state.creditsStop) ledger.stopped = state.creditsStop;
+    return {
+      keyword,
+      category_id: ctx.categoryId,
+      status,
+      model: opts.noModel || !opts.hasModelKey ? null : opts.model,
+      prompt_version: WR.PROMPT_VERSION,
+      ledger,
+      sources: state.sources.map((s) => {
+        const { _text, _full, _links, ...rest } = s;
+        return { ...rest, prompt_version: rest.prompt_version || WR.PROMPT_VERSION, excerpt: _text ? _text.slice(0, 600) : (rest.excerpt || null) };
+      }),
+      search_runs: state.searchRuns,
+      rollup: state.rollup,
+      verification: state.verification,
+      cost_usd: round6(cost.search + cost.extraction),
+      generated_at: iso(now()),
+    };
+  };
+  let writes = Promise.resolve();
+  let writeError = null;
+  const persist = (status, extra) => {
+    const row = buildRow(status, extra);
+    writes = writes.then(async () => {
+      const { error } = await dash.from(TABLE).upsert([row], { onConflict: 'keyword' });
+      if (error) { writeError = error; log(`  ⚠️ ${TABLE} upsert failed (${status}): ${error.message}`); }
+    });
+    return writes.then(() => row);
+  };
+
+  // 4. Search — reuse fresh successes, defer twice-failed, send the rest.
   let searches = 0;
-  let creditsStop = null;
   for (const q of plan) {
-    const reused = prevRuns.get(q.query);
-    if (reused) { searchRuns.push({ ...reused, query_id: q.id, intent: q.intent, reused: true, attempted: true }); continue; }
-    if (creditsStop) { searchRuns.push({ query_id: q.id, intent: q.intent, query: q.query, ok: false, attempted: false, results: [] }); continue; }
+    const prev = prevRuns.get(q.query);
+    if (WR.reusableSearch(prev, window)) { state.searchRuns.push({ ...prev, query_id: q.id, intent: q.intent, display: q.display, reused: true, attempted: true }); continue; }
+    if (WR.deferredSearch(prev, window)) {
+      state.searchRuns.push({ ...prev, query_id: q.id, intent: q.intent, display: q.display, ok: false, attempted: false, deferred: true, results: [] });
+      log(`   ${q.id}: deferred — failed ${prev.failed_attempts}× (last ${prev.last_attempt_at}); retried after ${opts.retryAfterDays} days`);
+      continue;
+    }
+    if (state.creditsStop) { state.searchRuns.push({ query_id: q.id, intent: q.intent, query: q.query, display: q.display, ok: false, attempted: false, results: [] }); continue; }
     searches++;
     const r = await deps.search(q);
     cost.search += r.cost_usd || 0;
     if (r.cost_usd) await recordUsage({ phase: 'P5b', model: 'perplexity/search-api', usage: { prompt_tokens: 0, completion_tokens: 0, cost: r.cost_usd }, categoryId: ctx.categoryId, keyword });
-    if (r.creditsExhausted) creditsStop = 'Perplexity credits exhausted (402)';
+    if (r.creditsExhausted) state.creditsStop = 'Perplexity credits exhausted (402)';
     const results = r.ok ? WR.normalizeSearchResults({ results: r.results }) : [];
-    searchRuns.push({ query_id: q.id, intent: q.intent, query: q.query, display: q.display, ok: !!r.ok, attempted: true, status: r.status, error: r.ok ? null : r.error, results });
+    const at = iso(now());
+    state.searchRuns.push({
+      query_id: q.id, intent: q.intent, query: q.query, display: q.display, ok: !!r.ok, attempted: true, status: r.status,
+      error: r.ok ? null : r.error, results,
+      searched_at: r.ok ? at : null,
+      last_attempt_at: at,
+      failed_attempts: r.ok ? 0 : WR.nextFailedAttempts(prev && prev.failed_attempts, prev && prev.last_attempt_at, window),
+    });
     log(`   ${q.id}: ${r.ok ? `${results.length} results` : `failed (${r.error})`}`);
   }
-  if (!searchRuns.some((r) => r.ok)) { log('  ❌ No search succeeded — nothing written.'); return { aborted: 'no_search_results', spent: round6(cost.search) }; }
+  if (!state.searchRuns.some((r) => r.ok)) {
+    log('  ❌ No search succeeded.');
+    if (searches) await persist('partial', { partial_reasons: ['no_search_results'] });
+    return { aborted: 'no_search_results', spent: round6(cost.search) };
+  }
 
   // 5. Pick pages, fetch, classify.
-  const { sources, toFetch } = WR.selectPagesToFetch(searchRuns, { maxPages: opts.maxPages });
-  const prevSources = new Map(((prevRow && !opts.force && prevRow.sources) || []).map((s) => [s.norm_url, s]));
+  const { sources, toFetch } = WR.selectPagesToFetch(state.searchRuns, { maxPages: opts.maxPages });
+  state.sources = sources;
+  state.pages = toFetch;
+  await persist('partial', { in_progress: 'searched' });
+
   const robotsCache = new Map();
   const robotsFor = async (url) => {
     let origin;
@@ -356,20 +454,17 @@ async function research(opts, deps) {
     return robotsCache.get(origin);
   };
   let fetches = 0;
-  const pages = await pool(toFetch, opts.concurrency, async (s) => {
+  await pool(toFetch, opts.concurrency, async (s) => {
     const fetchUrl = WR.fetchUrlFor(s.url);
     const u = new URL(fetchUrl);
-    if (!WR.robotsAllows(await robotsFor(fetchUrl), `${u.pathname}${u.search}`)) {
-      s.fetch_status = 'robots_disallowed';
-      return s;
-    }
+    if (!WR.robotsAllows(await robotsFor(fetchUrl), `${u.pathname}${u.search}`)) { s.fetch_status = 'robots_disallowed'; return s; }
     fetches++;
     const r = await deps.fetchPage(fetchUrl);
     s.fetched_via = r.via || null;
     s.http_status = r.status || null;
-    if (!r.ok || !r.html) { s.fetch_status = 'failed'; s.fetch_error = r.error || 'empty'; return s; }
+    if (!r.ok || !r.html) { s.fetch_status = r.blocked ? 'blocked' : 'failed'; s.fetch_error = r.error || 'empty'; return s; }
     const parsed = SC.extractPage(r.html, s.url);
-    Object.assign(s, { fetch_status: 'fetched', title: parsed.title || s.title, headings: parsed.headings.slice(0, 8), canonical: parsed.canonical, published: parsed.published, site_name: parsed.site_name, word_count: parsed.word_count });
+    Object.assign(s, { fetch_status: 'fetched', title: parsed.title || s.title, headings: parsed.headings.slice(0, 8), canonical: parsed.canonical, published: parsed.published, site_name: parsed.site_name, word_count: parsed.word_count, fetched_at: iso(now()) });
     s._text = parsed.text;
     s._full = parsed.full_text;
     s._links = parsed.links;
@@ -382,10 +477,11 @@ async function research(opts, deps) {
     if (own.brand) s.brand = own.brand;
     return s;
   });
-  log(`  Pages: ${sources.length} unique sources, ${fetches} fetched (${pages.filter((p) => p.fetch_status === 'fetched').length} ok, ${pages.filter((p) => p.fetch_status === 'failed').length} failed, ${pages.filter((p) => p.fetch_status === 'robots_disallowed').length} robots-disallowed)`);
+  const count = (st) => toFetch.filter((p) => p.fetch_status === st).length;
+  log(`  Pages: ${sources.length} unique sources, ${fetches} fetched (${count('fetched')} ok, ${count('failed')} failed, ${count('blocked')} blocked, ${count('robots_disallowed')} robots-disallowed, ${toFetch.filter((p) => /^browser/.test(p.fetched_via || '')).length} via browser)`);
 
   // 6. Syndication — among fetched pages and against the Amazon listings.
-  const fetched = pages.filter((p) => p.fetch_status === 'fetched');
+  const fetched = toFetch.filter((p) => p.fetch_status === 'fetched');
   const dups = SC.markSyndication(fetched.map((p) => ({ url: p.url, text: p._text, canonical: p.canonical, published: p.published })), marketing);
   for (const p of fetched) {
     const d = dups.get(p.url);
@@ -393,111 +489,119 @@ async function research(opts, deps) {
   }
   if (dups.size) log(`  Syndication: ${dups.size} page(s) are copies (${[...dups.values()].map((d) => d.kind).join(', ')}) — not counted as independent evidence`);
 
-  // 7. Extraction (resume: keep a previous successful extraction of the same URL).
+  // 7. Extraction — reuse fresh, defer twice-failed, batch the rest.
   const eligible = [];
+  let deferredPages = 0;
   for (const p of fetched) {
     const prev = prevSources.get(p.norm_url);
+    if (prev) { p.extraction_failed_attempts = prev.extraction_failed_attempts || 0; p.last_extraction_attempt_at = prev.last_extraction_attempt_at || null; }
     if (p.duplicate_of) { p.extraction_status = 'skipped_duplicate'; continue; }
     if ((p.word_count || 0) < 40) { p.extraction_status = 'skipped_thin'; continue; }
-    if (prev && prev.extraction_status === 'ok' && prev.extraction && prev.prompt_version === WR.PROMPT_VERSION) {
-      p.extraction = prev.extraction;
-      p.extraction_status = 'ok';
-      p.extraction_reused = true;
+    if (WR.reusableExtraction(prev, window)) {
+      Object.assign(p, { extraction: prev.extraction, extraction_status: 'ok', extraction_reused: true, extracted_at: prev.extracted_at, extraction_dropped: prev.extraction_dropped || {} });
       continue;
     }
+    if (WR.deferredExtraction(prev, window)) { p.extraction_status = 'deferred'; deferredPages++; continue; }
     eligible.push(p);
   }
+  if (deferredPages) log(`  ${deferredPages} page(s) failed extraction twice inside ${opts.retryAfterDays} days — deferred, not re-sent`);
   const useModel = !opts.noModel && opts.hasModelKey && eligible.length > 0;
   const batches = [];
   for (let i = 0; i < eligible.length; i += opts.batchSize) batches.push(eligible.slice(i, i + opts.batchSize));
-  const kept = {};
-  const dropped = {};
-  const batchStats = { total: batches.length, ok: 0, failed: 0, not_attempted: 0 };
+  state.batchStats = { total: batches.length, ok: 0, failed: 0, not_attempted: 0, attempts: 0 };
   let modelCalls = 0;
+  const refreshRollup = () => {
+    state.rollup = WR.buildRollup(fetched.filter((p) => p.extraction_status === 'ok').map((p) => ({ url: p.url, domain: p.domain, ownership: p.ownership, page_type: p.page_type, duplicate_of: p.duplicate_of || null, extraction: p.extraction })), { marketing });
+  };
   if (!useModel) {
     for (const p of eligible) p.extraction_status = 'not_attempted';
-    batchStats.not_attempted = batches.length;
+    state.batchStats.not_attempted = batches.length;
     if (!opts.noModel && !opts.hasModelKey && eligible.length) log('  ⚠️ No OPENROUTER_API_KEY — sources classified, nothing extracted.');
   } else {
-    let stop = null;
     await pool(batches, opts.concurrency, async (batch, bi) => {
-      if (stop) { batch.forEach((p) => { p.extraction_status = 'not_attempted'; }); batchStats.not_attempted++; return; }
+      if (state.creditsStop) { batch.forEach((p) => { p.extraction_status = 'not_attempted'; }); state.batchStats.not_attempted++; return; }
       const withIds = batch.map((p, k) => ({ id: `P${k + 1}`, url: p.url, title: p.title, text: p._text, page: p }));
-      const prompt = WR.buildExtractionPrompt(withIds, { keyword, brands, pageChars: opts.pageChars });
-      for (let attempt = 1; attempt <= 2; attempt++) {
+      const firstPrompt = WR.buildExtractionPrompt(withIds, { keyword, brands, pageChars: opts.pageChars });
+      let prompt = firstPrompt;
+      let lastError = null;
+      let ok = false;
+      for (let attempt = 1; attempt <= 2 && !ok; attempt++) {
         try {
           modelCalls++;
+          state.batchStats.attempts++;
           const { content, cost: c } = await deps.callModel(prompt);
           cost.extraction += c || 0;
           const parsed = WR.parseExtractionResponse(content, withIds.map((w) => w.id));
-          if (!parsed.ok) { log(`  batch ${bi + 1}/${batches.length}: unparseable (attempt ${attempt})`); continue; }
+          if (!parsed.ok) {
+            lastError = 'unparseable reply';
+            log(`  batch ${bi + 1}/${batches.length}: unparseable (attempt ${attempt})`);
+            prompt = WR.buildRetryPrompt(firstPrompt); // ask for LESS, not the same again
+            continue;
+          }
+          const at = iso(now());
           for (const w of withIds) {
             const raw = parsed.pages[w.id];
             if (!raw) { w.page.extraction_status = 'failed'; w.page.extraction_error = 'page missing from response'; continue; }
             const v = WR.validateExtraction(raw, { text: w.page._text, links: w.page._links }, { brands });
-            w.page.extraction = v.extraction;
-            w.page.extraction_status = 'ok';
-            w.page.extraction_dropped = v.dropped;
-            for (const [f, n] of Object.entries(v.dropped)) dropped[f] = (dropped[f] || 0) + n;
+            Object.assign(w.page, { extraction: v.extraction, extraction_status: 'ok', extraction_dropped: v.dropped, extracted_at: at, extraction_failed_attempts: 0 });
           }
-          batchStats.ok++;
-          log(`  batch ${bi + 1}/${batches.length}: ${withIds.length} pages extracted`);
-          return;
+          ok = true;
         } catch (e) {
-          if (e instanceof CreditsExhausted) { stop = e; break; }
+          lastError = e.message;
+          if (e instanceof CreditsExhausted) { state.creditsStop = e.message; break; }
           log(`  batch ${bi + 1}/${batches.length}: ${e.message} (attempt ${attempt})`);
         }
       }
-      batch.forEach((p) => { if (p.extraction_status !== 'ok') { p.extraction_status = stop ? 'not_attempted' : 'failed'; } });
-      if (stop) batchStats.not_attempted++; else batchStats.failed++;
+      const at = iso(now());
+      for (const p of batch) {
+        if (p.extraction_status === 'ok') continue;
+        if (state.creditsStop && !ok) { p.extraction_status = 'not_attempted'; continue; }
+        p.extraction_status = 'failed';
+        p.extraction_error = p.extraction_error || lastError;
+        p.extraction_failed_attempts = WR.nextFailedAttempts(p.extraction_failed_attempts, p.last_extraction_attempt_at, window);
+        p.last_extraction_attempt_at = at;
+      }
+      if (ok) { state.batchStats.ok++; log(`  batch ${bi + 1}/${batches.length}: ${withIds.length} pages extracted`); }
+      else if (state.creditsStop) state.batchStats.not_attempted++;
+      else state.batchStats.failed++;
+      refreshRollup();
+      await persist('partial', { in_progress: `extraction batch ${bi + 1}/${batches.length}` });
     });
-    if (stop) log(`  ❌ ${stop.message} — remaining batches not attempted; row saved as partial and resumes next run.`);
+    if (state.creditsStop) log(`  ❌ ${state.creditsStop} — remaining batches not attempted; row saved as partial and resumes next run.`);
   }
+  state.kept = {};
+  state.dropped = {};
   for (const p of fetched) {
     if (p.extraction_status !== 'ok' || !p.extraction) continue;
-    for (const f of WR.FIELDS) kept[f] = (kept[f] || 0) + (p.extraction[f] || []).length;
+    for (const f of WR.FIELDS) state.kept[f] = (state.kept[f] || 0) + (p.extraction[f] || []).length;
+    for (const [f, n] of Object.entries(p.extraction_dropped || {})) state.dropped[f] = (state.dropped[f] || 0) + n;
   }
 
   // 8. Roll-up + verification.
-  const rollup = WR.buildRollup(fetched.filter((p) => p.extraction_status === 'ok').map((p) => ({ url: p.url, domain: p.domain, ownership: p.ownership, page_type: p.page_type, duplicate_of: p.duplicate_of || null, extraction: p.extraction })), { marketing });
-  let verification = WR.buildVerificationTargets(rollup, { brands });
-  if (opts.verify && verification.length && deps.fetchText) {
-    verification = await CR.runVerification(verification, { fetchText: (url) => deps.fetchText(url, { timeoutMs: 15000 }), log });
+  refreshRollup();
+  state.verification = WR.buildVerificationTargets(state.rollup, { brands });
+  if (opts.verify && state.verification.length && deps.fetchText) {
+    state.verification = await CR.runVerification(state.verification, { fetchText: (url) => deps.fetchText(url, { timeoutMs: 15000 }), log });
   }
 
-  // 9. Status + ledger + write.
-  const allSearched = searchRuns.every((r) => r.ok);
-  const extractedAll = !eligible.some((p) => p.extraction_status !== 'ok');
-  const status = (opts.noModel || !opts.hasModelKey) ? 'no_model' : (allSearched && extractedAll && !creditsStop ? 'complete' : 'partial');
-  const model = useModel ? opts.model : null;
-  const ledger = WR.buildLedger({ plan, searchRuns, sources, pages, extraction: { batches: batchStats, kept, dropped }, rollup, cost, model, searchEngine: 'perplexity/search-api', verification });
-  ledger.competitor_source = compSource;
-  ledger.estimate = estimate;
-  if (creditsStop) ledger.stopped = creditsStop;
-
-  const storedSources = sources.map((s) => {
-    const { _text, _full, _links, ...rest } = s;
-    return { ...rest, prompt_version: WR.PROMPT_VERSION, excerpt: _text ? _text.slice(0, 600) : null };
+  // 9. Status (complete needs real content) + final write.
+  const keptTotal = WR.FIELDS.filter((f) => f !== 'evidence_links').reduce((a, f) => a + (state.kept[f] || 0), 0);
+  const decision = WR.decideStatus({
+    noModel: opts.noModel || !opts.hasModelKey,
+    searchRuns: state.searchRuns,
+    fetched: fetched.length,
+    keptTotal,
+    extractionIncomplete: fetched.filter((p) => ['failed', 'not_attempted'].includes(p.extraction_status)).length,
+    deferredSearches: state.searchRuns.filter((r) => r.deferred).length,
+    deferredPages,
+    creditsStop: state.creditsStop,
   });
-  const row = {
-    keyword,
-    category_id: ctx.categoryId,
-    status,
-    model,
-    prompt_version: WR.PROMPT_VERSION,
-    ledger,
-    sources: storedSources,
-    search_runs: searchRuns,
-    rollup,
-    verification,
-    cost_usd: round6(cost.search + cost.extraction),
-    generated_at: new Date(now()).toISOString(),
-  };
-  const { error } = await dash.from(TABLE).upsert([row], { onConflict: 'keyword' });
-  if (error) { log(`  ❌ ${TABLE} upsert failed: ${error.message}`); return { aborted: 'write_failed', row, spent: row.cost_usd, searches, fetches, modelCalls }; }
-  log(`  ✅ Saved ${TABLE} (${status}): ${ledger.sources_found} sources / ${ledger.fetched} fetched / ${ledger.classified} classified / ${ledger.extracted} extracted / ${ledger.duplicates_removed} duplicates removed; cost $${row.cost_usd.toFixed(4)}`);
-  for (const g of (rollup.ingredient_claims || []).slice(0, 8)) log(`   claim "${g.label}" — ${g.independent_sources} independent / ${g.brand_owned_sources} brand-owned / ${g.affiliate_sources} affiliate`);
-  return { status, row, ledger, rollup, verification, searches, fetches, modelCalls };
+  const row = await persist(decision.status, decision.reasons.length ? { partial_reasons: decision.reasons } : {});
+  if (writeError) return { aborted: 'write_failed', row, spent: row.cost_usd, searches, fetches, modelCalls };
+  const L = row.ledger;
+  log(`  ✅ Saved ${TABLE} (${decision.status}${decision.reasons.length ? `: ${decision.reasons.join('; ')}` : ''}): ${L.sources_found} sources / ${L.fetched} fetched / ${L.classified} classified / ${L.extracted} extracted / ${L.duplicates_removed} duplicates removed; cost $${row.cost_usd.toFixed(4)}`);
+  for (const g of (state.rollup.ingredient_claims || []).slice(0, 8)) log(`   claim "${g.label}" — ${g.independent_sources} independent / ${g.brand_owned_sources} brand-owned / ${g.affiliate_sources} affiliate`);
+  return { status: decision.status, reasons: decision.reasons, row, ledger: L, rollup: state.rollup, verification: state.verification, searches, fetches, modelCalls };
 }
 
 if (require.main === module) {
@@ -516,7 +620,7 @@ if (require.main === module) {
   }
   const ctx = { keyword: opts.keyword, categoryId: null };
   const { recordAiUsage, PRICING } = require('./utils/ai-usage');
-  const fetcher = opts.dryRun ? null : makePageFetcher({ browserFallback: opts.browserFallback, log: console.log });
+  const fetcher = opts.dryRun ? null : makePageFetcher({ browserFallback: opts.browserFallback, maxBrowserPages: opts.maxBrowserPages, log: console.log });
   const main = (dash || opts.dryRun)
     ? research(opts, {
       dovive,
@@ -527,7 +631,7 @@ if (require.main === module) {
       search: (q) => require('./utils/perplexity').searchWeb(q.query, { maxResults: 10, domainFilter: q.domain_filter }),
       fetchPage: fetcher ? fetcher.fetchPage : null,
       fetchText: (url, o) => httpGet(url, { timeoutMs: (o && o.timeoutMs) || 15000, maxBytes: 512 * 1024, accept: '*/*' }),
-      callModel: makeOpenRouterCaller({ model: opts.model, ctx, usageWrites }),
+      callModel: makeOpenRouterCaller({ model: opts.model, maxTokens: opts.maxTokens, timeoutMs: opts.modelTimeoutMs, ctx, usageWrites }),
       recordUsage: (row) => { const p = recordAiUsage(row).catch(() => {}); usageWrites.push(p); return p; },
       pricing: PRICING,
     })
@@ -537,4 +641,4 @@ if (require.main === module) {
     .finally(async () => { if (fetcher) await fetcher.close(); await Promise.allSettled(usageWrites); process.exit(0); });
 }
 
-module.exports = { research, parseOptions, loadPrevious, loadCompetitors, makePageFetcher, httpGet, TABLE, CreditsExhausted };
+module.exports = { research, parseOptions, loadPrevious, loadCompetitors, makePageFetcher, makeOpenRouterCaller, httpGet, TABLE, CreditsExhausted };

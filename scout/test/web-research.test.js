@@ -203,7 +203,7 @@ test('markSyndication honours rel=canonical among fetched pages', () => {
 test('copiedMarketingMatch: long quote by shingle containment, short quote by exact phrase', () => {
   const mk = [{ asin: 'B0ABCDEF12', brand: 'Calmwell', text: F.amazonListingText }];
   assert.equal(SC.copiedMarketingMatch('Magnesium glycinate is clinically proven to improve sleep quality in adults with poor sleep', mk).asin, 'B0ABCDEF12');
-  assert.equal(SC.copiedMarketingMatch('made in the USA', mk).asin, 'B0ABCDEF12');
+  assert.equal(SC.copiedMarketingMatch('made in the USA', mk), null, 'short phrases are category vocabulary, not copying');
   assert.equal(SC.copiedMarketingMatch('the texture never turned chalky in our six week test', mk), null);
 });
 
@@ -389,11 +389,18 @@ test('isFresh: complete + within the window only', () => {
   assert.equal(WR.isFresh(null, 30, now), false);
 });
 
-test('estimateCost uses PRICING per token and the flat search price', () => {
+test('estimateCost: typical and an honest MAX (every batch retried once, every reply at the token cap)', () => {
   const { PRICING } = require('../utils/ai-usage');
-  const e = WR.estimateCost({ queries: 12, pages: 20, model: 'google/gemini-3.7-flash', pricing: PRICING });
+  const p = PRICING['anthropic/claude-sonnet-5'];
+  const e = WR.estimateCost({ queries: 12, pages: 20, model: 'anthropic/claude-sonnet-5', pricing: PRICING, maxTokens: 6000 });
   assert.equal(e.search_usd, 0.06);
   assert.equal(e.extraction_calls, 5);
-  assert.ok(e.extraction_usd > 0.1 && e.extraction_usd < 0.2, String(e.extraction_usd));
-  assert.equal(WR.estimateCost({ queries: 1, pages: 1, model: 'nope', pricing: PRICING }).total_usd, null);
+  assert.equal(e.max_extraction_calls, 10);
+  const promptPerCall = Math.round(4 * (12000 + 400) / 4 + 700);
+  const worst = 0.06 + 10 * (promptPerCall * p.prompt + 6000 * p.completion);
+  assert.ok(Math.abs(e.max_usd - worst) < 1e-6, `${e.max_usd} vs ${worst}`);
+  assert.ok(e.max_usd > 2 * e.typical_usd, 'the max is not the typical run');
+  const capped = WR.estimateCost({ queries: 12, pages: 20, model: 'anthropic/claude-sonnet-5', pricing: PRICING, maxTokens: 12000 });
+  assert.ok(capped.max_usd > e.max_usd, 'the token cap drives the ceiling');
+  assert.equal(WR.estimateCost({ queries: 1, pages: 1, model: 'nope', pricing: PRICING }).max_usd, null);
 });

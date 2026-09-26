@@ -235,6 +235,16 @@ Include one object per page id: ${pages.map((p) => p.id).join(', ')}.
 ${body}`;
 }
 
+/**
+ * Second attempt after an unparseable reply: ask for LESS, not the same again
+ * (the usual cause is a reply cut off at max_tokens).
+ */
+function buildRetryPrompt(prompt) {
+  return `${prompt}
+
+IMPORTANT — your previous reply could not be parsed as JSON (it was probably cut off). Reply again with the JSON object ONLY: at most 4 items per field per page, quotes under 200 characters, no commentary.`;
+}
+
 function parseExtractionResponse(content, pageIds) {
   const RS = require('./review-synthesis');
   const parsed = RS.extractJson(content);
@@ -445,14 +455,15 @@ function buildRollup(pages, { marketing = [], mergeThreshold = 0.5 } = {}) {
     for (const it of (p.extraction && p.extraction.products_mentioned) || []) {
       const k = SC.slugify(it.brand) || SC.slugify(it.product);
       if (!k) continue;
-      if (!prods.has(k)) prods.set(k, { brand: it.brand || null, product: it.product || null, asin: it.asin || null, domains: {} });
+      if (!prods.has(k)) prods.set(k, { brand: it.brand || null, product: it.product || null, asin: null, asin_source: null, domains: {} });
       const e = prods.get(k);
-      if (!e.asin && it.asin) e.asin = it.asin;
+      // An ASIN printed on the page beats one guessed from the brand name.
+      if (it.asin && (!e.asin || (e.asin_source !== 'page' && it.asin_source === 'page'))) { e.asin = it.asin; e.asin_source = it.asin_source || null; }
       (e.domains[p.ownership] = e.domains[p.ownership] || new Set()).add(p.domain);
     }
   }
   rollup.products_discussed = [...prods.values()].map((e) => ({
-    brand: e.brand, product: e.product, asin: e.asin,
+    brand: e.brand, product: e.product, asin: e.asin, asin_source: e.asin_source,
     independent_sources: e.domains.independent ? e.domains.independent.size : 0,
     brand_owned_sources: e.domains.brand_owned ? e.domains.brand_owned.size : 0,
     affiliate_sources: e.domains.affiliate ? e.domains.affiliate.size : 0,
@@ -499,7 +510,7 @@ function buildVerificationTargets(rollup, { brands = [], max = 25 } = {}) {
         if (seen.has(key)) continue;
         seen.add(key);
         t = { kind: 'literature', claim_type: d.claim_type, ingredient, pubmed };
-        if (!pubmed) t.note = 'No ingredient named — nothing to search.';
+        if (!pubmed) t.note = ingredient ? 'No outcome to search — an ingredient-only search proves nothing.' : 'No ingredient named — nothing to search.';
       }
       out.push({
         ...t,
@@ -538,7 +549,8 @@ function buildLedger({ plan = [], searchRuns = [], sources = [], pages = [], ext
     queries_planned: plan.length,
     queries_run: searchRuns.filter((r) => r.ok).length,
     queries_failed: searchRuns.filter((r) => !r.ok && r.attempted).length,
-    queries_not_attempted: plan.length - searchRuns.filter((r) => r.attempted).length,
+    queries_not_attempted: searchRuns.filter((r) => !r.ok && !r.attempted).length + Math.max(0, plan.length - searchRuns.length),
+    queries_reused: searchRuns.filter((r) => r.reused).length,
     sources_found: sources.length,
     sources_skipped: countBy(sources.filter((s) => s.fetch_status === 'skipped' || s.fetch_status === 'not_fetched'), (s) => s.skip_reason),
     fetch_attempted: pages.filter((p) => p.fetch_status && p.fetch_status !== 'pending').length,
@@ -549,6 +561,7 @@ function buildLedger({ plan = [], searchRuns = [], sources = [], pages = [], ext
     extracted: extracted.length,
     extraction_failed: fetched.filter((p) => p.extraction_status === 'failed').length,
     extraction_not_attempted: fetched.filter((p) => !p.extraction_status || p.extraction_status === 'not_attempted').length,
+    extraction_reused: fetched.filter((p) => p.extraction_reused).length,
     extraction_skipped: countBy(fetched.filter((p) => /^skipped_/.test(p.extraction_status || '')), (p) => p.extraction_status.replace('skipped_', '')),
     extraction_batches: extraction.batches || null,
     items_kept: extraction.kept || {},
@@ -559,30 +572,122 @@ function buildLedger({ plan = [], searchRuns = [], sources = [], pages = [], ext
     counted_sources: counted.length,
     by_page_type: countBy(classified, (p) => p.page_type),
     by_ownership: countBy(counted, (p) => p.ownership),
+    blocked: pages.filter((p) => p.fetch_status === 'blocked').length,
+    browser_fetches: pages.filter((p) => /^browser/.test(p.fetched_via || '')).length,
+    extraction_deferred: fetched.filter((p) => p.extraction_status === 'deferred').length,
+    searches_deferred: searchRuns.filter((r) => r.deferred).length,
     verification_targets: verification.length,
     verification_checked: verification.filter((v) => v.status && v.status !== 'not_checked').length,
+    verification_by_status: countBy(verification, (v) => v.status || 'not_checked'),
     cost_usd: { search: round(cost.search || 0), extraction: round(cost.extraction || 0), verification: 0, total: round((cost.search || 0) + (cost.extraction || 0)) },
   };
 }
 
 function isFresh(row, days, now = Date.now()) {
   if (!row || !row.generated_at || row.status !== 'complete') return false;
-  const t = Date.parse(row.generated_at);
-  return Number.isFinite(t) && now - t <= days * 86400000;
+  return withinDays(row.generated_at, days, now);
+}
+
+/** Timestamp within `days` of now? Missing / unparseable timestamps are stale. */
+function withinDays(ts, days, now = Date.now()) {
+  const t = Date.parse(ts || '');
+  return Number.isFinite(t) && t <= now + 60000 && now - t <= days * 86400000;
+}
+
+// ─── Resume rules (per item, never per row) ─────────────────────────────────
+//
+// An item is reused only when ITS OWN timestamp is inside the freshness
+// window — a stale row (complete or partial) is re-researched, and a row
+// re-written today never makes old items look new. An item that failed twice
+// inside P5B_RETRY_AFTER_DAYS is not paid for again until the window passes.
+
+function reusableSearch(prev, { freshDays, now }) {
+  return !!(prev && prev.ok && withinDays(prev.searched_at, freshDays, now));
+}
+
+function deferredSearch(prev, { retryAfterDays, now }) {
+  return !!(prev && !prev.ok && (prev.failed_attempts || 0) >= 2 && withinDays(prev.last_attempt_at, retryAfterDays, now));
+}
+
+function reusableExtraction(prev, { freshDays, now }) {
+  return !!(prev && prev.extraction_status === 'ok' && prev.extraction && prev.prompt_version === PROMPT_VERSION
+    && withinDays(prev.extracted_at, freshDays, now));
+}
+
+function deferredExtraction(prev, { retryAfterDays, now }) {
+  return !!(prev && prev.extraction_status !== 'ok' && (prev.extraction_failed_attempts || 0) >= 2
+    && withinDays(prev.last_extraction_attempt_at, retryAfterDays, now));
+}
+
+/** Failed-attempt counter that restarts once the retry window has passed. */
+function nextFailedAttempts(prevCount, prevAt, { retryAfterDays, now }) {
+  return (withinDays(prevAt, retryAfterDays, now) ? prevCount || 0 : 0) + 1;
 }
 
 /**
- * Rough per-keyword cost (no calls). Search: flat per request. Extraction:
- * chars/4 tokens; completion assumed 1,200 tokens per page (generous).
+ * 'complete' needs: every planned search done, ≥ 1 page read, ≥ 1 quoted item
+ * kept, every eligible page extracted, nothing deferred, no credit stop.
+ * Anything else is 'partial' with the reasons; no model → 'no_model'.
  */
-function estimateCost({ queries, pages, pageChars = 12000, batchSize = 4, model, pricing = {}, searchPricePerRequest = 0.005, completionPerPage = 1200 }) {
+function decideStatus({ noModel = false, searchRuns = [], fetched = 0, keptTotal = 0, extractionIncomplete = 0, deferredSearches = 0, deferredPages = 0, creditsStop = null }) {
+  const reasons = [];
+  const searchesMissing = searchRuns.filter((r) => !r.ok).length;
+  if (searchesMissing) reasons.push(`searches_incomplete (${searchesMissing})`);
+  if (!fetched) reasons.push('no_pages_fetched');
+  if (!noModel && !keptTotal) reasons.push('no_items_kept');
+  if (!noModel && extractionIncomplete) reasons.push(`extraction_incomplete (${extractionIncomplete} pages)`);
+  if (deferredSearches || deferredPages) reasons.push(`deferred_after_repeated_failures (${deferredSearches} searches, ${deferredPages} pages)`);
+  if (creditsStop) reasons.push(`credits_exhausted: ${creditsStop}`);
+  if (noModel) return { status: 'no_model', reasons };
+  return { status: reasons.length ? 'partial' : 'complete', reasons };
+}
+
+// ─── Fetch verdict ──────────────────────────────────────────────────────────
+
+const BOT_WALL = /captcha|access denied|are you a (robot|human)|verify you are (a )?human|attention required|cf-browser-verification|just a moment\.\.\.|request blocked|unusual traffic|pardon our interruption/i;
+const JS_SHELL = /enable javascript|requires javascript|javascript is (disabled|required)|<div id=["'](root|app|__next)["']\s*>\s*<\/div>/i;
+
+/**
+ * What a plain HTTP fetch got. The browser is allowed ONLY for a network
+ * error or a JavaScript-only shell — never to get past a 401/403/429/451 or
+ * a bot wall (the site said no; robots-in-spirit).
+ * @returns {{ kind: 'ok'|'blocked'|'http_error'|'not_html'|'network_error'|'js_shell', browserOk: boolean, reason?: string }}
+ */
+function classifyFetch(r) {
+  if (!r || (!r.ok && !r.status)) return { kind: 'network_error', browserOk: true, reason: (r && r.error) || 'network error' };
+  const text = String(r.text || r.html || '');
+  if ([401, 403, 407, 429, 451].includes(r.status)) return { kind: 'blocked', browserOk: false, reason: `HTTP ${r.status}` };
+  if (!r.ok) return { kind: BOT_WALL.test(text.slice(0, 20000)) ? 'blocked' : 'http_error', browserOk: false, reason: `HTTP ${r.status}` };
+  if (r.contentType && !/html|xml|text\/plain/i.test(r.contentType)) return { kind: 'not_html', browserOk: false, reason: `not html (${r.contentType})` };
+  const words = SC.extractPage(text, 'https://x.invalid/').word_count;
+  if (words < 300 && BOT_WALL.test(text.slice(0, 20000))) return { kind: 'blocked', browserOk: false, reason: 'bot wall' };
+  if (words < 150 && JS_SHELL.test(text)) return { kind: 'js_shell', browserOk: true, reason: 'JavaScript-only page' };
+  return { kind: 'ok', browserOk: false };
+}
+
+/**
+ * Per-keyword cost (no calls). Search: flat per request. Extraction: chars/4
+ * prompt tokens; completion `completionPerPage` typical, capped at `maxTokens`
+ * per call. `max_usd` is the honest ceiling: every batch sent twice (one
+ * retry) and every reply running to the cap.
+ */
+function estimateCost({ queries, pages, pageChars = 12000, batchSize = 4, model, pricing = {}, searchPricePerRequest = 0.005, completionPerPage = 1200, maxTokens = 6000, attempts = 2 }) {
   const calls = Math.ceil(pages / Math.max(1, batchSize));
+  const promptPerCall = Math.round(Math.min(pages, batchSize) * (pageChars + 400) / 4 + 700);
   const promptTokens = Math.round(pages * (pageChars + 400) / 4 + calls * 700);
-  const completionTokens = pages * completionPerPage;
+  const completionTokens = Math.min(pages * completionPerPage, calls * maxTokens);
   const p = pricing[model];
-  const extraction = p ? promptTokens * p.prompt + completionTokens * p.completion : null;
   const search = queries * searchPricePerRequest;
-  return { queries, pages, extraction_calls: calls, prompt_tokens: promptTokens, completion_tokens: completionTokens, search_usd: search, extraction_usd: extraction, total_usd: extraction == null ? null : search + extraction };
+  const typical = p ? promptTokens * p.prompt + completionTokens * p.completion : null;
+  const worst = p ? calls * attempts * (promptPerCall * p.prompt + maxTokens * p.completion) : null;
+  const r6 = (x) => (x == null ? null : Math.round(x * 1e6) / 1e6);
+  return {
+    queries, pages, extraction_calls: calls, max_extraction_calls: calls * attempts, max_tokens: maxTokens,
+    prompt_tokens: promptTokens, completion_tokens: completionTokens,
+    search_usd: r6(search), extraction_usd: r6(typical), max_extraction_usd: r6(worst),
+    typical_usd: typical == null ? null : r6(search + typical),
+    max_usd: worst == null ? null : r6(search + worst),
+  };
 }
 
 // ─── Consumer text (P7 / P8) ────────────────────────────────────────────────
@@ -647,6 +752,7 @@ module.exports = {
   parseRobots,
   robotsAllows,
   buildExtractionPrompt,
+  buildRetryPrompt,
   parseExtractionResponse,
   normForMatch,
   quoteFound,
@@ -656,6 +762,14 @@ module.exports = {
   buildVerificationTargets,
   buildLedger,
   isFresh,
+  withinDays,
+  reusableSearch,
+  deferredSearch,
+  reusableExtraction,
+  deferredExtraction,
+  nextFailedAttempts,
+  decideStatus,
+  classifyFetch,
   estimateCost,
   webEvidenceText,
 };

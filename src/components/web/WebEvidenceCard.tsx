@@ -103,7 +103,7 @@ function Ledger({ ledger, status }: { ledger: WebLedger; status: WebResearchRow[
       <div className="flex flex-wrap gap-2">
         <Chip label="Searches" value={`${n(ledger.queries_run)} / ${n(ledger.queries_planned)}`} sub={ledger.queries_failed ? `${ledger.queries_failed} failed` : undefined} />
         <Chip label="Sources found" value={n(ledger.sources_found)} sub={sum(ledger.sources_skipped) ? `${sum(ledger.sources_skipped)} not fetched` : undefined} />
-        <Chip label="Pages read" value={n(ledger.fetched)} sub={[ledger.fetch_failed ? `${ledger.fetch_failed} failed` : null, ledger.robots_disallowed ? `${ledger.robots_disallowed} robots` : null].filter(Boolean).join(" · ") || undefined} />
+        <Chip label="Pages read" value={n(ledger.fetched)} sub={[ledger.fetch_failed ? `${ledger.fetch_failed} failed` : null, ledger.blocked ? `${ledger.blocked} refused` : null, ledger.robots_disallowed ? `${ledger.robots_disallowed} robots` : null, ledger.browser_fetches ? `${ledger.browser_fetches} via browser` : null].filter(Boolean).join(" · ") || undefined} />
         <Chip label="Extracted" value={n(ledger.extracted)} sub={sum(ledger.items_dropped_unquoted) ? `${sum(ledger.items_dropped_unquoted)} unquoted items dropped` : undefined} />
         <Chip label="Copies removed" value={n(ledger.duplicates_removed)} sub={ledger.copied_marketing_quotes ? `${ledger.copied_marketing_quotes} Amazon-copy quotes` : undefined} />
         <Chip label="Cost" value={ledger.cost_usd?.total != null ? `$${ledger.cost_usd.total.toFixed(2)}` : "–"} sub={ledger.model ?? undefined} />
@@ -115,7 +115,7 @@ function Ledger({ ledger, status }: { ledger: WebLedger; status: WebResearchRow[
         ))}
         {status !== "complete" && (
           <span className="text-amber-600 dark:text-amber-400">
-            · {status === "no_model" ? "sources classified only — claims not extracted yet" : `partial run${ledger.stopped ? ` (${ledger.stopped})` : ""}`}
+            · {status === "no_model" ? "sources classified only — claims not extracted yet" : `partial run${ledger.partial_reasons?.length ? `: ${ledger.partial_reasons.join("; ")}` : ""}`}
           </span>
         )}
       </div>
@@ -256,8 +256,8 @@ function WebEvidence({ row }: { row: WebResearchRow }) {
             <h4 className="text-sm font-semibold">Claim checks against original sources</h4>
             {checks.map((v, i) => (
               <div key={i} className="text-xs flex flex-wrap gap-2 items-center">
-                <Badge variant="outline" className={cn("text-[10px]", v.status === "supported" ? OWNER_CLASS.independent : OWNER_CLASS.sponsored)}>
-                  {v.status === "supported" ? "Supported" : "Not found"}
+                <Badge variant="outline" className={cn("text-[10px]", v.status === "supported" ? OWNER_CLASS.independent : v.status === "not_found" ? OWNER_CLASS.sponsored : OWNER_CLASS.unknown)}>
+                  {v.status === "supported" ? "Supported" : v.status === "not_found" ? "Not found" : "Registry unavailable"}
                 </Badge>
                 <span>{v.claim}</span>
                 {v.evidence_url && <a className="text-muted-foreground hover:underline" href={v.evidence_url} target="_blank" rel="noreferrer noopener">evidence</a>}

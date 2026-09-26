@@ -179,15 +179,22 @@ const SPECIALIST_HOSTS = /(^|\.)(examine\.com|labdoor\.com|consumerlab\.com|heal
 
 const EDITORIAL_TYPES = new Set(['review_article', 'comparison', 'category_guide', 'specialist_blog', 'forum', 'news']);
 
+/**
+ * Is this host a competitor's own site? Only two ways, never a prefix match
+ * (nature.com is not "Nature Made", health.com is not "Health Plus"):
+ *   1. the brand site P5 confirmed (dovive_p5_sources brand_site → b.domain);
+ *   2. the registrable domain's first label IS the brand slug
+ *      (gardenoflife.com ↔ "Garden of Life").
+ */
 function brandHostMatch(host, brands = []) {
   const reg = registrableDomain(host);
   const hostSlug = slugify(reg.split('.')[0]);
   for (const b of brands) {
-    if (b.domain && registrableDomain(b.domain) === reg) return { brand: b.brand, how: `domain ${reg} is ${b.brand}'s site` };
+    if (b.domain && registrableDomain(b.domain) === reg) return { brand: b.brand, how: `domain ${reg} is ${b.brand}'s site (confirmed by P5)` };
+  }
+  for (const b of brands) {
     const bs = slugify(b.brand);
-    if (bs.length >= 4 && hostSlug.length >= 4 && (hostSlug === bs || hostSlug.startsWith(bs) || (bs.startsWith(hostSlug) && hostSlug.length >= 6))) {
-      return { brand: b.brand, how: `domain ${reg} matches brand "${b.brand}"` };
-    }
+    if (bs.length >= 4 && hostSlug === bs) return { brand: b.brand, how: `domain ${reg} is exactly the brand name "${b.brand}"` };
   }
   return null;
 }
@@ -406,27 +413,28 @@ function markSyndication(pages, marketingTexts = [], { threshold = 0.6 } = {}) {
 }
 
 /**
- * Is a quote copied from a competitor's own marketing? Quotes of ≥ 5 words:
- * ≥ threshold of the quote's 5-word shingles occur in one listing. Shorter
- * quotes: exact (normalised) substring of a listing.
- * @returns {null | {asin, brand, score}}
+ * Is a quote copied from a competitor's own marketing? Only a DISTINCTIVE
+ * passage counts: ≥ 5 words, ≥ threshold of its 5-word shingles in one
+ * listing, and found in at most `maxListings` listings. Short or generic
+ * phrases ("gluten free", "third party tested") that many listings share
+ * are category vocabulary, not copying.
+ * @returns {null | {asin, brand, score, listings}}
  */
-function copiedMarketingMatch(quote, marketing, { threshold = 0.6 } = {}) {
+function copiedMarketingMatch(quote, marketing, { threshold = 0.6, maxListings = 2 } = {}) {
   const toks = tokenize(quote);
-  if (!toks.length) return null;
-  if (toks.length < 5) {
-    const q = toks.join(' ');
-    const hit = marketing.find((m) => ` ${tokenize(m.text).join(' ')} `.includes(` ${q} `));
-    return hit ? { asin: hit.asin, brand: hit.brand || null, score: 1 } : null;
-  }
+  if (toks.length < 5) return null;
   const qs = shingles(toks);
   let best = null;
+  let listings = 0;
   for (const m of marketing) {
     const msh = m.sh || (m.sh = shingles(m.text || ''));
     const c = containment(qs, msh);
-    if (c >= threshold && (!best || c > best.score)) best = { asin: m.asin, brand: m.brand || null, score: round2(c) };
+    if (c < threshold) continue;
+    listings++;
+    if (!best || c > best.score) best = { asin: m.asin, brand: m.brand || null, score: round2(c) };
   }
-  return best;
+  if (!best || listings > maxListings) return null;
+  return { ...best, listings };
 }
 
 module.exports = {

@@ -9,7 +9,7 @@
  */
 
 export type Basis = "per_serving" | "per_unit" | "per_day" | "per_container";
-export type ElementalBasis = "stated" | "computed" | "unknown";
+export type ElementalBasis = "stated" | "computed" | "unknown" | "model_claimed";
 
 export interface SourceRef {
   row_id: number | string | null;
@@ -32,6 +32,7 @@ export interface LabelFactRow {
   amount_kind: string | null;
   form?: string | null;
   compound: string | null;
+  compound_source?: "label" | "model_claimed" | null;
   compounds?: Array<{ name: string; mg: number | null }> | null;
   elemental_mg: number | null;
   elemental_basis: ElementalBasis | null;
@@ -43,6 +44,7 @@ export interface LabelFactRow {
     equivalent_basis: string | null;
     standardised_to: string | null;
     note?: string | null;
+    model_claimed?: string[] | null;
   } | null;
   dv_percent?: string | null;
   status?: string;
@@ -69,7 +71,7 @@ export type ConflictValue = SourceRef & { value: string | null; amount_mg?: numb
 export type LabelConflicts = Record<string, ConflictValue[]>;
 
 export interface LabelProductMatch {
-  verdict: "match" | "mismatch" | "unknown";
+  verdict: "match" | "match_by_serving" | "mismatch" | "unknown";
   why: string;
   mismatch_on?: string[];
   count_match?: boolean | null;
@@ -132,17 +134,10 @@ export function nutrientKey(name: string): string {
     .trim();
 }
 
-/** The conflict entry for a nutrient row, matching the pipeline's loose name match. */
+/** The conflict entry for a nutrient row (keyed by the chosen panel row's normalised name). */
 export function conflictFor(conflicts: LabelConflicts, name: string): ConflictValue[] | null {
   const k = nutrientKey(name);
-  if (!k) return null;
-  if (conflicts[`nutrient:${k}`]) return conflicts[`nutrient:${k}`];
-  for (const [field, values] of Object.entries(conflicts)) {
-    if (!field.startsWith("nutrient:")) continue;
-    const ck = field.slice("nutrient:".length);
-    if (ck.includes(k) || k.includes(ck)) return values;
-  }
-  return null;
+  return k ? conflicts[`nutrient:${k}`] ?? null : null;
 }
 
 export function formatMg(mg: number | null | undefined): string {

@@ -148,10 +148,28 @@ function basisHintFromText(t) {
  */
 function parseAmount(raw, context = '') {
   const amount_raw = raw == null ? null : String(raw).trim() || null;
-  const base = { amount_raw, value: null, unit_raw: null, unit_basis: null, amount_mg: null, conversion: null, alt_amounts: [], qualifier: null, basis_hint: null, variants: null, in_blend_mg: null, status: 'missing' };
+  const base = { amount_raw, value: null, unit_raw: null, unit_basis: null, amount_mg: null, conversion: null, alt_amounts: [], qualifier: null, basis_hint: null, variants: null, range: null, in_blend_mg: null, status: 'missing' };
   if (!amount_raw) return base;
-  const text = amount_raw;
+  // "1,5 g": a comma followed by exactly 1–2 digits ending the number is a
+  // decimal separator ("1,000" and "1,630" keep their thousands comma).
+  const text = amount_raw.replace(/(\d),(\d{1,2})(?![\d,])/g, '$1.$2');
   base.basis_hint = basisHintFromText(text);
+
+  // "240-250mg", "1-2 g", "120 to 130 mg": a range is not an amount.
+  const range = text.match(new RegExp(`${NUM}\\s*(?:-|–|to)\\s*${NUM}\\s*${UNIT}(?![a-z])`, 'i'));
+  if (range) {
+    const lo = toNumber(range[1]);
+    const hi = toNumber(range[2]);
+    const unit = normUnit(range[3]);
+    return { ...base, range: { min: lo, max: hi, unit, min_mg: round(toMg(lo, unit, context).mg, 6), max_mg: round(toMg(hi, unit, context).mg, 6) }, status: 'ambiguous' };
+  }
+  // "400/200mg", "9 / 13": two numbers sharing one slot — which one applies is not printed.
+  const pair = text.match(new RegExp(`^\\s*${NUM}\\s*\\/\\s*${NUM}\\s*${UNIT}?(?![a-z])`, 'i'));
+  if (pair) {
+    const unit = normUnit(pair[3]);
+    const variants = [pair[1], pair[2]].map((v) => ({ text: `${v}${unit ? ` ${unit}` : ''}`, value: toNumber(v), unit, amount_mg: unit ? round(toMg(toNumber(v), unit, context).mg, 6) : null, units: null, label: null }));
+    return { ...base, variants, status: 'ambiguous' };
+  }
 
   const blend = text.match(BLEND_RE);
   if (blend) {
@@ -210,8 +228,11 @@ function parseAmount(raw, context = '') {
 
 // ── serving size ────────────────────────────────────────────────────────
 
-const WORD_NUMS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, single: 1, a: 1 };
+const WORD_NUMS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, single: 1, a: 1, an: 1 };
 const DISCRETE_FORMS = new Set(['gummy', 'capsule', 'softgel', 'tablet', 'chew', 'lozenge', 'stick', 'packet', 'tube']);
+// More discrete units than this in ONE serving is a misread (a container count
+// like "120 gummies" in the serving-size slot), not a serving.
+const MAX_DISCRETE_UNITS = 12;
 
 function canonicalForm(w) {
   const x = String(w || '').toLowerCase().replace(/\s+/g, ' ');
@@ -236,23 +257,42 @@ function canonicalForm(w) {
  */
 function parseServing(raw) {
   const text = raw == null ? '' : String(raw).trim();
-  const out = { raw: text || null, units: null, form: null, discrete: false, serving_mass_g: null, per_day_units: null, range: null };
+  const out = { raw: text || null, units: null, form: null, discrete: false, serving_mass_g: null, per_day_units: null, range: null, serving_alternatives: null, implausible_serving: false, inferred: false };
   if (!text) return out;
-  const x = text.toLowerCase();
-  const formRe = new RegExp(`(\\d+(?:\\.\\d+)?|${Object.keys(WORD_NUMS).join('|')})(?:\\s*-\\s*(\\d+))?\\s+(?:[a-z®™-]+\\s+){0,2}?${UNIT_WORDS}`, 'i');
-  const m = x.match(formRe);
-  if (m) {
-    const n = WORD_NUMS[m[1]] ?? toNumber(m[1]);
-    out.form = canonicalForm(m[3]);
+  let x = text.toLowerCase();
+  // "(implied by 90 capsules / 45-day supply)": the model's inference, and its count is the container's.
+  if (/\(\s*implied\b[^)]*\)?/.test(x)) { out.inferred = true; x = x.replace(/\(\s*implied\b[^)]*\)?/g, ' '); }
+  if (/\bhalf\s+(?:an?\s+)?/.test(x)) x = x.replace(/\bhalf\s+(?:an?\s+)?/g, '0.5 ');
+  const numAlt = `\\d+(?:\\.\\d+)?|${Object.keys(WORD_NUMS).join('|')}`;
+  // Numbers and number-words only as whole words ("Mega scoop" is not "a scoop");
+  // the unit noun must end at a word boundary ("2 tablespoons" is not tablets).
+  const formRe = new RegExp(`(?<![\\w.])(${numAlt})(?:\\s*-\\s*(\\d+))?\\s+(?:[a-z®™-]+\\s+){0,2}?${UNIT_WORDS}\\b`, 'gi');
+  const hits = [];
+  // "(2 gummies daily)" is the day's total, not an alternative serving
+  const xs = x.replace(new RegExp(`\\(\\s*\\d+\\s+${UNIT_WORDS}\\s+(?:daily|per day|a day)\\s*\\)`, 'gi'), ' ');
+  let m;
+  while ((m = formRe.exec(xs))) {
+    hits.push({ n: WORD_NUMS[m[1]] ?? toNumber(m[1]), hi: m[2] ? toNumber(m[2]) : null, form: canonicalForm(m[3]), text: m[0].trim() });
+  }
+  if (hits.length) {
+    const first = hits[0];
+    out.form = first.form;
     out.discrete = DISCRETE_FORMS.has(out.form);
-    if (m[2]) out.range = [n, toNumber(m[2])];
-    else out.units = n;
+    if (first.hi != null) out.range = [first.n, first.hi];
+    else out.units = first.n;
+    // "1 Gummy for Ages 4+, 2 Gummies for Adults", "2 Gummies / 3 Gummies":
+    // several counts for one serving slot — which one the amounts are for is not printed.
+    const counts = new Set(hits.map((h) => h.n));
+    if (counts.size > 1) {
+      out.serving_alternatives = hits.map((h) => ({ units: h.n, form: h.form, text: h.text }));
+      out.units = null;
+    }
   }
-  const mass = x.match(/\(\s*(\d*\.?\d+)\s*(g|gm|grams?|oz)\b/) || x.match(/(\d*\.?\d+)\s*(g|gm|grams?)\s*scoop/);
-  if (mass) {
-    const v = toNumber(mass[1]);
-    out.serving_mass_g = v == null ? null : round(/oz/.test(mass[2]) ? v * 28.3495 : v, 3);
-  }
+  if (out.discrete && out.units != null && out.units > MAX_DISCRETE_UNITS) { out.implausible_serving = true; out.units = null; }
+  const masses = [...x.matchAll(/(\d*\.?\d+)\s*(g|gm|grams?|oz)\b/g)].map((mm) => round(/oz/.test(mm[2]) ? toNumber(mm[1]) * 28.3495 : toNumber(mm[1]), 3)).filter((v) => v != null);
+  const massSet = [...new Set(masses)];
+  // "(8.0g / 7.2g / 7.3g)" — one per flavour; no single serving mass
+  if (massSet.length === 1 || (massSet.length === 2 && /\boz\b/.test(x) && /\d\s*g\b/.test(x))) out.serving_mass_g = massSet[0];
   const daily = x.match(new RegExp(`\\(\\s*(\\d+)\\s+${UNIT_WORDS}\\s+(?:daily|per day|a day)\\s*\\)`, 'i'));
   if (daily) out.per_day_units = Number(daily[1]);
   else if (out.units != null) {
@@ -391,7 +431,12 @@ function parseExtract(name, amountRaw, amountMg) {
   const eqM = lower.match(new RegExp(`equivalent\\s+to\\s+${NUM}\\s*(mg|g|mcg)`))
     || lower.match(new RegExp(`${NUM}\\s*(mg|g|mcg)\\s+(?:dried\\s+|raw\\s+|whole\\s+)?(?:herb|root|plant|leaf|fruit)?\\s*equivalent`));
 
-  if (!isExtract && !fromM && !eqM) return null;
+  if (!isExtract && !fromM && !eqM) {
+    // "KSM-66® Ashwagandha Root … standardized to 5% withanolides" — keep the
+    // standardisation even when the word "extract" is not printed.
+    if (out.standardised_to) return { ...out, amount_kind: 'ingredient', note: null };
+    return null;
+  }
   if (!out.ratio && fromM && ratioM) { out.ratio_n = toNumber(ratioM[1]); out.ratio = `${ratioM[1]}:1`; }
 
   if (fromM) {
@@ -499,6 +544,8 @@ function buildRow(f, ctx = {}) {
     const serv = serving.units != null ? a.variants.find((v) => v.units === serving.units && v.amount_mg != null) : null;
     if (one) per_unit_mg = one.amount_mg;
     if (serv) { per_serving_mg = serv.amount_mg; amount_mg = serv.amount_mg; basis = 'per_serving'; basis_source = 'amount_text'; }
+  } else if (serving.serving_alternatives) {
+    // "1 Gummy for Ages 4+, 2 Gummies for Adults": which serving the amount is for is not printed.
   } else if (amount_mg != null && basis) {
     if (basis === 'per_serving') {
       per_serving_mg = amount_mg;
@@ -515,8 +562,22 @@ function buildRow(f, ctx = {}) {
   let elemental_factor = null;
   let amount_kind = null;
   let compound = n.compound;
-  // model-reported compound — only if that compound is printed on the label.
-  if (!compound && f && f.compound && raw && squash(raw).includes(squash(f.compound))) compound = cleanName(f.compound);
+  // Model-reported values are checked against THIS row's own line of label
+  // text (never the whole label: "Calories 20" must not back an invented
+  // "20 mg elemental"). No own line → the value is kept as `model_claimed`.
+  const ev = findExcerpt(raw, n.name, f && f.evidence_excerpt);
+  const ownLine = ev.excerpt && (ev.excerpt_source === 'model' || ev.excerpt_source === 'raw_text') ? ev.excerpt : null;
+  const hint = (value, check) => {
+    if (value == null || String(value).trim() === '') return null;
+    if (!ownLine) return 'model_claimed';
+    return check(value, ownLine) ? 'stated' : null;
+  };
+  const inLine = (v, line) => squash(line).includes(squash(v));
+  let compound_source = compound ? 'label' : null;
+  if (!compound && f && f.compound) {
+    const h = hint(f.compound, inLine);
+    if (h) { compound = cleanName(f.compound); compound_source = h === 'stated' ? 'label' : 'model_claimed'; }
+  }
   if (n.elemental_row_for) {
     amount_kind = 'elemental';
     elemental_mg = amount_mg;
@@ -537,10 +598,11 @@ function buildRow(f, ctx = {}) {
       elemental_basis = 'unknown';
     }
   }
-  // model-reported elemental amount — only if its number is printed on the label.
-  if (elemental_basis === 'unknown' && f && f.elemental_amount && numbersAppearIn(f.elemental_amount, raw)) {
+  // model-reported elemental amount — `stated` only if its number is on this row's own line.
+  if (elemental_basis === 'unknown' && f && f.elemental_amount) {
+    const h = hint(f.elemental_amount, numbersAppearIn);
     const q = parseAmount(f.elemental_amount);
-    if (q.amount_mg != null) { elemental_mg = q.amount_mg; elemental_basis = 'stated'; }
+    if (h && q.amount_mg != null) { elemental_mg = q.amount_mg; elemental_basis = h; }
   }
 
   let extract = parseExtract(n.name, a.amount_raw, amount_mg);
@@ -548,24 +610,31 @@ function buildRow(f, ctx = {}) {
     extract = { ratio: null, ratio_n: null, extract_mg: null, equivalent_whole_plant_mg: null, equivalent_basis: null, standardised_to: null, amount_kind: 'extract_declared', note: null };
   }
   if (extract && f) {
-    if (!extract.ratio && f.extract_ratio && numbersAppearIn(f.extract_ratio, raw)) {
+    const claimed = [];
+    if (!extract.ratio && f.extract_ratio) {
+      const h = hint(f.extract_ratio, numbersAppearIn);
       const r = String(f.extract_ratio).match(/(\d+(?:\.\d+)?)\s*:\s*1/);
-      if (r) { extract.ratio = `${r[1]}:1`; extract.ratio_n = toNumber(r[1]); }
+      if (h && r) { extract.ratio = `${r[1]}:1`; extract.ratio_n = toNumber(r[1]); if (h === 'model_claimed') claimed.push('ratio'); }
     }
-    if (extract.equivalent_whole_plant_mg == null && f.equivalent_amount && numbersAppearIn(f.equivalent_amount, raw)) {
+    if (extract.equivalent_whole_plant_mg == null && f.equivalent_amount) {
+      const h = hint(f.equivalent_amount, numbersAppearIn);
       const q = parseAmount(f.equivalent_amount);
-      if (q.amount_mg != null) {
+      if (h && q.amount_mg != null) {
         extract.equivalent_whole_plant_mg = q.amount_mg;
-        extract.equivalent_basis = 'stated';
-        if (amount_mg != null && amount_mg < q.amount_mg) { extract.amount_kind = 'extract_weight'; extract.extract_mg = amount_mg; }
+        extract.equivalent_basis = h;
+        // only a label-backed equivalent may re-classify what the printed amount measures
+        if (h === 'stated' && amount_mg != null && amount_mg < q.amount_mg) { extract.amount_kind = 'extract_weight'; extract.extract_mg = amount_mg; }
       }
     }
-    if (!extract.standardised_to && f.standardised_to && numbersAppearIn(f.standardised_to, raw)) extract.standardised_to = String(f.standardised_to).trim();
+    if (!extract.standardised_to && f.standardised_to) {
+      const h = hint(f.standardised_to, numbersAppearIn);
+      if (h) { extract.standardised_to = String(f.standardised_to).trim(); if (h === 'model_claimed') claimed.push('standardised_to'); }
+    }
+    if (claimed.length) extract.model_claimed = claimed;
   }
   if (extract) amount_kind = extract.amount_kind; // null = the label leaves unclear which mass this is
   else if (!amount_kind && amount_mg != null) amount_kind = 'ingredient';
 
-  const ev = findExcerpt(raw, n.name, f && f.evidence_excerpt);
   const src = ctx.source || {};
   return {
     name: n.name,
@@ -579,6 +648,7 @@ function buildRow(f, ctx = {}) {
     qualifier: a.qualifier,
     status: a.status,
     variants: a.variants,
+    range: a.range,
     in_blend_mg: a.in_blend_mg,
     basis,
     basis_source,
@@ -587,6 +657,7 @@ function buildRow(f, ctx = {}) {
     amount_kind,
     form: n.form,
     compound: compound || null,
+    compound_source: compound ? compound_source : null,
     compounds: n.compounds.length ? n.compounds : null,
     elemental_mg,
     elemental_basis,
@@ -598,6 +669,7 @@ function buildRow(f, ctx = {}) {
       equivalent_basis: extract.equivalent_basis,
       standardised_to: extract.standardised_to,
       note: extract.note,
+      model_claimed: extract.model_claimed || null,
     } : null,
     dv_percent: f && f.dv_percent != null && String(f.dv_percent).trim() !== '' ? String(f.dv_percent).trim() : null,
     source: {
@@ -662,6 +734,8 @@ function buildFactsV2(input = {}) {
   }
   const warnings = [];
   if (serving.range) warnings.push(`serving size is a range (${serving.raw}) — per-unit amounts not computed`);
+  if (serving.serving_alternatives) warnings.push(`serving size gives alternatives (${serving.raw}) — per-serving and per-unit amounts not computed`);
+  if (serving.implausible_serving) warnings.push(`serving size "${serving.raw}" is not a plausible single serving — ignored`);
   if (serving.units != null && !serving.discrete && serving.form) warnings.push(`serving unit "${serving.form}" is not a countable unit — per-unit amounts not computed`);
   for (const r of rows) {
     if (r.status === 'ambiguous') warnings.push(`${r.name}: several amounts printed (${r.amount_raw})`);

@@ -16,6 +16,9 @@
  *           no_registry           the claim has no registry (Vegan, Gluten-Free, GMP,
  *                                 plain "Non-GMO", "Third-Party Tested", …)
  *           not_checked           it has a registry, but verification is off (CERT_VERIFY != 1)
+ *                                 or the run's CERT_VERIFY_MAX_MS budget ran out first
+ *   claim_key 'facility_claim'    "Manufactured in an NSF Certified Facility" — about the
+ *                                 factory, never looked up as a product certification
  *
  * Registries and their public endpoints (probed 2026-09-27 from a residential
  * connection; the parsers below were written against the live markup where it
@@ -34,10 +37,12 @@
  *   USP Verified         https://www.quality-supplements.org/verified-products/verified-products-listings   (403 to scripts)
  *   Informed Sport       https://sport.wetestyoutrust.com/supplement-search?search=<q>                       (403 to scripts)
  *   Informed Choice      https://choice.wetestyoutrust.com/supplement-search?search=<q>                      (403 to scripts)
- *   Non-GMO Project      https://www.nongmoproject.org/find-non-gmo/search-participating-products/?search=<q> (403 to scripts)
- *     These four answered 403 (bot protection) to a scripted request, so their
- *     parsers are GENERIC and conservative: a page they cannot recognise is
- *     `registry_unavailable`, never `not_found`.
+ *   Non-GMO Project      https://www.nongmoproject.org/find-non-gmo/search-participating-products/?search=<q>
+ *     (301 then a 200 JavaScript shell: the results load in the browser, so the
+ *     HTML never contains them — review round 2026-09-27)
+ *     These four are parsed GENERICALLY and conservatively: they can VERIFY
+ *     (a block naming the brand and product) and say `not_found` only on an
+ *     explicit no-results sentence; any other page is `registry_unavailable`.
  *   USDA Organic (NOP Organic Integrity Database)
  *     https://organic.ams.usda.gov/integrity/ — an ASP.NET form postback with no
  *     documented GET query, so it is reported `registry_unavailable` with that
@@ -47,6 +52,8 @@
 
 'use strict';
 
+const { extractFlavors } = require('./label-variant');
+
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36';
 
 // ── claims → registry ───────────────────────────────────────────────────
@@ -55,6 +62,9 @@ const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (
 function classifyClaim(raw) {
   const s = String(raw || '').trim();
   if (!s) return null;
+  // "Manufactured in an NSF Certified Facility", "Made in a GMP facility":
+  // a statement about the factory, never a certification of this product.
+  if (/facilit|manufactured\s+in|produced\s+in|made\s+in\s+an?\b|(?:registered|certified|inspected|manufacturing)\s+plant\b/i.test(s)) return 'facility_claim';
   if (/certified\s*for\s*sport/i.test(s)) return 'nsf_sport';
   if (/\bnsf\b/i.test(s)) {
     if (/gmp|facility|registered/i.test(s)) return null; // facility GMP registration is not a product certification
@@ -88,12 +98,13 @@ const ADAPTERS = {
     parse(html) {
       if (/No Matching Products Found/i.test(html)) return { recognised: true, listings: [] };
       const listings = [];
-      const re = /<font size='\+2'>([^<]*?)(?:&nbsp;)?<\/font>|<td align="left" valign="top" width="28%">([^<]+)<\/td>/gi;
+      // company header, then rows: Trade Designation | Product ID | Product Form | Serving
+      const re = /<font size='\+2'>([^<]*?)(?:&nbsp;)?<\/font>|<td align="left" valign="top" width="28%">([^<]+)<\/td>\s*<td[^>]*>[^<]*<\/td>\s*<td[^>]*>([^<]*)<\/td>/gi;
       let company = null;
       let m;
       while ((m = re.exec(html))) {
         if (m[1] != null) company = m[1].replace(/&nbsp;/g, ' ').trim();
-        else listings.push({ company, product: m[2].trim(), url: null });
+        else listings.push({ company, product: m[2].trim(), form: formOf(m[3]), url: null });
       }
       return { recognised: listings.length > 0 || /NSF Product and Service Listings/i.test(html), listings };
     },
@@ -105,19 +116,20 @@ const ADAPTERS = {
     url: () => 'https://www.nsfsport.com/certified-products/search-results.php',
     parse(html) {
       const listings = [];
-      const re = /<li class="listng-results__item[^"]*">([\s\S]*?)<\/li>/gi;
+      const re = /<li class="listng-results__item([^"]*)">([\s\S]*?)<\/li>/gi;
       let m;
       while ((m = re.exec(html))) {
-        const block = m[1];
+        const block = m[2];
+        const form = formOf(m[1]); // the class list carries the form ("… 173 Powder Hydration …")
         const product = (block.match(/results__product-name">([^<]*)</) || [])[1];
         const company = (block.match(/results__company-name">([^<]*)</) || [])[1];
         const href = (block.match(/href="(\/certified-products\/listing-detail\.php\?id=\d+)"/) || [])[1];
-        if (product || company) listings.push({ company: company ? company.trim() : null, product: product ? product.trim() : null, url: href ? `https://www.nsfsport.com${href}` : null });
+        if (product || company) listings.push({ company: company ? company.trim() : null, product: product ? product.trim() : null, form, url: href ? `https://www.nsfsport.com${href}` : null });
       }
       return { recognised: listings.length >= 20, listings };
     },
   },
-  usp_verified: genericAdapter('USP Verified', 'product', () => 'https://www.quality-supplements.org/verified-products/verified-products-listings', { minBlocks: 20 }),
+  usp_verified: genericAdapter('USP Verified', 'product', () => 'https://www.quality-supplements.org/verified-products/verified-products-listings'),
   informed_sport: genericAdapter('Informed Sport', 'product', ({ brand }) => `https://sport.wetestyoutrust.com/supplement-search?search=${enc(brand)}`, { noResults: /no (?:products|results) (?:were )?found/i }),
   informed_choice: genericAdapter('Informed Choice', 'product', ({ brand }) => `https://choice.wetestyoutrust.com/supplement-search?search=${enc(brand)}`, { noResults: /no (?:products|results) (?:were )?found/i }),
   non_gmo_project: genericAdapter('Non-GMO Project Verified', 'product', ({ brand }) => `https://www.nongmoproject.org/find-non-gmo/search-participating-products/?search=${enc(brand)}`, { noResults: /no (?:products|results) (?:were )?found|0 results/i }),
@@ -131,62 +143,138 @@ const ADAPTERS = {
 };
 
 /**
- * A registry whose markup we could not observe (it refused scripted requests).
- * It recognises a results page only by a known "no results" sentence or by
- * enough repeated result blocks; anything else is unavailable, not not-found.
+ * A registry whose markup we could not observe (it refused scripted requests,
+ * or answered with a JavaScript shell whose results load later — the Non-GMO
+ * Project does, and its 4 navigation <li>s once passed for "results").
+ * It can VERIFY (a block naming the brand and the product), and it can say
+ * NOT FOUND only on an explicit no-results sentence. Anything else is
+ * `registry_unavailable`.
  */
-function genericAdapter(registry, scope, url, { noResults = null, minBlocks = 3 } = {}) {
+function genericAdapter(registry, scope, url, { noResults = null } = {}) {
   return {
     registry,
     scope,
     url,
     parse(html) {
-      if (noResults && noResults.test(stripTags(html))) return { recognised: true, listings: [] };
+      const explicitNone = !!(noResults && noResults.test(stripTags(html)));
       const blocks = String(html).split(/<(?:tr|li|article)\b/i).slice(1).map((b) => stripTags(b.split(/<\/(?:tr|li|article)>/i)[0])).filter((t) => t.length > 3 && t.length < 400);
-      return { recognised: blocks.length >= minBlocks, listings: blocks.map((t) => ({ company: null, product: t, url: null })) };
+      return { recognised: explicitNone, listings: explicitNone ? [] : blocks.map((t) => ({ company: null, product: t, form: formOf(t), url: null })) };
     },
   };
 }
 
 // ── matching ────────────────────────────────────────────────────────────
 
-const GENERIC = new Set(['supplement', 'supplements', 'dietary', 'powder', 'drink', 'mix', 'gummies', 'gummy', 'capsules', 'capsule', 'tablets', 'softgels',
-  'with', 'and', 'for', 'the', 'of', 'mg', 'mcg', 'iu', 'count', 'ct', 'pack', 'flavor', 'flavored', 'natural', 'organic', 'vegan', 'free', 'sugar', 'men', 'women']);
+// Words that say nothing about WHICH product this is.
+const GENERIC = new Set(['supplement', 'supplements', 'dietary', 'drink', 'mix', 'vitamin', 'vitamins', 'with', 'and', 'for', 'the', 'of', 'plus',
+  'mg', 'mcg', 'iu', 'count', 'ct', 'pack', 'flavor', 'flavored', 'natural', 'organic', 'vegan', 'free', 'sugar', 'men', 'women', 'adult', 'adults',
+  'kids', 'canada', 'usa', 'formula', 'support', 'extra', 'strength', 'high', 'potency', 'daily', 'all', 'new', 'size', 'oz', 'fl', 'g']);
 
+// Dosage forms: compared separately — a gummy is not a capsule.
+const FORMS = [
+  [/\bgumm(?:y|ies)\b/, 'gummy'], [/\bsoft\s*gels?\b|\bsoftgels?\b/, 'softgel'], [/\b(?:veg(?:gie)?\s*)?cap(?:sule)?s?\b|\bvcaps?\b/, 'capsule'],
+  [/\btab(?:let)?s?\b|\bcaplets?\b/, 'tablet'], [/\bpowders?\b/, 'powder'], [/\bstick\s*packs?\b|\bsticks?\b|\bstickpacks?\b/, 'stick'],
+  [/\bpackets?\b|\bsachets?\b/, 'packet'], [/\bchews?\b|\bchewables?\b/, 'chew'], [/\bliquids?\b|\bshots?\b/, 'liquid'], [/\bbars?\b/, 'bar'],
+];
+const FORM_WORDS = /^(gumm(y|ies)|softgels?|soft|gels?|caps?|capsules?|veggie|vcaps?|tab|tabs|tablets?|caplets?|powders?|sticks?|stickpacks?|packets?|sachets?|chews?|chewables?|liquids?|shots?|bars?)$/;
+
+// Powders sold in sticks or packets are the same product form.
+const FORM_FAMILY = { stick: 'powder', packet: 'powder' };
+
+/** The first dosage form named in the text, as a comparable family. */
+function formOf(s) {
+  const t = norm(s);
+  if (!t) return null;
+  let best = null;
+  for (const [re, f] of FORMS) {
+    const m = re.exec(t);
+    if (m && (!best || m.index < best.index)) best = { index: m.index, form: f };
+  }
+  return best ? (FORM_FAMILY[best.form] || best.form) : null;
+}
+
+/** [start, end) of the run of whole words that collapses to the brand, or null. */
+function brandSpan(words, brand) {
+  const want = collapse(brand);
+  if (!want || want.length < 3) return null;
+  for (let i = 0; i < words.length; i++) {
+    let acc = '';
+    for (let j = i; j < words.length && acc.length < want.length; j++) {
+      acc += words[j];
+      if (acc === want) return [i, j + 1];
+    }
+  }
+  return null;
+}
+
+/** Brand on word boundaries: "Liquid I.V." ~ "Liquid IV", but "Olly" ≁ "Jolly Rancher". */
+function brandIn(text, brand) {
+  return !!brandSpan(norm(text).split(' ').filter(Boolean), brand);
+}
+
+/** The text's words with every run spelling the brand removed ("Liquid I.V." is not a liquid). */
+function withoutBrand(s, brand) {
+  let words = norm(s).split(' ').filter(Boolean);
+  for (let span = brandSpan(words, brand); span; span = brandSpan(words, brand)) words = [...words.slice(0, span[0]), ...words.slice(span[1])];
+  return words;
+}
+
+/** Distinctive product words, de-duplicated, without the brand, generic or form words. */
 function productTokens(s, brand) {
-  const b = new Set(norm(brand).split(' '));
-  return norm(s).split(' ').filter((t) => t.length > 1 && !GENERIC.has(t) && !b.has(t) && !/^\d+$/.test(t));
+  return [...new Set(withoutBrand(s, brand).filter((t) => t.length > 1 && !GENERIC.has(t) && !FORM_WORDS.test(t) && !/^\d+[a-z]*$/.test(t)))];
 }
 
 /**
  * Is this brand (and, for product-level registries, this product) on the listing?
+ * Product level needs EVERY distinctive word of the listing's product name in
+ * the title (so "Magnesium Bisglycinate" never verifies "Magnesium CitraMate"),
+ * at least one such word, and the dosage form to agree when both state one.
  * @returns {{ listing, quality: 'product'|'brand' } | null}
  */
 function matchListing(listings, { brand, title }, scope = 'product') {
-  const b = collapse(brand);
-  if (!b || b.length < 3) return null;
-  const want = productTokens(title, brand);
+  if (!brand || collapse(brand).length < 3) return null;
+  const want = new Set(productTokens(title, brand));
+  const titleForm = formOf(withoutBrand(title, brand).join(' '));
+  const titleFlavors = extractFlavors(title);
   let best = null;
   for (const l of listings || []) {
-    const hay = collapse(`${l.company || ''} ${l.product || ''}`);
-    if (!hay.includes(b)) continue;
+    if (!brandIn(`${l.company || ''} ${l.product || ''}`, brand)) continue;
     if (scope === 'operation') return { listing: l, quality: 'brand' };
-    const have = new Set(productTokens(l.product, brand));
-    const shared = want.filter((t) => have.has(t)).length;
-    const need = Math.min(2, have.size);
-    if (have.size && shared >= need) {
-      const score = shared / have.size;
-      if (!best || score > best.score) best = { listing: l, quality: 'product', score };
-    }
+    const have = productTokens(l.product, brand);
+    if (!have.length) continue;
+    if (!have.every((t) => want.has(t))) continue;
+    const listingForm = l.form || formOf(withoutBrand(l.product, brand).join(' '));
+    if (titleForm && listingForm && titleForm !== listingForm) continue;
+    // NSF lists per flavour: when both name one, the flavour phrases must agree
+    // ("DripDrop® Lemon" is not "DripDrop … Lemon Lime").
+    const lf = extractFlavors(l.product);
+    if (lf.length && titleFlavors.length && !lf.some((f) => titleFlavors.includes(f))) continue;
+    // most distinctive words wins; on a tie the plainest name ("… CitraMate" over "… CitraMate (Canada)")
+    const score = have.length * 1000 - norm(l.product).length;
+    if (!best || score > best.score) best = { listing: l, quality: 'product', score };
   }
   return best ? { listing: best.listing, quality: best.quality } : null;
 }
 
 // ── orchestration ───────────────────────────────────────────────────────
 
-async function fetchPage(url, { fetchImpl, cache, timeoutMs = 20000 }) {
+/** At most `n` requests in flight per registry (host), shared across products. */
+function limiter(n) {
+  let active = 0;
+  const queue = [];
+  const next = () => { if (active < n && queue.length) { active++; queue.shift()(); } };
+  return (fn) => new Promise((resolve, reject) => {
+    queue.push(() => fn().then(resolve, reject).finally(() => { active--; next(); }));
+    next();
+  });
+}
+
+async function fetchPage(url, { fetchImpl, cache, limiters, concurrency = 2, timeoutMs = 20000 }) {
   if (cache && cache.has(url)) return cache.get(url);
-  const p = (async () => {
+  const host = (() => { try { return new URL(url).host; } catch (_) { return url; } })();
+  if (limiters && !limiters.has(host)) limiters.set(host, limiter(concurrency));
+  const run = limiters ? limiters.get(host) : (fn) => fn();
+  const p = run(async () => {
     try {
       const res = await fetchImpl(url, { headers: { 'User-Agent': UA, Accept: 'text/html,application/xhtml+xml' }, timeout: timeoutMs, redirect: 'follow' });
       const body = await res.text();
@@ -194,7 +282,7 @@ async function fetchPage(url, { fetchImpl, cache, timeoutMs = 20000 }) {
     } catch (e) {
       return { ok: false, status: null, body: '', error: e.message };
     }
-  })();
+  });
   if (cache) cache.set(url, p);
   return p;
 }
@@ -205,18 +293,22 @@ async function checkOne(key, { brand, title }, opts) {
   if (!a.url) return { ...base, status: 'registry_unavailable', evidence_url: a.manualUrl || null, match: null, reason: 'no public query endpoint — check manually at evidence_url' };
   if (!brand) return { ...base, status: 'registry_unavailable', evidence_url: null, match: null, reason: 'no brand to search the registry with' };
   const url = a.url({ brand, title });
+  if (opts.deadline && Date.now() > opts.deadline && !(opts.cache && opts.cache.has(url))) {
+    return { ...base, status: 'not_checked', evidence_url: null, match: null, reason: 'CERT_VERIFY_MAX_MS reached before this lookup' };
+  }
   const page = await fetchPage(url, opts);
   if (!page.ok) return { ...base, status: 'registry_unavailable', evidence_url: url, match: null, reason: page.error ? `request failed: ${page.error}` : `HTTP ${page.status}` };
   const parsed = a.parse(page.body);
   const hit = matchListing(parsed.listings, { brand, title }, a.scope);
-  if (hit) return { ...base, status: 'verified', evidence_url: hit.listing.url || url, match: { company: hit.listing.company, product: hit.listing.product, quality: hit.quality }, reason: null };
-  if (!parsed.recognised) return { ...base, status: 'registry_unavailable', evidence_url: url, match: null, reason: 'registry page not recognised (layout change or bot wall)' };
-  return { ...base, status: 'not_found', evidence_url: url, match: null, reason: `no ${a.scope === 'operation' ? 'operation' : 'product'} listed for brand "${brand}"` };
+  if (hit) return { ...base, status: 'verified', evidence_url: hit.listing.url || url, match: { company: hit.listing.company, product: hit.listing.product, form: hit.listing.form || null, quality: hit.quality }, reason: null };
+  if (!parsed.recognised) return { ...base, status: 'registry_unavailable', evidence_url: url, match: null, reason: 'registry page not recognised — no explicit "no results" and no listing for this brand (layout change, JavaScript-rendered results or bot wall)' };
+  return { ...base, status: 'not_found', evidence_url: url, match: null, reason: `no ${a.scope === 'operation' ? 'operation' : 'product'} listed for brand "${brand}" matching this product` };
 }
 
 /**
  * @param {object} p        { claims: string[], brand, title }
- * @param {object} [opts]   { enabled (default CERT_VERIFY === '1'), fetchImpl, cache: Map, now: Date }
+ * @param {object} [opts]   { enabled (default CERT_VERIFY === '1'), fetchImpl, cache: Map, limiters: Map,
+ *                            deadline: epoch ms after which no new request is made, now: Date }
  * @returns {Promise<Array<object>>} one result per distinct printed claim
  */
 async function verifyCertifications({ claims, brand, title } = {}, opts = {}) {
@@ -224,6 +316,7 @@ async function verifyCertifications({ claims, brand, title } = {}, opts = {}) {
   const checked_at = (opts.now || new Date()).toISOString();
   const fetchImpl = opts.fetchImpl || require('node-fetch');
   const cache = opts.cache || new Map();
+  const limiters = opts.limiters || new Map();
   const seen = new Set();
   const out = [];
   for (const raw of Array.isArray(claims) ? claims : []) {
@@ -231,6 +324,7 @@ async function verifyCertifications({ claims, brand, title } = {}, opts = {}) {
     if (!claim || seen.has(claim.toLowerCase())) continue;
     seen.add(claim.toLowerCase());
     const key = classifyClaim(claim);
+    if (key === 'facility_claim') { out.push({ claim, claim_key: key, registry: null, scope: 'facility', status: 'no_registry', checked_at, evidence_url: null, match: null, reason: 'a statement about the manufacturing facility, not a certification of this product' }); continue; }
     if (!key) { out.push({ claim, claim_key: null, registry: null, scope: null, status: 'no_registry', checked_at, evidence_url: null, match: null, reason: 'no certifying registry for this claim' }); continue; }
     const keys = key === 'nsf_any' ? ['nsf_contents', 'nsf_sport'] : [key];
     if (!enabled) {
@@ -240,14 +334,14 @@ async function verifyCertifications({ claims, brand, title } = {}, opts = {}) {
     let result = null;
     const tried = [];
     for (const k of keys) {
-      const r = await checkOne(k, { brand, title }, { fetchImpl, cache, timeoutMs: opts.timeoutMs });
+      const r = await checkOne(k, { brand, title }, { fetchImpl, cache, limiters, concurrency: opts.concurrency, timeoutMs: opts.timeoutMs, deadline: opts.deadline });
       tried.push(r);
       if (r.status === 'verified') { result = r; break; }
     }
-    if (!result) result = tried.find((r) => r.status === 'not_found' && tried.every((t) => t.status === 'not_found')) || tried.find((r) => r.status === 'registry_unavailable') || tried[0];
+    if (!result) result = (tried.every((t) => t.status === 'not_found') && tried[0]) || tried.find((r) => r.status === 'registry_unavailable') || tried.find((r) => r.status === 'not_checked') || tried[0];
     out.push({ claim, ...result, claim_key: key, checked_at });
   }
   return out;
 }
 
-module.exports = { classifyClaim, matchListing, verifyCertifications, ADAPTERS };
+module.exports = { classifyClaim, matchListing, verifyCertifications, formOf, ADAPTERS };

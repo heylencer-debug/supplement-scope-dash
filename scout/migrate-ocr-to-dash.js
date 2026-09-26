@@ -6,11 +6,13 @@
  * 2026-09-27 — per-field source resolution (utils/label-sources.js) replaces
  * "the row with the most facts wins for every field": facts-panel image > text
  * extraction for nutrients; serving size from the latest source when they agree,
- * else the nutrient source's plus a recorded conflict; certification wording
- * from the listing text, image-only claims kept. A row whose label does not
- * match the listing (label_product_match.verdict = 'mismatch') is never
- * promoted. Migration 013 adds products.label_facts / label_sources /
- * label_conflicts / label_product_match / certifications_verified; without it
+ * else the nutrient source's plus a recorded conflict; claims_on_label = the
+ * label images' claims (as before), claims_all_sources = the union with the
+ * listing text, per claim with its sources. A row whose label is ANOTHER
+ * product (label_product_match.verdict = 'mismatch': brand or flavour) is never
+ * promoted; a pack-size sibling's panel (match_by_serving) is. Migration 013
+ * adds products.label_facts / label_sources / label_conflicts /
+ * label_product_match / claims_all_sources / certifications_verified; without it
  * the legacy columns are written exactly as before and the new ones skipped.
  * Afterwards verify-certifications.js runs in-process (registry lookups only
  * with CERT_VERIFY=1).
@@ -30,7 +32,7 @@ const { resolveLabelFields } = require('./utils/label-sources');
 const { runCertificationVerification } = require('./verify-certifications');
 
 const isMissingColumn = (error) => !!error && (error.code === '42703' || error.code === 'PGRST204' || /column .* does not exist|Could not find the .* column/i.test(error.message || ''));
-const MIGRATION_013_PRODUCT_KEYS = ['label_facts', 'label_sources', 'label_conflicts', 'label_product_match'];
+const MIGRATION_013_PRODUCT_KEYS = ['label_facts', 'label_sources', 'label_conflicts', 'label_product_match', 'claims_all_sources'];
 
 const DOVIVE = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 const DASH = createClient(
@@ -167,7 +169,9 @@ async function main() {
 
     if (resolved.values.serving_size) updateData.serving_size = resolved.values.serving_size;
     if (resolved.values.servings_per_container) updateData.servings_per_container = parseInt(resolved.values.servings_per_container) || null;
-    if (resolved.values.certifications.length > 0) updateData.claims_on_label = resolved.values.certifications;
+    // claims_on_label keeps its meaning: claims printed on the label IMAGES.
+    // The union with the listing text goes to claims_all_sources (migration 013).
+    if (resolved.values.label_claims.length > 0) updateData.claims_on_label = resolved.values.label_claims;
 
     const conflicts = resolved.conflicts;
     if (Object.keys(conflicts).length) conflictProducts++;
@@ -176,6 +180,7 @@ async function main() {
       label_sources: { ...resolved.sources, ...(resolved.excluded.length ? { excluded: resolved.excluded } : {}) },
       label_conflicts: conflicts,
       label_product_match: resolved.product_match,
+      claims_all_sources: resolved.values.claims_all_sources.length ? resolved.values.claims_all_sources : null,
     };
 
     let { error } = await DASH.from('products').update(newCols ? { ...updateData, ...newData } : updateData).eq('id', productId);
@@ -200,10 +205,10 @@ async function main() {
   console.log(`Updated: ${updated} products`);
   console.log(`Skipped (ASIN not in DASH): ${skipped}`);
   console.log(`Errors: ${errors}`);
-  console.log(`\nFields now populated: all_nutrients, nutrients_count, ocr_confidence, serving_size, servings_per_container${newCols ? ', label_facts, label_sources, label_conflicts, label_product_match' : ''}`);
+  console.log(`\nFields now populated: all_nutrients, nutrients_count, ocr_confidence, serving_size, servings_per_container, claims_on_label${newCols ? ', label_facts, label_sources, label_conflicts, label_product_match, claims_all_sources' : ''}`);
   console.log(`Products with source conflicts recorded: ${conflictProducts}`);
   if (excludedLog.length) {
-    console.log(`\n⚠ Labels NOT promoted (they look like another product or variation): ${excludedLog.length} product(s)`);
+    console.log(`\n⚠ Labels NOT promoted (brand or flavour says they are another product): ${excludedLog.length} product(s)`);
     for (const e of excludedLog.slice(0, 30)) {
       for (const x of e.excluded) console.log(`  - ${e.asin} image ${x.image_index} (row ${x.row_id}): ${x.why} | ${e.title.substring(0, 70)}`);
     }

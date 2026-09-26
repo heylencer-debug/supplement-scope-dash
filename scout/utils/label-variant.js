@@ -11,10 +11,14 @@
  * variation attributes (dovive_keepa.raw_json.variations[{asin, attributes}]).
  *
  * Verdict:
- *   mismatch — the label contradicts the listing on flavour, count or brand.
- *              migrate-ocr-to-dash.js never promotes a mismatch row.
- *   match    — no contradiction and at least one positive agreement.
- *   unknown  — the label shows nothing that identifies the variation.
+ *   mismatch          — the label contradicts the listing on flavour or brand:
+ *                       another product. migrate-ocr-to-dash.js never promotes it.
+ *   match_by_serving  — only the count differs (a pack-size sibling's panel). Per
+ *                       serving it is the same product: kept, flagged.
+ *   match             — no contradiction and at least one positive agreement.
+ *   unknown           — the label shows nothing that identifies the variation.
+ * Flavour is compared only from the package identity or front-of-pack wording,
+ * never an ingredients line, and not at all on a variety/assorted listing.
  */
 
 'use strict';
@@ -89,6 +93,14 @@ function extractFlavors(text) {
   return out;
 }
 
+/** Label text minus ingredient lists ("Other Ingredients: …, natural raspberry flavor, …"). */
+function frontOfPack(raw) {
+  return String(raw || '')
+    .split(/\r?\n|⏎/)
+    .map((line) => line.replace(/\b(?:other\s+|inactive\s+)?ingredients?\s*:.*$/i, ' ').replace(/\bcontains\s*:.*$/i, ' '))
+    .join('\n');
+}
+
 /** Only the phrases the label/title marks as its flavour ("Mixed Berry Flavor", "Strawberry Flavored"). */
 function statedFlavors(text) {
   const s = String(text || '');
@@ -114,9 +126,15 @@ function ownVariationAttributes(variations, asin) {
     if (/flavou?r|scent/.test(dim)) out.flavor = val;
     if (/size|count|quantity/.test(dim)) {
       out.size = val;
-      const c = extractCount(val) || (val.match(/^(\d{1,4})\b/) ? { count: Number(val.match(/^(\d{1,4})\b/)[1]) } : null);
-      out.count = c ? c.count : null;
       out.pack = extractPack(val);
+      // "3.08 Ounce (Pack of 1)", "16 fl oz", "500 g": a weight or volume is not a unit count.
+      if (/^\s*[\d.,]+\s*(?:ounces?|oz|fl\.?\s*oz|fluid|grams?|g|kg|kilograms?|lbs?|pounds?|ml|millilit(?:er|re)s?|l|lit(?:er|re)s?)\b/i.test(val)) {
+        out.count = null;
+        out.size_is_measure = true;
+      } else {
+        const c = extractCount(val) || (val.match(/^(\d{1,4})\b/) ? { count: Number(val.match(/^(\d{1,4})\b/)[1]) } : null);
+        out.count = c ? c.count : null;
+      }
     }
   }
   return out;
@@ -147,7 +165,7 @@ function brandAgrees(labelBrand, listingBrand, title) {
  *   label                { brand, product_name, flavor, count, raw_text, serving_size, servings_per_container }
  *   keepa                { parent_asin, variations }  (dovive_keepa.raw_json fields)
  * @returns {{ title_tokens_overlap, flavor_match, count_match, brand_match, parent_asin, listing: object,
- *             label: object, verdict: 'match'|'mismatch'|'unknown', mismatch_on: string[], why: string }}
+ *             label: object, verdict: 'match'|'match_by_serving'|'mismatch'|'unknown', mismatch_on: string[], why: string }}
  */
 function checkLabelProductMatch(p = {}) {
   const label = p.label || {};
@@ -157,15 +175,22 @@ function checkLabelProductMatch(p = {}) {
   // Listing side: Keepa's own attributes first, then the title.
   const titleCount = extractCount(p.title);
   const titlePack = extractPack(p.title);
-  const listingFlavors = own && own.flavor ? extractFlavors(own.flavor) : (statedFlavors(p.title).length ? statedFlavors(p.title) : []);
+  const listingFlavorText = own && own.flavor ? own.flavor : p.title;
+  const listingFlavors = own && own.flavor ? extractFlavors(own.flavor) : statedFlavors(p.title);
+  // A variety / assorted listing holds several flavours: any one of them on a panel is expected.
+  const varietyListing = /\b(variety|assorted|sampler|mixed flavou?rs?)\b/i.test(listingFlavorText || '') || /\b(variety|assorted)\s+pack\b/i.test(p.title || '');
   const listingCounts = new Set();
+  const titleCounts = new Set();
+  if (titleCount) {
+    titleCounts.add(titleCount.count);
+    if (titlePack && titlePack > 1 && titleCount.count % titlePack === 0) titleCounts.add(titleCount.count / titlePack);
+    if (titlePack && titlePack > 1) titleCounts.add(titleCount.count * titlePack);
+  }
   if (own && own.count) {
     listingCounts.add(own.count);
     if (own.pack && own.pack > 1) listingCounts.add(own.count * own.pack);
-  } else if (titleCount) {
-    listingCounts.add(titleCount.count);
-    if (titlePack && titlePack > 1 && titleCount.count % titlePack === 0) listingCounts.add(titleCount.count / titlePack);
-    if (titlePack && titlePack > 1) listingCounts.add(titleCount.count * titlePack);
+  } else {
+    for (const c of titleCounts) listingCounts.add(c);
   }
 
   // Label side: printed count, else servings × units per serving.
@@ -176,22 +201,26 @@ function checkLabelProductMatch(p = {}) {
   const labelCount = printed ? printed.count : derived;
   const labelCountSource = printed ? 'printed' : derived ? 'servings × units' : null;
   const labelPack = extractPack(raw);
-  const labelFlavors = label.flavor ? extractFlavors(label.flavor) : statedFlavors(raw);
+  // Flavour comes from the package identity the model read, or front-of-pack
+  // wording — NEVER an ingredients line ("… natural raspberry flavor, …").
+  const labelFlavors = label.flavor ? extractFlavors(label.flavor) : statedFlavors(frontOfPack(raw));
 
   let count_match = null;
   let count_note = null;
   if (labelCount && listingCounts.size) {
-    count_match = listingCounts.has(labelCount) || (labelPack > 1 && listingCounts.has(labelCount * labelPack));
+    const all = new Set([...listingCounts, ...titleCounts]);
+    count_match = all.has(labelCount) || (labelPack > 1 && all.has(labelCount * labelPack));
     // "24 Count" of 8-packet boxes: a whole multiple of the label with NO pack
-    // size stated anywhere is probably a multipack, not another variation —
-    // unknown, not mismatch. An explicit "Pack of 1" keeps it a mismatch.
-    const packStated = (own && own.size && /pack\s+of/i.test(own.size)) || titlePack;
-    if (!count_match && !packStated) {
-      const multiple = [...listingCounts].find((c) => c > labelCount && c % labelCount === 0 && c / labelCount <= 12);
+    // size stated in Keepa is probably a multipack, not another variation —
+    // unknown, not mismatch. Keepa's explicit "Pack of 1" keeps it a count
+    // difference. The title's own count/pack is tried as well.
+    const keepaPackStated = own && own.size && /pack\s+of/i.test(own.size);
+    if (!count_match && !keepaPackStated) {
+      const multiple = [...all].find((c) => c > labelCount && c % labelCount === 0 && c / labelCount <= 12);
       if (multiple) { count_match = null; count_note = `listing count ${multiple} is ${multiple / labelCount}× the label's ${labelCount} with no pack size stated — probably a multipack`; }
     }
   }
-  const flavor_match = flavorsAgree(labelFlavors, listingFlavors);
+  const flavor_match = varietyListing ? null : flavorsAgree(labelFlavors, listingFlavors);
   const brand_match = brandAgrees(label.brand, p.brand, p.title);
 
   const nameTokens = tokens(label.product_name);
@@ -209,11 +238,17 @@ function checkLabelProductMatch(p = {}) {
   else if (brand_match) agreements.push('brand');
   if (title_tokens_overlap != null && title_tokens_overlap >= 0.5) agreements.push('product name');
 
+  // mismatch          — flavour or brand contradicts the listing: another product;
+  //                     never promoted.
+  // match_by_serving  — only the COUNT differs (a pack-size sibling's panel):
+  //                     per serving the panel is the same product, so it is kept
+  //                     and flagged, but servings_per_container is not this listing's.
   let verdict = 'unknown';
   let why;
-  if (conflicts.length) { verdict = 'mismatch'; why = conflicts.join('; '); }
+  if (mismatch_on.includes('flavor') || mismatch_on.includes('brand')) { verdict = 'mismatch'; why = conflicts.join('; '); }
+  else if (mismatch_on.includes('count')) { verdict = 'match_by_serving'; why = `${conflicts.join('; ')} — another pack size's panel; per serving it is the same product`; }
   else if (agreements.length) { verdict = 'match'; why = `label agrees on ${agreements.join(', ')}`; }
-  else why = count_note || 'the label shows no flavour, count or brand to compare';
+  else why = count_note || (varietyListing ? 'variety listing — flavour not compared; no count or brand to compare' : 'the label shows no flavour, count or brand to compare');
 
   return {
     title_tokens_overlap,
@@ -225,8 +260,8 @@ function checkLabelProductMatch(p = {}) {
     listing: { counts: [...listingCounts], flavors: listingFlavors, keepa_size: own ? own.size : null, keepa_flavor: own ? own.flavor : null },
     label: { count: labelCount, count_source: labelCountSource, pack: labelPack, flavors: labelFlavors, brand: label.brand || null, product_name: label.product_name || null },
     verdict,
-    // Which dimensions disagree. ['count'] alone is usually a pack-size sibling
-    // whose panel is per serving the same — still not THIS listing's label.
+    variety_listing: varietyListing,
+    // Which dimensions disagree.
     mismatch_on,
     why,
   };
@@ -256,6 +291,7 @@ module.exports = {
   extractPack,
   extractFlavors,
   statedFlavors,
+  frontOfPack,
   ownVariationAttributes,
   loadKeepaVariants,
 };

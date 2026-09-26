@@ -51,3 +51,21 @@ test('column missing (migration 013) → stops after one warning, never throws',
   assert.equal(s.skipped, 'column missing');
   assert.equal(warnings.length, 1);
 });
+
+test('reads claims_all_sources first; facility wording is never a product claim', async () => {
+  const db = dash([{ id: 'p1', category_id: 'c', asin: 'A', brand: 'Acme', title: 'x', claims_on_label: ['Vegan'],
+    claims_all_sources: [{ claim: 'Manufactured in an NSF Certified Facility', sources: [] }, { claim: 'Vegan', sources: [] }] }]);
+  await runCertificationVerification({ keyword: 'k', categoryId: 'c', dash: db, enabled: false, log: quiet });
+  const res = db.tables.products[0].certifications_verified.results;
+  assert.deepEqual(res.map((r) => [r.claim_key, r.status]), [['facility_claim', 'no_registry'], [null, 'no_registry']]);
+});
+
+test('CERT_VERIFY_MAX_MS: once the budget is spent, remaining lookups are not_checked with the reason', async () => {
+  const db = dash([{ id: 'p1', category_id: 'c', asin: 'A', brand: 'Acme', title: 'x', claims_on_label: ['NSF Contents Tested'] }]);
+  let fetched = 0;
+  await runCertificationVerification({ keyword: 'k', categoryId: 'c', dash: db, enabled: true, maxMs: -1, fetchImpl: async () => { fetched++; }, log: quiet });
+  assert.equal(fetched, 0);
+  const [r] = db.tables.products[0].certifications_verified.results;
+  assert.equal(r.status, 'not_checked');
+  assert.match(r.reason, /CERT_VERIFY_MAX_MS/);
+});

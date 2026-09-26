@@ -231,3 +231,101 @@ test('numbersAppearIn treats 1,000 and 1000 as the same printed number', () => {
 });
 
 function pick(o, keys) { return Object.fromEntries(keys.map((k) => [k, o[k]])); }
+
+// ── review round 2026-09-27: strings that came back with wrong numbers and status ok ──
+// (real dovive_ocr values unless marked "reviewer")
+
+test('ranges are ambiguous, never an amount; min/max kept', () => {
+  for (const [raw, min, max] of [['240-250mg', 240, 250], ['120-130mg', 120, 130], ['1-2 g', 1000, 2000] /* reviewer */]) {
+    const a = L.parseAmount(raw);
+    assert.equal(a.status, 'ambiguous', raw);
+    assert.equal(a.amount_mg, null, raw);
+    assert.equal(a.range.min_mg, min, raw);
+    assert.equal(a.range.max_mg, max, raw);
+  }
+  const r = row('Potassium', '240-250mg');
+  assert.equal(r.amount_mg, null);
+  assert.equal(r.per_unit_mg, null);
+  assert.deepEqual(r.range, { min: 240, max: 250, unit: 'mg', min_mg: 240, max_mg: 250 });
+});
+
+test('"400/200mg" and "9 / 13" are two values in one slot → ambiguous', () => {
+  const a = L.parseAmount('400/200mg');
+  assert.equal(a.status, 'ambiguous');
+  assert.equal(a.amount_mg, null);
+  assert.deepEqual(a.variants.map((v) => v.amount_mg), [400, 200]);
+  assert.equal(L.parseAmount('9 / 13').status, 'ambiguous');
+});
+
+test('"1,5 g" is 1.5 g (decimal comma); "1,000 mg" and "1,630mg" keep their thousands comma (reviewer)', () => {
+  assert.equal(L.parseAmount('1,5 g').amount_mg, 1500);
+  assert.equal(L.parseAmount('0,25 mg').amount_mg, 0.25);
+  assert.equal(L.parseAmount('1,000 mg').amount_mg, 1000);
+  assert.equal(L.parseAmount('1,630mg').amount_mg, 1630);
+});
+
+test('serving sizes with alternatives → no per-serving / per-unit, alternatives listed', () => {
+  const cases = [
+    ['1 Gummy for Ages 4+, 2 Gummies for Adults', [1, 2]],
+    ['2 Gummies (Adults), 1 Gummy (Ages 4+)', [2, 1]],
+    ['2 gummies (adults); 1 gummy (kids age 4+)', [2, 1]],
+    ['1 gummy daily (ages 4-13), 2 gummies daily (teens and adults)', [1, 2]],
+    ['1 Gummy for Children Ages 4 through 12; 4 Gummies for Ages 13 and Above', [1, 4]],
+    ['2 Gummies / 3 Gummies', [2, 3]],
+  ];
+  for (const [raw, alts] of cases) {
+    const s = L.parseServing(raw);
+    assert.equal(s.units, null, raw);
+    assert.deepEqual(s.serving_alternatives.map((a) => a.units), alts, raw);
+  }
+  const r = L.buildRow({ name: 'Magnesium (as Magnesium Citrate)', amount: '100 mg' }, { serving: L.parseServing('1 Gummy for Ages 4+, 2 Gummies for Adults'), panel_basis: 'per_serving' });
+  assert.equal(r.per_serving_mg, null);
+  assert.equal(r.per_unit_mg, null);
+  assert.equal(r.amount_mg, 100, 'the printed amount itself is kept');
+  // one count, several forms, or a daily total, are NOT alternatives
+  assert.equal(L.parseServing('1 scoop or stick').units, 1);
+  assert.equal(L.parseServing('2 gummies (for adults and children 14+)').units, 2);
+  assert.equal(L.parseServing('1 gummy twice daily (2 gummies daily)').units, 1);
+});
+
+test('serving parser: unit nouns end at a word boundary; "a" only as a word; half; implausible counts', () => {
+  assert.equal(L.parseServing('2 tablespoons').form, null, 'reviewer: tablespoons are not tablets');
+  assert.equal(L.parseServing('2 tablespoons').units, null);
+  assert.equal(L.parseServing('Half a scoop').units, 0.5, 'reviewer');
+  assert.equal(L.parseServing('Mega scoop').units, null);
+  const big = L.parseServing('120 gummies');
+  assert.equal(big.units, null);
+  assert.equal(big.implausible_serving, true);
+  const implied = L.parseServing('2 capsules (implied by 90 capsules / 45-day supply)');
+  assert.equal(implied.units, 2);
+  assert.equal(implied.inferred, true);
+  assert.equal(L.parseServing('1 Stickpack (8.0g / 7.2g / 7.3g)').serving_mass_g, null, 'one mass per flavour — no single serving mass');
+  assert.equal(L.parseServing('1 stick (7.4g / 0.26 oz)').serving_mass_g, 7.4);
+});
+
+test('model values are checked against the row\'s OWN line, not the whole label', () => {
+  const raw = 'Supplement Facts ⏎ Calories 20 ⏎ Magnesium Glycinate 500mg';
+  const invented = L.buildRow({ name: 'Magnesium Glycinate', amount: '500 mg', elemental_amount: '20 mg' }, { raw_text: raw });
+  assert.equal(invented.elemental_mg, null, '"Calories 20" must not back an invented 20 mg elemental');
+  assert.equal(invented.elemental_basis, 'unknown');
+  const onLine = L.buildRow({ name: 'Magnesium Glycinate', amount: '500 mg', elemental_amount: '70 mg', evidence_excerpt: 'Magnesium Glycinate 500mg (70mg elemental)' }, { raw_text: 'Calories 20 ⏎ Magnesium Glycinate 500mg (70mg elemental)' });
+  assert.equal(onLine.elemental_mg, 70);
+  assert.equal(onLine.elemental_basis, 'stated');
+  const noLine = L.buildRow({ name: 'Magnesium Glycinate', amount: '500 mg', elemental_amount: '70 mg' }, { raw_text: '' });
+  assert.equal(noLine.elemental_mg, 70);
+  assert.equal(noLine.elemental_basis, 'model_claimed', 'no excerpt → kept, never stated');
+  const ratioElsewhere = L.buildRow({ name: 'Rhodiola Extract', amount: '100 mg', extract_ratio: '4:1' }, { raw_text: 'Rhodiola Extract 100 mg ⏎ Contains 4:1 ratio of love' });
+  assert.equal(ratioElsewhere.extract.ratio, null);
+  const claimed = L.buildRow({ name: 'Rhodiola Extract', amount: '100 mg', extract_ratio: '4:1' }, { raw_text: '' });
+  assert.equal(claimed.extract.ratio, '4:1');
+  assert.deepEqual(claimed.extract.model_claimed, ['ratio']);
+  const cmp = L.buildRow({ name: 'Zinc', amount: '5 mg', compound: 'zinc picolinate' }, { raw_text: '' });
+  assert.equal(cmp.compound_source, 'model_claimed');
+});
+
+test('KSM-66 standardisation is captured without the word "extract"', () => {
+  const r = row('KSM-66® Ashwagandha Root (standardized to 5% withanolides)', '600 mg');
+  assert.equal(r.extract.standardised_to, '5% withanolides');
+  assert.equal(r.extract.ratio, null);
+  assert.equal(r.amount_kind, 'ingredient');
+});

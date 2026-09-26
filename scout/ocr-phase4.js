@@ -19,11 +19,12 @@
  * covers ~everything from bullet_points. Per product: scan at most
  * OCR_MAX_IMAGES (default 5) gallery images, and STOP as soon as one comes
  * back with has_supplement_facts=true — no need to keep burning calls once
- * the panel is found. Results here SUPPLEMENT phase4-text-extract.js rows —
+ * the panel is found (a panel whose label is ANOTHER product — flavour or brand
+ * mismatch — does not count as found; scanning continues). Results here SUPPLEMENT phase4-text-extract.js rows —
  * migrate-ocr-to-dash.js resolves each product field from its own best source
  * (utils/label-sources.js: facts-panel image > text for nutrients, text
  * wording for certifications, conflicts recorded), and never promotes a
- * panel whose label_product_match verdict is 'mismatch'.
+ * panel whose label_product_match verdict is 'mismatch' (another product).
  *
  * 2026-09-27 (migration 013): each row also gets facts_v2 (utils/label-facts.js
  * — basis, per-unit, elemental vs compound, extract vs equivalent, evidence
@@ -404,7 +405,9 @@ async function main() {
         }) : null;
         if (labelMatch && labelMatch.verdict === 'mismatch') {
           labelMismatches++;
-          console.log(`\n  ⚠ [P4 label check/${product.asin}] image ${imgIdx} looks like another product/variation — ${labelMatch.why} (kept in dovive_ocr, not promoted to the dashboard)`);
+          console.log(`\n  ⚠ [P4 label check/${product.asin}] image ${imgIdx} looks like another product — ${labelMatch.why} (kept in dovive_ocr, not promoted; scanning on)`);
+        } else if (labelMatch && labelMatch.verdict === 'match_by_serving') {
+          console.log(`\n  ⓘ [P4 label check/${product.asin}] image ${imgIdx}: ${labelMatch.why}`);
         }
         await saveOCR({
           asin:                  product.asin,
@@ -424,10 +427,14 @@ async function main() {
           processed_at:          new Date().toISOString()
         });
 
-        if (result.has_supplement_facts && !bestResult) {
+        // Stop at the first facts panel that belongs to THIS product (cost
+        // control). A panel whose label is another product (flavour/brand
+        // mismatch) is saved but not used — keep scanning for the right one,
+        // still within OCR_MAX_IMAGES. A pack-size sibling's panel
+        // (match_by_serving) is the same product per serving: stop there.
+        if (result.has_supplement_facts && !bestResult && !(labelMatch && labelMatch.verdict === 'mismatch')) {
           bestResult = result;
           bestImageIdx = imgIdx;
-          // Stop scanning this product — facts panel found (cost control).
           break;
         }
 

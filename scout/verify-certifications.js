@@ -13,7 +13,13 @@
  * Without CERT_VERIFY=1 no HTTP request is made: registry-backed claims are
  * stored as `not_checked`, everything else as `no_registry`. With it, each
  * distinct registry page is fetched once per run (the NSF Certified for Sport
- * catalogue is one ~2 MB page shared by every product). No AI calls, ever.
+ * catalogue is one ~2 MB page shared by every product), at most 2 requests in
+ * flight per registry, and the whole pass is capped at CERT_VERIFY_MAX_MS
+ * (default 90000): lookups not started by then are stored `not_checked` with
+ * that reason. No AI calls, ever.
+ *
+ * Claims come from products.claims_all_sources (label images + listing text,
+ * migration 013) when present, else products.claims_on_label.
  *
  * Fail-open: any failure logs and returns; the CLI always exits 0.
  */
@@ -35,7 +41,7 @@ function dashClient() {
  * @param {object} p  { keyword, categoryId?, dash?, dryRun?, enabled?, fetchImpl?, log? }
  * @returns {Promise<{ products: number, written: number, verified: number, statuses: object, skipped?: string }>}
  */
-async function runCertificationVerification({ keyword, categoryId, dash, dryRun = false, enabled, fetchImpl, log = console } = {}) {
+async function runCertificationVerification({ keyword, categoryId, dash, dryRun = false, enabled, fetchImpl, maxMs, log = console } = {}) {
   const DASH = dash || dashClient();
   const summary = { products: 0, written: 0, verified: 0, statuses: {} };
   let catId = categoryId;
@@ -43,30 +49,43 @@ async function runCertificationVerification({ keyword, categoryId, dash, dryRun 
     try { catId = (await resolveCategory(DASH, keyword)).id; } catch (e) { log.warn(`  ⚠ cert verification: category not resolved (${e.message})`); return { ...summary, skipped: 'no category' }; }
   }
   const lookups = enabled ?? process.env.CERT_VERIFY === '1';
-  const { data, error } = await DASH.from('products').select('id, asin, brand, title, claims_on_label').eq('category_id', catId).not('claims_on_label', 'is', null).limit(1000);
-  if (error) { log.warn(`  ⚠ cert verification: products read failed (${error.message})`); return { ...summary, skipped: 'read failed' }; }
-  const rows = (data || []).filter((r) => Array.isArray(r.claims_on_label) && r.claims_on_label.length);
-  log.log(`\n→ Certification claims: ${rows.length} products with claims (registry lookups ${lookups ? 'ON' : 'off — set CERT_VERIFY=1 to query registries'})`);
+  const budgetMs = Number(maxMs ?? process.env.CERT_VERIFY_MAX_MS ?? 90000) || 90000;
+  const deadline = Date.now() + budgetMs;
+  let res = await DASH.from('products').select('id, asin, brand, title, claims_on_label, claims_all_sources').eq('category_id', catId).limit(1000);
+  if (res.error && isMissingColumn(res.error)) res = await DASH.from('products').select('id, asin, brand, title, claims_on_label').eq('category_id', catId).limit(1000);
+  if (res.error) { log.warn(`  ⚠ cert verification: products read failed (${res.error.message})`); return { ...summary, skipped: 'read failed' }; }
+  const claimsOf = (r) => {
+    if (Array.isArray(r.claims_all_sources) && r.claims_all_sources.length) return r.claims_all_sources.map((c) => (c && typeof c === 'object' ? c.claim : c)).filter(Boolean);
+    return Array.isArray(r.claims_on_label) ? r.claims_on_label : [];
+  };
+  const rows = (res.data || []).filter((r) => claimsOf(r).length);
+  log.log(`\n→ Certification claims: ${rows.length} products with claims (registry lookups ${lookups ? `ON, budget ${Math.round(budgetMs / 1000)}s` : 'off — set CERT_VERIFY=1 to query registries'})`);
 
   const cache = new Map();
-  for (const r of rows) {
+  const limiters = new Map();
+  let columnMissing = false;
+  const handle = async (r) => {
+    const results = await verifyCertifications({ claims: claimsOf(r), brand: r.brand, title: r.title }, { enabled: lookups, fetchImpl, cache, limiters, deadline });
     summary.products++;
-    const results = await verifyCertifications({ claims: r.claims_on_label, brand: r.brand, title: r.title }, { enabled: lookups, fetchImpl, cache });
     for (const x of results) {
       summary.statuses[x.status] = (summary.statuses[x.status] || 0) + 1;
       if (x.status === 'verified') summary.verified++;
       if (lookups && x.status !== 'no_registry') log.log(`  ${r.asin} · ${x.claim} → ${x.status}${x.reason ? ` (${x.reason})` : ''}`);
     }
-    if (dryRun) continue;
+    if (dryRun || columnMissing) return;
     const payload = { schema_version: 1, checked_at: new Date().toISOString(), lookups_enabled: lookups, results };
     const { error: upErr } = await DASH.from('products').update({ certifications_verified: payload }).eq('id', r.id);
     if (upErr) {
-      if (isMissingColumn(upErr)) { log.warn('  ⚠ products.certifications_verified missing (migration 013) — not stored'); return { ...summary, skipped: 'column missing' }; }
+      if (isMissingColumn(upErr)) { if (!columnMissing) log.warn('  ⚠ products.certifications_verified missing (migration 013) — not stored'); columnMissing = true; return; }
       log.warn(`  ⚠ ${r.asin}: certification write failed (${upErr.message})`);
-      continue;
+      return;
     }
     summary.written++;
-  }
+  };
+  // A few products at a time; the per-registry limiter keeps each registry at ≤ 2 requests in flight.
+  const POOL = 4;
+  for (let i = 0; i < rows.length && !columnMissing; i += POOL) await Promise.all(rows.slice(i, i + POOL).map(handle));
+  if (columnMissing) return { ...summary, skipped: 'column missing' };
   log.log(`  Certification statuses: ${Object.entries(summary.statuses).map(([k, v]) => `${k} ${v}`).join(' · ') || 'none'}${dryRun ? ' (dry run — nothing written)' : ''}`);
   return summary;
 }

@@ -28,6 +28,7 @@ import {
 
 const VERDICT_STYLE = {
   match: "border-chart-4/40 text-chart-4",
+  match_by_serving: "border-chart-2/50 text-chart-2",
   mismatch: "border-destructive/50 text-destructive",
   unknown: "border-border text-muted-foreground",
 } as const;
@@ -61,8 +62,11 @@ function SourceLink({ src }: { src: SourceRef }) {
 function ElementalCell({ r }: { r: LabelFactRow }) {
   if (!r.elemental_basis) return <span className="text-muted-foreground">–</span>;
   if (r.elemental_basis === "unknown") return <span className="text-muted-foreground" title={r.compound ? `Compound: ${r.compound}` : undefined}>unknown</span>;
+  const why = r.elemental_basis === "model_claimed"
+    ? "reported by the model; not found on this row's own label line"
+    : r.elemental_factor ? `computed with factor ${r.elemental_factor}` : "printed on the label";
   return (
-    <span title={r.elemental_factor ? `computed with factor ${r.elemental_factor}` : "printed on the label"}>
+    <span title={why}>
       {formatMg(r.elemental_mg)} <span className="text-[10px] text-muted-foreground">{r.elemental_basis}</span>
     </span>
   );
@@ -90,7 +94,13 @@ export function LabelEvidence({ evidence }: { evidence: LabelEvidenceData }) {
       <div className="flex flex-wrap items-center gap-2 text-xs">
         {match && (
           <Badge variant="outline" className={cn("gap-1", VERDICT_STYLE[match.verdict])} title={match.why}>
-            {match.verdict === "match" ? "Label matches this listing" : match.verdict === "mismatch" ? "Label is another product/variation" : "Label match unknown"}
+            {match.verdict === "match"
+              ? "Label matches this listing"
+              : match.verdict === "match_by_serving"
+                ? "Another pack size's label — same per serving"
+                : match.verdict === "mismatch"
+                  ? "Label is another product"
+                  : "Label match unknown"}
           </Badge>
         )}
         {conflictEntries.length > 0 && <Badge variant="outline" className="border-chart-2/50 text-chart-2">{conflictEntries.length} source conflict{conflictEntries.length === 1 ? "" : "s"}</Badge>}
@@ -106,7 +116,7 @@ export function LabelEvidence({ evidence }: { evidence: LabelEvidenceData }) {
 
       {excluded.length > 0 && (
         <div className="text-xs space-y-1">
-          <p className="uppercase tracking-wide text-[10px] text-muted-foreground">Not used (label does not match this listing)</p>
+          <p className="uppercase tracking-wide text-[10px] text-muted-foreground">Not used (brand or flavour says another product)</p>
           {excluded.map((x, i) => (
             <p key={i} className="text-muted-foreground"><SourceLink src={x} /> — {x.why}</p>
           ))}

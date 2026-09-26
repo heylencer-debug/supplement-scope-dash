@@ -46,11 +46,10 @@ test('text extraction is used when no image has facts', () => {
 
 test('nutrient conflicts are recorded with both values and both sources; absences in text are not', () => {
   const r = resolveLabelFields([text, panel]);
-  const ash = r.conflicts['nutrient:ashwagandha root extract'];
-  assert.ok(ash, 'ashwagandha 3000 vs 300 recorded');
-  assert.deepEqual(ash.map((x) => [x.row_id, x.amount_mg]), [[101, 3000], [199, 300]]);
-  assert.ok(r.conflicts['nutrient:vitamin d3'], 'a nutrient with an amount only in the text is recorded');
-  assert.equal(r.conflicts['nutrient:vitamin d3'][0].note, 'not on this source');
+  assert.equal(r.conflicts['nutrient:ashwagandha root extract'], undefined, '"Ashwagandha" is not matched to "Ashwagandha Root Extract" by substring');
+  const same = resolveLabelFields([panel, { ...text, supplement_facts: [{ name: 'Ashwagandha Root Extract', amount: '300 mg' }] }]);
+  assert.deepEqual(same.conflicts['nutrient:ashwagandha root extract'].map((x) => [x.row_id, x.amount_mg]), [[101, 3000], [199, 300]], 'same normalised name, different amount → conflict');
+  assert.equal(r.conflicts['nutrient:vitamin d3'], undefined, 'listing text names ingredients loosely — its extras are not evidence against the panel');
   assert.equal(r.conflicts['nutrient:magnesium'], undefined, 'equal amounts are not a conflict');
   assert.equal(r.conflicts['nutrient:l theanine'], undefined, 'a name with no amount is not evidence');
 });
@@ -77,9 +76,10 @@ test('serving size: agreeing sources → latest; disagreeing → nutrient source
   assert.ok(disagree.conflicts.servings_per_container);
 });
 
-test('certifications: union by claim, listing-text wording first, image-only claims kept with their image', () => {
+test('certifications: claims_on_label = label images only; claims_all_sources = union, text wording first, per-claim sources', () => {
   const r = resolveLabelFields([panel, text]);
-  assert.deepEqual(r.values.certifications, ['Non-GMO Project Verified', 'Gluten Free', 'GMP', 'Non-GMO']);
+  assert.deepEqual(r.values.label_claims, ['Non-GMO', 'GMP Certified']);
+  assert.deepEqual(r.values.claims_all_sources.map((c) => c.claim), ['Non-GMO Project Verified', 'Gluten Free', 'GMP', 'Non-GMO']);
   const gmp = r.sources.certifications.find((c) => c.claim === 'GMP');
   assert.deepEqual(gmp.sources.map((s) => s.row_id), [199, 101]);
   const nongmo = r.sources.certifications.find((c) => c.claim === 'Non-GMO');
@@ -93,13 +93,13 @@ test('other ingredients: panel image over text', () => {
 });
 
 test('a mismatch row is never promoted and is listed as excluded', () => {
-  const wrong = { ...panel, label_product_match: { verdict: 'mismatch', why: 'count: label 60 vs listing 120' } };
+  const wrong = { ...panel, label_product_match: { verdict: 'mismatch', mismatch_on: ['flavor'], why: 'flavour: label watermelon vs listing tropical' } };
   const r = resolveLabelFields([wrong, text]);
   assert.equal(r.sources.nutrients.row_id, 199);
   assert.equal(r.excluded.length, 1);
   assert.equal(r.excluded[0].row_id, 101);
-  assert.match(r.excluded[0].why, /count/);
-  assert.ok(!r.values.certifications.includes('Non-GMO'), 'excluded from every field, not just nutrients');
+  assert.match(r.excluded[0].why, /flavour/);
+  assert.ok(!r.values.claims_all_sources.some((c) => c.claim === 'Non-GMO'), 'excluded from every field, not just nutrients');
   const only = resolveLabelFields([wrong]);
   assert.deepEqual(only.values.nutrients, []);
   assert.equal(only.label_facts, null);
@@ -117,4 +117,27 @@ test('empty input is safe', () => {
   const r = resolveLabelFields([]);
   assert.deepEqual(r.values.nutrients, []);
   assert.deepEqual(r.conflicts, {});
+});
+
+test('a pack-size sibling\'s panel (count-only) is KEPT; its servings_per_container is not this listing\'s', () => {
+  const sibling = { ...panel, servings_per_container: '60', label_product_match: { verdict: 'match_by_serving', mismatch_on: ['count'], why: 'count' } };
+  const r = resolveLabelFields([sibling, text]);
+  assert.equal(r.sources.nutrients.row_id, 101);
+  assert.equal(r.excluded.length, 0);
+  assert.equal(r.values.servings_per_container, '30', 'from the listing text, not the sibling panel');
+  // an older stored row with verdict 'mismatch' but only a count difference is kept too
+  const legacyCountOnly = { ...panel, label_product_match: { verdict: 'mismatch', mismatch_on: ['count'], why: 'count' } };
+  assert.equal(resolveLabelFields([legacyCountOnly]).excluded.length, 0);
+});
+
+test('nutrient identity: normalised name or (mineral, form) — no substring matches', () => {
+  const panel2 = { ...panel, id: 102, image_index: 3, supplement_facts: [{ name: 'Magnesium Glycinate ADVANCED COMPLEX (as 600mg Magnesium Glycinate and 400mg Magnesium L-Threonate)', amount: '1000mg' }] };
+  const p1 = { ...panel, supplement_facts: [{ name: 'Magnesium (as Magnesium Citrate)', amount: '100 mg' }, { name: 'Zinc (as Zinc Citrate)', amount: '5 mg' }] };
+  const r = resolveLabelFields([p1, panel2]);
+  assert.equal(r.conflicts['nutrient:magnesium'].length, 2, 'magnesium is absent from the other panel (different measure) — recorded as absence, not as 100 vs 1000');
+  assert.equal(r.conflicts['nutrient:magnesium'][1].note, 'not on this source');
+  // same mineral, same form, different measure (elemental vs compound weight): not compared
+  const elem = { ...panel, supplement_facts: [{ name: 'Magnesium (as Magnesium Glycinate)', amount: '100 mg' }] };
+  const cmpd = { ...panel, id: 103, image_index: 4, supplement_facts: [{ name: 'Magnesium Glycinate', amount: '700 mg' }] };
+  assert.deepEqual(resolveLabelFields([elem, cmpd]).conflicts, {});
 });

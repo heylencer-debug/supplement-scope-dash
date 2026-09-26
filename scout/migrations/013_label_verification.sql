@@ -7,10 +7,14 @@
 -- (supabase db query --linked --file ...).
 --
 -- Additive only (ADD COLUMN IF NOT EXISTS) — no existing column touched, and
--- the legacy columns keep their old shape and meaning:
+-- the legacy columns keep their old shape:
 --   dovive_ocr.supplement_facts   still [{ name, amount, dv_percent }]
 --   products.all_nutrients / serving_size / servings_per_container /
---   claims_on_label / nutrients_count / ocr_confidence   still written as before.
+--   nutrients_count / ocr_confidence   same columns, but now each resolved
+--   from its own best source (facts-panel image > listing text for nutrients)
+--   instead of "the row with the most facts" for all of them.
+--   products.claims_on_label   the claims read off the label IMAGES (image rows
+--   only). The union with the listing text goes to the new claims_all_sources.
 --
 -- Until this is applied:
 --   - ocr-phase4.js / phase4-text-extract.js retry their dovive_ocr upsert
@@ -35,8 +39,10 @@
 --   warnings: [] }
 ALTER TABLE dovive_ocr ADD COLUMN IF NOT EXISTS facts_v2 JSONB;
 -- label_product_match: { title_tokens_overlap, flavor_match, count_match,
---   brand_match, parent_asin, listing {…}, label {…},
---   verdict: 'match'|'mismatch'|'unknown', why }
+--   brand_match, count_note, parent_asin, listing {…}, label {…}, variety_listing,
+--   verdict: 'match'|'match_by_serving'|'mismatch'|'unknown', mismatch_on[], why }
+--   mismatch = brand or flavour says another product (never promoted);
+--   match_by_serving = only the count differs (a pack-size sibling's panel; kept).
 -- NULL on text-extraction rows (image_index 99): they read the listing's own copy.
 ALTER TABLE dovive_ocr ADD COLUMN IF NOT EXISTS label_product_match JSONB;
 
@@ -57,8 +63,14 @@ ALTER TABLE products ADD COLUMN IF NOT EXISTS label_sources JSONB;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS label_conflicts JSONB;
 -- label_product_match: the nutrient source row's check (see dovive_ocr above).
 ALTER TABLE products ADD COLUMN IF NOT EXISTS label_product_match JSONB;
+-- claims_all_sources: every certification/free-from claim from label images AND
+--   listing text, de-duplicated by claim, listing-text wording first:
+--   [{ claim, sources: [{row_id, image_url, image_index, processed_at}] }]
+--   (image_index 99 = listing text). verify-certifications.js reads this first.
+ALTER TABLE products ADD COLUMN IF NOT EXISTS claims_all_sources JSONB;
 -- certifications_verified: { schema_version: 1, checked_at, lookups_enabled,
 --   results: [{ claim, claim_key, registry, scope,
 --   status: 'verified'|'not_found'|'registry_unavailable'|'no_registry'|'not_checked',
+--   (claim_key 'facility_claim' = "made in an NSF/GMP facility": never looked up)
 --   checked_at, evidence_url, match {company, product, quality}, reason }] }
 ALTER TABLE products ADD COLUMN IF NOT EXISTS certifications_verified JSONB;

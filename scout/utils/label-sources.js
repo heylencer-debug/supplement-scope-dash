@@ -6,27 +6,41 @@
  * sources is RECORDED (products.label_conflicts), never silently dropped:
  *
  *   nutrients               facts-panel image > text extraction (image_index 99).
- *                           Among images: most facts, then latest. Nutrients the
- *                           other sources state differently — or only one source
- *                           states — are conflicts.
+ *                           Among images: most facts, then latest. A nutrient is
+ *                           the same across sources only by normalised name or by
+ *                           (mineral, form); a different amount of the same measure
+ *                           — or an amount only another panel states — is a conflict.
  *   serving_size /          when every source agrees: the latest. When they
  *   servings_per_container  disagree: the NUTRIENT source's value (its amounts are
  *                           per ITS serving), plus a conflict.
- *   certifications          union by claim; wording from the text extraction
- *                           (listing copy) when both have it; image-only claims
- *                           (a logo) kept with their image as the source.
+ *   claims_on_label         label IMAGE claims only (unchanged meaning).
+ *   claims_all_sources      union by claim incl. listing text; wording from the
+ *                           text extraction when both have it; each claim lists
+ *                           its sources.
  *   other_ingredients       facts-panel image > text.
  *
- * A row whose label_product_match.verdict is 'mismatch' (the label is another
- * product or another variation) is excluded from every field and listed in
- * `excluded` so the caller logs it.
+ * A row whose label_product_match says the label is ANOTHER PRODUCT (brand or
+ * flavour contradiction) is excluded from every field and listed in `excluded`
+ * so the caller logs it. A pack-size sibling's panel (match_by_serving) is kept.
  */
 
 'use strict';
 
-const { buildFactsV2, withRowSource, nutrientKey, parseServing } = require('./label-facts');
+const { buildFactsV2, withRowSource, nutrientKey, parseServing, parseName } = require('./label-facts');
 
 const TEXT_INDEX = 99;
+
+/**
+ * Excluded from every field ONLY when the label is another product: a brand or
+ * flavour contradiction. A count-only difference (verdict match_by_serving, or
+ * an older 'mismatch' row whose mismatch_on is just ['count']) is kept.
+ */
+function isOtherProduct(r) {
+  const m = r && r.label_product_match;
+  if (!m || m.verdict !== 'mismatch') return false;
+  if (!Array.isArray(m.mismatch_on) || !m.mismatch_on.length) return true;
+  return m.mismatch_on.includes('brand') || m.mismatch_on.includes('flavor');
+}
 
 function isText(r) { return r && r.image_index === TEXT_INDEX; }
 function factsOf(r) { return Array.isArray(r && r.supplement_facts) ? r.supplement_facts.filter((f) => f && f.name) : []; }
@@ -82,20 +96,37 @@ function factsV2For(row) {
   }), row);
 }
 
-/** Same nutrient under a slightly different printed name ("black pepper" ~ "black pepper extract"). */
-function matchKey(map, k) {
-  if (map.has(k)) return k;
-  const kt = new Set(k.split(' '));
-  let best = null;
-  let bestScore = 0;
-  for (const ck of map.keys()) {
-    if (ck.includes(k) || k.includes(ck)) return ck;
-    const ct = ck.split(' ');
-    const inter = ct.filter((t) => kt.has(t)).length;
-    const score = inter / new Set([...ct, ...kt]).size;
-    if (score > bestScore) { bestScore = score; best = ck; }
+/**
+ * Identity of a nutrient row for cross-source comparison: its normalised name
+ * ("vitamin d3"), and for minerals its (element, form) pair ("magnesium",
+ * "glycinate"). NO substring matching — "magnesium" is not "magnesium glycinate
+ * advanced complex", and "ashwagandha" is not "ashwagandha root extract".
+ */
+function identity(row) {
+  const n = parseName(row.name);
+  const element = n.element || null;
+  const formSrc = row.compound || n.compound || null;
+  const form = element && formSrc
+    ? formSrc.toLowerCase().replace(new RegExp(`\\b${element}\\b`, 'g'), ' ').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim() || null
+    : null;
+  return { key: nutrientKey(row.name), element, form };
+}
+
+/** The chosen-panel key this row is the same nutrient as, or null. */
+function matchKey(chosenIds, row) {
+  const id = identity(row);
+  if (!id.key) return null;
+  if (chosenIds.has(id.key)) return id.key;
+  if (id.element && id.form) {
+    for (const [k, cid] of chosenIds) if (cid.element === id.element && cid.form === id.form) return k;
   }
-  return bestScore >= 0.6 ? best : null;
+  return null;
+}
+
+/** Amounts are only comparable when they measure the same thing (elemental vs compound weight are not). */
+function comparable(a, b) {
+  const kinds = new Set([a.amount_kind, b.amount_kind].filter(Boolean));
+  return kinds.size <= 1;
 }
 
 function pickNutrientRow(rows) {
@@ -114,11 +145,13 @@ function pickNutrientRow(rows) {
  */
 function resolveLabelFields(rows) {
   const all = Array.isArray(rows) ? rows.filter(Boolean) : [];
-  const excluded = all.filter((r) => r.label_product_match && r.label_product_match.verdict === 'mismatch')
+  const excluded = all.filter(isOtherProduct)
     .map((r) => ({ ...src(r), why: r.label_product_match.why || 'label does not match this listing' }));
-  const usable = all.filter((r) => !(r.label_product_match && r.label_product_match.verdict === 'mismatch'));
+  const usable = all.filter((r) => !isOtherProduct(r));
 
-  const values = { nutrients: [], serving_size: null, servings_per_container: null, certifications: [], other_ingredients: null };
+  // label_claims: claims read off label IMAGES only (products.claims_on_label, as before);
+  // claims_all_sources: every claim incl. listing text, each with its sources.
+  const values = { nutrients: [], serving_size: null, servings_per_container: null, label_claims: [], claims_all_sources: [], other_ingredients: null };
   const sources = {};
   const conflicts = {};
 
@@ -130,18 +163,23 @@ function resolveLabelFields(rows) {
     sources.nutrients = src(nRow);
     label_facts = factsV2For(nRow);
     const chosen = new Map(label_facts.rows.map((r) => [nutrientKey(r.name), r]));
+    const chosenIds = new Map(label_facts.rows.map((r) => [nutrientKey(r.name), identity(r)]));
     for (const other of usable) {
       if (other === nRow || !factsOf(other).length) continue;
       const ov2 = factsV2For(other);
+      const otherIsPanel = !isText(other);
       const matched = new Set();
       for (const r of ov2.rows) {
         const k = nutrientKey(r.name);
         if (!k) continue;
-        const ck = matchKey(chosen, k);
+        const ck = matchKey(chosenIds, r);
         const c = ck ? chosen.get(ck) : null;
         if (ck) matched.add(ck);
         let differs;
-        if (!c) differs = r.amount_mg != null; // named elsewhere with an amount, absent from the chosen panel
+        // named with an amount on another PANEL but absent from the chosen one; listing
+        // text names ingredients loosely ("Ashwagandha"), so its extras are not evidence
+        if (!c) differs = otherIsPanel && r.amount_mg != null;
+        else if (!comparable(c, r)) differs = false;
         else if (c.amount_mg != null && r.amount_mg != null) differs = Math.abs(c.amount_mg - r.amount_mg) > Math.max(0.01, 0.02 * Math.max(c.amount_mg, r.amount_mg));
         else differs = c.amount_mg == null && r.amount_mg != null; // only the other source states an amount
         if (!differs) continue;
@@ -162,8 +200,10 @@ function resolveLabelFields(rows) {
   }
 
   // ── serving size / servings per container ──
+  const packSibling = (r) => r.label_product_match && r.label_product_match.verdict === 'match_by_serving';
   for (const [field, keyFn] of [['serving_size', servingKey], ['servings_per_container', countKey]]) {
-    const cands = usable.filter((r) => r[field] != null && String(r[field]).trim() !== '');
+    // a pack-size sibling's panel has the right serving but not this listing's container count
+    const cands = usable.filter((r) => r[field] != null && String(r[field]).trim() !== '' && !(field === 'servings_per_container' && packSibling(r)));
     if (!cands.length) continue;
     const keys = new Set(cands.map((r) => keyFn(r[field])));
     if (keys.size === 1) {
@@ -178,7 +218,7 @@ function resolveLabelFields(rows) {
     }
   }
 
-  // ── certifications: union by claim, text wording first ──
+  // ── certifications: union by claim (claims_all_sources), text wording first ──
   const byClaim = new Map();
   const ordered = [...usable.filter(isText), ...usable.filter((r) => !isText(r)).sort((a, b) => ts(b) - ts(a))];
   for (const r of ordered) {
@@ -190,8 +230,16 @@ function resolveLabelFields(rows) {
       else e.sources.push(src(r));
     }
   }
-  values.certifications = [...byClaim.values()].map((e) => e.claim);
-  if (byClaim.size) sources.certifications = [...byClaim.values()].map((e) => ({ claim: e.claim, sources: e.sources }));
+  values.claims_all_sources = [...byClaim.values()].map((e) => ({ claim: e.claim, sources: e.sources }));
+  if (byClaim.size) sources.certifications = values.claims_all_sources;
+  // products.claims_on_label keeps its old meaning: what the label IMAGES show.
+  const labelClaims = new Map();
+  for (const r of usable.filter((x) => !isText(x)).sort((a, b) => ts(b) - ts(a))) {
+    for (const c of Array.isArray(r.certifications) ? r.certifications : []) {
+      if (c && String(c).trim() && !labelClaims.has(claimKey(c))) labelClaims.set(claimKey(c), String(c).trim());
+    }
+  }
+  values.label_claims = [...labelClaims.values()];
 
   // ── other ingredients: panel image > text ──
   const oiCands = usable.filter((r) => r.other_ingredients && String(r.other_ingredients).trim());

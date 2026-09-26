@@ -47,14 +47,14 @@ test('match: 2-pack of 60 — label "60 … Gummies", Keepa "60 Count (Pack of 2
   assert.deepEqual(r.mismatch_on, []);
 });
 
-test('mismatch: the 120-count listing shows the 60-count panel (30 servings × 2) (B09WD43NBC)', () => {
+test('match_by_serving: the 120-count listing shows the 60-count panel (30 servings × 2) — same product per serving (B09WD43NBC)', () => {
   const r = V.checkLabelProductMatch({
     asin: 'B09WD43NBC',
     title: 'Nature\'s Key Ashwagandha Gummies, 120CT High Potency Root Extract+D2',
     keepa: { variations: [{ asin: 'B09HZ5NB8Y', attributes: [{ value: '60 Count (Pack of 1)', dimension: 'Size' }] }, { asin: 'B09WD43NBC', attributes: [{ value: '120 Count (Pack of 1)', dimension: 'Size' }] }] },
     label: { raw_text: 'Supplement Facts ⏎ 30 servings per container ⏎ Serving size 2 gummies', serving_size: '2 gummies', servings_per_container: '30' },
   });
-  assert.equal(r.verdict, 'mismatch');
+  assert.equal(r.verdict, 'match_by_serving');
   assert.deepEqual(r.mismatch_on, ['count']);
   assert.equal(r.label.count_source, 'servings × units');
   assert.match(r.why, /120 Count/);
@@ -112,4 +112,63 @@ test('Keepa "1 Count (Pack of 120)" reads as 120 (B0FK1833JY)', () => {
   });
   assert.equal(r.count_match, true);
   assert.equal(r.verdict, 'match');
+});
+
+// ── review round 2026-09-27: real panels that were wrongly excluded ──
+
+test('an ingredients line is not the flavour (Zipfizz B00KAWSJYC: "natural raspberry flavor" on the Fruit Punch listing)', () => {
+  const raw = 'Fruit Punch - Supplement Facts\nServing Size 1 Tube (11 g)\nOther Ingredients: Citric acid, potassium carbonate, glucose polymers, natural raspberry flavor, sodium bicarbonate';
+  assert.deepEqual(V.statedFlavors(V.frontOfPack(raw)), []);
+  const r = V.checkLabelProductMatch({
+    asin: 'B00KAWSJYC', title: 'Zipfizz Energy Drink Powder, 20 Pack Electrolyte Mix with B12 - Fruit Punch',
+    keepa: { variations: [{ asin: 'B00KAWSJYC', attributes: [{ value: 'Fruit Punch', dimension: 'FlavorName' }, { value: '0.39 Ounce (Pack of 20)', dimension: 'Size' }] }] },
+    label: { raw_text: raw, serving_size: '1 Tube (11 g)' },
+  });
+  assert.notEqual(r.verdict, 'mismatch');
+  assert.equal(r.flavor_match, null);
+  const front = V.checkLabelProductMatch({ asin: 'X', title: 'Brand Energy, Fruit Punch Flavor', label: { raw_text: 'natural raspberry flavor\nSupplement Facts' } });
+  assert.equal(front.verdict, 'mismatch', 'front-of-pack flavour wording still counts');
+  const identity = V.checkLabelProductMatch({ asin: 'X', title: 'Brand Energy, Fruit Punch Flavor', label: { flavor: 'Raspberry', raw_text: '' } });
+  assert.equal(identity.verdict, 'mismatch', 'the model\'s package identity counts');
+});
+
+test('a variety / assorted listing skips the flavour check (Ultima B0B6242P2W "Tropical Variety")', () => {
+  const r = V.checkLabelProductMatch({
+    asin: 'B0B6242P2W', title: 'Ultima Replenisher Tropical Variety Electrolyte Packets, 20 Stickpacks',
+    keepa: { variations: [{ asin: 'B0B6242P2W', attributes: [{ value: 'Tropical Variety', dimension: 'FlavorName' }, { value: '20 Count (Pack of 1)', dimension: 'Size' }] }] },
+    label: { flavor: 'Watermelon', raw_text: '' },
+  });
+  assert.equal(r.flavor_match, null);
+  assert.equal(r.variety_listing, true);
+  assert.notEqual(r.verdict, 'mismatch');
+});
+
+test('a Keepa size in ounces is not a count (Celsius B002RSRURY "3.08 Ounce (Pack of 1)")', () => {
+  const own = V.ownVariationAttributes([{ asin: 'B002RSRURY', attributes: [{ value: 'Berry', dimension: 'FlavorName' }, { value: '3.08 Ounce (Pack of 1)', dimension: 'Size' }] }], 'B002RSRURY');
+  assert.equal(own.count, null);
+  assert.equal(own.size_is_measure, true);
+  for (const v of ['16 Fl Oz (Pack of 12)', '500 g', '1.5 Pound', '250 ml']) {
+    assert.equal(V.ownVariationAttributes([{ asin: 'A', attributes: [{ value: v, dimension: 'Size' }] }], 'A').count, null, v);
+  }
+  const r = V.checkLabelProductMatch({
+    asin: 'B002RSRURY', title: 'CELSIUS On-The-Go Powder Stick Packs, Zero Sugar (14 Sticks per Pack)',
+    keepa: { variations: [{ asin: 'B002RSRURY', attributes: [{ value: 'Berry', dimension: 'FlavorName' }, { value: '3.08 Ounce (Pack of 1)', dimension: 'Size' }] }] },
+    label: { raw_text: 'Supplement Facts', serving_size: '1 Stick Pack (5.11g)', servings_per_container: '14' },
+  });
+  assert.equal(r.count_match, true, 'falls back to the title count (14 sticks)');
+});
+
+test('the title count is tried even when Keepa has its own count (Pedialyte "4 Count (Pack of 6), Total-24")', () => {
+  const r = V.checkLabelProductMatch({
+    asin: 'B0C1PY9FZP', title: 'Pedialyte Fast Hydration Electrolyte Powder Packets, Fruit Punch, Hydration Drink, 4 Count (Pack of 6), Total-24 Single-Serving Powder Packets',
+    keepa: { variations: [{ asin: 'B0C1PY9FZP', attributes: [{ value: 'Fruit Punch', dimension: 'FlavorName' }, { value: '24 Count', dimension: 'Size' }] }] },
+    label: { raw_text: 'Nutrition Facts\n8 servings per container\nServing size 1 Packet (9g)', serving_size: '1 Packet (9g)', servings_per_container: '8' },
+  });
+  assert.notEqual(r.verdict, 'mismatch');
+  const titleOnly = V.checkLabelProductMatch({
+    asin: 'Z', title: 'Brand Gummies, 10 Count (Pack of 6)',
+    keepa: { variations: [{ asin: 'Z', attributes: [{ value: '30 Count', dimension: 'Size' }] }] },
+    label: { count: '10 gummies', raw_text: '' },
+  });
+  assert.equal(titleOnly.count_match, true);
 });

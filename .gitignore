@@ -34,3 +34,4 @@ scout/C:\\SirPercival-Vault*
 # Supabase CLI local state
 supabase/.temp/
 .worktrees/
+scout/.tmp-*

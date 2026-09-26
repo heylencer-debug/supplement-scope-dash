@@ -288,13 +288,22 @@ async function runBrightDataFallback(zeroReviewRows) {
     // same snapshot pipeline — it just needed a bit more patience, not a
     // permanent failure. A retry re-triggers a fresh snapshot + fresh 180s
     // deadline.
+    // RESUME, don't re-trigger (2026-09-26): a "still running" failure carries
+    // its snapshot id, and the next attempt keeps polling that same snapshot.
+    // Re-triggering paid for a second collection and restarted the clock, so
+    // a slow day meant 0 reviews for every chunk. Attempts are bounded by
+    // BRIGHTDATA_REVIEWS_ATTEMPTS (default 3 ≈ 21 min per chunk at the 7-min
+    // default deadline) so a genuinely stuck snapshot still ends the phase.
     let byAsin = null;
-    for (let attempt = 1; attempt <= 2 && !byAsin; attempt++) {
+    let resumeSnapshotId = null;
+    const maxAttempts = Math.max(1, parseInt(process.env.BRIGHTDATA_REVIEWS_ATTEMPTS || '3', 10));
+    for (let attempt = 1; attempt <= maxAttempts && !byAsin; attempt++) {
       try {
-        byAsin = await brightData.fetchAmazonReviews(asins);
+        byAsin = await brightData.fetchAmazonReviews(asins, resumeSnapshotId ? { resumeSnapshotId } : {});
       } catch (err) {
-        console.error(`  ✗ Bright Data batch failed (${asins.length} ASINs, attempt ${attempt}/2): ${err.message}`);
-        if (attempt < 2) console.log('  ↻ retrying chunk once...');
+        console.error(`  ✗ Bright Data batch failed (${asins.length} ASINs, attempt ${attempt}/${maxAttempts}): ${err.message}`);
+        resumeSnapshotId = err && err.stillRunning && err.snapshotId ? err.snapshotId : null;
+        if (attempt < maxAttempts) console.log(resumeSnapshotId ? `  ↻ waiting on the same snapshot ${resumeSnapshotId}...` : '  ↻ retrying chunk...');
       }
     }
     if (!byAsin) continue;

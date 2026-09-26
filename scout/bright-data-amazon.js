@@ -97,7 +97,14 @@ async function bdAwaitSnapshot(snapshotId, apiKey, deadlineMs) {
     const parsed = parseRecords(sText);
     return Array.isArray(parsed) ? parsed : (Array.isArray(parsed?.data) ? parsed.data : [parsed]);
   }
-  throw new Error(`Amazon scrape is still running on Bright Data (snapshot ${snapshotId}). Try again in a minute.`);
+  // Carry the snapshot id: the caller can RESUME polling this same snapshot
+  // instead of triggering (and paying for) a fresh one. On 2026-09-26 two
+  // re-triggered attempts per chunk each timed out at 3 min while the first
+  // snapshot would have finished — 0 reviews saved for a whole category.
+  const err = new Error(`Amazon scrape is still running on Bright Data (snapshot ${snapshotId}). Try again in a minute.`);
+  err.snapshotId = snapshotId;
+  err.stillRunning = true;
+  throw err;
 }
 
 async function bdScrape(datasetId, input, apiKey, timeoutMs = 120000) {
@@ -405,8 +412,19 @@ async function fetchAmazonReviews(asins, opts = {}) {
   if (asins.length > 20) throw new Error('Bright Data reviews batch limit is 20 ASINs per call — chunk upstream.');
 
   const locale = String(opts.locale || 'US').toUpperCase();
-  const input = asins.map((a) => ({ url: reviewsProductUrl(a, locale) }));
-  const records = await bdTriggerAndAwait(REVIEWS_DATASET, input, apiKey);
+  // Reviews snapshots regularly outlive the old 180 s budget; the default is
+  // now 7 min (BRIGHTDATA_REVIEWS_DEADLINE_MS) and a caller that already holds
+  // a running snapshot passes `resumeSnapshotId` to keep polling IT rather
+  // than trigger a second collection for the same ASINs.
+  const deadlineMs = Number(opts.deadlineMs) > 0 ? Number(opts.deadlineMs) : parseInt(process.env.BRIGHTDATA_REVIEWS_DEADLINE_MS || '420000', 10);
+  let records;
+  if (opts.resumeSnapshotId) {
+    console.log(`[bright-data] resuming reviews snapshot ${opts.resumeSnapshotId} (no re-trigger)`);
+    records = await bdAwaitSnapshot(String(opts.resumeSnapshotId), apiKey, deadlineMs);
+  } else {
+    const input = asins.map((a) => ({ url: reviewsProductUrl(a, locale) }));
+    records = await bdTriggerAndAwait(REVIEWS_DATASET, input, apiKey, deadlineMs);
+  }
   console.log(`[bright-data] reviews for ${asins.length} ASIN(s) → ${records.length} raw records`);
 
   const byAsin = new Map(asins.map((a) => [a, []]));

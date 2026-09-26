@@ -38,6 +38,28 @@ function isRealModelText(t) {
   return typeof t === 'string' && t.trim().length > 0 && !t.trim().startsWith('[ERROR:');
 }
 
+/**
+ * GATE POOL CAP (2026-09-26). P1 now keeps an ~80-listing candidate pool so
+ * the competitor selection (migration 011) can pick 40. Until that selection
+ * is populated, P3 (30 ASINs) and P4 (20) still process the top of the pool
+ * by BSR — measuring them against all 80 made the P3 coverage gate
+ * unreachable (28/80 on "magnesium gummies #2"). With NO active selection the
+ * run-scoped gates therefore measure against the pool's top
+ * SCOUT_GATE_POOL_CAP (default 40 — the old P1 cap) by BSR, which is exactly
+ * the set those phases work through. With a selection active the gates are
+ * scoped to the selection instead (see measureVerifierMetrics).
+ */
+const GATE_POOL_CAP = Math.max(1, parseInt(process.env.SCOUT_GATE_POOL_CAP || '40', 10));
+function capGatePool(liveAsins, productRows, cap = GATE_POOL_CAP) {
+  if (liveAsins.length <= cap) return liveAsins;
+  const bsr = new Map();
+  for (const r of productRows || []) if (r && r.asin && !bsr.has(r.asin)) bsr.set(r.asin, r.bsr_current == null ? Infinity : Number(r.bsr_current));
+  const order = new Map(liveAsins.map((a, i) => [a, i]));
+  return [...liveAsins]
+    .sort((a, b) => ((bsr.get(a) ?? Infinity) - (bsr.get(b) ?? Infinity)) || (order.get(a) - order.get(b)))
+    .slice(0, cap);
+}
+
 async function resolveRunAsins({ DOVIVE, DASH, keyword, categoryId, warn = console.warn }) {
   let all = [];
   try {
@@ -60,6 +82,21 @@ async function resolveRunAsins({ DOVIVE, DASH, keyword, categoryId, warn = conso
       }
       const liveSet = new Set(liveAsins);
       result = { live: all.filter(a => liveSet.has(a)), all };
+      if (result.live.length > GATE_POOL_CAP) {
+        const sel = await loadSelection(DASH, categoryId);
+        if (!sel.active) {
+          const rows = [];
+          for (let from = 0; ; from += 1000) {
+            const { data, error } = await DASH.from('products').select('asin, bsr_current').eq('category_id', categoryId).in('asin', result.live).range(from, from + 999);
+            if (error) throw error;
+            rows.push(...(data || []));
+            if (!data || data.length < 1000) break;
+          }
+          const capped = capGatePool(result.live, rows);
+          warn(`  ℹ️ run-scoped gates measure the pool's top ${capped.length} by BSR (no competitor selection yet; ${result.live.length} in the pool)`);
+          result = { live: capped, all, pool: result.live };
+        }
+      }
     } catch (e) {
       warn(`  ⚠️ getLiveRunAsins failed (${e.message}) — falling back to full run-ASIN list`);
     }
@@ -241,4 +278,4 @@ function evaluateBars(m, scopePhases = null) {
   return { pass: failures.length === 0, failures, byPhase };
 }
 
-module.exports = { BARS, p5Targets, resolveRunAsins, measureVerifierMetrics, evaluateBars, isRealModelText };
+module.exports = { BARS, GATE_POOL_CAP, capGatePool, p5Targets, resolveRunAsins, measureVerifierMetrics, evaluateBars, isRealModelText };

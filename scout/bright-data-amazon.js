@@ -313,11 +313,17 @@ function normaliseReview(r, asinFallback) {
   return {
     asin,
     rating: Number.isFinite(rating) ? rating : null,
-    title: String(r?.review_title ?? r?.title ?? '').trim() || null,
+    // 2026-09-26: the reviews dataset's real field names are review_header,
+    // review_posted_date, is_verified and author_name (checked against every
+    // stored raw_json). The old names below never matched, so every Bright
+    // Data row landed with title=null, review_date=null (date_text was the
+    // SCRAPE `timestamp`) and verified_purchase=false. The old names stay as
+    // fallbacks in case the dataset schema changes back.
+    title: String(r?.review_header ?? r?.review_title ?? r?.title ?? '').trim() || null,
     body: String(r?.review_text ?? r?.body ?? r?.text ?? r?.content ?? '').trim() || null,
-    date_text: r?.review_date ?? r?.date ?? r?.timestamp ?? null,
-    reviewer_name: String(r?.reviewer_name ?? r?.author ?? r?.user_name ?? 'Anonymous').trim(),
-    verified_purchase: Boolean(r?.verified_purchase ?? r?.verified ?? false),
+    date_text: r?.review_posted_date ?? r?.review_date ?? r?.date ?? r?.timestamp ?? null,
+    reviewer_name: String(r?.author_name ?? r?.reviewer_name ?? r?.author ?? r?.user_name ?? 'Anonymous').trim(),
+    verified_purchase: Boolean(r?.is_verified ?? r?.verified_purchase ?? r?.verified ?? false),
     helpful_votes: Number(r?.helpful_count ?? r?.helpful_votes ?? r?.helpful ?? 0) || 0,
     raw: r,
   };
@@ -362,4 +368,5 @@ module.exports = {
   getApiKey,
   searchAmazonByKeyword,
   fetchAmazonReviews,
+  normaliseReview,
 };

@@ -17,11 +17,27 @@
  *   },
  *   analysis_metadata: { total_reviews_analyzed, average_rating, analysis_quality }
  * }
+ *
+ * 2026-09-26 (P3b review synthesis), additive only:
+ *   - rows are de-duplicated by Amazon review_id before counting (repeat
+ *     scrape runs stored the same review several times — "magnesium gummies"
+ *     1,922 rows = 1,080 reviews), so total_reviews_analyzed and the star
+ *     distribution count REVIEWS, not rows; analysis_metadata also carries
+ *     rows_collected / duplicate_rows_removed / verified_purchase_rate /
+ *     date_range / analysis_scope;
+ *   - title / verified / date fall back to raw_json.raw (Bright Data rows had
+ *     them only there);
+ *   - review_evidence (ledger + counted themes from dovive_review_synthesis)
+ *     is carried through when a P3b row exists, so re-running this migration
+ *     never drops it. top_reviews / pain_points keep their old 5-per-bucket
+ *     display role; the counted evidence lives in review_evidence.
  */
 
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const { resolveCategory } = require('./utils/category-resolver');
+const { prepareReviews, buildProductEvidence } = require('./utils/review-synthesis');
+const { fetchProductSyntheses } = require('./utils/review-synthesis-store');
 
 const DOVIVE = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 const DASH = createClient(
@@ -42,7 +58,19 @@ async function lookupCategoryId(keyword) {
 }
 
 
-function buildReviewAnalysis(reviews) {
+function buildReviewAnalysis(rows, productSynthesis = null) {
+  // De-duplicate first (same Amazon review stored by several scrape runs) and
+  // read title/verified/date from raw_json.raw when the columns are empty.
+  const prepared = prepareReviews(rows || []);
+  const reviews = prepared.reviews.map((r) => ({
+    rating: r.rating,
+    title: r.title,
+    body: r.body,
+    reviewer_name: r.reviewer_name || '',
+    review_date: r.date,
+    verified_purchase: r.verified,
+    helpful_votes: r.helpful,
+  })).filter((r) => r.rating != null);
   const total = reviews.length;
   if (total === 0) return null;
 
@@ -98,8 +126,20 @@ function buildReviewAnalysis(reviews) {
       neutral:  topNeutral,
     },
     pain_points,
+    ...(productSynthesis ? { review_evidence: buildProductEvidence(productSynthesis) } : {}),
     analysis_metadata: {
       total_reviews_analyzed: total,
+      rows_collected: prepared.stats.rows_collected,
+      duplicate_rows_removed: prepared.stats.duplicate_rows_removed,
+      // Rows without an Amazon review_id (e.g. read through a SELECT that
+      // omits raw_json) are de-duplicated within their ASIN by rating + text only.
+      rows_without_review_id: prepared.stats.rows_without_review_id,
+      verified_purchase_rate: Math.round((reviews.filter(r => r.verified_purchase).length / total) * 100),
+      date_range: (() => {
+        const d = reviews.map(r => r.review_date).filter(Boolean).sort();
+        return { min: d[0] || null, max: d[d.length - 1] || null, undated: total - d.length };
+      })(),
+      analysis_scope: 'Star distribution counts every unique review; top_reviews and pain_points are display samples. Counted themes: review_evidence (P3b).',
       average_rating: Math.round((ratingSum / total) * 10) / 10,
       analysis_quality: total >= 20 ? 'high' : total >= 5 ? 'medium' : 'low',
       source: 'dovive_reviews',
@@ -135,7 +175,7 @@ async function run() {
   while (true) {
     const { data, error } = await DOVIVE
       .from('dovive_reviews')
-      .select('asin, rating, title, body, reviewer_name, review_date, verified_purchase, helpful_votes')
+      .select('id, asin, rating, title, body, reviewer_name, review_date, verified_purchase, helpful_votes, rid:raw_json->raw->>review_id, rheader:raw_json->raw->>review_header, rdate:raw_json->raw->>review_posted_date, rverified:raw_json->raw->>is_verified')
       .eq('keyword', KEYWORD)
       .range(page * pageSize, (page + 1) * pageSize - 1);
 
@@ -158,9 +198,14 @@ async function run() {
   const asinsWithReviews = Object.keys(byAsin);
   console.log(`ASINs with reviews: ${asinsWithReviews.length}\n`);
 
+  // P3b product-level synthesis, when it exists (fail-open: {} otherwise).
+  const productSyntheses = await fetchProductSyntheses(DASH, { keyword: KEYWORD, reviewsClient: DOVIVE });
+  if (Object.keys(productSyntheses).length) console.log(`P3b review_evidence available for ${Object.keys(productSyntheses).length} ASINs\n`);
+
   let updated = 0;
   let skipped = 0;
   let errors = 0;
+  let rowsWithoutReviewId = 0;
 
   for (const asin of asinsWithReviews) {
     const dashId = asinToId[asin];
@@ -169,8 +214,9 @@ async function run() {
       continue;
     }
 
-    const analysis = buildReviewAnalysis(byAsin[asin]);
+    const analysis = buildReviewAnalysis(byAsin[asin], productSyntheses[asin] || null);
     if (!analysis) { skipped++; continue; }
+    rowsWithoutReviewId += analysis.analysis_metadata.rows_without_review_id || 0;
 
     const { error } = await DASH
       .from('products')
@@ -194,6 +240,9 @@ async function run() {
   console.log(`Updated: ${updated} products with review_analysis`);
   console.log(`Skipped (ASIN not in dash or no reviews): ${skipped}`);
   console.log(`Errors: ${errors}`);
+  if (rowsWithoutReviewId) console.log(`Note: ${rowsWithoutReviewId} rows had no Amazon review_id — de-duplicated within their ASIN by rating + text only.`);
 }
 
-run().catch(console.error);
+if (require.main === module) run().catch(console.error);
+
+module.exports = { buildReviewAnalysis };

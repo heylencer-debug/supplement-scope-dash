@@ -40,6 +40,11 @@ const DASH = createClient(
 // pattern as phase5-deep-research.js/phase6-market-analysis.js.
 const DOVIVE = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
+// P3b (2026-09-26): per-product themes counted over ALL of a product's
+// collected reviews. Preferred over the 5+5 slice below when present.
+const { fetchProductSyntheses } = require('./utils/review-synthesis-store');
+const { formatProductEvidenceForPrompt } = require('./utils/review-synthesis');
+
 // 2026-08-28 FIX (audit item #6): P6a scored products on catalog data alone —
 // zero review signal reached key_strengths/key_weaknesses/market_opportunity_gap.
 // Fetches a small (5 pos + 5 crit by helpfulness) review slice per ASIN, cheap
@@ -60,6 +65,8 @@ async function fetchReviewSentimentMap(asins) {
       if (r.rating >= 4 && bucket.positive.length < 5) bucket.positive.push(r);
       else if (r.rating <= 2 && bucket.critical.length < 5) bucket.critical.push(r);
     }
+    const synth = await fetchProductSyntheses(DASH, { keyword: KEYWORD, asins, reviewsClient: DOVIVE });
+    for (const asin of asins) if (synth[asin]) map[asin].synthesis = synth[asin];
     return map;
   } catch (e) {
     console.warn('  ⚠️ Review sentiment fetch failed (non-fatal):', e.message);
@@ -68,6 +75,8 @@ async function fetchReviewSentimentMap(asins) {
 }
 
 function formatReviewSentiment(bucket) {
+  const evidence = bucket && bucket.synthesis ? formatProductEvidenceForPrompt(bucket.synthesis) : '';
+  if (evidence) return evidence;
   if (!bucket || (!bucket.positive.length && !bucket.critical.length)) return 'No reviews available.';
   const fmt = r => `[${r.rating}★] "${(r.title || '').slice(0, 80)}" — ${(r.body || '').slice(0, 250)}`;
   const parts = [];
@@ -421,7 +430,7 @@ Revenue/Review Ratio: $${mm.revenue_per_review || 'N/A'}/review (${mm.revenue_pe
 Claims: ${(p.claims_on_label || []).join(', ') || 'N/A'}
 Feature Bullets: ${(p.feature_bullets_text || '').substring(0, 1200) || 'N/A'}
 Supplement Facts (OCR): ${(p.supplement_facts_raw || '').substring(0, 2500) || 'Not available'}
---- REVIEW SENTIMENT (real customer voice, up to 5 positive + 5 critical) ---
+--- REVIEW SENTIMENT (real customer voice — counted themes over all reviews when available, else up to 5 positive + 5 critical) ---
 ${formatReviewSentiment(reviewSentimentMap[p.asin])}`;
   }).join('\n═══\n');
 

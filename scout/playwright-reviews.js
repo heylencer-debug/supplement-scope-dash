@@ -166,7 +166,9 @@ function parseReviewDate(dateText) {
   // Amazon format: "Reviewed in the United States on August 17, 2025"
   const m = dateText.match(/(\w+ \d+, \d{4})/);
   if (!m) return null;
-  const d = new Date(m[1]);
+  // Parse at noon UTC: `new Date("August 17, 2025")` is LOCAL midnight, and
+  // toISOString() then shifts it to the previous day on any host east of UTC.
+  const d = new Date(`${m[1]} 12:00:00 UTC`);
   return isNaN(d.getTime()) ? null : d.toISOString().split('T')[0];
 }
 

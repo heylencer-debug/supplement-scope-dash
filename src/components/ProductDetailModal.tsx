@@ -23,7 +23,7 @@ import { parseClaimsList } from "@/lib/parseClaims";
 import { cn } from "@/lib/utils";
 import { ReviewEvidence } from "@/components/reviews/ReviewEvidence";
 import type { ProductReviewEvidence } from "@/hooks/useReviewSynthesis";
-import { useProductMarketingAssets } from "@/hooks/useMarketingAssets";
+import { useProductMarketingAssets, type MarketingAssetsProductRow } from "@/hooks/useMarketingAssets";
 import { ProductMarketingAssets } from "@/components/marketing-assets/MarketingAssets";
 
 // Single clean active treatment (smoke pill, no border-b + focus-ring
@@ -94,8 +94,7 @@ function StatChipRow({ children }: { children: React.ReactNode }) {
 }
 
 /** P7b: what this listing's images actually say (vision read). Renders nothing until P7b has run. */
-function ProductMarketingAssetsSection({ asin, categoryId }: { asin: string | null; categoryId: string | null }) {
-  const { data } = useProductMarketingAssets(asin, categoryId);
+function ProductMarketingAssetsSection({ data }: { data: MarketingAssetsProductRow | null | undefined }) {
   if (!data) return null;
   return (
     <DocSection icon={Image} title="Marketing Assets — what the listing images say">
@@ -296,6 +295,7 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
   const { analyzeProduct, isAnalyzing } = useSupplementFactsAnalysis();
   const { categoryName } = useCategoryContext();
   const { data: p5Sources } = useP5SourcesForProduct(product?.asin, categoryName || undefined);
+  const { data: marketingAssets } = useProductMarketingAssets(product?.asin, product?.category_id);
 
   if (!product) return null;
 
@@ -725,8 +725,8 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
           {/* Marketing Tab */}
           <TabsContent value="marketing" className={`mt-4 ${scrollableContentClass} ${maxContentHeight}`}>
             <div>
-              <ProductMarketingAssetsSection asin={product.asin} categoryId={product.category_id} />
-              <DocSection title="Marketing Score">
+              <ProductMarketingAssetsSection data={marketingAssets} />
+              <DocSection first={!marketingAssets} title="Marketing Score">
                 <StatChipRow>
                   <StatChip label="Overall Score" value={`${getOverallScore()}/100`} tone={getOverallScore() >= 70 ? "up" : getOverallScore() >= 40 ? "warn" : "down"} />
                   {marketingAnalysis?.image_analysis?.overall_quality_score !== undefined && (

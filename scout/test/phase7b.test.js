@@ -6,7 +6,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const MA = require('../utils/marketing-assets');
-const { run, parseOptions, CreditsExhausted } = require('../phase7b-marketing-assets');
+const { run, parseOptions, CreditsExhausted, RequestRejected, makeOpenRouterCaller } = require('../phase7b-marketing-assets');
 const { fetchCategoryMarketingAssets } = require('../utils/marketing-assets-store');
 const { fakeSupabase } = require('./helpers/fake-supabase');
 const { PRICING } = require('../utils/ai-usage');
@@ -218,6 +218,99 @@ test('credits exhausted mid-run → partial, the rest not attempted; the next ru
   assert.equal(r2.status, 'complete');
 });
 
+test('the model cannot evidence itself: unlabelled text_seen and label-less use cases are dropped', async () => {
+  const w = world({ n: 1 });
+  const m = { calls: 0, fn: async () => { m.calls++; return { content: JSON.stringify({
+    recurring_messages: [], demonstrated_use_cases: [{ use_case: 'Before bed', evidence: 'says so' }],
+    packaging: { format: 'bottle', claims_on_pack: ['Clinically proven'], certifications_shown: ['NSF'] },
+    text_seen: ['Clinically proven', { label: 'gallery-99', text: 'NSF' }],
+  }), cost: 0 }; } };
+  const res = await run(opts(), deps(w, m));
+  const row = w.dash.tables.dovive_marketing_assets.find((r) => r.asin === 'B0TEST0001');
+  assert.equal(row.analysis.text_seen.length, 0);
+  assert.equal(row.analysis.demonstrated_use_cases.length, 0);
+  assert.equal(row.analysis.packaging.claims_on_pack.length, 0);
+  assert.equal(row.analysis.packaging.certifications_shown.length, 0);
+  assert.equal(row.analysis.validation.dropped_total, 5);
+  assert.equal(res.ledger.claims_dropped_unevidenced, 10, 'two products in scope (B0OUTSIDE1 included), 5 each');
+});
+
+test('each product row is saved as soon as that product completes', async () => {
+  const w = world();
+  const seenBefore = [];
+  const m = fakeModel((n) => {
+    seenBefore.push(w.dash.tables.dovive_marketing_assets.filter((r) => r.scope === 'product' && r.status === 'complete').length);
+  });
+  await run(opts(), deps(w, m));
+  assert.deepEqual(seenBefore, [0, 1, 2, 3, 4], 'concurrency 1: before call n, n-1 finished rows are already stored');
+});
+
+test('failed products: 2 failed billed attempts on the same gallery → skipped next run (counted), --force retries', async () => {
+  const w = world({ n: 2 });
+  // Calls 1 and 2 are the first product's attempt + retry (concurrency 1).
+  const m1 = fakeModel((n) => { if (n <= 2) throw new Error('OpenRouter 500'); });
+  const r1 = await run(opts(), deps(w, m1));
+  assert.equal(r1.ledger.products_failed, 1);
+  const row = w.dash.tables.dovive_marketing_assets.find((r) => r.asin === 'B0TEST0001');
+  assert.equal(row.batch_results.failed_attempts, 2);
+
+  const m2 = fakeModel();
+  const r2 = await run(opts(), deps(w, m2));
+  assert.equal(m2.calls, 0, 'the failed product is not re-billed, the other is cached');
+  assert.equal(r2.ledger.products_skipped_failed, 1);
+  assert.equal(r2.status, 'partial');
+  assert.equal(w.dash.tables.dovive_marketing_assets.find((r) => r.asin === 'B0TEST0001').batch_results.skipped, true);
+
+  const m3 = fakeModel();
+  const r3 = await run(opts({ force: true }), deps(w, m3));
+  assert.equal(m3.calls, 3, '--force re-sends every product in scope');
+  assert.equal(r3.status, 'complete');
+  assert.equal(w.dash.tables.dovive_marketing_assets.find((r) => r.asin === 'B0TEST0001').batch_results.failed_attempts, 0);
+});
+
+test('HTTP 400/401 abort the model pass at once — never retried', async () => {
+  const w = world();
+  const m = fakeModel((n) => { if (n === 2) throw new RequestRejected('OpenRouter 401: bad key'); });
+  const res = await run(opts(), deps(w, m));
+  assert.equal(m.calls, 2, 'no retry, no further products');
+  assert.equal(res.ledger.products_analyzed, 1);
+  assert.equal(res.ledger.products_failed, 1);
+  assert.equal(res.ledger.products_not_attempted, 3);
+  assert.match(res.ledger.stopped, /401/);
+});
+
+test('an unreadable previous-rows read aborts before any model call (never a partial cache)', async () => {
+  const w = world();
+  const realFrom = w.dash.from;
+  w.dash.from = (name) => {
+    const q = realFrom(name);
+    if (name === 'dovive_marketing_assets') {
+      const range = q.range.bind(q);
+      q.range = (a, b) => { q.exec = () => ({ data: null, error: { message: 'statement timeout' } }); return range(a, b); };
+    }
+    return q;
+  };
+  const m = fakeModel();
+  const res = await run(opts(), deps(w, m));
+  assert.equal(res.aborted, 'previous_unreadable');
+  assert.equal(m.calls, 0);
+  assert.equal(w.dash.calls.upserts.length, 0);
+});
+
+test('OpenRouter caller: max_tokens 16000, no temperature, a timeout signal; 400/401 → RequestRejected, 402 → CreditsExhausted', async () => {
+  const sent = [];
+  const fakeFetch = (status) => async (url, init) => { sent.push(init); return { status, ok: false, text: async () => 'nope', json: async () => ({}) }; };
+  const mk = (status) => makeOpenRouterCaller({ model: 'm', maxTokens: 16000, timeoutMs: 1000, env: { OPENROUTER_API_KEY: 'k' }, ctx: {}, usageWrites: [], fetchImpl: fakeFetch(status) });
+  await assert.rejects(mk(400)([]), RequestRejected);
+  await assert.rejects(mk(401)([]), RequestRejected);
+  await assert.rejects(mk(402)([]), CreditsExhausted);
+  await assert.rejects(mk(503)([]), (e) => !(e instanceof RequestRejected) && /503/.test(e.message));
+  const body = JSON.parse(sent[0].body);
+  assert.equal(body.max_tokens, 16000);
+  assert.ok(!('temperature' in body));
+  assert.ok(sent[0].signal instanceof AbortSignal);
+});
+
 test('a failing product is recorded as failed (after one retry) and does not stop the others', async () => {
   const w = world();
   const m = fakeModel((n, labels) => { if (labels.includes('a+-1') && m.sent.length <= 2) throw new Error('OpenRouter 400: bad image'); });
@@ -247,5 +340,5 @@ test('no OPENROUTER_API_KEY → inventory only, $0, still written', async () => 
   assert.equal(m.calls, 0);
   assert.equal(res.status, 'inventory_only');
   assert.ok(w.dash.tables.dovive_marketing_assets.every((r) => r.scope === 'category' || r.status === 'inventory_only'));
-  assert.ok(res.evc.items.every((i) => i.claim_surface === 'bullets_only'), 'only the deterministic bullet claims exist');
+  assert.equal(res.evc.items.length, 0, 'bullets only count for analysed products, and none were analysed');
 });

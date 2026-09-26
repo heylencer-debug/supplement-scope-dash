@@ -17,7 +17,7 @@ export type SeenBucket = "main" | "gallery" | "a+" | "brand";
 export type SeenOn = Partial<Record<SeenBucket, number>>;
 
 export type AssetStatus = "complete" | "partial" | "inventory_only" | "failed" | "not_attempted" | "no_images";
-export type Verdict = "experienced" | "claimed_only" | "contradicted" | "no_review_signal";
+export type Verdict = "experienced" | "mixed_weak" | "claimed_only" | "contradicted" | "no_review_signal";
 
 export interface AssetLedger {
   products: number;
@@ -26,6 +26,8 @@ export interface AssetLedger {
   products_cached?: number;
   products_failed?: number;
   products_not_attempted?: number;
+  /** Skipped after 2 failed (billed) attempts on the same gallery; --force retries. */
+  products_skipped_failed?: number;
   images_available: number;
   gallery_images_available?: number;
   images_selected?: number;
@@ -105,7 +107,7 @@ export interface ExperiencedVsClaimedItem {
 export interface ExperiencedVsClaimed {
   available: boolean;
   items: ExperiencedVsClaimedItem[];
-  counts: Record<Verdict, number>;
+  counts: Partial<Record<Verdict, number>>;
   excluded_attribute_claims?: number;
   synthesis?: { keyword: string | null; generated_at: string | null; status: string | null; themes: number; products_with_reviews: number } | null;
 }
@@ -160,13 +162,14 @@ export interface MarketingAssetsProductRow {
     per_image?: PerImage[];
   };
   analysis: ProductAnalysis | null;
+  batch_results?: { ok?: boolean; skipped?: boolean; failed_attempts?: number; max_failed_attempts?: number; error?: string | null } | null;
   status: AssetStatus;
   model: string | null;
   generated_at: string;
 }
 
 const CATEGORY_COLUMNS = "keyword, category_id, ledger, rollup, experienced_vs_claimed, status, model, generated_at";
-const PRODUCT_COLUMNS = "keyword, asin, ledger, assets, analysis, status, model, generated_at";
+const PRODUCT_COLUMNS = "keyword, asin, ledger, assets, analysis, batch_results, status, model, generated_at";
 
 export function useMarketingAssets(categoryId: string | null | undefined, keyword?: string | null) {
   return useQuery({

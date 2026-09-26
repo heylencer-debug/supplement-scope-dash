@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS dovive_marketing_assets (
   -- lexical rule that matched.
   experienced_vs_claimed JSONB,
   -- Product: { key = sha1(prompt version + ordered image URLs), ok, status,
+  --   failed_attempts (billed failures on THIS key; 2 → skipped until --force), skipped,
   -- attempts, error, cost_usd, model, analyzed_at } — the resume key.
   -- Category: { asin: { key, ok, status } }.
   batch_results          JSONB,

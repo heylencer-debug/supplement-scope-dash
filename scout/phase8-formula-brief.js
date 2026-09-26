@@ -1260,7 +1260,7 @@ ${cs.review_evidence_text}
 ${cs.marketing_assets_text ? `---
 
 ## COMPETITOR MARKETING ASSETS — WHAT THE LISTINGS ACTUALLY SHOW (vision read of gallery + A+ images, counted)
-Messages below come from the competitors' images, not their bullets. EXPERIENCED benefits are backed by a customer praise theme; CLAIMED ONLY benefits have no review support although the claiming products have reviews; CONTRADICTED benefits draw more complaints than praise. Build DOVIVE's promise on EXPERIENCED benefits and treat CLAIMED ONLY / CONTRADICTED ones as openings to do better, never as proven consumer value.
+Messages below come from the competitors' images, not their bullets. EXPERIENCED benefits are backed by a customer praise theme on the claiming products; MIXED ones have too few or split reviews to judge; CLAIMED ONLY benefits have no review support although the claiming products have reviews; CONTRADICTED benefits draw clearly more complaints than praise on the claiming products. Build DOVIVE's promise on EXPERIENCED benefits and treat CLAIMED ONLY / CONTRADICTED ones as openings to do better, never as proven consumer value.
 ${cs.marketing_assets_text}
 ` : ''}---
 

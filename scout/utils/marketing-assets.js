@@ -96,6 +96,12 @@ const GENERIC_LEXICON_SOURCES = new Set([
   '\\bpackag(e|ing)\\b', '\\bmislead(ing)?\\b', '\\barriv(e|ed|al)\\b', '\\bdeliver(y|ed)\\b',
   '\\bshipp(ed|ing)\\b', '\\blate\\b', '\\bcompany\\b', '\\bmanufacturer\\b', '\\bresponded?\\b',
   '\\bcontacted\\b', '\\bworth\\b', '\\bdeal\\b', '\\bcost(s|ly)?\\b', '\\bvalue\\b',
+  // Broad stems that join unrelated topics ("stress relief" ≠ "relief from
+  // leg cramps"; "chewable" ≠ "chewy texture complaint"; "glass bottle" ≠
+  // "bottle arrived broken").
+  '\\brelie(f|ve|ved)\\b', '\\bchew(y|ing|able)?\\b', '\\bbottles?\\b', '\\bjars?\\b',
+  '\\bcontainers?\\b', '\\bcaps?\\b', '\\blids?\\b', '\\bscoops?\\b', '\\bsleep(ing)?\\b', '\\benergy\\b',
+  '\\bstomach\\b', '\\ballerg(y|ic|ies)\\b', '\\bmix(es|ed|ing)? (well|easily|poorly)\\b',
 ]);
 
 // Audience segments (for the roll-up). Unmatched "who" strings are clustered
@@ -259,12 +265,21 @@ function buildInventory(product, research = null) {
  */
 function selectImagesForCall(inv, { maxImages = 8, maxAplus = 2 } = {}) {
   const gal = inv.gallery || [];
-  const aplus = [...((inv.a_plus && inv.a_plus.images) || []), ...(inv.brand_story || [])];
+  const aImgs = (inv.a_plus && inv.a_plus.images) || [];
+  const brand = inv.brand_story || [];
   const max = Math.max(0, maxImages);
-  const reserve = Math.min(Math.max(0, maxAplus), aplus.length, max);
-  const galTake = Math.min(gal.length, max - reserve);
-  const aTake = Math.min(aplus.length, max - galTake);
-  return [...gal.slice(0, galTake), ...aplus.slice(0, aTake)];
+  const reserve = Math.min(Math.max(0, maxAplus), max);
+  // Comparison tables and "vs others" charts sit late in A+ — prefer the LAST
+  // modules. Brand-story images get one slot only when A+ has ≤ 1 image.
+  const extra = [...(aImgs.length > reserve ? aImgs.slice(-reserve) : aImgs)];
+  if (aImgs.length <= 1 && brand.length && extra.length < reserve) extra.push(brand[0]);
+  const galTake = Math.min(gal.length, max - extra.length);
+  // Slots the gallery cannot fill go back to the remaining A+, then brand images.
+  const rest = [...aImgs.filter((x) => !extra.includes(x)), ...brand.filter((x) => !extra.includes(x))];
+  const fill = rest.slice(0, Math.max(0, max - galTake - extra.length));
+  const picked = new Set([...extra, ...fill]);
+  const order = [...aImgs, ...brand].filter((x) => picked.has(x));
+  return [...gal.slice(0, galTake), ...order];
 }
 
 /** Resume key: prompt version + the ordered image URL list. Model changes do NOT re-pay. */
@@ -275,7 +290,7 @@ function assetKey(images, { promptVersion = PROMPT_VERSION } = {}) {
 
 /** Digest of the whole in-scope plan (asin:key), for the category skip-when-fresh check. */
 function planDigest(entries) {
-  const s = (entries || []).map((e) => `${e.asin}:${e.key || '-'}`).sort().join('|');
+  const s = (entries || []).map((e) => `${e.asin || (e.inv && e.inv.asin) || '?'}:${e.key || '-'}`).sort().join('|');
   return crypto.createHash('sha1').update(`${PROMPT_VERSION}|${s}`).digest('hex');
 }
 
@@ -336,29 +351,33 @@ function cleanLabels(v, allowed) {
 
 /**
  * Validate one model response against the labels actually sent. Every
- * message / use case / claim / certification must carry at least one
- * seen_on label that was sent, or (for bare-string pack claims and
- * certifications) appear verbatim in the text read off the images. What
- * fails is DROPPED and counted in `validation.dropped`.
+ * message / use case / claim / certification / text_seen entry must carry at
+ * least one label of an image that was SENT. Pack claims and certifications
+ * without one are kept only when printed verbatim in a LABELLED text_seen
+ * entry (and inherit its label). What fails is DROPPED and counted in
+ * `validation.dropped`.
  */
 function validateAnalysis(raw, sentLabels) {
   const allowed = new Set((sentLabels || []).map(lc));
   const dropped = { target_audience: 0, main_promise: 0, recurring_messages: 0, demonstrated_use_cases: 0, claims_on_pack: 0, certifications_shown: 0, comparison_table_claims: 0, text_seen: 0 };
   const o = raw && typeof raw === 'object' ? raw : {};
 
+  // text_seen is only kept when it names an image that was SENT — a bare
+  // string or an unknown label is the model quoting nobody, and it must never
+  // be able to evidence its own claims.
   const textSeen = [];
   for (const t of Array.isArray(o.text_seen) ? o.text_seen : []) {
-    if (typeof t === 'string') {
-      if (clean(t)) textSeen.push({ label: null, text: clean(t, 400) }); else dropped.text_seen++;
-      continue;
-    }
-    const label = cleanLabels(t && t.label, allowed)[0] || null;
-    const text = clean(t && t.text, 400);
-    if (!text || (t && t.label != null && !label)) { dropped.text_seen++; continue; }
+    const label = t && typeof t === 'object' ? cleanLabels(t.label, allowed)[0] || null : null;
+    const text = clean(t && typeof t === 'object' ? t.text : t, 400);
+    if (!text || !label) { if (text || t) dropped.text_seen++; continue; }
     textSeen.push({ label, text });
   }
-  const corpus = normText(textSeen.map((t) => t.text).join(' \n '));
-  const verbatimIn = (s) => { const n = normText(s); return n.length >= 3 && corpus.includes(n); };
+  // Labels of the LABELLED text entries that contain `s` verbatim (normalised).
+  const verbatimLabels = (s) => {
+    const n = normText(s);
+    if (n.length < 3) return [];
+    return uniq(textSeen.filter((t) => normText(t.text).includes(n)).map((t) => t.label));
+  };
 
   let audience = null;
   const ta = o.target_audience && typeof o.target_audience === 'object' ? o.target_audience : null;
@@ -391,7 +410,7 @@ function validateAnalysis(raw, sentLabels) {
     const useCase = clean(u && u.use_case, 160);
     const evidence = clean(u && u.evidence, 240);
     const seen = cleanLabels(u && u.seen_on, allowed);
-    if (!useCase || evidence.length < 3 || (u && u.seen_on != null && !seen.length)) { if (useCase) dropped.demonstrated_use_cases++; continue; }
+    if (!useCase || evidence.length < 3 || !seen.length) { if (useCase) dropped.demonstrated_use_cases++; continue; }
     useCases.push({ use_case: useCase, evidence, seen_on: seen });
   }
 
@@ -399,17 +418,15 @@ function validateAnalysis(raw, sentLabels) {
   const evidenced = (items, key, bucket) => {
     const out = [];
     for (const it of Array.isArray(items) ? items : []) {
-      if (typeof it === 'string') {
-        // Bare string: kept only when it is printed verbatim on an image we read.
-        if (verbatimIn(it)) out.push({ [key]: clean(it, 160), seen_on: [], evidence: 'verbatim in text_seen' });
-        else dropped[bucket]++;
-        continue;
-      }
-      const val = clean(it && it[key], 160);
-      const seen = cleanLabels(it && it.seen_on, allowed);
+      const isStr = typeof it === 'string';
+      const val = clean(isStr ? it : it && it[key], 160);
       if (!val) continue;
-      if (seen.length) out.push({ [key]: val, seen_on: seen });
-      else if (verbatimIn(val)) out.push({ [key]: val, seen_on: [], evidence: 'verbatim in text_seen' });
+      const seen = isStr ? [] : cleanLabels(it && it.seen_on, allowed);
+      if (seen.length) { out.push({ [key]: val, seen_on: seen }); continue; }
+      // No usable seen_on: kept only when printed verbatim in LABELLED text
+      // read off a sent image; seen_on becomes those labels.
+      const vl = verbatimLabels(val);
+      if (vl.length) out.push({ [key]: val, seen_on: vl, evidence: 'verbatim in labelled text_seen' });
       else dropped[bucket]++;
     }
     return out;
@@ -616,7 +633,9 @@ function buildRollup(products) {
     for (const c of new Set(pk.colours || [])) colours[c] = (colours[c] || 0) + 1;
     for (const c of new Set((pk.certifications_shown || []).map((x) => lc(x.name)))) certs[c] = (certs[c] || 0) + 1;
   }
-  const bulletItems = (products || []).flatMap((p) => bulletClaims(p.asin, p.bullets_text));
+  // Bullets count only for ANALYSED products, so every count shares one
+  // denominator (products_analyzed) and a table can never show "3 / 1".
+  const bulletItems = analysed.flatMap((p) => bulletClaims(p.asin, p.bullets_text));
 
   const segments = Object.keys(segCount).map((s) => ({ segment: s, products: segCount[s], asins: uniq(segAsins[s]).sort(), example_cues: uniq(segCues[s]).slice(0, 4) }));
   for (const c of clusterItems(otherAudience.map((x) => ({ ...x, group: null })))) segments.push({ segment: c.label, products: c.products, asins: c.asins, example_cues: [], unmatched: true });
@@ -694,15 +713,25 @@ function claimSurface(c) {
  * @param {object|null} synthesis  dovive_review_synthesis category row
  * @returns {{ available, items[], counts, excluded_attribute_claims, synthesis }}
  *
- * Verdicts:
- *   experienced      ≥1 matching praise theme, and matching complaint/unmet
- *                    reviews do not outnumber it (counter kept alongside)
- *   contradicted     matching complaint / unmet-need reviews ≥ praise reviews (> 0)
- *   claimed_only     the claiming products HAVE analysed reviews, but no
- *                    review theme matches the claim
- *   no_review_signal no synthesis, or none of the claiming products has
- *                    analysed reviews — silence proves nothing
+ * Matching: a cluster keyed by a benefit group matches ONLY themes that hit
+ * that same group (`synonym:<key>`) — a variant string can never pull in a
+ * neighbouring group ("Better sleep & less stress" in the Sleep cluster does
+ * not match a stress theme). Unkeyed clusters use matchRule (lexicon, then
+ * token overlap).
+ *
+ * Verdicts (P = matching praise reviews, C = matching complaint/unmet-need
+ * reviews; "on a claiming product" = the theme's reviews include ≥ 1 of the
+ * products making the claim):
+ *   contradicted     C ≥ 3, C ≥ 1.5 × P, and a complaint theme on a claiming product
+ *   experienced      a praise theme on a claiming product and P > C
+ *   mixed_weak       themes match, but neither bar is met (too few reviews,
+ *                    evidence split, or only on non-claiming products)
+ *   claimed_only     claiming products have analysed reviews, no theme matches
+ *   no_review_signal no synthesis, or none of the claiming products has reviews
  */
+const CONTRADICT_MIN_REVIEWS = 3;
+const CONTRADICT_RATIO = 1.5;
+
 function buildExperiencedVsClaimed(rollup, synthesis) {
   const themes = synthesis && Array.isArray(synthesis.themes) ? synthesis.themes : [];
   const reviewed = new Set(((synthesis && synthesis.ledger && synthesis.ledger.distinct_asins) || []));
@@ -713,7 +742,8 @@ function buildExperiencedVsClaimed(rollup, synthesis) {
     const claimText = [c.seed, ...c.variants].join(' | ');
     const matches = [];
     for (const t of themes) {
-      const rule = matchRule(claimText, [t.label, ...(t.merged_labels || [])].join(' | '));
+      const themeText = [t.label, ...(t.merged_labels || [])].join(' | ');
+      const rule = c.key ? (groupsOf(themeText).includes(c.key) ? `synonym:${c.key}` : null) : matchRule(claimText, themeText);
       if (!rule) continue;
       const tAsins = (t.distinct_products && t.distinct_products.asins) || [];
       matches.push({
@@ -732,13 +762,18 @@ function buildExperiencedVsClaimed(rollup, synthesis) {
     const against = matches.filter((m) => m.polarity !== 'praise');
     const P = praise.reduce((s, m) => s + m.review_count, 0);
     const C = against.reduce((s, m) => s + m.review_count, 0);
+    const praiseOnClaiming = praise.filter((m) => m.on_claiming_products > 0);
+    const againstOnClaiming = against.filter((m) => m.on_claiming_products > 0);
     const claimingReviewed = c.asins.filter((a) => reviewed.has(a)).length;
     let verdict;
     if (!themes.length) verdict = 'no_review_signal';
-    else if (C > 0 && C >= P) verdict = 'contradicted';
-    else if (P > 0) verdict = 'experienced';
-    else verdict = claimingReviewed ? 'claimed_only' : 'no_review_signal';
-    const lead = verdict === 'contradicted' ? against[0] : praise[0] || against[0] || null;
+    else if (!matches.length) verdict = claimingReviewed ? 'claimed_only' : 'no_review_signal';
+    else if (C >= CONTRADICT_MIN_REVIEWS && C >= CONTRADICT_RATIO * P && againstOnClaiming.length) verdict = 'contradicted';
+    else if (claimingReviewed > 0 && praiseOnClaiming.length && P > C) verdict = 'experienced';
+    else verdict = 'mixed_weak';
+    const lead = verdict === 'contradicted' ? againstOnClaiming[0]
+      : verdict === 'experienced' ? praiseOnClaiming[0]
+        : praiseOnClaiming[0] || againstOnClaiming[0] || praise[0] || against[0] || null;
     const kinds = {};
     for (const a of c.asins) for (const k of new Set(c.items.filter((x) => x.asin === a).map((x) => x.kind))) kinds[k] = (kinds[k] || 0) + 1;
     return {
@@ -765,12 +800,13 @@ function buildExperiencedVsClaimed(rollup, synthesis) {
       verdict,
     };
   }).sort((a, b) => b.products_claiming - a.products_claiming || a.claim.localeCompare(b.claim));
-  const counts = { experienced: 0, claimed_only: 0, contradicted: 0, no_review_signal: 0 };
+  const counts = { experienced: 0, mixed_weak: 0, claimed_only: 0, contradicted: 0, no_review_signal: 0 };
   for (const i of items) counts[i.verdict]++;
   return {
     available: themes.length > 0,
     items,
     counts,
+    rules: { contradicted: `complaint reviews ≥ ${CONTRADICT_MIN_REVIEWS} and ≥ ${CONTRADICT_RATIO}× praise, on ≥ 1 claiming product`, experienced: 'a praise theme on ≥ 1 claiming product and praise > complaints' },
     excluded_attribute_claims: claims.length - benefits.length,
     synthesis: synthesis ? { keyword: synthesis.keyword || null, generated_at: synthesis.generated_at || null, status: synthesis.status || null, themes: themes.length, products_with_reviews: reviewed.size } : null,
   };
@@ -790,6 +826,7 @@ function buildAssetLedger(entries, { scope = null } = {}) {
     products_cached: 0,
     products_failed: 0,
     products_not_attempted: 0,
+    products_skipped_failed: 0,
     images_available: 0,
     gallery_images_available: 0,
     images_selected: 0,
@@ -843,6 +880,9 @@ function buildAssetLedger(entries, { scope = null } = {}) {
       L.brand_story_images_analyzed += imgs.filter((i) => i.kind === 'brand' && !unread.has(i.label)).length;
       if (aImgs) L.a_plus_analyzed++;
       L.claims_dropped_unevidenced += (r.analysis && r.analysis.validation && r.analysis.validation.dropped_total) || 0;
+    } else if (r && r.skipped) {
+      // Skipped after 2 failed (billed) attempts on this exact gallery; --force retries.
+      L.products_skipped_failed++;
     } else if (r && r.attempted) {
       L.products_failed++;
       if (!r.cached) L.images_sent_this_run += (e.images || []).length;
@@ -856,7 +896,7 @@ function buildAssetLedger(entries, { scope = null } = {}) {
 /** complete | partial | inventory_only, from the ledger. */
 function computeCategoryStatus(L) {
   if (!L.products_analyzed) return 'inventory_only';
-  if (L.products_failed || L.products_not_attempted) return 'partial';
+  if (L.products_failed || L.products_not_attempted || L.products_skipped_failed) return 'partial';
   return 'complete';
 }
 
@@ -894,9 +934,20 @@ function estimateCost(plan, { model, pricing, env = {}, completionPerCall = 2000
   return { calls, images, tokens_per_image: tpi, prompt_tokens: promptTokens, completion_tokens: completion, cost_usd: cost == null ? null : Math.round(cost * 10000) / 10000 };
 }
 
+/**
+ * Honest ceiling: every product needs both attempts and every response runs
+ * to max_tokens. Real runs land near estimateCost(); this is what a bad run
+ * could bill.
+ */
+function estimateWorstCase(plan, { model, pricing, env = {}, maxTokens = 16000, attempts = 2 } = {}) {
+  const one = estimateCost(plan, { model, pricing, env, completionPerCall: maxTokens });
+  const x = (v) => (v == null ? null : v * attempts);
+  return { ...one, attempts, calls: x(one.calls), prompt_tokens: x(one.prompt_tokens), completion_tokens: x(one.completion_tokens), cost_usd: one.cost_usd == null ? null : Math.round(one.cost_usd * attempts * 10000) / 10000 };
+}
+
 // ─── Prompt block for P7 (market analysis) and P9 (formula brief) ──────────
 
-const VERDICT_LABEL = { experienced: 'EXPERIENCED', claimed_only: 'CLAIMED ONLY', contradicted: 'CONTRADICTED', no_review_signal: 'NO REVIEW SIGNAL' };
+const VERDICT_LABEL = { experienced: 'EXPERIENCED', mixed_weak: 'MIXED / TOO FEW REVIEWS TO JUDGE', claimed_only: 'CLAIMED ONLY', contradicted: 'CONTRADICTED', no_review_signal: 'NO REVIEW SIGNAL' };
 
 function seenLine(s) {
   const parts = [['main', 'main'], ['gallery', 'gallery'], ['a+', 'A+'], ['brand', 'brand story']].filter(([k]) => s && s[k]).map(([k, l]) => `${l} ${s[k]}`);
@@ -913,7 +964,7 @@ function formatMarketingAssetsForPrompt(row, { maxMessages = 14, maxEvc = 16, ma
   const R = row.rollup;
   const E = row.experienced_vs_claimed || { items: [] };
   const lines = [];
-  lines.push(`Coverage: vision read ${L.images_analyzed ?? '?'} images (${L.a_plus_images_analyzed ?? 0} A+) from ${L.products_analyzed ?? R.products_analyzed} of ${L.products ?? '?'} products${L.products_failed || L.products_not_attempted ? ` — ${L.products_failed || 0} failed, ${L.products_not_attempted || 0} not attempted, so counts are a lower bound` : ''}. Videos: ${L.videos_available ?? 0} available, 0 analysed (no frame/transcript path). Claims without an image label were dropped (${L.claims_dropped_unevidenced ?? 0}).`);
+  lines.push(`Coverage: vision read ${L.images_analyzed ?? '?'} images (${L.a_plus_images_analyzed ?? 0} A+) from ${L.products_analyzed ?? R.products_analyzed} of ${L.products ?? '?'} products${L.products_failed || L.products_not_attempted || L.products_skipped_failed ? ` — ${L.products_failed || 0} failed, ${L.products_not_attempted || 0} not attempted, ${L.products_skipped_failed || 0} skipped after 2 failed attempts, so counts are a lower bound` : ''}. Videos: ${L.videos_available ?? 0} available, 0 analysed (no frame/transcript path). Claims without an image label were dropped (${L.claims_dropped_unevidenced ?? 0}).`);
   lines.push('');
   lines.push('RECURRING MESSAGES ON THE IMAGES (products showing it · where seen):');
   const msgs = (R.recurring_messages || []).filter((m) => m.seen_on && (m.seen_on.main + m.seen_on.gallery + m.seen_on['a+'] + m.seen_on.brand) > 0).slice(0, maxMessages);
@@ -937,7 +988,7 @@ function formatMarketingAssetsForPrompt(row, { maxMessages = 14, maxEvc = 16, ma
     lines.push(`EXPERIENCED vs CLAIMED (claimed benefit → P3b review evidence${E.available ? '' : ' — NO review synthesis available, nothing can be confirmed'}):`);
     for (const i of E.items.slice(0, maxEvc)) {
       const rs = i.review_support;
-      const ev = rs ? `${rs.polarity} theme "${rs.theme_label}", ${rs.review_count} reviews across ${rs.distinct_products} products [${rs.rule}]` : i.verdict === 'claimed_only' ? `no matching review theme although ${i.claiming_products_with_reviews} claiming products have analysed reviews` : 'no review data for the claiming products';
+      const ev = rs ? `${rs.polarity} theme "${rs.theme_label}", ${rs.review_count} reviews across ${rs.distinct_products} products, on ${rs.on_claiming_products ?? 0} of the claiming products [${rs.rule}]` : i.verdict === 'claimed_only' ? `no matching review theme although ${i.claiming_products_with_reviews} claiming products have analysed reviews` : 'no review data for the claiming products';
       const surf = i.claim_surface !== 'shown_in_images' ? ` [${i.claim_surface.replace(/_/g, ' ')}]` : '';
       lines.push(`- ${VERDICT_LABEL[i.verdict]}: ${i.claim} — claimed by ${i.products_claiming} product${i.products_claiming === 1 ? '' : 's'}${surf}; ${ev}${i.verdict === 'experienced' && i.complaint_reviews ? `; ${i.complaint_reviews} reviews report the opposite` : ''}`);
     }
@@ -977,6 +1028,7 @@ module.exports = {
   tokensPerImage,
   pricingFor,
   estimateCost,
+  estimateWorstCase,
   formatMarketingAssetsForPrompt,
   isMissingTableError: RS.isMissingTableError,
 };

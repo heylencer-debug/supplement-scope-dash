@@ -26,6 +26,10 @@ import type {
 
 const nf = new Intl.NumberFormat("en-US");
 const n = (v: number | null | undefined) => (v == null ? "–" : nf.format(v));
+/** "3 / 10" — or just "3" if the numerator would exceed its denominator (never "3 / 1"). */
+function OfTotal({ v, total }: { v: number; total: number }) {
+  return <>{n(v)}{total >= v && total > 0 ? <span className="text-muted-foreground text-xs"> / {n(total)}</span> : null}</>;
+}
 
 function Chip({ label, value, sub }: { label: string; value: React.ReactNode; sub?: React.ReactNode }) {
   return (
@@ -43,7 +47,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 export function AssetLedgerChips({ ledger, scope }: { ledger: AssetLedger; scope: "category" | "product" }) {
   const aplusImgs = ledger.a_plus_images_available ?? 0;
-  const lowerBound = (ledger.products_failed ?? 0) + (ledger.products_not_attempted ?? 0);
+  const lowerBound = (ledger.products_failed ?? 0) + (ledger.products_not_attempted ?? 0) + (ledger.products_skipped_failed ?? 0);
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap gap-2">
@@ -69,7 +73,7 @@ export function AssetLedgerChips({ ledger, scope }: { ledger: AssetLedger; scope
       </div>
       {lowerBound > 0 && (
         <p className="text-xs text-chart-2">
-          {n(ledger.products_failed ?? 0)} products failed and {n(ledger.products_not_attempted ?? 0)} were not attempted — counts below are a lower bound.
+          {n(ledger.products_failed ?? 0)} products failed, {n(ledger.products_not_attempted ?? 0)} were not attempted and {n(ledger.products_skipped_failed ?? 0)} were skipped after 2 failed attempts (--force to retry) — counts below are a lower bound.
         </p>
       )}
       {(ledger.videos_available ?? 0) > 0 && ledger.videos_note && <p className="text-[11px] text-muted-foreground">{ledger.videos_note}</p>}
@@ -126,7 +130,7 @@ function CountTable({
                 {extra?.(r)}
               </TableCell>
               <TableCell className="align-top text-right tabular-nums text-sm">
-                {n(r.products)} <span className="text-muted-foreground text-xs">/ {n(total)}</span>
+                <OfTotal v={r.products} total={total} />
               </TableCell>
               {withSeen && <TableCell className="align-top text-right text-sm"><SeenOnLine seen={r.seen_on} /></TableCell>}
             </TableRow>
@@ -143,9 +147,10 @@ function CountTable({
 }
 
 const VERDICT: Record<Verdict, { label: string; cls: string; hint: string }> = {
-  experienced: { label: "Experienced", cls: "border-chart-4/40 text-chart-4 bg-chart-4/10", hint: "A customer praise theme backs this claim" },
+  experienced: { label: "Experienced", cls: "border-chart-4/40 text-chart-4 bg-chart-4/10", hint: "A praise theme on the claiming products backs this claim, and praise outweighs complaints" },
+  mixed_weak: { label: "Mixed / too few", cls: "border-border text-foreground bg-muted/60", hint: "Too few reviews to judge, the evidence is split, or it only shows up on products that do not make the claim" },
   claimed_only: { label: "Claimed only", cls: "border-chart-2/40 text-chart-2 bg-chart-2/10", hint: "Claiming products have reviews, but no review theme mentions it" },
-  contradicted: { label: "Contradicted", cls: "border-destructive/40 text-destructive bg-destructive/10", hint: "Complaint reviews on this topic outnumber praise" },
+  contradicted: { label: "Contradicted", cls: "border-destructive/40 text-destructive bg-destructive/10", hint: "≥ 3 complaint reviews, ≥ 1.5× the praise, on at least one claiming product" },
   no_review_signal: { label: "No review signal", cls: "border-border text-muted-foreground", hint: "No review synthesis, or none of the claiming products has analysed reviews" },
 };
 
@@ -220,14 +225,14 @@ export function ExperiencedVsClaimedTable({ evc, total }: { evc: ExperiencedVsCl
                     )}
                   </TableCell>
                   <TableCell className="align-top text-right tabular-nums text-sm">
-                    {n(i.products_claiming)} <span className="text-muted-foreground text-xs">/ {n(total)}</span>
+                    <OfTotal v={i.products_claiming} total={total} />
                   </TableCell>
                   <TableCell className="align-top text-sm">
                     {rs ? (
                       <>
                         <span className="text-foreground">"{rs.theme_label}"</span>{" "}
                         <span className="text-muted-foreground text-xs">
-                          {rs.polarity} · {n(rs.review_count)} reviews · {n(rs.distinct_products)} products
+                          {rs.polarity} · {n(rs.review_count)} reviews · {n(rs.distinct_products)} products · on {n(rs.on_claiming_products ?? 0)} of the {n(i.products_claiming)} claiming products
                         </span>
                         <p className="text-[11px] text-muted-foreground mt-0.5" title="The lexical rule that matched this claim to the review theme">
                           matched by {rs.rule}
@@ -302,7 +307,7 @@ export function MarketingAssetsCategory({ row }: { row: MarketingAssetsCategoryR
                             )}
                           </TableCell>
                           <TableCell className="align-top text-right tabular-nums text-sm">
-                            {n(s.products)} <span className="text-muted-foreground text-xs">/ {n(total)}</span>
+                            <OfTotal v={s.products} total={total} />
                           </TableCell>
                         </TableRow>
                       ))}
@@ -354,7 +359,9 @@ export function ProductMarketingAssets({ row }: { row: MarketingAssetsProductRow
       <AssetLedgerChips ledger={row.ledger} scope="product" />
       {row.status !== "complete" && (
         <p className="text-xs text-chart-2">
-          {row.status === "failed" ? "The vision read failed for this product; it is retried on the next run." :
+          {row.status === "failed" ? (row.batch_results?.skipped || (row.batch_results?.failed_attempts ?? 0) >= (row.batch_results?.max_failed_attempts ?? 2)
+            ? `The vision read failed ${n(row.batch_results?.failed_attempts ?? 2)} times on this gallery, so it is skipped — run P7b with --force to retry.`
+            : "The vision read failed for this product; it is retried on the next run.") :
             row.status === "not_attempted" ? "Not read yet (the run stopped before this product); it resumes next run." :
               row.status === "no_images" ? "No listing images were found for this product." :
                 "Inventory only — no vision pass ran for this product."}

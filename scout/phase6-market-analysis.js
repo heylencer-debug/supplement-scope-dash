@@ -361,7 +361,7 @@ ${positiveReviewSample || 'No positive reviews found in the database for this ca
 ${criticalReviewSample || 'No critical reviews found in the database for this category.'}
 `}
 ${marketingAssetsText ? `### Marketing Assets — what competitors actually SHOW (vision read of listing gallery + A+ images, counted per product)
-Messages are what the images say, not the bullets. "Experienced vs claimed" joins each claimed benefit with the customer review themes above: EXPERIENCED = a praise theme backs it, CLAIMED ONLY = claiming products have reviews but none mention it, CONTRADICTED = complaints outnumber praise. Treat CLAIMED ONLY and CONTRADICTED benefits as positioning risks or openings, never as proven consumer value.
+Messages are what the images say, not the bullets. "Experienced vs claimed" joins each claimed benefit with the customer review themes above: EXPERIENCED = a praise theme on the claiming products backs it, MIXED = too few or split reviews to judge, CLAIMED ONLY = claiming products have reviews but none mention it, CONTRADICTED = complaints clearly outnumber praise on the claiming products. Treat CLAIMED ONLY and CONTRADICTED benefits as positioning risks or openings, never as proven consumer value.
 ${marketingAssetsText}
 
 ` : ''}### Price Range Distribution

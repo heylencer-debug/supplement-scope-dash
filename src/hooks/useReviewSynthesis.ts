@@ -35,6 +35,12 @@ export interface ReviewLedger {
   reviews_analyzed: number;
   reviews_with_text?: number;
   rating_only_reviews?: number;
+  /** Reviews the model actually read (successful batches). null = no theme pass ran. */
+  reviews_theme_analyzed?: number | null;
+  reviews_in_failed_batches?: number;
+  reviews_themes_not_attempted?: number;
+  reviews_in_suspect_batches?: number;
+  rows_without_review_id?: number;
   cap_applied?: { max: number; reviews_collected: number; reviews_dropped: number; rule: string } | null;
   products_with_reviews: number;
   distinct_asins?: string[];
@@ -47,12 +53,14 @@ export interface ReviewLedger {
   average_rating?: number | null;
   theme_pass?: {
     model: string | null;
-    batches: number;
-    batches_ok: number;
-    batches_failed: number;
-    reviews_sent: number;
-    reviews_in_failed_batches: number;
+    batches?: number;
+    batches_ok?: number;
+    batches_failed?: number;
+    batches_not_attempted?: number;
+    reviews_sent?: number;
+    reviews_theme_analyzed?: number;
     cost_usd?: number;
+    category_status?: SynthesisStatus;
   };
 }
 
@@ -84,13 +92,15 @@ export interface DomainBreakdownRow {
   unclear?: number;
 }
 
+export type SynthesisStatus = "complete" | "partial" | "deterministic_only";
+
 export interface ReviewSynthesisRow {
   keyword: string;
   category_id: string | null;
   ledger: ReviewLedger;
   themes: ReviewTheme[];
   domain_breakdown: DomainBreakdownRow[];
-  status: "complete" | "partial" | "deterministic_only";
+  status: SynthesisStatus;
   model: string | null;
   generated_at: string;
 }
@@ -98,6 +108,7 @@ export interface ReviewSynthesisRow {
 /** products.review_analysis.review_evidence (written by P3b / migrate-reviews-to-dash.js). */
 export interface ProductReviewEvidence {
   ledger: ReviewLedger;
+  status?: SynthesisStatus | null;
   themes: ReviewTheme[];
   theme_count?: number;
   generated_at?: string | null;

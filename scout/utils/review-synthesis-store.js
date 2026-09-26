@@ -2,7 +2,12 @@
  * utils/review-synthesis-store.js — read side of dovive_review_synthesis
  * (migration 012). Shared by P6a, P7, P8 and migrate-reviews-to-dash.js so
  * each can PREFER the full-coverage synthesis and fall back to its old
- * sampling when no row exists.
+ * sampling when no usable row exists.
+ *
+ * STALENESS: pass `reviewsClient` (the client that reads dovive_reviews) and
+ * a synthesis generated BEFORE the latest scrape of its keyword is ignored —
+ * with a log line saying so — because it no longer describes the reviews the
+ * phase is about to reason over (e.g. P3 re-scraped, P3b not re-run yet).
  *
  * FAIL-OPEN: a missing table (migration not applied yet), a network error or
  * an empty result all return null / {} — never throw. A consumer must work
@@ -11,10 +16,36 @@
 
 'use strict';
 
+const { isStaleSynthesis } = require('./review-synthesis');
+
 const TABLE = 'dovive_review_synthesis';
 
+/** Latest dovive_reviews.scraped_at for a keyword (or null). */
+async function fetchLatestScrapedAt(reviewsClient, keyword) {
+  try {
+    if (!reviewsClient || !keyword) return null;
+    const { data, error } = await reviewsClient.from('dovive_reviews')
+      .select('scraped_at')
+      .eq('keyword', keyword)
+      .order('scraped_at', { ascending: false })
+      .limit(1);
+    if (error || !data || !data.length) return null;
+    return data[0].scraped_at || null;
+  } catch {
+    return null;
+  }
+}
+
+async function isStale(reviewsClient, keyword, generatedAt, log, what) {
+  if (!reviewsClient) return false;
+  const latest = await fetchLatestScrapedAt(reviewsClient, keyword);
+  if (!isStaleSynthesis(generatedAt, latest)) return false;
+  log(`  ⚠️ Ignoring ${what} review synthesis for "${keyword}": generated ${generatedAt}, but reviews were scraped again at ${latest} — falling back to sampled reviews until P3b re-runs.`);
+  return true;
+}
+
 /** Latest category-scope synthesis for a keyword (optionally a category id). */
-async function fetchCategorySynthesis(client, { keyword, categoryId = null } = {}) {
+async function fetchCategorySynthesis(client, { keyword, categoryId = null, reviewsClient = null, log = console.log } = {}) {
   try {
     if (!client || (!keyword && !categoryId)) return null;
     let q = client.from(TABLE)
@@ -24,21 +55,23 @@ async function fetchCategorySynthesis(client, { keyword, categoryId = null } = {
     const { data, error } = await q.order('generated_at', { ascending: false }).limit(1);
     if (error || !data || !data.length) return null;
     const row = data[0];
-    return Array.isArray(row.themes) ? row : null;
+    if (!Array.isArray(row.themes)) return null;
+    if (await isStale(reviewsClient, row.keyword || keyword, row.generated_at, log, 'category')) return null;
+    return row;
   } catch {
     return null;
   }
 }
 
-/** Product-scope rows for a keyword, keyed by ASIN. */
-async function fetchProductSyntheses(client, { keyword, asins = null } = {}) {
-  const out = {};
+/** Product-scope rows for a keyword, keyed by ASIN (all-or-nothing on staleness). */
+async function fetchProductSyntheses(client, { keyword, asins = null, reviewsClient = null, log = console.log } = {}) {
+  let out = {};
   try {
     if (!client || !keyword) return out;
     const pageSize = 500;
     for (let page = 0; ; page++) {
       let q = client.from(TABLE)
-        .select('asin, ledger, themes, domain_breakdown, generated_at, model, prompt_version')
+        .select('asin, ledger, themes, domain_breakdown, generated_at, model, prompt_version, status')
         .eq('scope', 'product')
         .eq('keyword', keyword);
       if (asins && asins.length) q = q.in('asin', asins);
@@ -47,10 +80,15 @@ async function fetchProductSyntheses(client, { keyword, asins = null } = {}) {
       for (const r of data) if (r.asin) out[r.asin] = r;
       if (data.length < pageSize) break;
     }
+    const rows = Object.values(out);
+    if (rows.length && reviewsClient) {
+      const oldest = rows.reduce((m, r) => (!m || (r.generated_at && r.generated_at < m) ? r.generated_at : m), null);
+      if (await isStale(reviewsClient, keyword, oldest, log, 'product')) out = {};
+    }
   } catch {
     // fail-open
   }
   return out;
 }
 
-module.exports = { TABLE, fetchCategorySynthesis, fetchProductSyntheses };
+module.exports = { TABLE, fetchCategorySynthesis, fetchProductSyntheses, fetchLatestScrapedAt };

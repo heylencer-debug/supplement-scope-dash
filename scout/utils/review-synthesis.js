@@ -205,13 +205,12 @@ function normalizeReview(row) {
   return {
     row_id: row.id,
     // Amazon's review_id when present (every Bright Data row). Otherwise the
-    // text: a long body is specific enough to match across ASINs (parent-level
-    // review pools); a short one ("Great!") only matches within its own ASIN.
-    review_key: reviewId
-      ? `rid:${reviewId}`
-      : (normText(body).length >= 60
-        ? `txt:${rating}|${normText(body)}`
-        : `txt:${row.asin}|${rating}|${normText(title)}|${normText(body)}`),
+    // text, WITHIN ONE ASIN only: text alone is never allowed to join two
+    // ASINs into a product family (a review_id is the only proof of a shared
+    // variant review pool).
+    review_key: reviewId ? `rid:${reviewId}` : textKey(row.asin, rating, title, body),
+    text_key: textKey(row.asin, rating, title, body),
+    has_review_id: !!reviewId,
     asin: row.asin,
     rating: Number.isFinite(rating) ? rating : null,
     title,
@@ -227,6 +226,12 @@ function normalizeReview(row) {
 
 function normText(s) {
   return (s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+/** Per-ASIN text identity: the body when there is one, else the title. */
+function textKey(asin, rating, title, body) {
+  const b = normText(body);
+  return `txt:${asin}|${rating}|${b || `t:${normText(title)}`}`;
 }
 
 /** Union-find over ASINs. */
@@ -259,27 +264,53 @@ function makeUnionFind() {
  *   reviews[i].family = the family id (smallest ASIN in the family).
  */
 function prepareReviews(rows) {
-  const byKey = new Map();
+  const reviews = [];
+  const byRid = new Map();
+  const byText = new Map(); // per-ASIN text key → review (so an id-less copy of a review we hold by id merges into it)
   const uf = makeUnionFind();
   let rowsCollected = 0;
+  let rowsWithoutReviewId = 0;
+  let rowsWithoutRowId = 0;
+  let rowsSkippedNoAsin = 0;
   for (const row of rows || []) {
-    if (!row || !row.asin) continue;
+    if (!row || !row.asin) { rowsSkippedNoAsin++; continue; }
     rowsCollected++;
     const n = normalizeReview(row);
+    if (!n.has_review_id) rowsWithoutReviewId++;
+    if (n.row_id == null) rowsWithoutRowId++;
     uf.find(n.asin);
-    const existing = byKey.get(n.review_key);
+    let existing = null;
+    if (n.has_review_id) {
+      existing = byRid.get(n.review_key) || null;
+      if (!existing) {
+        const t = byText.get(n.text_key);
+        if (t && !t.has_review_id) existing = t; // id-less copy seen first: adopt the id
+      }
+    } else {
+      existing = byText.get(n.text_key) || null;
+    }
     if (!existing) {
-      byKey.set(n.review_key, { ...n, id: n.row_id, row_ids: [n.row_id], asins: [n.asin] });
+      const r = { ...n, id: n.row_id ?? null, row_ids: [n.row_id ?? null], asins: [n.asin] };
+      reviews.push(r);
+      if (n.has_review_id) byRid.set(n.review_key, r);
+      if (!byText.has(n.text_key)) byText.set(n.text_key, r);
       continue;
     }
-    existing.row_ids.push(n.row_id);
+    existing.row_ids.push(n.row_id ?? null);
+    if (n.has_review_id && !existing.has_review_id) {
+      existing.has_review_id = true;
+      existing.review_key = n.review_key;
+      byRid.set(n.review_key, existing);
+    }
+    if (!byText.has(n.text_key)) byText.set(n.text_key, existing);
     if (!existing.asins.includes(n.asin)) {
+      // Only a shared Amazon review_id reaches here with a new ASIN (text keys are per ASIN).
       existing.asins.push(n.asin);
       uf.union(existing.asins[0], n.asin);
     }
     if (n.row_id != null && (existing.id == null || n.row_id < existing.id)) existing.id = n.row_id;
     // Fill gaps from later duplicates (e.g. an older row missing its title).
-    for (const f of ['title', 'body', 'date', 'variant']) if (!existing[f] && n[f]) existing[f] = n[f];
+    for (const f of ['title', 'body', 'date', 'variant', 'reviewer_name']) if (!existing[f] && n[f]) existing[f] = n[f];
     existing.verified = existing.verified || n.verified;
     existing.vine = existing.vine || n.vine;
     existing.helpful = Math.max(existing.helpful, n.helpful);
@@ -292,17 +323,23 @@ function prepareReviews(rows) {
     (families[f] = families[f] || []).push(asin);
   }
   for (const f of Object.keys(families)) families[f].sort();
-  const reviews = [...byKey.values()]
+  const out = reviews
     .map((r) => ({ ...r, asins: [...r.asins].sort(), family: familyOf[r.asins[0]] }))
-    .sort((a, b) => (a.id ?? 0) - (b.id ?? 0));
+    .sort((a, b) => (a.id ?? Infinity) - (b.id ?? Infinity));
   return {
-    reviews,
+    reviews: out,
     familyOf,
     families,
     stats: {
       rows_collected: rowsCollected,
-      duplicate_rows_removed: rowsCollected - reviews.length,
-      reviews_shared_across_asins: reviews.filter((r) => r.asins.length > 1).length,
+      duplicate_rows_removed: rowsCollected - out.length,
+      reviews_shared_across_asins: out.filter((r) => r.asins.length > 1).length,
+      // Honest fallbacks for rows that arrive without identifiers (e.g. a
+      // reuse SELECT that omits id / raw_json): de-duplicated by ASIN +
+      // rating + text only, never joined across ASINs.
+      rows_without_review_id: rowsWithoutReviewId,
+      rows_without_row_id: rowsWithoutRowId,
+      rows_skipped_no_asin: rowsSkippedNoAsin,
     },
   };
 }
@@ -662,34 +699,39 @@ function labelSimilarity(a, b) {
 }
 
 /**
- * Union the per-batch clusters into category themes. Two clusters merge when
- * they share polarity AND (same domain and label similarity ≥ threshold, or
- * near-identical labels ≥ 0.8 regardless of domain). Canonical label = the
- * member label with the most supporting reviews; domain = review-weighted
- * majority.
+ * Union the per-batch clusters into category themes.
+ *
+ * SEED-BASED, never transitive: clusters are visited largest first; each one
+ * joins the existing theme whose SEED label (its largest member) it matches —
+ * same polarity AND (same domain and label similarity ≥ threshold, or
+ * near-identical labels ≥ 0.8). A cluster that only resembles another
+ * non-seed member does not join, so "melted" → "melted and sticky" →
+ * "sticky texture" cannot chain into one theme. Every merge is reported to
+ * `onMerge({ into, from, similarity })` so the phase can log it.
+ * Canonical label = the seed; domain = review-weighted majority.
  */
-function mergeThemes(batchThemes, { threshold = 0.5 } = {}) {
-  const items = batchThemes.flat().filter(Boolean);
-  const parent = items.map((_, i) => i);
-  const find = (i) => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
-  const tokens = items.map((t) => labelTokens(t.label));
-  for (let i = 0; i < items.length; i++) {
-    for (let j = i + 1; j < items.length; j++) {
-      if (items[i].polarity !== items[j].polarity) continue;
-      const sim = jaccard(tokens[i], tokens[j]);
-      if ((items[i].domain === items[j].domain && sim >= threshold) || sim >= 0.8) {
-        const ri = find(i); const rj = find(j);
-        if (ri !== rj) parent[Math.max(ri, rj)] = Math.min(ri, rj);
-      }
+function mergeThemes(batchThemes, { threshold = 0.5, onMerge = null } = {}) {
+  const items = batchThemes.flat().filter(Boolean)
+    .map((t) => ({ t, tok: labelTokens(t.label) }))
+    .sort((a, b) => b.t.review_ids.length - a.t.review_ids.length || a.t.label.localeCompare(b.t.label));
+  const clusters = [];
+  for (const it of items) {
+    let best = null;
+    let bestSim = 0;
+    for (const c of clusters) {
+      if (c.seed.t.polarity !== it.t.polarity) continue;
+      const sim = jaccard(c.seed.tok, it.tok);
+      const ok = (c.seed.t.domain === it.t.domain && sim >= threshold) || sim >= 0.8;
+      if (ok && sim > bestSim) { best = c; bestSim = sim; }
+    }
+    if (best) {
+      best.members.push(it.t);
+      if (onMerge && best.seed.t.label !== it.t.label) onMerge({ into: best.seed.t.label, from: it.t.label, similarity: Math.round(bestSim * 100) / 100 });
+    } else {
+      clusters.push({ seed: it, members: [it.t] });
     }
   }
-  const groups = new Map();
-  items.forEach((t, i) => {
-    const r = find(i);
-    if (!groups.has(r)) groups.set(r, []);
-    groups.get(r).push(t);
-  });
-  return sortMerged([...groups.values()].map((members) => combineMembers(members)));
+  return sortMerged(clusters.map((c) => combineMembers(c.members, c.seed.t.label)));
 }
 
 function sortMerged(list) {
@@ -853,7 +895,11 @@ function summarizeIds(ids, reviewById) {
  * taste"). It is never merged away and never netted off — a complaint with a
  * large counter_evidence is a split experience, not a verdict.
  */
-function finalizeThemes(merged, reviews, { productsWithReviews, reviewsAnalyzed, topicThreshold = 0.5 } = {}) {
+function finalizeThemes(merged, reviews, { productsWithReviews, reviewsThemed, reviewsAnalyzed, topicThreshold = 0.5 } = {}) {
+  // share_of_analyzed is over the reviews the model actually READ (successful
+  // batches), not the capped set — rating-only reviews and failed batches
+  // cannot support a theme.
+  const denom = reviewsThemed != null ? reviewsThemed : reviewsAnalyzed;
   const reviewById = new Map(reviews.map((r) => [r.id, r]));
   const topics = merged.map((t) => topicTokens(t.label));
   return merged.map((t, i) => {
@@ -874,7 +920,7 @@ function finalizeThemes(merged, reviews, { productsWithReviews, reviewsAnalyzed,
       polarity: t.polarity,
       review_ids: s.reviews.map((r) => r.id),
       review_count: s.review_count,
-      share_of_analyzed: share(s.review_count, reviewsAnalyzed),
+      share_of_analyzed: share(s.review_count, denom),
       distinct_products: { count: s.families, asin_count: s.asins.length, asins: s.asins },
       scope: scopeFor(s.families, productsWithReviews),
       verified_count: s.verified,
@@ -963,16 +1009,32 @@ function formatThemeLine(t) {
   return `- ${t.label} [${DOMAIN_LABEL[t.domain] || t.domain}] — ${fmtN(t.review_count)} review${t.review_count === 1 ? '' : 's'} across ${prods} product${prods === 1 ? '' : 's'} (${fmtN(t.verified_count)} verified); ${scope}${conflict}.${ex}`;
 }
 
+/** "1,080 collected · 1,062 themed · 18 rating-only · 0 in failed batches". */
+function coverageHeadline(l) {
+  if (!l) return '';
+  const parts = [`${fmtN(l.reviews_collected)} unique reviews collected`];
+  if (l.cap_applied) parts.push(`${fmtN(l.reviews_analyzed)} in scope (capped at ${fmtN(l.cap_applied.max)} — ${fmtN(l.cap_applied.reviews_dropped)} not analyzed)`);
+  if (l.reviews_theme_analyzed == null) {
+    parts.push(`themes not attempted for ${fmtN(l.reviews_analyzed)} reviews`);
+    return parts.join(' · ');
+  }
+  parts.push(`${fmtN(l.reviews_theme_analyzed)} themed`);
+  parts.push(`${fmtN(l.rating_only_reviews || 0)} rating-only`);
+  parts.push(`${fmtN(l.reviews_in_failed_batches || 0)} in failed batches`);
+  if (l.reviews_themes_not_attempted) parts.push(`themes not attempted for ${fmtN(l.reviews_themes_not_attempted)} reviews`);
+  return parts.join(' · ');
+}
+
 function formatLedgerLine(l) {
   if (!l) return '';
-  const cap = l.cap_applied ? ` (capped at ${fmtN(l.cap_applied.max)} — ${fmtN(l.cap_applied.reviews_dropped)} not analyzed)` : '';
   const dup = l.duplicate_rows_removed ? `; ${fmtN(l.rows_collected)} scraped rows before removing ${fmtN(l.duplicate_rows_removed)} duplicates` : '';
   const dr = l.date_range && l.date_range.min ? `${fmtMonth(l.date_range.min)}–${fmtMonth(l.date_range.max)}` : 'dates unknown';
   const ver = l.verified_share != null ? `, ${Math.round(l.verified_share * 100)}% verified` : '';
-  const tp = l.theme_pass && l.theme_pass.batches_failed
-    ? ` Theme extraction PARTIAL: ${fmtN(l.theme_pass.reviews_in_failed_batches)} reviews were in failed batches, so theme counts are a lower bound.`
+  const lower = l.reviews_theme_analyzed != null && (l.reviews_in_failed_batches || l.reviews_themes_not_attempted)
+    ? ' Theme extraction PARTIAL — theme counts are a lower bound.'
     : '';
-  return `Evidence base: ${fmtN(l.reviews_analyzed)} of ${fmtN(l.reviews_collected)} unique reviews analyzed${cap}${dup}; ${fmtN(l.products_with_reviews)} ASINs in ${fmtN(l.product_families)} product families; ${dr}${ver}.${tp}`;
+  const fams = l.product_families != null ? ` in ${fmtN(l.product_families)} product families` : '';
+  return `Evidence base: ${coverageHeadline(l)}${dup}; ${fmtN(l.products_with_reviews)} ASINs${fams}; ${dr}${ver}.${lower}`;
 }
 
 /**
@@ -1071,7 +1133,7 @@ function formatProductEvidenceForPrompt(productRow, { maxThemes = 10 } = {}) {
   const l = productRow.ledger || {};
   const dr = l.date_range && l.date_range.min ? `${fmtMonth(l.date_range.min)}–${fmtMonth(l.date_range.max)}` : 'dates unknown';
   const ver = l.verified_share != null ? `, ${Math.round(l.verified_share * 100)}% verified` : '';
-  const head = `All ${fmtN(l.reviews_analyzed)} unique reviews for this product analyzed (${dr}${ver}); themes with supporting review counts:`;
+  const head = `This product: ${coverageHeadline(l)} (${dr}${ver})${(l.reviews_in_failed_batches || l.reviews_themes_not_attempted) ? ' — PARTIAL, counts are a lower bound' : ''}; themes with supporting review counts:`;
   const lines = productRow.themes.slice(0, maxThemes).map((t) => {
     const sign = t.polarity === 'praise' ? '+' : t.polarity === 'unmet_need' ? '?' : '-';
     const conflict = t.counter_evidence && t.counter_evidence.count ? `, ${t.counter_evidence.count} say the opposite` : '';
@@ -1092,6 +1154,7 @@ function buildProductEvidence(productRow, { maxThemes = 12 } = {}) {
   if (!productRow) return null;
   return {
     ledger: productRow.ledger,
+    status: productRow.status || null,
     themes: (productRow.themes || []).slice(0, maxThemes),
     theme_count: (productRow.themes || []).length,
     generated_at: productRow.generated_at || null,
@@ -1099,6 +1162,113 @@ function buildProductEvidence(productRow, { maxThemes = 12 } = {}) {
     prompt_version: productRow.prompt_version || null,
     source: 'dovive_review_synthesis',
   };
+}
+
+// ─── Theme-pass accounting (what the model actually read) ─────────────────
+
+const SUSPECT_DROP_SHARE = 0.1;
+
+/** A batch whose response cited > 10% unknown review ids is suspect. */
+function isSuspectBatch(dropped, batchSize, threshold = SUSPECT_DROP_SHARE) {
+  return batchSize > 0 && dropped / batchSize > threshold;
+}
+
+/** Stable key for a batch: prompt version + model + its sorted review ids. */
+function batchKey(batch, { model, promptVersion = PROMPT_VERSION } = {}) {
+  const ids = batch.map((r) => r.id).sort((a, b) => a - b).join(',');
+  return require('crypto').createHash('sha1').update(`${promptVersion}|${model}|${ids}`).digest('hex');
+}
+
+/**
+ * Summarise the batch results. Each result: { ok, attempted, reused,
+ * suspect, dropped, cost }. `attempted:false` = never sent (e.g. skipped after
+ * a 402) — those reviews are NOT "sent" and are reported as not attempted.
+ * Returns the ledger's theme_pass block and the id sets used for per-scope
+ * coverage.
+ */
+function summarizeThemePass(batches, results, { model = null, promptVersion = PROMPT_VERSION } = {}) {
+  const tp = {
+    model, prompt_version: promptVersion,
+    batches: batches.length, batches_ok: 0, batches_reused: 0, batches_failed: 0, batches_not_attempted: 0,
+    batches_with_dropped_ids: 0,
+    reviews_sent: 0, reviews_theme_analyzed: 0, reviews_in_failed_batches: 0, reviews_themes_not_attempted: 0,
+    ids_dropped: 0, cost_usd: 0,
+  };
+  const themed = new Set();
+  const failed = new Set();
+  const notAttempted = new Set();
+  const suspect = new Set();
+  batches.forEach((b, i) => {
+    const r = results[i] || { ok: false, attempted: false };
+    const ids = b.map((x) => x.id);
+    tp.cost_usd += r.cost || 0;
+    tp.ids_dropped += r.dropped || 0;
+    if (r.suspect) { tp.batches_with_dropped_ids++; ids.forEach((id) => suspect.add(id)); }
+    if (r.attempted && !r.reused) tp.reviews_sent += b.length;
+    if (r.ok) {
+      tp.batches_ok++;
+      if (r.reused) tp.batches_reused++;
+      tp.reviews_theme_analyzed += b.length;
+      ids.forEach((id) => themed.add(id));
+    } else if (r.attempted) {
+      tp.batches_failed++;
+      tp.reviews_in_failed_batches += b.length;
+      ids.forEach((id) => failed.add(id));
+    } else {
+      tp.batches_not_attempted++;
+      tp.reviews_themes_not_attempted += b.length;
+      ids.forEach((id) => notAttempted.add(id));
+    }
+  });
+  tp.cost_usd = Math.round(tp.cost_usd * 10000) / 10000;
+  return { themePass: tp, coverage: { themed, failed, notAttempted, suspect, attemptedAny: batches.length > 0 && results.some((r) => r && (r.attempted || r.reused)) } };
+}
+
+/**
+ * Coverage fields for any set of reviews (category or one ASIN). When no theme
+ * pass ran at all, reviews_theme_analyzed is null and every review with text
+ * counts as "themes not attempted" — never as analyzed.
+ */
+function themeCoverage(reviews, coverage) {
+  const withText = reviews.filter((r) => reviewText(r).length >= 15);
+  const ratingOnly = reviews.length - withText.length;
+  if (!coverage || !coverage.attemptedAny) {
+    return { reviews_theme_analyzed: null, rating_only_reviews: ratingOnly, reviews_in_failed_batches: 0, reviews_themes_not_attempted: withText.length, reviews_in_suspect_batches: 0 };
+  }
+  let themed = 0; let failed = 0; let na = 0; let sus = 0;
+  for (const r of withText) {
+    if (coverage.themed.has(r.id)) themed++;
+    else if (coverage.failed.has(r.id)) failed++;
+    else na++;
+    if (coverage.suspect && coverage.suspect.has(r.id)) sus++;
+  }
+  return { reviews_theme_analyzed: themed, rating_only_reviews: ratingOnly, reviews_in_failed_batches: failed, reviews_themes_not_attempted: na, reviews_in_suspect_batches: sus };
+}
+
+/**
+ * complete | partial | deterministic_only, from coverage. A batch whose
+ * response cited > 10% unknown ids downgrades its reviews' scope to partial.
+ */
+function computeStatus(cov) {
+  if (cov.reviews_theme_analyzed == null || (cov.reviews_theme_analyzed === 0 && (cov.reviews_in_failed_batches || cov.reviews_themes_not_attempted))) return 'deterministic_only';
+  if (cov.reviews_in_failed_batches || cov.reviews_themes_not_attempted || cov.reviews_in_suspect_batches) return 'partial';
+  return 'complete';
+}
+
+// ─── Freshness & table checks ──────────────────────────────────────────────
+
+/** A synthesis generated before the latest scrape of its keyword is stale. */
+function isStaleSynthesis(generatedAt, latestScrapedAt) {
+  if (!generatedAt || !latestScrapedAt) return false;
+  return new Date(generatedAt).getTime() < new Date(latestScrapedAt).getTime();
+}
+
+/** PostgREST / Postgres "relation does not exist". */
+function isMissingTableError(error) {
+  if (!error) return false;
+  const code = String(error.code || '');
+  const msg = String(error.message || '');
+  return code === 'PGRST205' || code === '42P01' || /could not find the table|does not exist/i.test(msg);
 }
 
 // ─── Cost estimate (no calls) ──────────────────────────────────────────────
@@ -1140,6 +1310,14 @@ module.exports = {
   topicTokens,
   labelSimilarity,
   mergeThemes,
+  isSuspectBatch,
+  batchKey,
+  summarizeThemePass,
+  themeCoverage,
+  computeStatus,
+  isStaleSynthesis,
+  isMissingTableError,
+  coverageHeadline,
   buildLabelMergePrompt,
   applyLabelGroups,
   finalizeThemes,

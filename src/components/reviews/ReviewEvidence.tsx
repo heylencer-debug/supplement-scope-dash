@@ -17,6 +17,7 @@ import type {
   IssueDomain,
   ReviewLedger,
   ReviewTheme,
+  SynthesisStatus,
   ThemeScope,
 } from "@/hooks/useReviewSynthesis";
 
@@ -56,6 +57,21 @@ function Chip({ label, value, sub }: { label: string; value: React.ReactNode; su
   );
 }
 
+/** Reviews with text the model never read: no theme pass at all, or batches never sent. */
+function notAttempted(l: ReviewLedger): number {
+  if (l.reviews_theme_analyzed == null) return l.reviews_themes_not_attempted ?? l.reviews_with_text ?? l.reviews_analyzed ?? 0;
+  return l.reviews_themes_not_attempted ?? 0;
+}
+
+function themedSub(l: ReviewLedger): string {
+  if (l.reviews_theme_analyzed == null) return "themes not attempted";
+  const bits = [`of ${n(l.reviews_analyzed)}`];
+  if (l.rating_only_reviews) bits.push(`${n(l.rating_only_reviews)} rating-only`);
+  if (l.reviews_in_failed_batches) bits.push(`${n(l.reviews_in_failed_batches)} failed`);
+  if (l.reviews_themes_not_attempted) bits.push(`${n(l.reviews_themes_not_attempted)} not attempted`);
+  return bits.join(" · ");
+}
+
 export function ReviewLedgerChips({ ledger, scope }: { ledger: ReviewLedger; scope: "category" | "product" }) {
   const dr = ledger.date_range;
   const capped = !!ledger.cap_applied;
@@ -67,10 +83,11 @@ export function ReviewLedgerChips({ ledger, scope }: { ledger: ReviewLedger; sco
           value={n(ledger.reviews_collected)}
           sub={ledger.duplicate_rows_removed ? `${n(ledger.rows_collected)} rows, ${n(ledger.duplicate_rows_removed)} duplicates` : "unique reviews"}
         />
+        {capped && <Chip label="In scope" value={n(ledger.reviews_analyzed)} sub={`capped at ${n(ledger.cap_applied?.max)}`} />}
         <Chip
-          label="Analyzed"
-          value={n(ledger.reviews_analyzed)}
-          sub={capped ? `capped at ${n(ledger.cap_applied?.max)}` : ledger.reviews_analyzed === ledger.reviews_collected ? "all of them" : undefined}
+          label="Themed"
+          value={ledger.reviews_theme_analyzed == null ? "–" : n(ledger.reviews_theme_analyzed)}
+          sub={themedSub(ledger)}
         />
         {scope === "category" && (
           <Chip
@@ -91,9 +108,12 @@ export function ReviewLedgerChips({ ledger, scope }: { ledger: ReviewLedger; sco
           {n(ledger.cap_applied?.reviews_dropped)} of {n(ledger.reviews_collected)} reviews were not analyzed — {ledger.cap_applied?.rule}.
         </p>
       )}
-      {!!ledger.theme_pass?.batches_failed && (
+      {ledger.reviews_theme_analyzed != null && notAttempted(ledger) > 0 && (
+        <p className="text-xs text-chart-2">Themes not attempted for {n(notAttempted(ledger))} reviews — theme counts are a lower bound.</p>
+      )}
+      {!!ledger.reviews_in_failed_batches && (
         <p className="text-xs text-chart-2">
-          Theme extraction is partial: {n(ledger.theme_pass.reviews_in_failed_batches)} reviews were in batches that failed, so theme counts may be low.
+          {n(ledger.reviews_in_failed_batches)} reviews were in batches that failed, so theme counts are a lower bound.
         </p>
       )}
     </div>
@@ -260,8 +280,9 @@ export function ReviewEvidence({
   themes: ReviewTheme[];
   domainBreakdown?: DomainBreakdownRow[];
   scope: "category" | "product";
-  status?: "complete" | "partial" | "deterministic_only";
+  status?: SynthesisStatus | null;
 }) {
+  const unread = notAttempted(ledger);
   return (
     <div className="space-y-4">
       <ReviewLedgerChips ledger={ledger} scope={scope} />
@@ -269,9 +290,11 @@ export function ReviewEvidence({
         <ReviewThemeTable themes={themes} scope={scope} />
       ) : (
         <p className="text-sm text-muted-foreground/80">
-          {status === "deterministic_only"
-            ? "Themes were not generated for this run (keyword pass only) — see the issue-type counts."
-            : "No recurring themes were found in these reviews."}
+          {status === "deterministic_only" || ledger.reviews_theme_analyzed == null || (ledger.reviews_theme_analyzed === 0 && unread > 0)
+            ? `Themes not attempted for ${n(unread)} reviews${scope === "category" ? " — see the issue-type counts below" : ""}.`
+            : status === "partial"
+              ? `No recurring themes in the ${n(ledger.reviews_theme_analyzed)} reviews that were read; themes not attempted for ${n(unread)}.`
+              : `No recurring themes were found in the ${n(ledger.reviews_theme_analyzed)} reviews that were read.`}
         </p>
       )}
       {scope === "category" && domainBreakdown && <DomainBreakdown rows={domainBreakdown} />}

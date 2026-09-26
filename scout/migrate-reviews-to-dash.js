@@ -131,6 +131,9 @@ function buildReviewAnalysis(rows, productSynthesis = null) {
       total_reviews_analyzed: total,
       rows_collected: prepared.stats.rows_collected,
       duplicate_rows_removed: prepared.stats.duplicate_rows_removed,
+      // Rows without an Amazon review_id (e.g. read through a SELECT that
+      // omits raw_json) are de-duplicated within their ASIN by rating + text only.
+      rows_without_review_id: prepared.stats.rows_without_review_id,
       verified_purchase_rate: Math.round((reviews.filter(r => r.verified_purchase).length / total) * 100),
       date_range: (() => {
         const d = reviews.map(r => r.review_date).filter(Boolean).sort();
@@ -196,12 +199,13 @@ async function run() {
   console.log(`ASINs with reviews: ${asinsWithReviews.length}\n`);
 
   // P3b product-level synthesis, when it exists (fail-open: {} otherwise).
-  const productSyntheses = await fetchProductSyntheses(DASH, { keyword: KEYWORD });
+  const productSyntheses = await fetchProductSyntheses(DASH, { keyword: KEYWORD, reviewsClient: DOVIVE });
   if (Object.keys(productSyntheses).length) console.log(`P3b review_evidence available for ${Object.keys(productSyntheses).length} ASINs\n`);
 
   let updated = 0;
   let skipped = 0;
   let errors = 0;
+  let rowsWithoutReviewId = 0;
 
   for (const asin of asinsWithReviews) {
     const dashId = asinToId[asin];
@@ -212,6 +216,7 @@ async function run() {
 
     const analysis = buildReviewAnalysis(byAsin[asin], productSyntheses[asin] || null);
     if (!analysis) { skipped++; continue; }
+    rowsWithoutReviewId += analysis.analysis_metadata.rows_without_review_id || 0;
 
     const { error } = await DASH
       .from('products')
@@ -235,6 +240,7 @@ async function run() {
   console.log(`Updated: ${updated} products with review_analysis`);
   console.log(`Skipped (ASIN not in dash or no reviews): ${skipped}`);
   console.log(`Errors: ${errors}`);
+  if (rowsWithoutReviewId) console.log(`Note: ${rowsWithoutReviewId} rows had no Amazon review_id — de-duplicated within their ASIN by rating + text only.`);
 }
 
 if (require.main === module) run().catch(console.error);

@@ -38,6 +38,10 @@ CREATE TABLE IF NOT EXISTS dovive_review_synthesis (
   domain_breakdown JSONB NOT NULL DEFAULT '[]'::jsonb,
   status           TEXT NOT NULL DEFAULT 'complete'
                    CHECK (status IN ('complete', 'partial', 'deterministic_only')),
+  -- Category row only: per-batch model results keyed by sha1(prompt version
+  -- + model + sorted review ids), so a partial run resumes by re-sending only
+  -- the failed / not-attempted / suspect batches.
+  batch_results    JSONB,
   model            TEXT,
   prompt_version   TEXT,
   cost_usd         NUMERIC(12, 6),

@@ -670,7 +670,7 @@ async function compileMarketData(categoryId) {
   // conflicting reviews) instead of the 5 most-helpful critical TITLES per
   // product, and the VOC section below shows those themes instead of a random
   // 60+60 sample. No synthesis row → everything below runs exactly as before.
-  const reviewSynthesis = await fetchCategorySynthesis(DASH, { keyword: KEYWORD, categoryId });
+  const reviewSynthesis = await fetchCategorySynthesis(DASH, { keyword: KEYWORD, categoryId, reviewsClient: DOVIVE });
   const reviewInput = briefReviewInput(reviewSynthesis, null);
   if (reviewInput.mode === 'synthesis') {
     topPainPoints = painPointsFromSynthesis(reviewSynthesis, 40);

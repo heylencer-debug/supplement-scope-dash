@@ -76,17 +76,30 @@ test('prepareReviews de-duplicates by review_id and groups ASINs that share revi
   assert.equal(shared.id, Math.min(...shared.row_ids), 'canonical id = smallest row id');
 });
 
-test('text fallback key: long identical bodies merge across ASINs, short ones only within an ASIN', () => {
+test('rows without a review_id: de-duplicated within their ASIN only, never joined across ASINs; an id-less copy merges into its id-bearing twin', () => {
   const long = 'These gummies arrived completely melted into one solid block and I could not separate them at all.';
   const rows = [
     { id: 1, asin: 'A1', rating: 1, body: long, raw_json: {} },
-    { id: 2, asin: 'A2', rating: 1, body: long, raw_json: {} },
+    { id: 2, asin: 'A2', rating: 1, body: long, raw_json: {} },            // same text, other ASIN → separate review, separate family
     { id: 3, asin: 'A1', rating: 5, body: 'Great!', raw_json: {} },
-    { id: 4, asin: 'A2', rating: 5, body: 'Great!', raw_json: {} },
+    { id: 4, asin: 'A1', rating: 5, body: 'Great!', raw_json: {} },        // repeat scrape → merged
+    { id: 5, asin: 'A3', rating: 4, body: 'Nice chew, mild berry taste.', raw_json: { raw: { review_id: 'RQ' } } },
+    // sibling-reuse SELECT shape: no id, no raw_json, no review_id
+    { asin: 'A3', rating: 4, title: null, body: 'Nice chew, mild berry taste.' },
+    { asin: 'A4', rating: 2, body: 'Too sweet.' },
+    { rating: 3, body: 'no asin at all' },
   ];
   const p = RS.prepareReviews(rows);
-  assert.equal(p.reviews.length, 3);
-  assert.equal(p.familyOf.A1, p.familyOf.A2);
+  assert.equal(p.reviews.length, 5);
+  assert.notEqual(p.familyOf.A1, p.familyOf.A2, 'text alone never joins families');
+  const q = p.reviews.find((r) => r.asins.includes('A3'));
+  assert.equal(q.row_ids.length, 2, 'id-less copy merged into the review_id row');
+  assert.equal(q.id, 5);
+  assert.equal(p.stats.rows_without_review_id, 6);
+  assert.equal(p.stats.rows_without_row_id, 2);
+  assert.equal(p.stats.rows_skipped_no_asin, 1);
+  const noId = p.reviews.find((r) => r.asins.includes('A4'));
+  assert.equal(noId.id, null, 'no fabricated id');
 });
 
 // ── lexicon ───────────────────────────────────────────────────────────────
@@ -171,10 +184,10 @@ test('cap: analyzed < collected only when the cap is hit, and the ledger says so
   assert.equal(ledger.reviews_analyzed, 4);
   assert.equal(ledger.cap_applied.max, 4);
   assert.equal(ledger.cap_applied.reviews_dropped, 7);
-  assert.match(RS.formatLedgerLine(ledger), /4 of 11 unique reviews analyzed \(capped at 4 — 7 not analyzed\)/);
+  assert.match(RS.formatLedgerLine(ledger), /11 unique reviews collected · 4 in scope \(capped at 4 — 7 not analyzed\) · themes not attempted for 4 reviews/);
   assert.equal(RS.applyCap(p.reviews, 100).cap, null);
-  ledger.theme_pass = { batches_failed: 1, reviews_in_failed_batches: 3 };
-  assert.match(RS.formatLedgerLine(ledger), /Theme extraction PARTIAL: 3 reviews were in failed batches/);
+  Object.assign(ledger, { reviews_theme_analyzed: 1, rating_only_reviews: 0, reviews_in_failed_batches: 3, reviews_themes_not_attempted: 0 });
+  assert.match(RS.formatLedgerLine(ledger), /4 in scope .* · 1 themed · 0 rating-only · 3 in failed batches.*PARTIAL/);
 });
 
 // ── batching & parsing ────────────────────────────────────────────────────
@@ -225,6 +238,20 @@ test('mergeThemes unions similar labels across batches, keeps polarity and disti
   assert.equal(merged.length, 4);
   assert.ok(merged.some((t) => t.polarity === 'praise' && t.label === 'Great taste'));
   assert.ok(RS.labelSimilarity('Bitter aftertaste', 'Misleading dose on front label') < 0.5);
+});
+
+test('merge guard: seed-based, no transitive chaining, every merge reported', () => {
+  const log = [];
+  const merged = RS.mergeThemes([[
+    { label: 'Melted in heat', domain: 'shipping_condition', polarity: 'complaint', review_ids: [1, 2, 3, 4], opposite_review_ids: [] },
+    { label: 'Melted heat, sticky clump', domain: 'shipping_condition', polarity: 'complaint', review_ids: [5, 6], opposite_review_ids: [] },
+    { label: 'Sticky clump', domain: 'shipping_condition', polarity: 'complaint', review_ids: [7], opposite_review_ids: [] },
+  ]], { onMerge: (m) => log.push(m) });
+  // A~B (0.5), B~C (0.5) but A!~C (0): C must NOT ride B into A (union-find did)
+  assert.equal(merged.length, 2);
+  assert.deepEqual(merged.find((t) => t.label === 'Melted in heat').review_ids, [1, 2, 3, 4, 5, 6]);
+  assert.ok(merged.some((t) => t.label === 'Sticky clump'));
+  assert.deepEqual(log, [{ into: 'Melted in heat', from: 'Melted heat, sticky clump', similarity: 0.5 }]);
 });
 
 test('applyLabelGroups joins model-proposed synonyms, validates indices, never mixes polarity', () => {
@@ -348,7 +375,7 @@ test('selectThemesForBrief: counts in every line, domain floor, fallback when no
   themes.push(mk('Melts in transit', 'shipping_condition', 'complaint', 41, 9, 12, 17));
   themes.push(mk('Seller refused refund', 'seller_service', 'complaint', 2, 1, 1, 0, 'single_product'));
   themes.push(mk('Great taste', 'taste_texture', 'praise', 300, 20, 200));
-  const synthesis = { themes, ledger: { reviews_collected: 1080, reviews_analyzed: 1080, rows_collected: 1922, duplicate_rows_removed: 842, products_with_reviews: 37, product_families: 34, date_range: { min: '2018-01-31', max: '2026-08-24' }, verified_share: 0.78, cap_applied: null } };
+  const synthesis = { themes, ledger: { reviews_collected: 1080, reviews_analyzed: 1080, rows_collected: 1922, duplicate_rows_removed: 842, products_with_reviews: 37, product_families: 34, date_range: { min: '2018-01-31', max: '2026-08-24' }, verified_share: 0.78, cap_applied: null, reviews_theme_analyzed: 1062, rating_only_reviews: 18, reviews_in_failed_batches: 0, reviews_themes_not_attempted: 0 } };
   const sel = RS.selectThemesForBrief(synthesis, { max: 10 });
   assert.equal(sel.available, true);
   assert.equal(sel.complaints.length, 10);
@@ -356,7 +383,7 @@ test('selectThemesForBrief: counts in every line, domain floor, fallback when no
   assert.ok(sel.complaints.some((t) => t.label === 'Seller refused refund'), 'domain floor keeps service in');
   assert.match(sel.text, /Melts in transit \[arrival condition\] — 41 reviews across 9 products \(12 verified\); category-wide; conflicting: 17 reviews report the opposite\./);
   assert.match(sel.text, /Seller refused refund .*ONE product only/);
-  assert.match(sel.ledgerLine, /1,080 of 1,080 unique reviews analyzed; 1,922 scraped rows before removing 842 duplicates; 37 ASINs in 34 product families; Jan 2018–Aug 2026, 78% verified/);
+  assert.match(sel.ledgerLine, /1,080 unique reviews collected · 1,062 themed · 18 rating-only · 0 in failed batches; 1,922 scraped rows before removing 842 duplicates; 37 ASINs in 34 product families; Jan 2018–Aug 2026, 78% verified\.$/);
 
   const withSynth = RS.briefReviewInput(synthesis, { positive: ['p'], critical: ['c'] });
   assert.equal(withSynth.mode, 'synthesis');

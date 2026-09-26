@@ -65,7 +65,7 @@ async function fetchReviewSentimentMap(asins) {
       if (r.rating >= 4 && bucket.positive.length < 5) bucket.positive.push(r);
       else if (r.rating <= 2 && bucket.critical.length < 5) bucket.critical.push(r);
     }
-    const synth = await fetchProductSyntheses(DASH, { keyword: KEYWORD, asins });
+    const synth = await fetchProductSyntheses(DASH, { keyword: KEYWORD, asins, reviewsClient: DOVIVE });
     for (const asin of asins) if (synth[asin]) map[asin].synthesis = synth[asin];
     return map;
   } catch (e) {

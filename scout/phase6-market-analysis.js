@@ -532,7 +532,12 @@ async function run() {
 
   // Fetch raw reviews for real consumer-voice grounding
   // P3b synthesis first; the random sample is fetched only when it is missing.
-  const reviewSynthesis = await fetchCategorySynthesis(DASH, { keyword: KEYWORD, categoryId: CAT_ID });
+  const reviewSynthesis = await fetchCategorySynthesis(DASH, {
+    keyword: KEYWORD,
+    categoryId: CAT_ID,
+    // dovive_reviews client, so a synthesis older than the latest scrape is ignored
+    reviewsClient: createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY),
+  });
   const reviewInput = briefReviewInput(reviewSynthesis, null);
   let rawReviews = { positive: [], critical: [] };
   if (reviewInput.mode === 'synthesis') {

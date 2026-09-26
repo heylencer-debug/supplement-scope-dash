@@ -215,7 +215,7 @@ interface ReviewAnalysis {
     loses_against_competitors?: string[];
   };
   actionable_recommendations?: Array<{ area: string; recommendation: string; priority: string; rationale?: string }>;
-  analysis_metadata?: { total_reviews_analyzed?: number; verified_purchase_rate?: number; average_helpful_votes?: number; analysis_quality?: string };
+  analysis_metadata?: { total_reviews_analyzed?: number; verified_purchase_rate?: number; average_helpful_votes?: number; analysis_quality?: string; rows_collected?: number; duplicate_rows_removed?: number };
   summary?: string;
 }
 
@@ -929,6 +929,7 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                         ledger={reviewAnalysis.review_evidence.ledger}
                         themes={reviewAnalysis.review_evidence.themes ?? []}
                         scope="product"
+                        status={reviewAnalysis.review_evidence.status}
                       />
                     </DocSection>
                   )}
@@ -943,6 +944,12 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                     <DocSection title="Analysis Coverage" first={!reviewAnalysis.summary && !reviewAnalysis.review_evidence?.ledger}>
                       <StatChipRow>
                         <StatChip label="Reviews Analyzed" value={reviewAnalysis.analysis_metadata.total_reviews_analyzed ?? "-"} />
+                        {!!reviewAnalysis.analysis_metadata.duplicate_rows_removed && (
+                          <StatChip
+                            label="Scraped Rows"
+                            value={`${reviewAnalysis.analysis_metadata.rows_collected ?? "-"} (${reviewAnalysis.analysis_metadata.duplicate_rows_removed} duplicates)`}
+                          />
+                        )}
                         <StatChip label="Verified Rate" value={reviewAnalysis.analysis_metadata.verified_purchase_rate ? `${reviewAnalysis.analysis_metadata.verified_purchase_rate}%` : "-"} />
                         <StatChip label="Avg Helpful Votes" value={reviewAnalysis.analysis_metadata.average_helpful_votes?.toFixed(1) ?? "-"} />
                         <StatChip label="Analysis Quality" value={reviewAnalysis.analysis_metadata.analysis_quality ?? "-"} />

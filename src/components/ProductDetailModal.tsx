@@ -21,6 +21,8 @@ import { useCategoryContext } from "@/contexts/CategoryContext";
 import { Globe } from "lucide-react";
 import { parseClaimsList } from "@/lib/parseClaims";
 import { cn } from "@/lib/utils";
+import { ReviewEvidence } from "@/components/reviews/ReviewEvidence";
+import type { ProductReviewEvidence } from "@/hooks/useReviewSynthesis";
 
 // Single clean active treatment (smoke pill, no border-b + focus-ring
 // double outline) for the product-detail tab strip. Kept as one shared
@@ -184,6 +186,8 @@ interface MarketingAnalysis {
 }
 
 interface ReviewAnalysis {
+  /** P3b: coverage ledger + evidence-counted themes for this product. */
+  review_evidence?: ProductReviewEvidence;
   pain_points?: Array<{ category?: string; theme?: string; issue?: string; frequency: number; severity?: string; quotes?: string[]; representative_quotes?: string[]; affected_percentage?: number }>;
   positive_themes?: Array<{ theme: string; frequency: number; impact?: string; representative_quotes?: string[]; mentioned_by_percentage?: number }>;
   feature_requests?: Array<{ request: string; frequency: number; priority?: string }>;
@@ -910,7 +914,7 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
           <TabsContent value="reviews" className={`mt-4 ${scrollableContentClass} ${maxContentHeight}`}>
             <div>
               {!reviewAnalysis || !(
-                reviewAnalysis.summary || reviewAnalysis.analysis_metadata || sentimentData.length > 0 ||
+                reviewAnalysis.review_evidence || reviewAnalysis.summary || reviewAnalysis.analysis_metadata || sentimentData.length > 0 ||
                 reviewAnalysis.product_experience_breakdown || reviewAnalysis.competitor_comparisons ||
                 reviewAnalysis.demographics_insights || reviewAnalysis.pain_points?.length ||
                 reviewAnalysis.positive_themes?.length || reviewAnalysis.feature_requests?.length ||
@@ -919,14 +923,24 @@ export default function ProductDetailModal({ product, open, onOpenChange }: Prod
                 <DocSection first><EmptyLine>No review analysis data available for this product.</EmptyLine></DocSection>
               ) : (
                 <>
+                  {reviewAnalysis.review_evidence?.ledger && (
+                    <DocSection first title="Review Evidence">
+                      <ReviewEvidence
+                        ledger={reviewAnalysis.review_evidence.ledger}
+                        themes={reviewAnalysis.review_evidence.themes ?? []}
+                        scope="product"
+                      />
+                    </DocSection>
+                  )}
+
                   {reviewAnalysis.summary && (
-                    <DocSection first title="Review Summary">
+                    <DocSection first={!reviewAnalysis.review_evidence?.ledger} title="Review Summary">
                       <MarkdownDoc content={reviewAnalysis.summary} className="text-sm" />
                     </DocSection>
                   )}
 
                   {reviewAnalysis.analysis_metadata && (
-                    <DocSection title="Analysis Coverage" first={!reviewAnalysis.summary}>
+                    <DocSection title="Analysis Coverage" first={!reviewAnalysis.summary && !reviewAnalysis.review_evidence?.ledger}>
                       <StatChipRow>
                         <StatChip label="Reviews Analyzed" value={reviewAnalysis.analysis_metadata.total_reviews_analyzed ?? "-"} />
                         <StatChip label="Verified Rate" value={reviewAnalysis.analysis_metadata.verified_purchase_rate ? `${reviewAnalysis.analysis_metadata.verified_purchase_rate}%` : "-"} />

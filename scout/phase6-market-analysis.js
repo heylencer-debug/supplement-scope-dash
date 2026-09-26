@@ -21,6 +21,10 @@ require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const { resolveCategory } = require('./utils/category-resolver');
 const { withUsageTracking, recordAiUsage } = require('./utils/ai-usage');
+// P3b (2026-09-26): evidence-counted review themes over ALL collected reviews,
+// preferred over the random 60+60 sample when a synthesis row exists.
+const { fetchCategorySynthesis } = require('./utils/review-synthesis-store');
+const { briefReviewInput } = require('./utils/review-synthesis');
 const fs = require('fs');
 const path = require('path');
 
@@ -303,7 +307,7 @@ function buildMarketContext(products) {
 
 // â"€â"€â"€ Build Grok prompt â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
-function buildPrompt(ctx, keyword, rawReviews) {
+function buildPrompt(ctx, keyword, rawReviews, reviewEvidenceText = '') {
   const s = ctx.summary;
   const positiveReviewSample = (rawReviews?.positive || []).slice(0, 60)
     .map(r => `[★${r.rating}] "${r.title || ''}" — ${(r.body || '').slice(0, 800)}`).join('\n');
@@ -342,12 +346,15 @@ ${ctx.servingSizeNorm}
 ### Competitor Dosage Comparison (from OCR supplement facts)
 ${ctx.dosageTable}
 
-### Raw Customer Reviews — POSITIVE (Voice of Customer)
+${reviewEvidenceText ? `### Customer Review Evidence — themes counted over ALL collected reviews (not a sample)
+Weigh each theme by its review and product counts. A theme marked ONE product only is that product's problem, not a category trend. Where a theme has conflicting reviews, report it as a split experience.
+${reviewEvidenceText}
+` : `### Raw Customer Reviews — POSITIVE (Voice of Customer)
 ${positiveReviewSample || 'No positive reviews found in the database for this category.'}
 
 ### Raw Customer Reviews — CRITICAL (Pain Points)
 ${criticalReviewSample || 'No critical reviews found in the database for this category.'}
-
+`}
 ### Price Range Distribution
 <$15: ${ctx.priceRanges.under15} | $15-20: ${ctx.priceRanges['15to20']} | $20-25: ${ctx.priceRanges['20to25']} | $25-30: ${ctx.priceRanges['25to30']} | >$30: ${ctx.priceRanges.over30}
 
@@ -524,12 +531,20 @@ async function run() {
   console.log(`  Rising stars: ${ctx.velocities.rocket + ctx.velocities.rising} products\n`);
 
   // Fetch raw reviews for real consumer-voice grounding
-  console.log(`Fetching raw reviews...`);
-  const rawReviews = await fetchRawReviews(CAT_ID);
-  console.log(`  ${rawReviews.positive.length} positive / ${rawReviews.critical.length} critical reviews loaded\n`);
+  // P3b synthesis first; the random sample is fetched only when it is missing.
+  const reviewSynthesis = await fetchCategorySynthesis(DASH, { keyword: KEYWORD, categoryId: CAT_ID });
+  const reviewInput = briefReviewInput(reviewSynthesis, null);
+  let rawReviews = { positive: [], critical: [] };
+  if (reviewInput.mode === 'synthesis') {
+    console.log(`Using P3b review synthesis: ${reviewSynthesis.themes.length} themes — ${reviewInput.ledgerLine}\n`);
+  } else {
+    console.log(`Fetching raw reviews (no P3b synthesis found)...`);
+    rawReviews = await fetchRawReviews(CAT_ID);
+    console.log(`  ${rawReviews.positive.length} positive / ${rawReviews.critical.length} critical reviews loaded\n`);
+  }
 
   // Build prompt
-  const prompt = buildPrompt(ctx, KEYWORD, rawReviews);
+  const prompt = buildPrompt(ctx, KEYWORD, rawReviews, reviewInput.evidenceText);
   console.log(`Calling ${ANALYSIS_MODEL} via OpenRouter... prompt: ${Math.round(prompt.length / 1000)}k chars`);
   const startTime = Date.now();
   const report = await callGrok(prompt, 64000);

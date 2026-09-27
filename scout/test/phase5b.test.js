@@ -280,17 +280,45 @@ test('H2: every extracted item dropped as unquoted → partial (no_items_kept)',
   assert.ok(r.row.ledger.items_dropped_unquoted.ingredient_claims > 0);
 });
 
-test('M2: an unparseable reply is retried with a request for LESS, not the identical prompt', async () => {
+test('M2: an unparseable multi-page reply is SPLIT per page (one call each) — never the identical prompt again', async () => {
   const dbs = db();
   const prompts = [];
   let first = true;
   const good = fakeModel([]);
   const { d } = deps(dbs, { callModel: async (p) => { prompts.push(p); if (first) { first = false; return { content: '{"pages": [ {"id": "P1", "ingredient_claims": [', cost: 0.02 }; } return good(p); } });
-  await P5b.research(baseOpts({ batchSize: 20 }), d);
-  assert.equal(prompts.length, 2);
-  assert.notEqual(prompts[0], prompts[1]);
-  assert.ok(prompts[1].startsWith(prompts[0]));
-  assert.match(prompts[1], /could not be parsed/);
+  const r = await P5b.research(baseOpts({ batchSize: 20 }), d);
+  const okPages = r.row.sources.filter((x) => x.extraction_status === 'ok').length;
+  assert.ok(okPages >= 2, 'fixture has several extractable pages');
+  assert.equal(prompts.length, 1 + okPages, 'one batch call, then one call per page');
+  assert.equal(new Set(prompts).size, prompts.length, 'no identical prompt was ever sent twice');
+  for (const p of prompts.slice(1)) assert.equal((p.match(/=== PAGE P\d+ ===/g) || []).length, 1, 'each follow-up call carries exactly one page');
+  assert.equal(r.row.sources.filter((x) => x.extraction_status === 'failed').length, 0);
+});
+
+test('M2b: a TRUNCATED reply (finish_reason length) is treated like unparseable — split per page, all recovered', async () => {
+  const dbs = db();
+  const prompts = [];
+  const good = fakeModel([]);
+  const { d } = deps(dbs, { callModel: async (p) => {
+    prompts.push(p);
+    const n = (p.match(/=== PAGE P\d+ ===/g) || []).length;
+    if (n > 1) return { content: '{"pages": [ {"id": "P1"', cost: 0.09, finish_reason: 'length', completion_tokens: 12000 };
+    return { ...(await good(p)), finish_reason: 'stop' };
+  } });
+  const r = await P5b.research(baseOpts({ batchSize: 20 }), d);
+  assert.equal(r.row.sources.filter((x) => x.extraction_status === 'failed').length, 0);
+  assert.equal(new Set(prompts).size, prompts.length);
+});
+
+test('M2c: a SINGLE-page unparseable reply gets one "ask for less" retry, then fails honestly', async () => {
+  const dbs = db();
+  const prompts = [];
+  const { d } = deps(dbs, { callModel: async (p) => { prompts.push(p); return { content: 'nope', cost: 0.02 }; } });
+  const r = await P5b.research(baseOpts({ batchSize: 1 }), d);
+  const eligible = r.row.sources.filter((x) => ['failed', 'ok'].includes(x.extraction_status)).length;
+  assert.equal(prompts.length, eligible * 2, 'first prompt + one "less" retry per page');
+  assert.ok(prompts.some((p) => /could not be parsed/.test(p)));
+  assert.ok(r.row.sources.every((x) => x.extraction_status !== 'ok'));
 });
 
 test('M3: a page that failed twice inside the retry window is deferred, not re-sent; the ledger says so', async () => {

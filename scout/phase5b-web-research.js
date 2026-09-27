@@ -45,7 +45,7 @@
  *   P5B_FRESH_DAYS (30), P5B_VERIFY (off), P5B_MODEL (else ANALYSIS_MODEL, else
  *   CHEAP_MODE_MODEL under CHEAP_MODE=true, else anthropic/claude-sonnet-5),
  *   P5B_BATCH (4), P5B_PAGE_CHARS (12000), P5B_TOP_BRANDS (10), P5B_BROWSER_FALLBACK (on),
- *   P5B_MAX_BROWSER_PAGES (5), P5B_MAX_TOKENS (6000 per extraction reply),
+ *   P5B_MAX_BROWSER_PAGES (5), P5B_MAX_TOKENS (12000 per extraction reply; reasoning off),
  *   P5B_MODEL_TIMEOUT_MS (120000), P5B_RETRY_AFTER_DAYS (7).
  *
  * BROWSER: plain HTTP first. The Bright Data browser is used only for a
@@ -103,7 +103,7 @@ function parseOptions(argv = process.argv.slice(2), env = process.env) {
     concurrency: 2,
     browserFallback: env.P5B_BROWSER_FALLBACK !== '0',
     maxBrowserPages: int(env.P5B_MAX_BROWSER_PAGES, 5, 0),
-    maxTokens: int(env.P5B_MAX_TOKENS, 6000, 500),
+    maxTokens: int(env.P5B_MAX_TOKENS, 12000, 500),
     modelTimeoutMs: int(env.P5B_MODEL_TIMEOUT_MS, 120000, 5000),
     retryAfterDays: int(env.P5B_RETRY_AFTER_DAYS, 7, 0),
     model: env.P5B_MODEL
@@ -260,14 +260,26 @@ function makeOpenRouterCaller({ model, maxTokens = 6000, timeoutMs = 120000, env
       const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://dovive.com', 'X-Title': 'DOVIVE Scout P5b Web Research' },
-        body: JSON.stringify(withUsageTracking({ model, max_tokens: maxTokens, temperature: 0, messages: [{ role: 'user', content: prompt }] })),
+        // 2026-09-27: Sonnet 5 spends thousands of REASONING tokens inside
+        // max_tokens on this structured call (P5 logged reasoning_tokens 7280),
+        // so 4-page extraction replies at 6000 were all cut off. Reasoning is
+        // off here (P5B_REASONING=1 re-enables) and finish_reason comes back so
+        // a truncated batch is split per page rather than re-sent.
+        body: JSON.stringify(withUsageTracking({
+          model, max_tokens: maxTokens, temperature: 0,
+          ...(env.P5B_REASONING === '1' ? {} : { reasoning: { enabled: false } }),
+          messages: [{ role: 'user', content: prompt }],
+        })),
         signal: ctl.signal,
       });
       if (res.status === 402) throw new CreditsExhausted('[ERROR: credits] OpenRouter credits exhausted (402)');
       const j = await res.json();
       if (j.error) throw new Error(`OpenRouter: ${j.error.message || JSON.stringify(j.error)}`);
       usageWrites.push(recordAiUsage({ phase: 'P5b', model, usage: j.usage, categoryId: ctx.categoryId, keyword: ctx.keyword }).catch(() => {}));
-      return { content: j.choices?.[0]?.message?.content || '', cost: typeof j.usage?.cost === 'number' ? j.usage.cost : null };
+      const choice = j.choices?.[0] || {};
+      const finish_reason = choice.finish_reason || choice.native_finish_reason || null;
+      if (finish_reason && finish_reason !== 'stop') console.log(`  [P5b] finish_reason: ${finish_reason} | completion_tokens: ${j.usage?.completion_tokens ?? '?'}`);
+      return { content: choice.message?.content || '', cost: typeof j.usage?.cost === 'number' ? j.usage.cost : null, finish_reason, completion_tokens: j.usage?.completion_tokens ?? null };
     } catch (e) {
       if (e.name === 'AbortError') throw new Error(`OpenRouter timeout after ${timeoutMs}ms`);
       throw e;
@@ -520,37 +532,60 @@ async function research(opts, deps) {
   } else {
     await pool(batches, opts.concurrency, async (batch, bi) => {
       if (state.creditsStop) { batch.forEach((p) => { p.extraction_status = 'not_attempted'; }); state.batchStats.not_attempted++; return; }
-      const withIds = batch.map((p, k) => ({ id: `P${k + 1}`, url: p.url, title: p.title, text: p._text, page: p }));
-      const firstPrompt = WR.buildExtractionPrompt(withIds, { keyword, brands, pageChars: opts.pageChars });
-      let prompt = firstPrompt;
-      let lastError = null;
-      let ok = false;
-      for (let attempt = 1; attempt <= 2 && !ok; attempt++) {
-        try {
+      // SPLIT, DON'T RESEND (2026-09-27). One call for the batch; if the reply
+      // is truncated (finish_reason 'length') or unparseable, every page in it
+      // gets its OWN call (a page is the natural unit) — never the identical
+      // prompt again, which fails the same way at temperature 0 and pays twice.
+      // A single page that still fails gets one 'ask for less' retry.
+      const extractSet = async (items, label) => {
+        const ids = items.map((w) => w.id);
+        const first = WR.buildExtractionPrompt(items, { keyword, brands, pageChars: opts.pageChars });
+        let prompt = first;
+        for (let attempt = 1; attempt <= 2; attempt++) {
           modelCalls++;
           state.batchStats.attempts++;
-          const { content, cost: c } = await deps.callModel(prompt);
-          cost.extraction += c || 0;
-          const parsed = WR.parseExtractionResponse(content, withIds.map((w) => w.id));
-          if (!parsed.ok) {
-            lastError = 'unparseable reply';
-            log(`  batch ${bi + 1}/${batches.length}: unparseable (attempt ${attempt})`);
-            prompt = WR.buildRetryPrompt(firstPrompt); // ask for LESS, not the same again
-            continue;
+          const r = await deps.callModel(prompt);
+          cost.extraction += r.cost || 0;
+          const truncated = r.finish_reason === 'length';
+          const parsed = truncated ? { ok: false } : WR.parseExtractionResponse(r.content, ids);
+          if (parsed.ok) {
+            const at = iso(now());
+            for (const w of items) {
+              const raw = parsed.pages[w.id];
+              if (!raw) { w.page.extraction_status = 'failed'; w.page.extraction_error = 'page missing from response'; continue; }
+              const v = WR.validateExtraction(raw, { text: w.page._text, links: w.page._links }, { brands });
+              Object.assign(w.page, { extraction: v.extraction, extraction_status: 'ok', extraction_dropped: v.dropped, extracted_at: at, extraction_failed_attempts: 0 });
+            }
+            return true;
           }
-          const at = iso(now());
-          for (const w of withIds) {
-            const raw = parsed.pages[w.id];
-            if (!raw) { w.page.extraction_status = 'failed'; w.page.extraction_error = 'page missing from response'; continue; }
-            const v = WR.validateExtraction(raw, { text: w.page._text, links: w.page._links }, { brands });
-            Object.assign(w.page, { extraction: v.extraction, extraction_status: 'ok', extraction_dropped: v.dropped, extracted_at: at, extraction_failed_attempts: 0 });
-          }
-          ok = true;
-        } catch (e) {
-          lastError = e.message;
-          if (e instanceof CreditsExhausted) { state.creditsStop = e.message; break; }
-          log(`  batch ${bi + 1}/${batches.length}: ${e.message} (attempt ${attempt})`);
+          const why = truncated ? `truncated at ${r.completion_tokens ?? '?'} output tokens` : 'unparseable reply';
+          log(`  ${label}: ${why}${items.length > 1 ? ' — splitting per page' : attempt === 1 ? ' — asking for less' : ''}`);
+          if (items.length > 1) return false;          // caller splits per page
+          if (attempt === 1) prompt = WR.buildRetryPrompt(first); // a single page: one 'less' retry
+          else return false;
         }
+        return false;
+      };
+      const withIds = batch.map((p, k) => ({ id: `P${k + 1}`, url: p.url, title: p.title, text: p._text, page: p }));
+      let lastError = null;
+      let ok = false;
+      try {
+        ok = await extractSet(withIds, `batch ${bi + 1}/${batches.length}`);
+        if (!ok && withIds.length > 1) {
+          let okPages = 0;
+          for (let k = 0; k < withIds.length; k++) {
+            if (state.creditsStop) break;
+            const one = { ...withIds[k], id: 'P1' };
+            try { if (await extractSet([one], `batch ${bi + 1}/${batches.length} page ${k + 1}/${withIds.length}`)) okPages++; }
+            catch (e) { if (e instanceof CreditsExhausted) { state.creditsStop = e.message; break; } lastError = e.message; log(`  batch ${bi + 1}/${batches.length} page ${k + 1}: ${e.message}`); }
+          }
+          ok = okPages === withIds.length;
+          if (!ok) lastError = lastError || 'unparseable reply';
+        } else if (!ok) lastError = 'unparseable reply';
+      } catch (e) {
+        lastError = e.message;
+        if (e instanceof CreditsExhausted) state.creditsStop = e.message;
+        else log(`  batch ${bi + 1}/${batches.length}: ${e.message}`);
       }
       const at = iso(now());
       for (const p of batch) {

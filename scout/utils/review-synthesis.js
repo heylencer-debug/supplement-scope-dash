@@ -46,7 +46,7 @@
 
 'use strict';
 
-const PROMPT_VERSION = 'p3b-v1';
+const PROMPT_VERSION = 'p3b-v2'; // v2 (2026-09-27): compact-output rule, 60-review batches, split on truncation
 
 const ISSUE_DOMAINS = [
   'product_efficacy',
@@ -611,6 +611,7 @@ Rules:
 - "opposite_review_ids": reviews in this batch that report the OPPOSITE experience on the same topic (e.g. for "tastes bitter", reviews that say it tastes good). Leave empty if none.
 - A review may belong to several themes. Include a theme even if only one review supports it — support is counted downstream.
 - Do not merge different problems into one vague theme ("quality issues"). Be specific.
+- Output size: at most 25 themes for this batch, JSON on one line with no extra whitespace, no prose before or after. A cut-off reply is worthless.
 
 REVIEWS:
 ${lines}`;

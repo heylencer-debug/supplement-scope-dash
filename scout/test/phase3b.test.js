@@ -167,7 +167,7 @@ test('suspect batch (>10% unknown ids) downgrades status and is not cached', asy
   model.fn = async (p) => {
     const r = await inner(p);
     n++;
-    if (n <= 2 && !p.includes('THEMES:')) { // batch 1: both attempts cite many unknown ids
+    if (n <= 1 && !p.includes('THEMES:')) { // batch 1's one call cites many unknown ids (a suspect reply is never re-sent identically — 2026-09-27)
       const j = JSON.parse(r.content);
       j.themes[0].review_ids.push(...Array.from({ length: 10 }, (_, k) => 900000 + k));
       return { ...r, content: JSON.stringify(j) };

@@ -26,7 +26,7 @@
  *     [--force]          re-synthesise even if a current row exists
  *     [--dry-run]        read + ledger + batch plan + cost estimate; no model, no writes
  *     [--no-model]       deterministic only (ledger + domain breakdown), writes, $0
- *     [--batch 100]      reviews per model call
+ *     [--batch 60]       reviews per model call (REVIEW_SYNTHESIS_BATCH)
  *     [--concurrency 3]  parallel model calls
  *
  * Model: REVIEW_SYNTHESIS_MODEL, else ANALYSIS_MODEL (run-pipeline.js sets it
@@ -104,7 +104,7 @@ function parseOptions(argv = process.argv.slice(2), env = process.env) {
     force: argv.includes('--force'),
     dryRun: argv.includes('--dry-run'),
     noModel: argv.includes('--no-model'),
-    batchSize: Math.max(10, parseInt(val('--batch', '100'), 10) || 100),
+    batchSize: Math.max(10, parseInt(val('--batch', process.env.REVIEW_SYNTHESIS_BATCH || '60'), 10) || 60),
     concurrency: Math.max(1, parseInt(val('--concurrency', '3'), 10) || 3),
     maxReviews: parseInt(env.REVIEW_SYNTHESIS_MAX_REVIEWS || '12000', 10),
     model: env.REVIEW_SYNTHESIS_MODEL
@@ -144,13 +144,29 @@ function makeOpenRouterCaller({ model, env = process.env, ctx, usageWrites }) {
         'HTTP-Referer': 'https://dovive.com',
         'X-Title': 'DOVIVE Scout P3b Review Synthesis',
       },
-      body: JSON.stringify(withUsageTracking({ model, max_tokens: 12000, temperature: 0, messages: [{ role: 'user', content: prompt }] })),
+      // 2026-09-27: the first live run truncated MOST batches at the old
+      // 12k cap (Sonnet 5 answered 100-review batches with exactly 12000
+      // output tokens, JSON cut off, "unparseable" ×2 per batch ≈ $0.30
+      // wasted each). Bigger cap, reasoning off for this structured call
+      // (REVIEW_SYNTHESIS_REASONING=1 re-enables), and the caller reports
+      // finish_reason so a truncated batch is SPLIT rather than re-sent.
+      body: JSON.stringify(withUsageTracking({
+        model,
+        max_tokens: parseInt(env.REVIEW_SYNTHESIS_MAX_TOKENS || '16000', 10),
+        temperature: 0,
+        ...(env.REVIEW_SYNTHESIS_REASONING === '1' ? {} : { reasoning: { enabled: false } }),
+        messages: [{ role: 'user', content: prompt }],
+      })),
     });
     if (res.status === 402) throw new CreditsExhausted('[ERROR: credits] OpenRouter credits exhausted (402)');
     const j = await res.json();
     if (j.error) throw new Error(`OpenRouter: ${j.error.message || JSON.stringify(j.error)}`);
     usageWrites.push(recordAiUsage({ phase: 'P3b', model, usage: j.usage, categoryId: ctx.categoryId, keyword: ctx.keyword }).catch(() => {}));
-    return { content: j.choices?.[0]?.message?.content || '', cost: typeof j.usage?.cost === 'number' ? j.usage.cost : null };
+    const choice = j.choices?.[0] || {};
+    const finish_reason = choice.finish_reason || choice.native_finish_reason || null;
+    const completion_tokens = j.usage?.completion_tokens ?? null;
+    if (finish_reason && finish_reason !== 'stop') console.log(`  [P3b] finish_reason: ${finish_reason} | completion_tokens: ${completion_tokens}`);
+    return { content: choice.message?.content || '', cost: typeof j.usage?.cost === 'number' ? j.usage.cost : null, finish_reason, completion_tokens };
   };
 }
 
@@ -218,37 +234,76 @@ async function fetchSiblingRows({ dovive, dash, categoryId, keyword, reuseKeywor
 
 // ─── Model pass ────────────────────────────────────────────────────────────
 
-/** One batch → { ok, attempted, suspect, themes, dropped, cost }. One retry. */
-async function runBatch({ batch, index, total, keyword, preById, callModel, log, retryDelayMs = 5000 }) {
+/**
+ * One batch → { ok, attempted, suspect, themes, dropped, cost }.
+ *
+ * SPLIT, DON'T RESEND (2026-09-27). A reply that is truncated
+ * (finish_reason 'length') or otherwise unparseable is not retried with the
+ * identical prompt at temperature 0 — that fails the same way and pays twice
+ * (the first live run lost ~11 of 15 batches per category that way). The
+ * batch is split in two and each half runs as its own call, down to
+ * MIN_SPLIT_SIZE reviews; only a transport error gets one identical retry.
+ * A split batch is `ok` only when every leaf parsed, so coverage stays honest.
+ */
+const MIN_SPLIT_SIZE = Math.max(10, parseInt(process.env.REVIEW_SYNTHESIS_MIN_SPLIT || '20', 10));
+
+async function runBatch({ batch, index, total, keyword, preById, callModel, log, retryDelayMs = 5000, depth = 0, label = null }) {
+  const tag = label || `batch ${index + 1}/${total}`;
   const prompt = RS.buildBatchPrompt(batch, { keyword, preById });
   const ids = batch.map((r) => r.id);
   let cost = 0;
   let last = null;
+  let reason = null; // why attempt 1 did not yield a clean result
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
-      const { content, cost: c } = await callModel(prompt);
-      cost += c || 0;
-      const parsed = RS.parseBatchResponse(content, ids);
-      if (parsed.ok) {
+      const r = await callModel(prompt);
+      cost += r.cost || 0;
+      const truncated = r.finish_reason === 'length';
+      const parsed = RS.parseBatchResponse(r.content, ids);
+      if (parsed.ok && !truncated) {
         const suspect = RS.isSuspectBatch(parsed.dropped_ids, batch.length);
         last = { ok: true, attempted: true, suspect, themes: parsed.themes, dropped: parsed.dropped_ids, cost };
         if (!suspect) {
-          log(`  batch ${index + 1}/${total}: ${parsed.themes.length} themes${parsed.dropped_ids ? `, ${parsed.dropped_ids} unknown ids dropped` : ''}`);
+          log(`  ${tag}: ${parsed.themes.length} themes${parsed.dropped_ids ? `, ${parsed.dropped_ids} unknown ids dropped` : ''}`);
           return last;
         }
-        log(`  batch ${index + 1}/${total}: ${parsed.dropped_ids} unknown ids (> 10% of ${batch.length}) — suspect (attempt ${attempt})`);
+        log(`  ${tag}: ${parsed.dropped_ids} unknown ids (> 10% of ${batch.length}) — suspect`);
+        reason = 'suspect';
       } else {
-        log(`  batch ${index + 1}/${total}: unparseable response (attempt ${attempt})`);
+        reason = truncated ? `truncated at ${r.completion_tokens ?? '?'} output tokens` : 'unparseable response';
+        log(`  ${tag}: ${reason}`);
       }
+      break; // never resend the identical prompt for a content problem — split below
     } catch (e) {
       if (e instanceof CreditsExhausted) {
-        // Nothing was processed on this call: report the batch as not attempted.
         e.partial = last ? { ...last, cost } : { ok: false, attempted: attempt > 1, themes: [], dropped: 0, cost };
         throw e;
       }
-      log(`  batch ${index + 1}/${total}: ${e.message} (attempt ${attempt})`);
+      log(`  ${tag}: ${e.message} (attempt ${attempt})`);
+      reason = 'transport';
+      if (attempt === 1 && retryDelayMs) await new Promise((r) => setTimeout(r, retryDelayMs));
     }
-    if (attempt === 1 && retryDelayMs) await new Promise((r) => setTimeout(r, retryDelayMs));
+  }
+  // Content problem on a batch big enough to split: two halves, each its own call.
+  if (reason !== 'transport' && batch.length >= MIN_SPLIT_SIZE * 2 && depth < 3) {
+    const mid = Math.ceil(batch.length / 2);
+    const halves = [batch.slice(0, mid), batch.slice(mid)];
+    log(`  ${tag}: splitting ${batch.length} reviews into ${halves[0].length} + ${halves[1].length}`);
+    const parts = [];
+    for (let h = 0; h < 2; h++) {
+      parts.push(await runBatch({ batch: halves[h], index, total, keyword, preById, callModel, log, retryDelayMs, depth: depth + 1, label: `${tag}${'abcd'[depth]}${h + 1}` }));
+    }
+    const leafCost = parts.reduce((a, p) => a + (p.cost || 0), 0);
+    const okAll = parts.every((p) => p.ok);
+    return {
+      ok: okAll,
+      attempted: true,
+      suspect: parts.some((p) => p.suspect),
+      themes: parts.flatMap((p) => p.themes || []),
+      dropped: parts.reduce((a, p) => a + (p.dropped || 0), 0),
+      cost: cost + leafCost,
+      split: { parts: parts.length, ok: parts.filter((p) => p.ok).length },
+    };
   }
   return last ? { ...last, cost } : { ok: false, attempted: true, themes: [], dropped: 0, cost };
 }

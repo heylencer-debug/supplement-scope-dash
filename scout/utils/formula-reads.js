@@ -79,7 +79,20 @@ function p7MarketingAssets(ev, { keyword, categoryId }) {
   return ev.creativeVerdicts({ keyword, categoryId });
 }
 
+// ── P8 — Packaging Intelligence (phase7-packaging-intelligence.js) ─────────
+
+/**
+ * Every product in the category, BSR asc; `limit(topN)` only when topN < 999
+ * (the phase's own rule — the default 999 means no limit). Not selection-scoped.
+ */
+function p8Products(ev, categoryId, topN) {
+  const ops = [['order', 'bsr_current', { ascending: true }]];
+  if (topN < 999) ops.push(['limit', topN]);
+  return ev.products(categoryId, 'id, asin, title, brand, bsr_current, price, main_image_url, feature_bullets_text, supplement_facts_raw', { ops });
+}
+
 module.exports = {
   P6_PRODUCT_COLUMNS, p6Products, p6RawReviews, p6ProductSyntheses,
   p7Products, p7CategorySynthesis, p7CategoryAsins, p7RawReviews, p7WebEvidence, p7MarketingAssets,
+  p8Products,
 };

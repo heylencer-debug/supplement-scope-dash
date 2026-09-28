@@ -15,12 +15,17 @@
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const { resolveCategory } = require('./utils/category-resolver');
+const { createEvidenceSource } = require('./utils/evidence-source');
+const { p8Products } = require('./utils/formula-reads');
 
 const DASH = createClient(
   process.env.DASH_URL || process.env.SUPABASE_URL,
   process.env.DASH_KEY || process.env.SUPABASE_KEY
 );
 const DOVIVE = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+// Evidence reads (SCOUT_EVIDENCE_SOURCE: 'scout' default | 'rnd'). The per-row
+// marketing_analysis merge-read and every write below stay on Scout.
+const EV = createEvidenceSource({ dash: DASH, dovive: DOVIVE });
 
 const KEYWORD = process.argv.includes('--keyword') ? process.argv[process.argv.indexOf('--keyword') + 1] : 'ashwagandha gummies';
 const TOP_N = process.argv.includes('--top')
@@ -244,13 +249,7 @@ async function run() {
   console.log('=== Phase 7: Packaging Intelligence ===');
   console.log(`Keyword: "${KEYWORD}" | Limit: ${TOP_N}\n`);
 
-  const query = DASH.from('products')
-    .select('id, asin, title, brand, bsr_current, price, main_image_url, feature_bullets_text, supplement_facts_raw')
-    .eq('category_id', CAT_ID)
-    .order('bsr_current', { ascending: true });
-  if (TOP_N < 999) query.limit(TOP_N);
-
-  const { data: products, error } = await query;
+  const { data: products, error } = await p8Products(EV, CAT_ID, TOP_N);
   if (error) throw error;
   console.log(`Fetched ${products.length} products\n`);
 

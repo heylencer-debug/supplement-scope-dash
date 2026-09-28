@@ -137,3 +137,28 @@ test('P7 phase file reads through the evidence layer; the formula_briefs patch s
   assert.match(s, /DASH\.from\('formula_briefs'\)\s*\.select\('id, ingredients'\)/, 'patch read-merge-write stays on Scout');
   assert.match(s, /DASH\.from\('formula_briefs'\)\.update\(/);
 });
+
+// ── P8 ──────────────────────────────────────────────────────────────────────
+
+test('P8 reads: scout chain identical to the pre-layer phase (limit only below 999), rnd on the view', async () => {
+  const x = backends();
+  await FR.p8Products(x.scout, CAT, 999);
+  await FR.p8Products(x.scout, CAT, 25);
+  const cols = 'id, asin, title, brand, bsr_current, price, main_image_url, feature_bullets_text, supplement_facts_raw';
+  // phase7-packaging-intelligence.js before the layer (:247-251)
+  assert.deepEqual(x.dash.queries, [
+    { table: 'products', calls: [['select', cols], ['eq', 'category_id', CAT], ['order', 'bsr_current', { ascending: true }]] },
+    { table: 'products', calls: [['select', cols], ['eq', 'category_id', CAT], ['order', 'bsr_current', { ascending: true }], ['limit', 25]] },
+  ]);
+  await FR.p8Products(x.rndEv, CAT, 999);
+  assert.deepEqual(x.rnd.queries, [{ table: 'v_formula_products', calls: x.dash.queries[0].calls }]);
+});
+
+test('P8 phase file reads through the evidence layer; merge-read and writes stay on Scout', () => {
+  const f = 'phase7-packaging-intelligence.js';
+  const s = src(f);
+  assert.match(s, /p8Products\(EV, CAT_ID, TOP_N\)/);
+  assert.doesNotMatch(s, /DASH\.from\('products'\)\s*\.select\('id, asin, title/);
+  assert.match(s, /DASH\.from\('products'\)\.select\('marketing_analysis'\)\.eq\('id', p\.id\)/, 'per-row merge-read stays on Scout');
+  assert.match(s, /DOVIVE\s*\.from\('dovive_packaging_intelligence'\)\s*\.upsert\(/);
+});

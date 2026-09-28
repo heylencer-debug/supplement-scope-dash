@@ -309,3 +309,36 @@ test('scout backend with a missing client fails loudly on the read that needs it
   const ev = ES.createEvidenceSource({ dash: recordingSupabase(), backend: 'scout' });
   assert.throws(() => ev.marketSignals('B1'), /Scout DOVIVE client was not provided/);
 });
+
+test('scout backend never builds or touches an RnD client, even with RND_* set', async () => {
+  const dash = recordingSupabase();
+  const dovive = recordingSupabase();
+  const trap = { from() { throw new Error('RnD client touched under scout'); } };
+  const env = { RND_SUPABASE_URL: 'https://x.supabase.co', RND_SUPABASE_ANON_KEY: 'k' };
+  for (const e of [env, { ...env, SCOUT_EVIDENCE_SOURCE: '' }, { ...env, SCOUT_EVIDENCE_SOURCE: '  Scout ' }]) {
+    const ev = ES.createEvidenceSource({ dash, dovive, env: e, rndClient: trap });
+    assert.equal(ev.backend, 'scout');
+    await ev.products('c', 'asin');
+    await ev.roster('c');
+    await ev.selection('c');
+    await ev.labelFacts({ categoryId: 'c' });
+    await ev.labelPanels('B1', { categoryId: 'c' });
+    await ev.listingClaims('B1', { keyword: 'kw', categoryId: 'c' });
+    await ev.marketSignals('B1');
+    await ev.reviewThemes({ scope: 'category', keyword: 'kw' });
+    await ev.reviewThemes({ scope: 'product', keyword: 'kw', asins: ['B1'] });
+    await ev.rawReviews('B1', 'rating');
+    await ev.webClaims({ keyword: 'kw' }, { log: () => {} });
+    await ev.creativeVerdicts({ keyword: 'kw' });
+    await ev.deepResearch({ keyword: 'kw', columns: 'asin' });
+    await ev.p5Sources({ keyword: 'kw', columns: 'asin' });
+    await ev.packaging({ keyword: 'kw' });
+    await ev.productIntel('c');
+    await ev.briefCurrent('c', { columns: 'id' });
+    await ev.marketIntel('c');
+    const n = dash.queries.length + dovive.queries.length;
+    assert.equal(await ev.briefWriteBase('c', { id: 1 }, { columns: 'id' }).then((r) => r.id), 1);
+    await ev.productWriteBase([{ id: 1 }]);
+    assert.equal(dash.queries.length + dovive.queries.length, n, 'write bases issue no query under scout');
+  }
+});

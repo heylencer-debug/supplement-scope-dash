@@ -28,8 +28,12 @@ const { createClient } = require('@supabase/supabase-js');
 const { resolveCategory } = require('./utils/category-resolver');
 const { withUsageTracking, extractUsageFromSSE, recordAiUsage } = require('./utils/ai-usage');
 // P7's report, read from where P7 writes it (formula_briefs.ingredients.market_intelligence).
-const { fetchMarketIntel } = require('./utils/market-intel-store');
-const { P10_COMPETITOR_COLUMNS, competitorFlavourFields } = require('./utils/formula-inputs');
+// P7's report (utils/market-intel-store.js) and every other evidence read go
+// through the evidence layer; competitors select P10_COMPETITOR_COLUMNS
+// (formula-reads p10Competitors).
+const { competitorFlavourFields } = require('./utils/formula-inputs');
+const { createEvidenceSource } = require('./utils/evidence-source');
+const { p10Competitors, briefSkipRow, briefFormulaRow, briefFormulaWriteBase } = require('./utils/formula-reads');
 const fs = require('fs');
 const path = require('path');
 
@@ -42,6 +46,10 @@ const DASH = createClient(
   process.env.DASH_URL || process.env.SUPABASE_URL,
   process.env.DASH_KEY || process.env.SUPABASE_KEY
 );
+// Evidence reads (SCOUT_EVIDENCE_SOURCE: 'scout' default | 'rnd'). Both
+// formula_briefs updates, the per-product qa_comparison_note merge and the
+// categories bump stay on DASH.
+const EV = createEvidenceSource({ dash: DASH });
 
 const KEYWORD = process.argv.includes('--keyword')
   ? process.argv[process.argv.indexOf('--keyword') + 1]
@@ -222,7 +230,7 @@ async function callClaudeSonnetQA(prompt, maxTokens = 64000, model = ANALYSIS_MO
 // null (graceful fallback) when P7 has not run for the category.
 const MARKET_INTEL_MAX_CHARS = 30000;
 async function loadMarketIntelFromDB(categoryId) {
-  const mi = await fetchMarketIntel(DASH, categoryId);
+  const mi = await EV.marketIntel(categoryId);
   if (!mi) return null;
   const text = mi.ai_market_analysis;
   return text.length > MARKET_INTEL_MAX_CHARS
@@ -1153,8 +1161,7 @@ async function run() {
 
   // Check if already done
   if (!FORCE) {
-    const { data: existing } = await DASH.from('formula_briefs')
-      .select('ingredients').eq('category_id', CAT_ID).limit(1).single();
+    const { data: existing } = await briefSkipRow(EV, CAT_ID);
     if (existing?.ingredients?.qa_report) {
       console.log(`âœ… P9 QA report already exists. Use --force to regenerate.`);
       return;
@@ -1163,9 +1170,7 @@ async function run() {
 
   // Load BOTH P9 formula briefs (Grok 4.2 + Claude Sonnet 4.6)
   console.log(`Loading dual P9 formula briefs (Grok 4.2 + Claude Sonnet 4.6)...`);
-  const { data: briefRow } = await DASH.from('formula_briefs')
-    .select('id, ingredients').eq('category_id', CAT_ID)
-    .not('ingredients', 'is', null).limit(1).single();
+  const { data: briefRow } = await briefFormulaRow(EV, CAT_ID);
   const grokBrief   = briefRow?.ingredients?.ai_generated_brief_grok   || briefRow?.ingredients?.ai_generated_brief || null;
   const claudeBrief = briefRow?.ingredients?.ai_generated_brief_claude || null;
   if (!grokBrief && !claudeBrief) {
@@ -1182,12 +1187,8 @@ async function run() {
 
   // Load top 10 competitors
   console.log(`Loading top 10 competitors with formulas...`);
-  const { data: competitors } = await DASH.from('products')
-    .select(P10_COMPETITOR_COLUMNS) // includes other_ingredients for the flavour scan
-    .eq('category_id', CAT_ID)
-    .not('bsr_current', 'is', null)
-    .order('bsr_current', { ascending: true })
-    .limit(40);
+  // P10_COMPETITOR_COLUMNS includes other_ingredients for the flavour scan
+  const { data: competitors } = await p10Competitors(EV, CAT_ID);
   console.log(`  OK ${competitors?.length || 0} competitors loaded\n`);
 
   // Build dual-comparison QA prompt
@@ -1286,8 +1287,12 @@ async function run() {
 
   // â"€â"€ Save QA report to formula_briefs â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
   console.log(`Saving QA report to Supabase...`);
+  // Merge into Scout's row: briefRow itself under 'scout' (no extra query),
+  // Scout's own formula_briefs row under 'rnd' (the write never carries a view).
+  const writeRow = await briefFormulaWriteBase(EV, CAT_ID, briefRow);
+  if (!writeRow) throw new Error('No Scout formula_briefs row to save the QA report into');
   const updatedIngredients = {
-    ...(briefRow.ingredients || {}),
+    ...(writeRow.ingredients || {}),
     qa_report: qaReport + '\n\n' + validationReport,
     qa_verdict: verdict,
     adjusted_formula: adjustedFormula,
@@ -1307,7 +1312,7 @@ async function run() {
   };
   const { error: saveErr } = await DASH.from('formula_briefs')
     .update({ ingredients: updatedIngredients })
-    .eq('id', briefRow.id);
+    .eq('id', writeRow.id);
   if (saveErr) console.error(`  âŒ Save error: ${saveErr.message}`);
   else {
     console.log(`  âœ… Saved to formula_briefs.ingredients.qa_report`);
@@ -1539,7 +1544,7 @@ async function run() {
           },
         }
       })
-      .eq('id', briefRow.id);
+      .eq('id', writeRow.id);
     if (c2Err) console.error('  Call 2 save error:', c2Err.message);
     else {
       console.log('  Call 2 results saved (comparison + flavor QA + pipeline metadata + run audit) OK');

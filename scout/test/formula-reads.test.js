@@ -459,3 +459,35 @@ test('P9 phase file reads through the evidence layer; the brief delete/insert an
   assert.match(s, /DASH\.from\('formula_briefs'\)\.delete\(\)/);
   assert.match(s, /DASH\.from\('formula_briefs'\)\.insert\(/);
 });
+
+// ── P10 ─────────────────────────────────────────────────────────────────────
+
+test('P10 reads: competitors chain identical to the pre-layer phase; brief + market intel via the shared reads', async () => {
+  const { P10_COMPETITOR_COLUMNS } = require('../utils/formula-inputs');
+  const x = backends();
+  await FR.p10Competitors(x.scout, CAT);
+  await FR.briefSkipRow(x.scout, CAT);
+  await FR.briefFormulaRow(x.scout, CAT);
+  await x.scout.marketIntel(CAT);
+  // phase9-formula-qa.js before the layer: competitors :1185-1190, skip :1156-1157, brief :1166-1168, market intel :225 (store)
+  assert.deepEqual(x.dash.queries, [
+    { table: 'products', calls: [['select', P10_COMPETITOR_COLUMNS], ['eq', 'category_id', CAT], ['not', 'bsr_current', 'is', null], ['order', 'bsr_current', { ascending: true }], ['limit', 40]] },
+    { table: 'formula_briefs', calls: BRIEF_SKIP_CHAIN },
+    { table: 'formula_briefs', calls: BRIEF_FORMULA_CHAIN },
+    { table: 'formula_briefs', calls: [['select', 'id, ingredients, created_at'], ['eq', 'category_id', CAT], ['order', 'created_at', { ascending: false }], ['limit', 1]] },
+  ]);
+  await FR.p10Competitors(x.rndEv, CAT);
+  assert.deepEqual(x.rnd.queries, [{ table: 'v_formula_products', calls: x.dash.queries[0].calls }]);
+});
+
+test('P10 phase file reads through the evidence layer; both brief updates target the Scout write base', () => {
+  const s = src('phase9-formula-qa.js');
+  assert.deepEqual(directReads('phase9-formula-qa.js', ['formula_briefs']), []);
+  assert.doesNotMatch(s, /DASH\.from\('products'\)\s*\.select\(P10_COMPETITOR_COLUMNS\)/);
+  assert.match(s, /EV\.marketIntel\(categoryId\)/);
+  assert.match(s, /const writeRow = await briefFormulaWriteBase\(EV, CAT_ID, briefRow\)/);
+  assert.match(s, /\.\.\.\(writeRow\.ingredients \|\| \{\}\),\s*qa_report/);
+  assert.equal((s.match(/\.eq\('id', writeRow\.id\)/g) || []).length, 2);
+  assert.doesNotMatch(s, /briefRow\.id|briefRow\.ingredients \|\|/);
+  assert.match(s, /DASH\.from\('products'\)\s*\.select\('marketing_analysis'\)\.eq\('asin', asin\)/, 'qa note merge-read stays on Scout');
+});

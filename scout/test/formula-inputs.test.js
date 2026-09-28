@@ -91,8 +91,11 @@ test('P10: competitorFlavourFields ignores marketing_analysis.other_ingredients 
 });
 
 test('P10 selects competitors through P10_COMPETITOR_COLUMNS and scans the real column', () => {
+  // The read moved to utils/formula-reads.js (evidence layer); it still selects P10_COMPETITOR_COLUMNS.
   const src = fs.readFileSync(path.join(__dirname, '..', 'phase9-formula-qa.js'), 'utf8');
-  assert.match(src, /\.select\(P10_COMPETITOR_COLUMNS\)/);
+  const reads = fs.readFileSync(path.join(__dirname, '..', 'utils', 'formula-reads.js'), 'utf8');
+  assert.match(src, /p10Competitors\(EV, CAT_ID\)/);
+  assert.match(reads, /ev\.products\(categoryId, P10_COMPETITOR_COLUMNS,/);
   assert.doesNotMatch(src, /marketing_analysis\??\.other_ingredients/);
   assert.equal((src.match(/competitorFlavourFields\(c\)/g) || []).length, 2);
 });

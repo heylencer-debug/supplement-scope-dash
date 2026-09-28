@@ -3,8 +3,9 @@
  * the pure helpers that read them, so a unit test can prove every field a
  * helper reads is actually in the select.
  *
- * History: P7's dosage table read `all_nutrients` its select never asked for,
- * so it always printed "OCR dosage data not yet available" (fixed 2026-09-29).
+ * History (fixed 2026-09-29): P7's dosage table read `all_nutrients` and P9's
+ * serving-size distribution read `serving_size`, neither of which their
+ * selects asked for, so both sections were always empty.
  */
 
 'use strict';
@@ -36,4 +37,31 @@ function buildDosageTable(products) {
   return rows.length ? rows.join('\n') : 'OCR dosage data not yet available';
 }
 
-module.exports = { selectColumns, P7_PRODUCT_COLUMNS, buildDosageTable };
+// P9 (phase8-formula-brief.js) "all products" aggregate set — every product in
+// the category with marketing_analysis. Read for price, form, P6 ingredients,
+// packaging claims, review pain points and the serving-size distribution.
+const P9_ALL_PRODUCT_COLUMNS = [
+  'price', 'packaging_type', 'all_nutrients', 'marketing_analysis', 'review_analysis',
+  // read by servingSizeDistribution (was missing → the distribution was always empty)
+  'serving_size',
+].join(', ');
+
+/** P9 serving-size distribution: top 8 normalised serving sizes with counts, '' when none. */
+function servingSizeDistribution(products) {
+  const servingSizeMap = {};
+  for (const p of products || []) {
+    if (p.serving_size) {
+      const ss = String(p.serving_size).toLowerCase().trim();
+      servingSizeMap[ss] = (servingSizeMap[ss] || 0) + 1;
+    }
+  }
+  return Object.entries(servingSizeMap)
+    .sort((a, b) => b[1] - a[1]).slice(0, 8)
+    .map(([ss, count]) => `"${ss}": ${count} products`).join('\n');
+}
+
+module.exports = {
+  selectColumns,
+  P7_PRODUCT_COLUMNS, buildDosageTable,
+  P9_ALL_PRODUCT_COLUMNS, servingSizeDistribution,
+};

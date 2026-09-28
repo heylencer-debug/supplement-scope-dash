@@ -27,6 +27,7 @@ const { loadWebEvidence } = require('./utils/web-research-store');
 const { fetchCategoryMarketingAssets } = require('./utils/marketing-assets-store');
 // P7's report, read from where P7 writes it (formula_briefs.ingredients.market_intelligence).
 const { fetchMarketIntel } = require('./utils/market-intel-store');
+const { P9_ALL_PRODUCT_COLUMNS, servingSizeDistribution } = require('./utils/formula-inputs');
 const { formatMarketingAssetsForPrompt } = require('./utils/marketing-assets');
 
 // Set once run() resolves the category — read by recordAiUsage() calls
@@ -569,7 +570,7 @@ async function compileMarketData(categoryId) {
 
   // All products for aggregates
   const { data: allProducts } = await DASH.from('products')
-    .select('price, packaging_type, all_nutrients, marketing_analysis, review_analysis')
+    .select(P9_ALL_PRODUCT_COLUMNS) // includes serving_size for the distribution below
     .eq('category_id', categoryId)
     .not('marketing_analysis', 'is', null);
 
@@ -685,16 +686,7 @@ async function compileMarketData(categoryId) {
     .map(([form]) => form);
 
   // ── Serving size distribution ──────────────────────────────────────────────
-  const servingSizeMap = {};
-  for (const p of allProducts || []) {
-    if (p.serving_size) {
-      const ss = String(p.serving_size).toLowerCase().trim();
-      servingSizeMap[ss] = (servingSizeMap[ss] || 0) + 1;
-    }
-  }
-  const servingSizeDistribution = Object.entries(servingSizeMap)
-    .sort((a, b) => b[1] - a[1]).slice(0, 8)
-    .map(([ss, count]) => `"${ss}": ${count} products`).join('\n');
+  const servingSizeDist = servingSizeDistribution(allProducts);
 
   // ── Ingredient dosage ranges from OCR (all_nutrients) ─────────────────────
   const dosageRangeMap = {}; // ingredient → [amounts]
@@ -824,7 +816,7 @@ async function compileMarketData(categoryId) {
       top_pain_points: topPainPoints,
       top_claims: topClaims,
       top_ingredients: topIngredients,
-      serving_size_distribution: servingSizeDistribution,
+      serving_size_distribution: servingSizeDist,
       dosage_ranges: dosageRanges,
       price_per_serving: pricePerServing,
       positive_ingredient_signals: topPositiveIngredients,

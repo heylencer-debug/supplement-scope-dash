@@ -48,3 +48,23 @@ test('P7 selects through P7_PRODUCT_COLUMNS', () => {
   assert.match(src, /\.select\(P7_PRODUCT_COLUMNS\)/);
   assert.doesNotMatch(src, /function buildDosageTable/);
 });
+
+test('P9: "all products" fetched with P9_ALL_PRODUCT_COLUMNS produce a serving-size distribution', () => {
+  assert.ok(fi.selectColumns(fi.P9_ALL_PRODUCT_COLUMNS).includes('serving_size'));
+  const rows = [FULL_ROW, { ...FULL_ROW, serving_size: '1 Stick (7 g) ' }, { ...FULL_ROW, serving_size: '2 scoops' }]
+    .map((r) => project(r, fi.P9_ALL_PRODUCT_COLUMNS));
+  assert.equal(fi.servingSizeDistribution(rows), '"1 stick (7 g)": 2 products\n"2 scoops": 1 products');
+});
+
+test('P9: servingSizeDistribution keeps the top 8 and is empty with no data', () => {
+  const rows = Array.from({ length: 10 }, (_, i) => ({ serving_size: `${i + 1} g` }));
+  assert.equal(fi.servingSizeDistribution(rows).split('\n').length, 8);
+  assert.equal(fi.servingSizeDistribution([{ price: 1 }]), '');
+  assert.equal(fi.servingSizeDistribution(null), '');
+});
+
+test('P9 selects its aggregate set through P9_ALL_PRODUCT_COLUMNS', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'phase8-formula-brief.js'), 'utf8');
+  assert.match(src, /\.select\(P9_ALL_PRODUCT_COLUMNS\)/);
+  assert.match(src, /serving_size_distribution: servingSizeDist,/);
+});

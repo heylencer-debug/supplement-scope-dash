@@ -5,7 +5,8 @@
  *
  * History (fixed 2026-09-29): P7's dosage table read `all_nutrients` and P9's
  * serving-size distribution read `serving_size`, neither of which their
- * selects asked for, so both sections were always empty.
+ * selects asked for, so both sections were always empty; P10's flavour scan
+ * read a jsonb key nothing writes instead of the other_ingredients column.
  */
 
 'use strict';
@@ -60,8 +61,31 @@ function servingSizeDistribution(products) {
     .map(([ss, count]) => `"${ss}": ${count} products`).join('\n');
 }
 
+// P10 (phase9-formula-qa.js) competitor set — top 40 by BSR.
+const P10_COMPETITOR_COLUMNS = [
+  'asin', 'brand', 'title', 'bsr_current', 'price', 'monthly_revenue', 'monthly_sales',
+  'rating_value', 'rating_count', 'supplement_facts_raw', 'marketing_analysis',
+  // read by competitorFlavourFields — flavours are declared in "Other ingredients"
+  'other_ingredients',
+].join(', ');
+
+/**
+ * P10 flavour scan: the lower-cased texts a competitor's flavours can be read
+ * from, each with its field name for provenance. The scan used to read
+ * marketing_analysis.other_ingredients, a key no phase writes; the label's
+ * other-ingredients line is the products.other_ingredients text column.
+ */
+function competitorFlavourFields(c) {
+  return [
+    { key: 'title', text: (c?.title || '').toLowerCase() },
+    { key: 'supplement_facts_raw', text: (c?.supplement_facts_raw || '').toLowerCase() },
+    { key: 'other_ingredients', text: (typeof c?.other_ingredients === 'string' ? c.other_ingredients : '').toLowerCase() },
+  ];
+}
+
 module.exports = {
   selectColumns,
   P7_PRODUCT_COLUMNS, buildDosageTable,
   P9_ALL_PRODUCT_COLUMNS, servingSizeDistribution,
+  P10_COMPETITOR_COLUMNS, competitorFlavourFields,
 };

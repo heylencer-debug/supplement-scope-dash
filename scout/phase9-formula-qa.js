@@ -29,6 +29,7 @@ const { resolveCategory } = require('./utils/category-resolver');
 const { withUsageTracking, extractUsageFromSSE, recordAiUsage } = require('./utils/ai-usage');
 // P7's report, read from where P7 writes it (formula_briefs.ingredients.market_intelligence).
 const { fetchMarketIntel } = require('./utils/market-intel-store');
+const { P10_COMPETITOR_COLUMNS, competitorFlavourFields } = require('./utils/formula-inputs');
 const fs = require('fs');
 const path = require('path');
 
@@ -770,7 +771,8 @@ Rating: ${c.rating_value} (${c.rating_count} reviews)
 
   // Flavor intelligence from competitor data
   const flavorData = top10.map(c => {
-    const raw = ((c.supplement_facts_raw || '') + ' ' + ((c.marketing_analysis?.other_ingredients) || '')).toLowerCase();
+    // supplement facts + the label's other-ingredients line (title is left to the fallback scan below)
+    const raw = competitorFlavourFields(c).filter(f => f.key !== 'title').map(f => f.text).join(' ');
     const flavors = ['strawberry','raspberry','lemon','mango','peach','cherry','mixed berry','apple','watermelon','citrus','blackberry','tropical']
       .filter(f => raw.includes(f));
     return flavors.length ? `- ${c.brand}: ${flavors.join(', ')}` : null;
@@ -862,7 +864,7 @@ Return ONLY a valid JSON array with 5 to 7 items. Use this exact schema per item
     "provenance": {
       "source_brand": "exact brand name from competitor data above, or empty string",
       "source_asin": "exact ASIN from competitor data above, or empty string",
-      "source_field": "title|supplement_facts_raw|marketing_analysis.other_ingredients|derived"
+      "source_field": "title|supplement_facts_raw|other_ingredients|derived"
     },
     "evidence": {
       "competitor_presence": "high|medium|low",
@@ -1181,8 +1183,7 @@ async function run() {
   // Load top 10 competitors
   console.log(`Loading top 10 competitors with formulas...`);
   const { data: competitors } = await DASH.from('products')
-    .select(`asin, brand, title, bsr_current, price, monthly_revenue, monthly_sales,
-             rating_value, rating_count, supplement_facts_raw, marketing_analysis`)
+    .select(P10_COMPETITOR_COLUMNS) // includes other_ingredients for the flavour scan
     .eq('category_id', CAT_ID)
     .not('bsr_current', 'is', null)
     .order('bsr_current', { ascending: true })
@@ -1355,11 +1356,9 @@ async function run() {
     const flavorList = ['apple','mixed berry','blackberry','raspberry','strawberry','lemon','citrus','tropical','mango','peach','cherry','watermelon'];
     const detectedFlavorMap = new Map(); // flavor_name -> { brand, asin, field }
     for (const c of (competitors || []).slice(0, 20)) {
-      const fields = [
-        { key: 'title',                                 text: (c?.title || '').toLowerCase() },
-        { key: 'supplement_facts_raw',                  text: (c?.supplement_facts_raw || '').toLowerCase() },
-        { key: 'marketing_analysis.other_ingredients',  text: (c?.marketing_analysis?.other_ingredients || '').toLowerCase() },
-      ];
+      // title, supplement facts, and products.other_ingredients (was
+      // a marketing_analysis jsonb key nothing writes)
+      const fields = competitorFlavourFields(c);
       for (const { key, text } of fields) {
         for (const f of flavorList) {
           if (text.includes(f) && !detectedFlavorMap.has(f)) {

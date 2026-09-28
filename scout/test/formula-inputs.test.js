@@ -68,3 +68,25 @@ test('P9 selects its aggregate set through P9_ALL_PRODUCT_COLUMNS', () => {
   assert.match(src, /\.select\(P9_ALL_PRODUCT_COLUMNS\)/);
   assert.match(src, /serving_size_distribution: servingSizeDist,/);
 });
+
+test('P10: competitors fetched with P10_COMPETITOR_COLUMNS expose the other-ingredients flavour', () => {
+  assert.ok(fi.selectColumns(fi.P10_COMPETITOR_COLUMNS).includes('other_ingredients'));
+  const c = project({ ...FULL_ROW, title: 'Acme Electrolytes', supplement_facts_raw: 'Sodium: 500 mg' }, fi.P10_COMPETITOR_COLUMNS);
+  const fields = fi.competitorFlavourFields(c);
+  assert.deepEqual(fields.map((f) => f.key), ['title', 'supplement_facts_raw', 'other_ingredients']);
+  const hit = fields.find((f) => f.text.includes('lemon'));
+  assert.equal(hit && hit.key, 'other_ingredients');
+});
+
+test('P10: competitorFlavourFields ignores marketing_analysis.other_ingredients and non-string values', () => {
+  const fields = fi.competitorFlavourFields({ marketing_analysis: { other_ingredients: 'mango' }, other_ingredients: ['cherry'] });
+  assert.ok(fields.every((f) => f.text === ''));
+  assert.ok(fi.competitorFlavourFields(null).every((f) => f.text === ''));
+});
+
+test('P10 selects competitors through P10_COMPETITOR_COLUMNS and scans the real column', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'phase9-formula-qa.js'), 'utf8');
+  assert.match(src, /\.select\(P10_COMPETITOR_COLUMNS\)/);
+  assert.doesNotMatch(src, /marketing_analysis\??\.other_ingredients/);
+  assert.equal((src.match(/competitorFlavourFields\(c\)/g) || []).length, 2);
+});

@@ -55,7 +55,7 @@ const { reportProgress } = require('./utils/job-heartbeat');
 const { reuseAsinsFromEnv, rescrapeAsinsFromEnv } = require('./utils/reuse-asins');
 const { loadSelection, applySelection } = require('./utils/selected-competitors');
 
-const KEYWORD         = process.argv[2] || 'ashwagandha gummies';
+const KEYWORD         = require('./utils/keyword-arg').requireKeyword('node ocr-phase4.js "<session label>" [--test] [--top-n <n>]');
 // 2026-09-01: resolved once in main() below, purely so recordAiUsage() can
 // attribute P4's cost to the right category (P4 previously omitted
 // categoryId entirely — its real AI spend, often the largest single-phase

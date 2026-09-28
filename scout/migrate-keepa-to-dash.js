@@ -23,10 +23,7 @@ const DASH = createClient(
 );
 
 // ── Dynamic keyword resolution ────────────────────────────────
-const _kwIdx = process.argv.indexOf('--keyword');
-const KEYWORD_ARG = _kwIdx >= 0
-  ? process.argv[_kwIdx + 1]
-  : (process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : 'ashwagandha gummies');
+const KEYWORD_ARG = require('./utils/keyword-arg').requireKeyword('node migrate-keepa-to-dash.js "<session label>"  (or --keyword "<session label>")');
 
 async function lookupCategoryId(keyword) {
   const cat = await resolveCategory(DASH, keyword);

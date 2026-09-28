@@ -426,8 +426,9 @@ the local `scout/.env` has none for Keepa, Bright Data or Perplexity
   - Before 2026-09-26, `review_count` was read from `stats.current[16]` (the
     rating ×10). The real count is `[17]`. The corrupted counts are detected and
     ignored at read time; a repair UPDATE sits commented out in migration 011.
-  - `migrate-keepa-to-dash.js` defaults its keyword to `'ashwagandha gummies'`
-    when called with no argument (`:25-28`) and exits 0 on failure (`:210`).
+  - `migrate-keepa-to-dash.js` exits 0 on failure (`run().catch(console.error)`).
+    Called with no keyword it now stops with a usage line; before 2026-09-29 it
+    defaulted to `'ashwagandha gummies'`.
   - P2 does **not** update `products.bsr_current` (see P1).
 - **Re-run.** from_phase 2. The migrate step and the selection alone are free:
   `node migrate-keepa-to-dash.js "<label>"` (a database write).
@@ -583,7 +584,8 @@ the local `scout/.env` has none for Keepa, Bright Data or Perplexity
     after the paid vision OCR, and a non-zero exit would re-run that OCR. It
     prints a `SYNC FAILED — migrate-ocr-to-dash.js: …` line instead, and the P4
     bar reports the missing data.
-    All three default to `'ashwagandha gummies'` when called without a keyword.
+    All three stop with a usage line when called without a keyword (before
+    2026-09-29 they defaulted to `'ashwagandha gummies'`).
 - **Re-run.** from_phase 4. The label-v2 parse of already-stored OCR rows is
   free: `node backfill-facts-v2.js …` then `node migrate-ocr-to-dash.js --keyword "<label>"`
   (operations log, 2026-09-27). Both write to the database.
@@ -1006,10 +1008,16 @@ image".
   (operations log). Apply new ones deliberately; the pipeline never applies them.
 - **The review collector still appends duplicates** (P3). Count reviews by
   review id, not by row.
-- **Several scripts default to `'ashwagandha gummies'` when the keyword argument
-  is missing.** These include `migrate-keepa-to-dash.js`,
-  `migrate-ocr-to-dash.js`, `phase4-text-extract.js`, `ocr-phase4.js`,
-  `phase5-deep-research.js`, P6 and P8. Always pass the full session label.
+- **A missing keyword.** `migrate-reviews-to-dash.js`, `migrate-ocr-to-dash.js`,
+  `migrate-keepa-to-dash.js`, `phase4-text-extract.js`, `ocr-phase4.js` and
+  `phase7-packaging-intelligence.js` (P8) stop with a usage line
+  (`utils/keyword-arg.js`, 2026-09-29). These still default to
+  `'ashwagandha gummies'`: `phase5-deep-research.js`,
+  `phase6-product-intelligence.js`, `phase6-market-analysis.js`,
+  `phase8-formula-brief.js`, `phase9-formula-qa.js`,
+  `phase10-competitive-benchmarking.js`, `phase11-fda-compliance.js`,
+  `phase12-final-signoff.js` and `seed-category-analysis.js`. Always pass the
+  full session label.
 - **Exit codes on a script's own failure** (`utils/script-exit.js`). The runner
   re-runs a phase's WHOLE script chain on any non-zero exit (up to 3 times),
   then stops, so the exit code decides what gets re-run:

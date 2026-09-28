@@ -48,10 +48,10 @@ const DASH = createClient(
 );
 
 // ── Dynamic keyword + category resolution ─────────────────────
-const _kwIdx = process.argv.indexOf('--keyword');
-const KEYWORD = _kwIdx >= 0
-  ? process.argv[_kwIdx + 1]
-  : (process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : 'ashwagandha gummies');
+// Required only when run as a script: tests require this file for buildReviewAnalysis.
+const KEYWORD = require.main === module
+  ? require('./utils/keyword-arg').requireKeyword('node migrate-reviews-to-dash.js "<session label>"  (or --keyword "<session label>")')
+  : null;
 
 async function lookupCategoryId(keyword) {
   const cat = await resolveCategory(DASH, keyword);

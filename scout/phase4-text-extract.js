@@ -26,8 +26,7 @@ const { loadSelection, applySelection } = require('./utils/selected-competitors'
 const { failAndExit } = require('./utils/script-exit');
 
 // Support both: node phase4-text-extract.js "keyword" AND node phase4-text-extract.js --keyword "keyword"
-const _kwIdx = process.argv.indexOf('--keyword');
-const KEYWORD   = _kwIdx > -1 ? process.argv[_kwIdx + 1] : (process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : 'ashwagandha gummies');
+const KEYWORD   = require('./utils/keyword-arg').requireKeyword('node phase4-text-extract.js "<session label>" [--test] [--limit <n>]  (or --keyword "<session label>")');
 // 2026-09-01: resolved once in main() below, purely so recordAiUsage() can
 // attribute this pass's cost to the right category (previously omitted
 // entirely — see the same fix in ocr-phase4.js/phase5-deep-research.js).

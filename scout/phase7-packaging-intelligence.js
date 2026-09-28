@@ -28,7 +28,7 @@ const DOVIVE = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 // marketing_analysis merge-read and every write below stay on Scout.
 const EV = createEvidenceSource({ dash: DASH, dovive: DOVIVE });
 
-const KEYWORD = process.argv.includes('--keyword') ? process.argv[process.argv.indexOf('--keyword') + 1] : 'ashwagandha gummies';
+const KEYWORD = require('./utils/keyword-arg').requireKeyword('node phase7-packaging-intelligence.js --keyword "<session label>" [--top N]');
 const TOP_N = process.argv.includes('--top')
   ? parseInt(process.argv[process.argv.indexOf('--top') + 1])
   : 999;

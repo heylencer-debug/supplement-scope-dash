@@ -41,8 +41,7 @@ const DASH = createClient(
   process.env.DASH_KEY || process.env.SUPABASE_KEY
 );
 
-const kwIdx = process.argv.indexOf('--keyword');
-const KEYWORD = kwIdx !== -1 ? process.argv[kwIdx + 1] : (process.argv[2] || 'ashwagandha gummies');
+const KEYWORD = require('./utils/keyword-arg').requireKeyword('node migrate-ocr-to-dash.js "<session label>"  (or --keyword "<session label>")');
 
 // Dynamic category lookup — resolves keyword → DASH category_id
 async function lookupCategoryId(keyword) {

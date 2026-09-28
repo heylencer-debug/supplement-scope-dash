@@ -77,6 +77,7 @@
 const WR = require('./utils/web-research');
 const SC = require('./utils/source-classify');
 const CR = require('./utils/cert-registry-web');
+const { createEvidenceSource } = require('./utils/evidence-source');
 
 const TABLE = 'dovive_web_research';
 const UA = 'Mozilla/5.0 (compatible; DoviveScout/1.0; +https://dovive.com) research bot';
@@ -136,33 +137,37 @@ const PRODUCT_COLS = 'asin, brand, title, bsr_current, feature_bullets_text, des
 /**
  * Selected competitors (products.selected) when populated, else top-N by BSR.
  * Returns { competitors, source } — competitors carry the Amazon copy used by
- * the syndication check.
+ * the syndication check. Reads go through the evidence layer (`evidence`, or
+ * one built on `dash` for the active SCOUT_EVIDENCE_SOURCE); same chains as
+ * before under 'scout'.
  */
-async function loadCompetitors({ dash, categoryId, topN, loadSelection, log }) {
+async function loadCompetitors({ dash, evidence = null, categoryId, topN, loadSelection, log }) {
   if (!dash || !categoryId) return { competitors: [], source: 'none' };
+  const ev = evidence || createEvidenceSource({ dash });
   const sel = loadSelection ? await loadSelection(dash, categoryId) : { active: false, why: 'no loader' };
   if (sel.active) {
-    const { data, error } = await dash.from('products').select(PRODUCT_COLS)
-      .eq('category_id', categoryId).eq('selected', true)
-      .order('selection_rank', { ascending: true }).limit(200);
+    const { data, error } = await ev.products(categoryId, PRODUCT_COLS, {
+      ops: [['eq', 'selected', true], ['order', 'selection_rank', { ascending: true }], ['limit', 200]],
+    });
     if (!error && data && data.length) return { competitors: data, source: `selection (${sel.why})` };
     log(`  ⚠️ selection active but unreadable (${error && error.message}) — falling back to top ${topN} by BSR`);
   }
-  const { data, error } = await dash.from('products').select(PRODUCT_COLS)
-    .eq('category_id', categoryId)
-    .order('bsr_current', { ascending: true, nullsFirst: false })
-    .limit(Math.max(topN, 40));
+  const { data, error } = await ev.products(categoryId, PRODUCT_COLS, {
+    ops: [['order', 'bsr_current', { ascending: true, nullsFirst: false }], ['limit', Math.max(topN, 40)]],
+  });
   if (error) { log(`  ⚠️ products read failed (${error.message}) — planning without brands`); return { competitors: [], source: 'none' }; }
   return { competitors: (data || []).filter((p) => p.bsr_current != null), source: `top by BSR (${sel.why || 'no selection'})` };
 }
 
 /** Brand sites P5 already confirmed (dovive_p5_sources.source_type = 'brand_site'). */
-async function loadBrandDomains({ dovive, keyword, log }) {
+async function loadBrandDomains({ dovive, evidence = null, keyword, log }) {
   const out = new Map();
-  if (!dovive) return out;
+  const ev = evidence || (dovive ? createEvidenceSource({ dovive }) : null);
+  if (!ev) return out;
   try {
-    const { data, error } = await dovive.from('dovive_p5_sources').select('asin, source_url, source_type')
-      .eq('keyword', keyword).eq('source_type', 'brand_site').limit(200);
+    const { data, error } = await ev.p5Sources({
+      keyword, columns: 'asin, source_url, source_type', ops: [['eq', 'source_type', 'brand_site'], ['limit', 200]],
+    });
     if (error) { log(`  (brand domains from P5 not read: ${error.message})`); return out; }
     for (const r of data || []) { const h = SC.hostOf(r.source_url); if (h && !out.has(r.asin)) out.set(r.asin, h); }
   } catch (e) { log(`  (brand domains from P5 not read: ${e.message})`); }
@@ -311,8 +316,12 @@ const iso = (t) => new Date(t).toISOString();
 
 /**
  * @param {object} opts  from parseOptions
- * @param {object} deps  { dovive, dash, resolveCategory, loadSelection, search, fetchPage,
+ * @param {object} deps  { dovive, dash, evidence, resolveCategory, loadSelection, search, fetchPage,
  *                         fetchText, callModel, recordUsage, pricing, log, now }
+ *   evidence — utils/evidence-source.js instance for the competitor / P5 source
+ *   reads (default: one built on dash/dovive for SCOUT_EVIDENCE_SOURCE). The
+ *   dovive_web_research pre-flight and upsert are this phase's own output and
+ *   stay on `dash`.
  */
 async function research(opts, deps) {
   const log = deps.log || console.log;
@@ -354,8 +363,8 @@ async function research(opts, deps) {
       log(`  → Category (${cat.method}): "${cat.name}" (${cat.id})`);
     } catch (e) { log(`  ⚠️ Category not resolved (${e.message}) — planning from the keyword alone.`); }
   }
-  const { competitors, source: compSource } = await loadCompetitors({ dash, categoryId: ctx.categoryId, topN: opts.topBrands, loadSelection: deps.loadSelection, log });
-  const domains = await loadBrandDomains({ dovive, keyword, log });
+  const { competitors, source: compSource } = await loadCompetitors({ dash, evidence: deps.evidence || null, categoryId: ctx.categoryId, topN: opts.topBrands, loadSelection: deps.loadSelection, log });
+  const domains = await loadBrandDomains({ dovive, evidence: deps.evidence || null, keyword, log });
   const brands = competitors.map((c) => ({ brand: c.brand, asin: c.asin, domain: domains.get(c.asin) || null }));
   const planBrands = WR.uniqueBrands(brands).slice(0, opts.topBrands);
   const marketing = competitors
@@ -646,10 +655,13 @@ if (require.main === module) {
   const env = process.env;
   let dovive = null;
   let dash = null;
+  let evidence = null;
   if (env.SUPABASE_URL && env.SUPABASE_KEY) {
     const { createClient } = require('@supabase/supabase-js');
     dovive = createClient(env.SUPABASE_URL, env.SUPABASE_KEY);
     dash = createClient(env.DASH_URL || env.SUPABASE_URL, env.DASH_KEY || env.SUPABASE_KEY);
+    // SCOUT_EVIDENCE_SOURCE=rnd without an RnD client throws here — before any paid call.
+    evidence = createEvidenceSource({ dash, dovive });
   } else if (!opts.dryRun) {
     console.log('❌ P5b: SUPABASE_URL / SUPABASE_KEY not set — nothing done (non-fatal).');
   }
@@ -660,9 +672,11 @@ if (require.main === module) {
     ? research(opts, {
       dovive,
       dash,
+      evidence,
       ctx,
       resolveCategory: require('./utils/category-resolver').resolveCategory,
-      loadSelection: require('./utils/selected-competitors').loadSelection,
+      // the selection comes from the evidence source (products | v_formula_roster)
+      loadSelection: evidence ? (_client, categoryId) => evidence.selection(categoryId) : require('./utils/selected-competitors').loadSelection,
       search: (q) => require('./utils/perplexity').searchWeb(q.query, { maxResults: 10, domainFilter: q.domain_filter }),
       fetchPage: fetcher ? fetcher.fetchPage : null,
       fetchText: (url, o) => httpGet(url, { timeoutMs: (o && o.timeoutMs) || 15000, maxBytes: 512 * 1024, accept: '*/*' }),
@@ -676,4 +690,4 @@ if (require.main === module) {
     .finally(async () => { if (fetcher) await fetcher.close(); await Promise.allSettled(usageWrites); process.exit(0); });
 }
 
-module.exports = { research, parseOptions, loadPrevious, loadCompetitors, makePageFetcher, makeOpenRouterCaller, httpGet, TABLE, CreditsExhausted };
+module.exports = { research, parseOptions, loadPrevious, loadCompetitors, loadBrandDomains, makePageFetcher, makeOpenRouterCaller, httpGet, TABLE, CreditsExhausted };

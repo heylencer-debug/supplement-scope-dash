@@ -263,3 +263,54 @@ test('P13 phase file reads the brief through the evidence layer; final_signoff m
   assert.match(s, /\.\.\.\(writeRow\.ingredients \|\| \{\}\),\s*final_signoff/);
   assert.match(s, /\.update\(\{ ingredients: updated \}\)\.eq\('id', writeRow\.id\)/);
 });
+
+// ── P5b (module is requirable: its reads are tested in place) ─────────────
+
+test('P5b reads: loadCompetitors / loadBrandDomains issue the pre-layer chains under scout, the views under rnd', async () => {
+  const P5b = require('../phase5b-web-research');
+  const cols = 'asin, brand, title, bsr_current, feature_bullets_text, description_text';
+  const log = () => {};
+  const rows = [{ asin: 'B1', brand: 'A', bsr_current: 5 }];
+  const x = backends(() => ({ data: rows, error: null }));
+  const active = async () => ({ active: true, why: '1 selected competitors' });
+  const inactive = async () => ({ active: false, why: 'selection not populated' });
+
+  // no evidence passed → built on dash for the default (scout) backend
+  await P5b.loadCompetitors({ dash: x.dash, categoryId: CAT, topN: 10, loadSelection: active, log });
+  await P5b.loadCompetitors({ dash: x.dash, categoryId: CAT, topN: 10, loadSelection: inactive, log });
+  await P5b.loadBrandDomains({ dovive: x.dovive, keyword: 'kw #2', log });
+  // phase5b-web-research.js before the layer (:141-157, :164-165)
+  assert.deepEqual(x.dash.queries, [
+    { table: 'products', calls: [['select', cols], ['eq', 'category_id', CAT], ['eq', 'selected', true], ['order', 'selection_rank', { ascending: true }], ['limit', 200]] },
+    { table: 'products', calls: [['select', cols], ['eq', 'category_id', CAT], ['order', 'bsr_current', { ascending: true, nullsFirst: false }], ['limit', 40]] },
+  ]);
+  assert.deepEqual(x.dovive.queries, [{ table: 'dovive_p5_sources', calls: [
+    ['select', 'asin, source_url, source_type'], ['eq', 'keyword', 'kw #2'], ['eq', 'source_type', 'brand_site'], ['limit', 200],
+  ] }]);
+
+  // explicit scout evidence source → identical chains
+  const y = backends(() => ({ data: rows, error: null }));
+  await P5b.loadCompetitors({ dash: y.dash, evidence: y.scout, categoryId: CAT, topN: 10, loadSelection: active, log });
+  await P5b.loadBrandDomains({ dovive: y.dovive, evidence: y.scout, keyword: 'kw #2', log });
+  assert.deepEqual(y.dash.queries, x.dash.queries.slice(0, 1));
+  assert.deepEqual(y.dovive.queries, x.dovive.queries);
+
+  // rnd → the views, same chains; Scout untouched
+  const z = backends(() => ({ data: rows, error: null }));
+  await P5b.loadCompetitors({ dash: z.dash, evidence: z.rndEv, categoryId: CAT, topN: 10, loadSelection: active, log });
+  await P5b.loadBrandDomains({ dovive: z.dovive, evidence: z.rndEv, keyword: 'kw #2', log });
+  assert.deepEqual(z.rnd.queries, [
+    { table: 'v_formula_products', calls: x.dash.queries[0].calls },
+    { table: 'v_formula_p5_sources', calls: x.dovive.queries[0].calls },
+  ]);
+  assert.equal(z.dash.queries.length + z.dovive.queries.length, 0);
+});
+
+test('P5b main wires the evidence source and its selection; the web-research pre-flight/upsert stay on dash', () => {
+  const s = src('phase5b-web-research.js');
+  assert.deepEqual(directReads('phase5b-web-research.js', ['products', 'dovive_p5_sources']), []);
+  assert.match(s, /evidence = createEvidenceSource\(\{ dash, dovive \}\)/);
+  assert.match(s, /loadSelection: evidence \? \(_client, categoryId\) => evidence\.selection\(categoryId\)/);
+  assert.match(s, /dash\.from\(TABLE\)\s*\.select\('keyword, status, generated_at, ledger, sources, search_runs, model'\)/);
+  assert.match(s, /dash\.from\(TABLE\)\.upsert\(/);
+});

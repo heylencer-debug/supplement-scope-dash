@@ -886,9 +886,11 @@ node submit-job.js "magnesium gummies" --cheap    # all-Flash test run, is_test
 - `submit-job.js` inserts the row, then invokes the `trigger-scout-job` edge
   function with `{scout_job_id}`. If the trigger call fails, the row stays
   `queued`.
-- **Its error message suggests `node submit-job.js trigger`, but no such mode
-  exists.** That command would queue a job for the keyword "trigger". Use the
-  Cloud Run execute command in §3.2 instead.
+- When the trigger call fails, the message prints the Cloud Run execute
+  command from §3.2 with the new job id filled in (and `node drain-queue.js`
+  as the alternative). Before 2026-09-29 it suggested `node submit-job.js
+  trigger`, a mode that does not exist: that command queues a job for the
+  keyword "trigger".
 
 ### 3.2 Re-running a job or a phase
 
@@ -1036,5 +1038,5 @@ image".
 | `READ-FIRST.md` "Turn this off with `--no-auto-aliases`" | runner flag | only `inventory.js` parses it; `run-pipeline.js` always auto-aliases |
 | `FORMULA-INPUTS.md` §2 "Reads that silently return nothing", items 1, 2, 3, 5 | open gaps | fixed on 2026-09-29 in `daef995` (P9/P10 read P7's report), `871ed0a` (P7 `all_nutrients`), `c92cbc8` (P9 `serving_size`), `51c6bbd` (P10 `other_ingredients`) |
 | `supabase/functions/trigger-scout-job/index.ts` header | `scout_jobs` lives in `fhfqjcvwcxizbioftvdw` | single project `jwkitkfufigldpldqtbq` (`DEPLOY_NOTES.md`, 2026-09-15 log) |
-| `submit-job.js:70` | "retry: node submit-job.js trigger" | no such mode (§3.1) |
+| `submit-job.js:70` | "retry: node submit-job.js trigger" | no such mode (§3.1). **Fixed 2026-09-29:** the hint prints the gcloud execute command for the job id. |
 | `scout/README.md` | legacy `scout-agent.js` / `dovive_jobs` flow | the Cloud Run flow in §1.3 |

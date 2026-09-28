@@ -10,6 +10,20 @@
  *   --cheap  cheap_mode test run (all-Flash, is_test tagged)
  */
 require('dotenv').config();
+
+// The command that starts the Cloud Run execution for a row that is already
+// queued (docs/PIPELINE.md §3.2). There is no `submit-job.js trigger` mode:
+// that would queue a NEW job for the keyword "trigger".
+function triggerRetryHint(jobId) {
+  return [
+    `job ${jobId} stays queued. Start it with:`,
+    `  gcloud run jobs execute dovive-scout --region=us-central1 --project=noodle-worker --update-env-vars SCOUT_JOB_ID=${jobId} --async`,
+    '  or run `node drain-queue.js` (starts queued jobs one at a time through the edge function), or use the app.',
+  ].join('\n');
+}
+module.exports = { triggerRetryHint };
+if (require.main !== module) return; // required by a test: export only, no network (CommonJS top-level return)
+
 const URL_ = process.env.SUPABASE_URL;
 const KEY = process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!URL_ || !KEY) { console.error('Missing SUPABASE_URL / SUPABASE_KEY in scout/.env'); process.exit(1); }
@@ -67,5 +81,5 @@ const STALE_QUEUED_MS = 15 * 60 * 1000;
   const trigRes = await fetch(`${URL_}/functions/v1/trigger-scout-job`, {
     method: 'POST', headers: H, body: JSON.stringify({ scout_job_id: job.id }) });
   if (trigRes.ok) console.log('✓ trigger-scout-job invoked — Cloud Run execution starting.');
-  else console.error(`⚠ trigger invoke failed (${trigRes.status}) — job stays queued; retry: node submit-job.js trigger, or use the app.`);
+  else console.error(`⚠ trigger invoke failed (${trigRes.status}) — ${triggerRetryHint(job.id)}`);
 })();

@@ -934,11 +934,12 @@ the row as stored (id, keyword, from_phase, only_phases, force).
   - `plan`
   - `error`
   - `total_cost_usd`
-- **When a phase fails, `scout_jobs.error` usually ends up holding the final
-  verifier's message, not the phase's own error.** After the phase failure the
-  loop breaks and the final verifier still runs; its `Verifier FAIL: …` write
-  overwrites the earlier `P5 Deep Research: …` text (`run-pipeline.js:916,986-993`).
-  The phase error is always in the logs.
+- **When a phase fails, `scout_jobs.error` leads with the phase's own error**,
+  followed by the final verifier's failures:
+  `P5 Deep Research: <msg> | verifier: <failures>` (`utils/job-error.js`). The
+  loop still breaks and the verifier still runs. Before 2026-09-29 the
+  verifier's `Verifier FAIL: …` write overwrote the phase error. A run with no
+  phase failure still writes `Verifier FAIL: …`.
 - **Cloud Run:**
 
   ```bash

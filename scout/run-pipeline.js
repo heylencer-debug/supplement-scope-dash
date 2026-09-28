@@ -29,6 +29,7 @@ const path = require('path');
 const { resolveCategory } = require('./utils/category-resolver');
 const { resolveRunAsins, measureVerifierMetrics, evaluateBars } = require('./utils/verifier-bars');
 const { loadSelection, scopeToSelection, top20Need } = require('./utils/selected-competitors');
+const { composeJobError } = require('./utils/job-error');
 
 const DASH = createClient(
   process.env.DASH_URL || process.env.SUPABASE_URL,
@@ -991,7 +992,8 @@ async function run() {
     console.log('Verifier FAIL:', verifier.failures.join(' | '));
     await notify(`❌ Pipeline incomplete for "${KEYWORD}"\nVerifier FAIL:\n- ${verifier.failures.join('\n- ')}`);
     await rollupJobCost();
-    await updateJobStatus({ status: 'error', error: `Verifier FAIL: ${verifier.failures.join(' | ')}`.slice(0, 2000), finished_at: new Date().toISOString() });
+    // A failed phase's own error leads; the verifier's failures follow it (utils/job-error.js).
+    await updateJobStatus({ status: 'error', error: composeJobError(results.find(r => r.status === 'error'), verifier.failures), finished_at: new Date().toISOString() });
     process.exitCode = 2;
   }
 }

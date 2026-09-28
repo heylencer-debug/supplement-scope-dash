@@ -309,9 +309,11 @@ comparative_note?}` (`:357-371`).
 ### Reads that silently return nothing today (found while mapping)
 
 These are real gaps in what the formula chain actually receives, and any
-replacement data source has to decide whether to reproduce or fix them:
+replacement data source has to decide whether to reproduce or fix them.
+Items 1, 2, 3 and 5 were fixed on 2026-09-29; their text below describes the
+code before the fix.
 
-1. **P7's report never reaches P9 or P10.** P7 writes
+1. **Fixed 2026-09-29 (`daef995`).** **P7's report never reaches P9 or P10.** P7 writes
    `formula_briefs.ingredients.market_intelligence` (`phase6-market-analysis.js:479-481`),
    but P9 and P10 look for it in a `market_intelligence` table and in
    `formula_briefs.brief_type='market_analysis'` / `ingredients.ai_generated_brief`
@@ -322,10 +324,10 @@ replacement data source has to decide whether to reproduce or fix them:
    `market_intelligence: {has_data:false}` and P10 runs "without market
    context". The same missing `brief_type` means P7's skip check never
    skips (`phase6-market-analysis.js:522-523`).
-2. **P7's dosage table is always empty.** `buildDosageTable` reads
+2. **Fixed 2026-09-29 (`871ed0a`).** **P7's dosage table is always empty.** `buildDosageTable` reads
    `p.all_nutrients` (`phase6-market-analysis.js:141-149`), which P7 does not
    select (`:532-537`).
-3. **P9's serving-size distribution is always empty.** The loop reads
+3. **Fixed 2026-09-29 (`c92cbc8`).** **P9's serving-size distribution is always empty.** The loop reads
    `p.serving_size` from the "all products" rows (`phase8-formula-brief.js:705-711`),
    whose select has no `serving_size` (`:588-591`).
 4. **P9's review-analysis ingredient signals are empty.** It reads
@@ -335,7 +337,7 @@ replacement data source has to decide whether to reproduce or fix them:
    analysis_metadata, sentiment_distribution}` with `pain_points` empty in
    the sampled rows. P9 overrides pain points from the P3b synthesis when it
    exists (`:687-692`), so this only bites without P3b.
-5. **P10 flavour scan reads `marketing_analysis.other_ingredients`**, a key
+5. **Fixed 2026-09-29 (`51c6bbd`).** **P10 flavour scan reads `marketing_analysis.other_ingredients`**, a key
    no phase writes (`phase9-formula-qa.js:782, 1370`). The real column is
    `products.other_ingredients`.
 6. **None of the migration-013 label columns are read by a formula phase.**

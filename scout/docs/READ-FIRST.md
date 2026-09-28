@@ -21,7 +21,7 @@ Every Scout job starts by reading what the database already holds for the keywor
 
 The family starts from the base keyword with any trailing `#N` stripped. It then adds:
 
-- singular/plural variants of each word ("electrolyte powder" matches "electrolytes powder"). Turn this off with `--no-auto-aliases`.
+- singular/plural variants of each word ("electrolyte powder" matches "electrolytes powder"). Turn this off with `--no-auto-aliases`, a flag of `inventory.js` only: `run-pipeline.js` does not parse it and always adds the variants.
 - any explicit `--alias "…"`, or the comma-separated list in `SCOUT_KEYWORD_ALIASES`.
 
 Every label found in `categories.search_term` or `dovive_research.keyword` that normalises to one of those names is a session of the family. Each label is resolved to its category with `utils/category-resolver.js`, the same resolver the phase scripts use. Labels that share the first word but are not in the family are printed as "related, NOT counted" (for example `electrolyte packets`). Pass `--alias` to include one.
@@ -61,7 +61,7 @@ Freshness windows in days. Defaults: P1 14, P2 7, P3 30, P4 90, P5 60, P6 60, P7
 
 Two more conditions sit on top of the bar:
 
-- **A top-20-only pass is fragile.** If P3 or P4 passes *only* on its top-20 path, and P2 is not itself being skipped, this run's Keepa refresh re-ranks `bsr_current`. A single ASIN moving is then enough to fail the P5 gate, with no P3/P4 run left to fill the gap. So such a phase becomes a `top-up`, not a `reuse`. This is the live ashwagandha case: P3 29/131, top-20 15/20.
+- **A top-20-only pass is fragile.** If P3 or P4 passes *only* on its top-20 path, and P2 is not itself being skipped, the top-20 set can change under it within this run. Not through `bsr_current`: only P1 writes `products.bsr_current` (P2 writes `dovive_research.bsr` and `dovive_keepa.bsr_current`), and the plan is rebuilt after P1. Through the competitor selection: `migrate-keepa-to-dash.js` re-runs it on every P2, and with a selection active the top-20 is taken in `selection_rank` order. A single ASIN moving is then enough to fail the P5 gate, with no P3/P4 run left to fill the gap. So such a phase becomes a `top-up`, not a `reuse`. (`plan-scope.js` still words the reason as "P2 Keepa refresh re-ranks".) This is the live ashwagandha case: P3 29/131, top-20 15/20.
 - **The freshness floors in `DEFAULT_RULES` still apply** (P3 50% of the top 40 with 80% of the top 10, and so on). They are an extra condition on the candidate set. They never replace the bar.
 
 **Freshness comes only from the raw rows.** That means `dovive_research.scraped_at`, `dovive_keepa.parsed_at`, `dovive_reviews.scraped_at`, `dovive_ocr.processed_at`, `dovive_phase5_research.researched_at`, the phases' own `analyzed_at` / `generated_at` stamps, and, for P9 only, the brief row's `created_at` (P9 re-inserts the row). It never comes from `products.*_updated_at` or `formula_briefs.updated_at`: migrate scripts stamp those with `now()` even when they sync a sibling's old rows. A missing timestamp counts as unknown, and unknown counts as stale.

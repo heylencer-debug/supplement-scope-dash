@@ -23,20 +23,24 @@ const { createClient } = require('@supabase/supabase-js');
 const { resolveCategory } = require('./utils/category-resolver');
 const { withUsageTracking, recordAiUsage } = require('./utils/ai-usage');
 // P3b (2026-09-26): evidence-counted review themes over ALL collected reviews,
-// preferred over the random 60+60 sample when a synthesis row exists.
-const { fetchCategorySynthesis } = require('./utils/review-synthesis-store');
+// preferred over the random 60+60 sample when a synthesis row exists
+// (read through the evidence layer — utils/review-synthesis-store.js).
 const { briefReviewInput } = require('./utils/review-synthesis');
 // P5b (2026-09-27): counted, source-labelled web claims (independent vs
-// brand-owned vs affiliate). Added to the prompt only when a row exists.
-const { loadWebEvidence } = require('./utils/web-research-store');
+// brand-owned vs affiliate). Added to the prompt only when a row exists
+// (utils/web-research-store.js, through the evidence layer).
 // P7b (2026-09-27): what competitors actually SHOW on their gallery / A+ images,
 // counted, plus claimed-vs-experienced against the P3b themes. No row → the
-// prompt is byte-identical to before.
-const { fetchCategoryMarketingAssets } = require('./utils/marketing-assets-store');
+// prompt is byte-identical to before (utils/marketing-assets-store.js, through
+// the evidence layer).
 const { formatMarketingAssetsForPrompt } = require('./utils/marketing-assets');
-// Read side of this phase's own output (skip check) — shared with P9/P10.
-const { fetchMarketIntel } = require('./utils/market-intel-store');
-const { P7_PRODUCT_COLUMNS, buildDosageTable } = require('./utils/formula-inputs');
+// Read side of this phase's own output (skip check) — shared with P9/P10
+// (utils/market-intel-store.js, through the evidence layer: EV.marketIntel).
+const { buildDosageTable } = require('./utils/formula-inputs');
+const { createEvidenceSource } = require('./utils/evidence-source');
+const {
+  p7Products, p7CategorySynthesis, p7CategoryAsins, p7RawReviews, p7WebEvidence, p7MarketingAssets,
+} = require('./utils/formula-reads');
 const fs = require('fs');
 const path = require('path');
 
@@ -47,6 +51,10 @@ const DASH = createClient(
   process.env.DASH_URL || process.env.SUPABASE_URL,
   process.env.DASH_KEY || process.env.SUPABASE_KEY
 );
+// dovive_reviews client (raw-review fallback + the synthesis staleness guard).
+const DOVIVE = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+// Evidence reads (SCOUT_EVIDENCE_SOURCE: 'scout' default | 'rnd'); writes stay on DASH.
+const EV = createEvidenceSource({ dash: DASH, dovive: DOVIVE });
 
 const KEYWORD = process.argv.includes('--keyword')
   ? process.argv[process.argv.indexOf('--keyword') + 1]
@@ -129,13 +137,10 @@ async function callGrok(prompt, maxTokens = 64000) {
 
 // ─── Fetch raw reviews for richer consumer signal ─────────────────────────────
 async function fetchRawReviews(categoryId) {
-  const { data: prods } = await DASH.from('products').select('asin').eq('category_id', categoryId).limit(500);
+  const { data: prods } = await p7CategoryAsins(EV, categoryId);
   if (!prods?.length) return { positive: [], critical: [] };
   const asins = prods.map(p => p.asin);
-  const DOVIVE_SB = require('@supabase/supabase-js').createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
-  const { data: reviews } = await DOVIVE_SB.from('dovive_reviews')
-    .select('asin, rating, title, body').in('asin', asins.slice(0, 400))
-    .not('body', 'is', null).limit(3000);
+  const { data: reviews } = await p7RawReviews(EV, asins);
   if (!reviews?.length) return { positive: [], critical: [] };
   const positive = reviews.filter(r => r.rating >= 4).sort(() => Math.random() - 0.5).slice(0, 80);
   const critical = reviews.filter(r => r.rating <= 2).sort(() => Math.random() - 0.5).slice(0, 80);
@@ -517,7 +522,7 @@ async function run() {
   // (Used to filter on formula_briefs.brief_type, a column that does not
   // exist, so the query errored and this never skipped.)
   if (!FORCE) {
-    const existing = await fetchMarketIntel(DASH, CAT_ID);
+    const existing = await EV.marketIntel(CAT_ID);
     if (existing) {
       console.log(`✅ Market intelligence already exists (${existing.generated_at || 'no timestamp'}). Use --force to regenerate.`);
       process.exit(0);
@@ -526,10 +531,8 @@ async function run() {
 
   // Fetch all products with all enriched data
   console.log(`Fetching all products...`);
-  const { data: products, error } = await DASH.from('products')
-    .select(P7_PRODUCT_COLUMNS) // includes all_nutrients for the dosage table
-    .eq('category_id', CAT_ID)
-    .order('bsr_current', { ascending: true, nullsFirst: false });
+  // P7_PRODUCT_COLUMNS (utils/formula-inputs.js) includes all_nutrients for the dosage table
+  const { data: products, error } = await p7Products(EV, CAT_ID);
   if (error) throw error;
   console.log(`  ${products.length} products loaded\n`);
 
@@ -544,11 +547,11 @@ async function run() {
 
   // Fetch raw reviews for real consumer-voice grounding
   // P3b synthesis first; the random sample is fetched only when it is missing.
-  const reviewSynthesis = await fetchCategorySynthesis(DASH, {
+  const reviewSynthesis = await p7CategorySynthesis(EV, {
     keyword: KEYWORD,
     categoryId: CAT_ID,
     // dovive_reviews client, so a synthesis older than the latest scrape is ignored
-    reviewsClient: createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY),
+    reviewsClient: DOVIVE,
   });
   const reviewInput = briefReviewInput(reviewSynthesis, null);
   let rawReviews = { positive: [], critical: [] };
@@ -561,9 +564,9 @@ async function run() {
   }
 
   // P5b web evidence (fail-open: no row → '' → the prompt is unchanged)
-  const webEvidence = await loadWebEvidence(DASH, { keyword: KEYWORD, categoryId: CAT_ID });
+  const webEvidence = await p7WebEvidence(EV, { keyword: KEYWORD, categoryId: CAT_ID });
   // P7b marketing assets (fail-open: no row → '' → prompt unchanged)
-  const marketingAssets = await fetchCategoryMarketingAssets(DASH, { keyword: KEYWORD, categoryId: CAT_ID });
+  const marketingAssets = await p7MarketingAssets(EV, { keyword: KEYWORD, categoryId: CAT_ID });
   const marketingAssetsText = formatMarketingAssetsForPrompt(marketingAssets);
   if (marketingAssetsText) console.log(`Using P7b marketing assets: ${marketingAssets.rollup.products_analyzed} products read by vision (${marketingAssets.status})\n`);
 

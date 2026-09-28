@@ -15,6 +15,8 @@
 
 'use strict';
 
+const { P7_PRODUCT_COLUMNS } = require('./formula-inputs');
+
 // ── P6 — Product Intelligence (phase6-product-intelligence.js) ─────────────
 
 const P6_PRODUCT_COLUMNS = `id, asin, brand, title, bsr_current, bsr_30_days_avg, bsr_90_days_avg,
@@ -41,6 +43,43 @@ function p6ProductSyntheses(ev, { keyword, asins, reviewsClient }) {
   return ev.reviewThemes({ scope: 'product', keyword, asins, reviewsClient });
 }
 
+// ── P7 — Market Intelligence (phase6-market-analysis.js) ───────────────────
+
+/** Every product in the category with P7_PRODUCT_COLUMNS, BSR asc (nulls last). Not selection-scoped. */
+function p7Products(ev, categoryId) {
+  return ev.products(categoryId, P7_PRODUCT_COLUMNS, {
+    ops: [['order', 'bsr_current', { ascending: true, nullsFirst: false }]],
+  });
+}
+
+/** P3b category synthesis (keyword, then category id), staleness-checked against `reviewsClient`. */
+function p7CategorySynthesis(ev, { keyword, categoryId, reviewsClient }) {
+  return ev.reviewThemes({ scope: 'category', keyword, categoryId, reviewsClient });
+}
+
+/** Raw-review fallback, step 1: up to 500 category ASINs. */
+function p7CategoryAsins(ev, categoryId) {
+  return ev.products(categoryId, 'asin', { ops: [['limit', 500]] });
+}
+
+/** Raw-review fallback, step 2: reviews with a body for the first 400 ASINs, ≤3000 (Scout dovive_reviews). */
+function p7RawReviews(ev, asins) {
+  return ev.rawReviews(asins.slice(0, 400), 'asin, rating, title, body', {
+    ops: [['not', 'body', 'is', null], ['limit', 3000]],
+  });
+}
+
+/** P5b web claims → { row, text }. */
+function p7WebEvidence(ev, { keyword, categoryId }) {
+  return ev.webClaims({ keyword, categoryId });
+}
+
+/** P7b marketing-asset category row, or null. */
+function p7MarketingAssets(ev, { keyword, categoryId }) {
+  return ev.creativeVerdicts({ keyword, categoryId });
+}
+
 module.exports = {
   P6_PRODUCT_COLUMNS, p6Products, p6RawReviews, p6ProductSyntheses,
+  p7Products, p7CategorySynthesis, p7CategoryAsins, p7RawReviews, p7WebEvidence, p7MarketingAssets,
 };

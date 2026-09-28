@@ -73,3 +73,67 @@ test('P6 phase file reads through the evidence layer; its merge-write base is th
   assert.match(s, /EV\.productWriteBase\(/);
   assert.match(s, /DASH\.from\('products'\)\.update\(/, 'the write stays on Scout');
 });
+
+// ── P7 ──────────────────────────────────────────────────────────────────────
+
+test('P7 reads: scout chain identical to the pre-layer phase, rnd on the views', async () => {
+  const { P7_PRODUCT_COLUMNS } = require('../utils/formula-inputs');
+  const x = backends();
+  await FR.p7Products(x.scout, CAT);
+  await FR.p7CategoryAsins(x.scout, CAT);
+  await FR.p7CategorySynthesis(x.scout, { keyword: 'kw', categoryId: CAT, reviewsClient: null });
+  await FR.p7WebEvidence(x.scout, { keyword: 'kw', categoryId: CAT });
+  await FR.p7MarketingAssets(x.scout, { keyword: 'kw', categoryId: CAT });
+  await x.scout.marketIntel(CAT);
+  const asins = Array.from({ length: 450 }, (_, i) => `A${i}`);
+  await FR.p7RawReviews(x.scout, asins);
+  // phase6-market-analysis.js before the layer: products :529-537, fetchRawReviews :131-138,
+  // synthesis :547 (store), web :570 (store), assets :572 (store), skip check :520 (store)
+  assert.deepEqual(x.dash.queries, [
+    { table: 'products', calls: [['select', P7_PRODUCT_COLUMNS], ['eq', 'category_id', CAT], ['order', 'bsr_current', { ascending: true, nullsFirst: false }]] },
+    { table: 'products', calls: [['select', 'asin'], ['eq', 'category_id', CAT], ['limit', 500]] },
+    { table: 'dovive_review_synthesis', calls: [
+      ['select', 'keyword, category_id, scope, asin, ledger, themes, domain_breakdown, generated_at, model, prompt_version, status'],
+      ['eq', 'scope', 'category'], ['eq', 'keyword', 'kw'], ['order', 'generated_at', { ascending: false }], ['limit', 1],
+    ] },
+    { table: 'dovive_web_research', calls: [
+      ['select', 'keyword, category_id, status, ledger, rollup, verification, model, generated_at'],
+      ['eq', 'keyword', 'kw'], ['order', 'generated_at', { ascending: false }], ['limit', 1],
+    ] },
+    { table: 'dovive_web_research', calls: [
+      ['select', 'keyword, category_id, status, ledger, rollup, verification, model, generated_at'],
+      ['eq', 'category_id', CAT], ['order', 'generated_at', { ascending: false }], ['limit', 1],
+    ] },
+    { table: 'dovive_marketing_assets', calls: [
+      ['select', 'keyword, category_id, scope, ledger, rollup, experienced_vs_claimed, status, model, prompt_version, generated_at'],
+      ['eq', 'scope', 'category'], ['eq', 'keyword', 'kw'], ['order', 'generated_at', { ascending: false }], ['limit', 1],
+    ] },
+    { table: 'dovive_marketing_assets', calls: [
+      ['select', 'keyword, category_id, scope, ledger, rollup, experienced_vs_claimed, status, model, prompt_version, generated_at'],
+      ['eq', 'scope', 'category'], ['eq', 'category_id', CAT], ['order', 'generated_at', { ascending: false }], ['limit', 1],
+    ] },
+    { table: 'formula_briefs', calls: [['select', 'id, ingredients, created_at'], ['eq', 'category_id', CAT], ['order', 'created_at', { ascending: false }], ['limit', 1]] },
+  ]);
+  assert.deepEqual(x.dovive.queries, [{ table: 'dovive_reviews', calls: [
+    ['select', 'asin, rating, title, body'], ['in', 'asin', asins.slice(0, 400)], ['not', 'body', 'is', null], ['limit', 3000],
+  ] }]);
+
+  await FR.p7Products(x.rndEv, CAT);
+  await FR.p7CategorySynthesis(x.rndEv, { keyword: 'kw', categoryId: CAT });
+  await FR.p7WebEvidence(x.rndEv, { keyword: 'kw', categoryId: CAT });
+  await FR.p7MarketingAssets(x.rndEv, { keyword: 'kw', categoryId: CAT });
+  await x.rndEv.marketIntel(CAT);
+  assert.deepEqual([...new Set(x.rnd.tables())], ['v_formula_products', 'v_formula_review_themes', 'v_formula_claims', 'v_formula_creative', 'v_formula_brief_current']);
+  assert.deepEqual(x.rnd.queries[0].calls.slice(1), x.dash.queries[0].calls.slice(1));
+});
+
+test('P7 phase file reads through the evidence layer; the formula_briefs patch stays on Scout', () => {
+  const f = 'phase6-market-analysis.js';
+  const s = src(f);
+  assert.deepEqual(directReads(f, ['products', 'dovive_reviews', 'dovive_review_synthesis', 'dovive_web_research', 'dovive_marketing_assets']), []);
+  assert.doesNotMatch(s, /fetchCategorySynthesis\(|loadWebEvidence\(|fetchCategoryMarketingAssets\(|fetchMarketIntel\(/);
+  assert.match(s, /const EV = createEvidenceSource\(\{ dash: DASH, dovive: DOVIVE \}\)/);
+  assert.match(s, /EV\.marketIntel\(CAT_ID\)/);
+  assert.match(s, /DASH\.from\('formula_briefs'\)\s*\.select\('id, ingredients'\)/, 'patch read-merge-write stays on Scout');
+  assert.match(s, /DASH\.from\('formula_briefs'\)\.update\(/);
+});

@@ -44,8 +44,11 @@ test('P7: buildDosageTable accepts the ingredient/quantity spelling and skips em
 });
 
 test('P7 selects through P7_PRODUCT_COLUMNS', () => {
+  // The read moved to utils/formula-reads.js (evidence layer); it still selects P7_PRODUCT_COLUMNS.
   const src = fs.readFileSync(path.join(__dirname, '..', 'phase6-market-analysis.js'), 'utf8');
-  assert.match(src, /\.select\(P7_PRODUCT_COLUMNS\)/);
+  const reads = fs.readFileSync(path.join(__dirname, '..', 'utils', 'formula-reads.js'), 'utf8');
+  assert.match(src, /p7Products\(EV, CAT_ID\)/);
+  assert.match(reads, /ev\.products\(categoryId, P7_PRODUCT_COLUMNS,/);
   assert.doesNotMatch(src, /function buildDosageTable/);
 });
 

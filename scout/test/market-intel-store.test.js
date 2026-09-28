@@ -68,6 +68,7 @@ test('P7 skip check, P9 and P10 no longer query the missing table / columns', ()
     const src = fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
     assert.doesNotMatch(src, /from\(\s*['"]market_intelligence['"]\s*\)/, `${f} reads a market_intelligence table`);
     assert.doesNotMatch(src, /\.eq\(\s*['"]brief_type['"]/, `${f} filters on formula_briefs.brief_type`);
-    assert.match(src, /fetchMarketIntel\(DASH, /, `${f} does not read P7's report through the store`);
+    // through the store directly, or through the evidence layer (EV.marketIntel → fetchMarketIntel)
+    assert.match(src, /fetchMarketIntel\(DASH, |EV\.marketIntel\(/, `${f} does not read P7's report through the store`);
   }
 });

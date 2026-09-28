@@ -314,3 +314,67 @@ test('P5b main wires the evidence source and its selection; the web-research pre
   assert.match(s, /dash\.from\(TABLE\)\s*\.select\('keyword, status, generated_at, ledger, sources, search_runs, model'\)/);
   assert.match(s, /dash\.from\(TABLE\)\.upsert\(/);
 });
+
+// ── P5 ──────────────────────────────────────────────────────────────────────
+
+test('P5 pool reads: scout chains identical to the old productsQuery() pattern, rnd on the view', async () => {
+  const x = backends();
+  const sel = { active: true, why: '2', ranks: new Map([['B1', 1]]) };
+  await FR.p5Established(x.scout, CAT, sel, 5);
+  await FR.p5BestBsr(x.scout, CAT, sel, 7);
+  await FR.p5Emerging(x.scout, CAT, sel, 3);
+  await FR.p5Emerging(x.scout, CAT, null, 43);
+  await FR.p5LowReviewEarners(x.scout, CAT, { active: false }, 4);
+  const S = ['select', FR.P5_PRODUCT_SELECT];
+  const C = ['eq', 'category_id', CAT];
+  const SEL = [['eq', 'selected', true], ['order', 'selection_rank', { ascending: true }]];
+  const NN = ['not', 'bsr_current', 'is', null];
+  const BSR = ['order', 'bsr_current', { ascending: true }];
+  // phase5-deep-research.js before the layer (:872-935)
+  assert.deepEqual(x.dash.callsOn('products'), [
+    [S, C, ...SEL, ['eq', 'cohort', 'established'], NN, BSR, ['limit', 5]],
+    [S, C, ...SEL, NN, BSR, ['limit', 7]],
+    [S, C, ...SEL, ['eq', 'cohort', 'emerging'], NN, BSR, ['limit', 3]],
+    [S, C, ['eq', 'cohort', 'emerging'], NN, BSR, ['limit', 43]],
+    [S, C, NN, ['lt', 'rating_count', 500], ['gt', 'monthly_revenue', 0], BSR, ['limit', 4]],
+  ]);
+  assert.match(FR.P5_PRODUCT_SELECT, /other_ingredients,[\s\S]*review_analysis, cohort$/);
+  await FR.p5Established(x.rndEv, CAT, sel, 5);
+  assert.deepEqual(x.rnd.queries, [{ table: 'v_formula_products', calls: x.dash.callsOn('products')[0] }]);
+});
+
+test('P5 grounding reads: the four dovive_* chains under scout (legacy OCR retry in the layer), views + Scout reviews under rnd', async () => {
+  const x = backends();
+  await FR.p5Listing(x.scout, 'B1', 'kw #4', CAT);
+  await FR.p5LabelPanels(x.scout, 'B1', CAT);
+  await FR.p5Reviews(x.scout, 'B1');
+  await FR.p5Keepa(x.scout, 'B1');
+  // phase5-deep-research.js before the layer (:192-202)
+  assert.deepEqual(x.dovive.queries, [
+    { table: 'dovive_research', calls: [['select', 'title, brand, description, bullet_points, price, rating, review_count, bsr'], ['eq', 'asin', 'B1'], ['ilike', 'keyword', 'kw #4'], ['limit', 1], ['maybeSingle']] },
+    { table: 'dovive_ocr', calls: [['select', 'supplement_facts, other_ingredients, health_claims, certifications, label_product_match'], ['eq', 'asin', 'B1'], ['order', 'image_index', { ascending: true }], ['limit', 8]] },
+    { table: 'dovive_reviews', calls: [['select', 'rating, title, body, verified_purchase, helpful_votes'], ['eq', 'asin', 'B1'], ['order', 'helpful_votes', { ascending: false }], ['limit', 40]] },
+    { table: 'dovive_keepa', calls: [['select', 'price_usd, bsr_current, bsr_drops_30d, bsr_drops_90d, bsr_history_30d'], ['eq', 'asin', 'B1'], ['limit', 1], ['maybeSingle']] },
+  ]);
+  assert.equal(x.dash.queries.length, 0);
+
+  const y = backends(() => ({ data: [], error: null }));
+  await FR.p5Listing(y.rndEv, 'B1', 'kw #4', CAT);
+  await FR.p5LabelPanels(y.rndEv, 'B1', CAT);
+  await FR.p5Reviews(y.rndEv, 'B1');
+  await FR.p5Keepa(y.rndEv, 'B1');
+  assert.deepEqual(y.rnd.tables(), ['v_formula_roster', 'v_formula_listing', 'v_formula_label_facts', 'v_formula_listing', 'v_formula_keepa']);
+  assert.deepEqual(y.dovive.tables(), ['dovive_reviews']);
+});
+
+test('P5 phase file reads through the evidence layer; skip check and writes stay on Scout', () => {
+  const s = src('phase5-deep-research.js');
+  assert.deepEqual(directReads('phase5-deep-research.js', ['dovive_research', 'dovive_ocr', 'dovive_reviews', 'dovive_keepa']), []);
+  assert.doesNotMatch(s, /DASH\.from\('products'\)\s*\.select\(PRODUCT_SELECT\)|productsQuery\(\)/);
+  assert.match(s, /const EV = createEvidenceSource\(\{ dash: DASH, dovive: DOVIVE \}\)/);
+  assert.match(s, /EV\.selection\(categoryId\)/);
+  assert.match(s, /fetchGroundingData\(product\.asin, KEYWORD, categoryId\)/);
+  assert.match(s, /\.filter\(\(r\) => !\(r\.label_product_match && r\.label_product_match\.verdict === 'mismatch'\)\)/, 'mismatch filter kept');
+  assert.match(s, /DOVIVE\.from\('dovive_phase5_research'\)\s*\.select\('asin, pool, researched_by'\)/, 'already-researched check stays on Scout');
+  assert.match(s, /DASH\.from\('products'\)\s*\.select\('marketing_analysis'\)/, 'mirror merge-read stays on Scout');
+});

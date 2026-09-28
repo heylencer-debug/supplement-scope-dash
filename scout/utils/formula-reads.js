@@ -17,6 +17,59 @@
 
 const { P7_PRODUCT_COLUMNS } = require('./formula-inputs');
 
+// ── P5 — Deep Research (phase5-deep-research.js) ──────────────────────────
+
+const P5_PRODUCT_SELECT = `asin, brand, title, bsr_current, price, monthly_revenue, monthly_sales,
+             rating_value, rating_count, supplement_facts_raw, other_ingredients,
+             claims_on_label, feature_bullets_text, marketing_analysis, review_analysis, cohort`;
+
+const BSR_ASC = ['order', 'bsr_current', { ascending: true }];
+const HAS_BSR = ['not', 'bsr_current', 'is', null];
+
+/** Pool A: established cohort, best BSR first. `selection` scopes it when active. */
+function p5Established(ev, categoryId, selection, n) {
+  return ev.products(categoryId, P5_PRODUCT_SELECT, { selection, ops: [['eq', 'cohort', 'established'], HAS_BSR, BSR_ASC, ['limit', n]] });
+}
+
+/** Pool A fallback fill: best BSR overall. */
+function p5BestBsr(ev, categoryId, selection, n) {
+  return ev.products(categoryId, P5_PRODUCT_SELECT, { selection, ops: [HAS_BSR, BSR_ASC, ['limit', n]] });
+}
+
+/** Pool B: emerging cohort, best BSR first. `selection` null = outside the selection (P5's top-up). */
+function p5Emerging(ev, categoryId, selection, n) {
+  return ev.products(categoryId, P5_PRODUCT_SELECT, { selection, ops: [['eq', 'cohort', 'emerging'], HAS_BSR, BSR_ASC, ['limit', n]] });
+}
+
+/** Pool B fallback fill: <500 reviews with real revenue. */
+function p5LowReviewEarners(ev, categoryId, selection, n) {
+  return ev.products(categoryId, P5_PRODUCT_SELECT, {
+    selection, ops: [HAS_BSR, ['lt', 'rating_count', 500], ['gt', 'monthly_revenue', 0], BSR_ASC, ['limit', n]],
+  });
+}
+
+/** Grounding: the listing (dovive_research shape) for the exact session keyword. */
+function p5Listing(ev, asin, keyword, categoryId) {
+  return ev.listingClaims(asin, { keyword, categoryId });
+}
+
+/** Grounding: label panels (≤8, image order; pre-013 retry inside the layer). */
+function p5LabelPanels(ev, asin, categoryId) {
+  return ev.labelPanels(asin, { categoryId });
+}
+
+/** Grounding: top 40 reviews by helpfulness (Scout dovive_reviews in both backends). */
+function p5Reviews(ev, asin) {
+  return ev.rawReviews(asin, 'rating, title, body, verified_purchase, helpful_votes', {
+    ops: [['order', 'helpful_votes', { ascending: false }], ['limit', 40]],
+  });
+}
+
+/** Grounding: Keepa price/BSR row. */
+function p5Keepa(ev, asin) {
+  return ev.marketSignals(asin);
+}
+
 // ── P6 — Product Intelligence (phase6-product-intelligence.js) ─────────────
 
 const P6_PRODUCT_COLUMNS = `id, asin, brand, title, bsr_current, bsr_30_days_avg, bsr_90_days_avg,
@@ -152,6 +205,8 @@ function p13BriefWriteBase(ev, categoryId, row) {
 }
 
 module.exports = {
+  P5_PRODUCT_SELECT, p5Established, p5BestBsr, p5Emerging, p5LowReviewEarners,
+  p5Listing, p5LabelPanels, p5Reviews, p5Keepa,
   P6_PRODUCT_COLUMNS, p6Products, p6RawReviews, p6ProductSyntheses,
   p7Products, p7CategorySynthesis, p7CategoryAsins, p7RawReviews, p7WebEvidence, p7MarketingAssets,
   p8Products,

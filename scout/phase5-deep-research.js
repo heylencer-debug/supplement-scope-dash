@@ -61,12 +61,20 @@ require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const { withUsageTracking, recordAiUsage } = require('./utils/ai-usage');
 const { resolveCategory } = require('./utils/category-resolver');
-const { loadSelection, scopeToSelection } = require('./utils/selected-competitors');
+const { createEvidenceSource } = require('./utils/evidence-source');
+const {
+  p5Established, p5BestBsr, p5Emerging, p5LowReviewEarners,
+  p5Listing, p5LabelPanels, p5Reviews, p5Keepa,
+} = require('./utils/formula-reads');
 const { launchBrowserContext, launchBrowserAPIOnly } = require('./utils/bright-data-browser');
 const { researchBrand: perplexityResearchBrand, getPerplexityKey } = require('./utils/perplexity');
 
 const DASH   = createClient(process.env.DASH_URL || process.env.SUPABASE_URL, process.env.DASH_KEY || process.env.SUPABASE_KEY);
 const DOVIVE = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+// Evidence reads (SCOUT_EVIDENCE_SOURCE: 'scout' default | 'rnd'). The
+// already-researched check, the dovive_phase5_research / dovive_p5_sources
+// writes and the products.marketing_analysis mirror stay on Scout.
+const EV = createEvidenceSource({ dash: DASH, dovive: DOVIVE });
 
 // 2026-09-01: set once resolved in run() below (same pattern as phase6-
 // product-intelligence.js/phase6-market-analysis.js's `_categoryId`) so
@@ -181,7 +189,11 @@ async function runPool(items, concurrency, worker) {
 
 // ─── Grounding: pull REAL data already in Supabase for this ASIN ──────────────
 
-async function fetchGroundingData(asin, keyword) {
+async function fetchGroundingData(asin, keyword, categoryId = null) {
+  // Reads through the evidence layer (utils/formula-reads.js → evidence-source).
+  // Under 'scout' these are the same four dovive_* reads as before; under
+  // 'rnd' the listing / label / Keepa come from the RnD views (one row per
+  // ASIN, scoped to categoryId) and reviews stay on Scout.
   const [researchRes, ocrRes, reviewsRes, keepaRes] = await Promise.all([
     // Session-isolation fix (2026-09-01): exact match on the full session
     // label, not a first-word substring — the substring version could pull
@@ -189,19 +201,12 @@ async function fetchGroundingData(asin, keyword) {
     // run's grounding prompt (data-mixing into AI-generated content, not
     // just a gate miscount). `keyword` here is always the full KEYWORD
     // (session label) — see the researchOneProduct() call site.
-    DOVIVE.from('dovive_research')
-      .select('title, brand, description, bullet_points, price, rating, review_count, bsr')
-      .eq('asin', asin).ilike('keyword', keyword).limit(1).maybeSingle(),
-    DOVIVE.from('dovive_ocr')
-      .select('supplement_facts, other_ingredients, health_claims, certifications, label_product_match')
-      .eq('asin', asin).order('image_index', { ascending: true }).limit(8),
-    DOVIVE.from('dovive_reviews')
-      .select('rating, title, body, verified_purchase, helpful_votes')
-      .eq('asin', asin).order('helpful_votes', { ascending: false }).limit(40),
-    DOVIVE.from('dovive_keepa')
-      .select('price_usd, bsr_current, bsr_drops_30d, bsr_drops_90d, bsr_history_30d')
-      .eq('asin', asin).limit(1).maybeSingle(),
-
+    p5Listing(EV, asin, keyword, categoryId),
+    // Migration 013: when the select with label_product_match errors (column
+    // absent), the layer retries the legacy select — same as before.
+    p5LabelPanels(EV, asin, categoryId),
+    p5Reviews(EV, asin),
+    p5Keepa(EV, asin),
   ]);
 
   const research = researchRes.data || null;
@@ -209,13 +214,7 @@ async function fetchGroundingData(asin, keyword) {
   // (label_product_match.verdict 'mismatch' — brand/flavour) must not ground
   // this ASIN's research. Before 013 the column is absent and the read is the
   // same as it always was.
-  let ocrData = ocrRes.data;
-  if (ocrRes.error) {
-    const legacy = await DOVIVE.from('dovive_ocr')
-      .select('supplement_facts, other_ingredients, health_claims, certifications')
-      .eq('asin', asin).order('image_index', { ascending: true }).limit(8);
-    ocrData = legacy.data;
-  }
+  const ocrData = ocrRes.data;
   const ocrRows  = (ocrData || []).filter((r) => !(r.label_product_match && r.label_product_match.verdict === 'mismatch'));
   const reviews  = reviewsRes.data || [];
   const keepa    = keepaRes.data || null;
@@ -859,33 +858,25 @@ function parseResearchOutput(rawText, product, pool, meta) {
 // established/emerging thresholds). This keeps P5 working exactly as
 // before on data that predates cohort tagging, while aligning with it going
 // forward.
-const PRODUCT_SELECT = `asin, brand, title, bsr_current, price, monthly_revenue, monthly_sales,
-             rating_value, rating_count, supplement_facts_raw, other_ingredients,
-             claims_on_label, feature_bullets_text, marketing_analysis, review_analysis, cohort`;
+// (Columns: P5_PRODUCT_SELECT in utils/formula-reads.js.)
 
 async function getProducts(categoryId) {
   // Competitor selection (2026-09-26, migration 011): when populated, both
   // pools draw ONLY from the selected competitors, selection_rank first
   // (bsr_current stays the tie-break). Inactive → unchanged queries.
-  const selection = await loadSelection(DASH, categoryId);
+  const selection = await EV.selection(categoryId);
   console.log(selection.active ? `  Pools drawn from the competitor selection (${selection.why})` : `  Competitor selection inactive (${selection.why}) — pools by BSR`);
-  const productsQuery = () => scopeToSelection(DASH.from('products').select(PRODUCT_SELECT).eq('category_id', categoryId), selection);
+  // Reads: utils/formula-reads.js p5* (P5_PRODUCT_SELECT, selection-scoped
+  // when active) — the same chains the inline products queries issued.
 
   // Pool A — established cohort first, ordered by bsr_current
-  const { data: establishedRows } = await productsQuery()
-    .eq('cohort', 'established')
-    .not('bsr_current', 'is', null)
-    .order('bsr_current', { ascending: true })
-    .limit(P5_TOP_COUNT);
+  const { data: establishedRows } = await p5Established(EV, categoryId, selection, P5_TOP_COUNT);
 
   let top10 = establishedRows || [];
   if (top10.length < P5_TOP_COUNT) {
     // Fallback fill — old "best BSR overall" heuristic, excluding anything
     // already selected above.
-    const { data: fallback } = await productsQuery()
-      .not('bsr_current', 'is', null)
-      .order('bsr_current', { ascending: true })
-      .limit(P5_TOP_COUNT + top10.length);
+    const { data: fallback } = await p5BestBsr(EV, categoryId, selection, P5_TOP_COUNT + top10.length);
     const haveAsins = new Set(top10.map((p) => p.asin));
     for (const p of fallback || []) {
       if (top10.length >= P5_TOP_COUNT) break;
@@ -894,11 +885,7 @@ async function getProducts(categoryId) {
   }
 
   // Pool B — emerging cohort first, ordered by bsr_current
-  const { data: emergingRows } = await productsQuery()
-    .eq('cohort', 'emerging')
-    .not('bsr_current', 'is', null)
-    .order('bsr_current', { ascending: true })
-    .limit(P5_NEW_COUNT);
+  const { data: emergingRows } = await p5Emerging(EV, categoryId, selection, P5_NEW_COUNT);
 
   let newBrands = emergingRows || [];
   // The selection favours established sellers, so it can hold too few
@@ -906,13 +893,7 @@ async function getProducts(categoryId) {
   // category's emerging products OUTSIDE the selection before falling back
   // to the heuristic below — and say so.
   if (selection.active && newBrands.length < P5_NEW_COUNT) {
-    const { data: outside } = await DASH.from('products')
-      .select(PRODUCT_SELECT)
-      .eq('category_id', categoryId)
-      .eq('cohort', 'emerging')
-      .not('bsr_current', 'is', null)
-      .order('bsr_current', { ascending: true })
-      .limit(P5_NEW_COUNT + 40);
+    const { data: outside } = await p5Emerging(EV, categoryId, null, P5_NEW_COUNT + 40);
     const have = new Set([...newBrands, ...top10].map((p) => p.asin));
     const before = newBrands.length;
     for (const p of outside || []) {
@@ -925,12 +906,7 @@ async function getProducts(categoryId) {
     // Fallback fill — old "<500 reviews + real revenue" heuristic, excluding
     // anything already in Pool A or already selected above.
     const top10Asins = new Set(top10.map((p) => p.asin));
-    const { data: fallback } = await productsQuery()
-      .not('bsr_current', 'is', null)
-      .lt('rating_count', 500)
-      .gt('monthly_revenue', 0)
-      .order('bsr_current', { ascending: true })
-      .limit(P5_NEW_COUNT + newBrands.length);
+    const { data: fallback } = await p5LowReviewEarners(EV, categoryId, selection, P5_NEW_COUNT + newBrands.length);
     const haveAsins = new Set(newBrands.map((p) => p.asin));
     for (const p of fallback || []) {
       if (newBrands.length >= P5_NEW_COUNT) break;
@@ -1054,7 +1030,7 @@ async function saveToDashProduct(asin, research, categoryId) {
 // ─── Per-product pipeline: ground → scrape → summarize → save ─────────────────
 
 async function researchOneProduct({ product, rank, pool }, browserContext, categoryId) {
-  const grounding = await fetchGroundingData(product.asin, KEYWORD);
+  const grounding = await fetchGroundingData(product.asin, KEYWORD, categoryId);
   const groundingText = formatGroundingForPrompt(grounding);
 
   const scraped = await findAndScrapeSource(browserContext, product, SEARCH_KEYWORD);

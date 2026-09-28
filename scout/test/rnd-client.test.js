@@ -61,3 +61,23 @@ test('the RnD client can only read: no insert/update/upsert/delete/rpc', () => {
   assert.deepEqual(Object.keys(qb), ['select']);
   assert.deepEqual(Object.keys(readOnly({ from: () => ({}) })).sort(), ['from', 'readOnly']);
 });
+
+test('a malformed RND_SUPABASE_URL is a reason, and createRndClient returns null instead of throwing', () => {
+  const bad = { RND_SUPABASE_URL: 'rnd.example.supabase.co', RND_SUPABASE_ANON_KEY: 'k' };
+  assert.equal(rndClientReason(bad), 'RnD client unavailable: RND_SUPABASE_URL is not a valid http(s) URL');
+  assert.doesNotMatch(rndClientReason(bad), /rnd\.example/);
+  // the real supabase-js createClient throws on this URL; the RnD client must not
+  assert.doesNotThrow(() => createRndClient(bad));
+  assert.equal(createRndClient(bad), null);
+  // any other construction failure also yields null, never an exception
+  const boom = () => { throw new Error('Invalid supabaseUrl'); };
+  assert.equal(createRndClient(ENV, { createClient: boom }), null);
+});
+
+test('inventory / run-pipeline: a malformed RnD URL cannot fail READ-FIRST (client null, reason printed)', async () => {
+  const { fetchRndCoverage, formatRndCoverage } = require('../inventory');
+  const bad = { RND_SUPABASE_URL: 'not a url', RND_SUPABASE_ANON_KEY: 'k' };
+  const cov = await fetchRndCoverage(createRndClient(bad), ['B01'], { reason: rndClientReason(bad) });
+  assert.deepEqual(cov, { available: false, reason: 'RnD client unavailable: RND_SUPABASE_URL is not a valid http(s) URL' });
+  assert.match(formatRndCoverage(cov), /not checked — RnD client unavailable: RND_SUPABASE_URL is not a valid http\(s\) URL$/);
+});

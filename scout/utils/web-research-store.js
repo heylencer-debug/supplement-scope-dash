@@ -14,12 +14,13 @@ const { webEvidenceText } = require('./web-research');
 const TABLE = 'dovive_web_research';
 const COLS = 'keyword, category_id, status, ledger, rollup, verification, model, generated_at';
 
-async function fetchWebResearch(client, { keyword = null, categoryId = null } = {}) {
+/** `table` defaults to dovive_web_research; evidence-source passes 'v_formula_claims' for RnD. */
+async function fetchWebResearch(client, { keyword = null, categoryId = null, table = TABLE } = {}) {
   try {
     if (!client || (!keyword && !categoryId)) return null;
     for (const [col, val] of [['keyword', keyword], ['category_id', categoryId]]) {
       if (!val) continue;
-      const { data, error } = await client.from(TABLE).select(COLS).eq(col, val).order('generated_at', { ascending: false }).limit(1);
+      const { data, error } = await client.from(table).select(COLS).eq(col, val).order('generated_at', { ascending: false }).limit(1);
       if (!error && data && data.length && data[0].rollup) return data[0];
     }
     return null;

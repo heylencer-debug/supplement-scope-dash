@@ -22,7 +22,7 @@ const TABLE = 'formula_briefs';
 const KEY = 'market_intelligence';
 
 /** The P7 payload out of a formula_briefs.ingredients object, or null. */
-function extractMarketIntel(ingredients) {
+function extractMarketIntel(ingredients, { table = TABLE } = {}) {
   const mi = ingredients && typeof ingredients === 'object' ? ingredients[KEY] : null;
   if (!mi || typeof mi !== 'object') return null;
   const text = typeof mi.ai_market_analysis === 'string' ? mi.ai_market_analysis.trim() : '';
@@ -33,21 +33,25 @@ function extractMarketIntel(ingredients) {
     model: mi.grok_model || null,
     products_analyzed: mi.products_analyzed ?? null,
     review_coverage: mi.review_coverage ?? null,
-    source: `${TABLE}.ingredients.${KEY}`,
+    source: `${table}.ingredients.${KEY}`,
   };
 }
 
-/** Newest formula_briefs row for the category → its P7 report, or null. */
-async function fetchMarketIntel(client, categoryId) {
+/**
+ * Newest formula_briefs row for the category → its P7 report, or null.
+ * `table` defaults to Scout's formula_briefs; utils/evidence-source.js passes
+ * 'v_formula_brief_current' (same columns) for the RnD backend.
+ */
+async function fetchMarketIntel(client, categoryId, { table = TABLE } = {}) {
   try {
     if (!client || !categoryId) return null;
-    const { data, error } = await client.from(TABLE)
+    const { data, error } = await client.from(table)
       .select('id, ingredients, created_at')
       .eq('category_id', categoryId)
       .order('created_at', { ascending: false })
       .limit(1);
     if (error || !data || !data.length) return null;
-    return extractMarketIntel(data[0].ingredients);
+    return extractMarketIntel(data[0].ingredients, { table });
   } catch {
     return null;
   }

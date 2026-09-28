@@ -17,13 +17,16 @@ const INACTIVE = (why) => ({ active: false, why, ranks: new Map() });
 /**
  * @param {import('@supabase/supabase-js').SupabaseClient} client  DASH client (products lives there)
  * @param {string} categoryId
+ * @param {{ table?: string }} [opts]  table to read `asin, selection_rank, selected`
+ *   from — 'products' (Scout, default) or 'v_formula_roster' (RnD, through
+ *   utils/evidence-source.js). Same columns, same filters either way.
  * @returns {Promise<{ active: boolean, why: string, ranks: Map<string, number> }>}
  */
-async function loadSelection(client, categoryId) {
+async function loadSelection(client, categoryId, { table = 'products' } = {}) {
   if (!client || !categoryId) return INACTIVE('no category');
   try {
     const { data, error } = await client
-      .from('products')
+      .from(table)
       .select('asin, selection_rank')
       .eq('category_id', categoryId)
       .eq('selected', true)

@@ -13,14 +13,18 @@
 
 const TABLE = 'dovive_marketing_assets';
 
-/** Latest category-scope row for a keyword (or, failing that, a category id). */
-async function fetchCategoryMarketingAssets(client, { keyword = null, categoryId = null } = {}) {
+/**
+ * Latest category-scope row for a keyword (or, failing that, a category id).
+ * `table` defaults to dovive_marketing_assets; evidence-source passes
+ * 'v_formula_creative' (same columns) for the RnD backend.
+ */
+async function fetchCategoryMarketingAssets(client, { keyword = null, categoryId = null, table = TABLE } = {}) {
   try {
     if (!client || (!keyword && !categoryId)) return null;
     const cols = 'keyword, category_id, scope, ledger, rollup, experienced_vs_claimed, status, model, prompt_version, generated_at';
     for (const [col, val] of [['keyword', keyword], ['category_id', categoryId]]) {
       if (!val) continue;
-      const { data, error } = await client.from(TABLE).select(cols).eq('scope', 'category').eq(col, val)
+      const { data, error } = await client.from(table).select(cols).eq('scope', 'category').eq(col, val)
         .order('generated_at', { ascending: false }).limit(1);
       if (error || !data || !data.length) continue;
       const row = data[0];

@@ -44,11 +44,15 @@ async function isStale(reviewsClient, keyword, generatedAt, log, what) {
   return true;
 }
 
-/** Latest category-scope synthesis for a keyword (optionally a category id). */
-async function fetchCategorySynthesis(client, { keyword, categoryId = null, reviewsClient = null, log = console.log } = {}) {
+/**
+ * Latest category-scope synthesis for a keyword (optionally a category id).
+ * `table` defaults to dovive_review_synthesis; utils/evidence-source.js passes
+ * 'v_formula_review_themes' (same columns) for the RnD backend.
+ */
+async function fetchCategorySynthesis(client, { keyword, categoryId = null, reviewsClient = null, log = console.log, table = TABLE } = {}) {
   try {
     if (!client || (!keyword && !categoryId)) return null;
-    let q = client.from(TABLE)
+    let q = client.from(table)
       .select('keyword, category_id, scope, asin, ledger, themes, domain_breakdown, generated_at, model, prompt_version, status')
       .eq('scope', 'category');
     q = keyword ? q.eq('keyword', keyword) : q.eq('category_id', categoryId);
@@ -64,13 +68,13 @@ async function fetchCategorySynthesis(client, { keyword, categoryId = null, revi
 }
 
 /** Product-scope rows for a keyword, keyed by ASIN (all-or-nothing on staleness). */
-async function fetchProductSyntheses(client, { keyword, asins = null, reviewsClient = null, log = console.log } = {}) {
+async function fetchProductSyntheses(client, { keyword, asins = null, reviewsClient = null, log = console.log, table = TABLE } = {}) {
   let out = {};
   try {
     if (!client || !keyword) return out;
     const pageSize = 500;
     for (let page = 0; ; page++) {
-      let q = client.from(TABLE)
+      let q = client.from(table)
         .select('asin, ledger, themes, domain_breakdown, generated_at, model, prompt_version, status')
         .eq('scope', 'product')
         .eq('keyword', keyword);

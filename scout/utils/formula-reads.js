@@ -6,7 +6,7 @@
  * can not require it to watch its queries. The reads therefore live here, one
  * function per read the phase issues, and the phase calls them with its
  * evidence source. Each function carries the phase's ORIGINAL chain verbatim
- * (same select string, filters, order, limit) — test/evidence-phase-*.test.js
+ * (same select string, filters, order, limit) — test/formula-reads.test.js
  * assert the Scout backend issues exactly that, call for call.
  *
  * Only reads live here. Writes, and the reads a phase does right before a

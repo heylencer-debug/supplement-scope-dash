@@ -6,7 +6,7 @@
  *                      the phase already holds. Every function issues EXACTLY
  *                      the select the phase issued before this layer existed
  *                      (same table, columns, filters, order, limit) — see the
- *                      per-phase tests in test/evidence-phase-*.test.js.
+ *                      per-phase tests in test/formula-reads.test.js.
  *   'rnd'              The RnD evidence database's read-only views
  *                      (docs/FORMULA-INPUTS.md §5), through utils/rnd-client.js.
  *                      The views return Scout's own column names, so the

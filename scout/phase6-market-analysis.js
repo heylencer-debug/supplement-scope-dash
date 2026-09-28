@@ -36,6 +36,7 @@ const { fetchCategoryMarketingAssets } = require('./utils/marketing-assets-store
 const { formatMarketingAssetsForPrompt } = require('./utils/marketing-assets');
 // Read side of this phase's own output (skip check) — shared with P9/P10.
 const { fetchMarketIntel } = require('./utils/market-intel-store');
+const { P7_PRODUCT_COLUMNS, buildDosageTable } = require('./utils/formula-inputs');
 const fs = require('fs');
 const path = require('path');
 
@@ -141,16 +142,7 @@ async function fetchRawReviews(categoryId) {
   return { positive, critical };
 }
 
-function buildDosageTable(products) {
-  const rows = [];
-  for (const p of products.slice(0, 60)) {
-    const nutrients = p.all_nutrients;
-    if (!nutrients || !Array.isArray(nutrients) || !nutrients.length) continue;
-    const key = nutrients.slice(0, 15).map(n => `${n.name || n.ingredient || '?'}: ${n.amount || n.quantity || '?'}`).join(' | ');
-    rows.push(`${p.brand || '?'} (BSR ${p.bsr_current?.toLocaleString() || '?'}): ${key}`);
-  }
-  return rows.length ? rows.join('\n') : 'OCR dosage data not yet available';
-}
+// buildDosageTable lives in utils/formula-inputs.js next to P7_PRODUCT_COLUMNS.
 
 function buildIngredientWhiteSpace(products) {
   const total = products.length;
@@ -535,10 +527,7 @@ async function run() {
   // Fetch all products with all enriched data
   console.log(`Fetching all products...`);
   const { data: products, error } = await DASH.from('products')
-    .select(`asin, brand, title, bsr_current, bsr_30_days_avg, bsr_90_days_avg,
-             price, monthly_revenue, monthly_sales, rating_value, rating_count,
-             supplement_facts_raw, feature_bullets_text, claims_on_label,
-             review_analysis, marketing_analysis, serving_size, servings_per_container`)
+    .select(P7_PRODUCT_COLUMNS) // includes all_nutrients for the dosage table
     .eq('category_id', CAT_ID)
     .order('bsr_current', { ascending: true, nullsFirst: false });
   if (error) throw error;

@@ -25,7 +25,9 @@ const { createClient } = require('@supabase/supabase-js');
 const { resolveCategory } = require('./utils/category-resolver');
 const { withUsageTracking, recordAiUsage } = require('./utils/ai-usage');
 const { reportProgress } = require('./utils/job-heartbeat');
-const { loadSelection, applySelection } = require('./utils/selected-competitors');
+const { applySelection } = require('./utils/selected-competitors');
+const { createEvidenceSource } = require('./utils/evidence-source');
+const { p6Products, p6RawReviews, p6ProductSyntheses } = require('./utils/formula-reads');
 const fs = require('fs');
 const path = require('path');
 
@@ -41,9 +43,13 @@ const DASH = createClient(
 // pattern as phase5-deep-research.js/phase6-market-analysis.js.
 const DOVIVE = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
+// Evidence reads go through utils/evidence-source.js (SCOUT_EVIDENCE_SOURCE:
+// 'scout' default = these same tables; 'rnd' = the RnD views). Writes stay on DASH.
+const EV = createEvidenceSource({ dash: DASH, dovive: DOVIVE });
+
 // P3b (2026-09-26): per-product themes counted over ALL of a product's
-// collected reviews. Preferred over the 5+5 slice below when present.
-const { fetchProductSyntheses } = require('./utils/review-synthesis-store');
+// collected reviews. Preferred over the 5+5 slice below when present
+// (read through EV.reviewThemes — utils/review-synthesis-store.js).
 const { formatProductEvidenceForPrompt } = require('./utils/review-synthesis');
 
 // 2026-08-28 FIX (audit item #6): P6a scored products on catalog data alone —
@@ -53,11 +59,7 @@ const { formatProductEvidenceForPrompt } = require('./utils/review-synthesis');
 async function fetchReviewSentimentMap(asins) {
   if (!asins.length) return {};
   try {
-    const { data } = await DOVIVE.from('dovive_reviews')
-      .select('asin, rating, title, body, helpful_votes')
-      .in('asin', asins)
-      .order('helpful_votes', { ascending: false })
-      .limit(asins.length * 20);
+    const { data } = await p6RawReviews(EV, asins);
     const map = {};
     for (const asin of asins) map[asin] = { positive: [], critical: [] };
     for (const r of (data || [])) {
@@ -66,7 +68,7 @@ async function fetchReviewSentimentMap(asins) {
       if (r.rating >= 4 && bucket.positive.length < 5) bucket.positive.push(r);
       else if (r.rating <= 2 && bucket.critical.length < 5) bucket.critical.push(r);
     }
-    const synth = await fetchProductSyntheses(DASH, { keyword: KEYWORD, asins, reviewsClient: DOVIVE });
+    const synth = await p6ProductSyntheses(EV, { keyword: KEYWORD, asins, reviewsClient: DOVIVE });
     for (const asin of asins) if (synth[asin]) map[asin].synthesis = synth[asin];
     return map;
   } catch (e) {
@@ -540,14 +542,7 @@ async function run() {
   _categoryId = CAT_ID;
 
   // Fetch all products with all needed fields
-  const { data: products, error } = await DASH.from('products')
-    .select(`id, asin, brand, title, bsr_current, bsr_30_days_avg, bsr_90_days_avg,
-             price, monthly_revenue, monthly_sales, rating_value, rating_count,
-             serving_size, servings_per_container, supplement_facts_raw,
-             feature_bullets_text, claims_on_label, marketing_analysis`)
-    .eq('category_id', CAT_ID)
-    .order('bsr_current', { ascending: true, nullsFirst: false })
-    .limit(TOP_N);
+  const { data: products, error } = await p6Products(EV, CAT_ID, TOP_N);
 
   if (error) throw error;
   console.log(`Fetched: ${products.length} products\n`);
@@ -555,7 +550,7 @@ async function run() {
   // Competitor selection (2026-09-26, migration 011): analyse the selected
   // competitors only (selection_rank order). Market metrics below still use
   // EVERY product in the category. Inactive selection → all products, as before.
-  const selection = await loadSelection(DASH, CAT_ID);
+  const selection = await EV.selection(CAT_ID);
   console.log(selection.active ? `Scoped to the competitor selection (${selection.why})\n` : `Competitor selection inactive (${selection.why}) — analysing all products\n`);
 
   // Filter already-done
@@ -671,8 +666,11 @@ async function run() {
     // already signed-off "Electrolyte Powder" category's 161 products
     // mid-run. `id` is the row's own unique primary key (now selected
     // above), so scoping by it can never cross a category boundary.
+    // Merge base for the write: under 'scout' the rows just read (no query,
+    // unchanged); under 'rnd' Scout's own rows, since the write lands on Scout.
+    const writeBase = await EV.productWriteBase(analyses.map((a) => a.product));
     for (const { product, intel } of analyses) {
-      const existing = product.marketing_analysis || {};
+      const existing = (writeBase.get(product.id) || {}).marketing_analysis || {};
       const { error: saveErr } = await DASH.from('products').update({
         marketing_analysis: { ...existing, product_intelligence: intel }
       }).eq('id', product.id);

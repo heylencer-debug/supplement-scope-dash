@@ -1,9 +1,9 @@
 ﻿/**
  * run-pipeline.js — Full Scout Pipeline Orchestrator
  *
- * Runs P1 → P2 → P3 → P4 → P5 → P6 → P7 → P8 → P9 → P10 for a keyword.
+ * Runs P1 → P13 for a keyword (the PHASES array below; see docs/PIPELINE.md).
  * P6 = Product Intelligence (per-product AI scoring — powers 9 dashboard sections)
- * P7 = Market Intelligence (category-level Grok report — powers Market tab)
+ * P7 = Market Intelligence (category-level ANALYSIS_MODEL report — powers Market tab)
  * READ-FIRST (P0.5): before any phase, inventory.js reads what the keyword
  * FAMILY already holds (every "#N" session + aliases) and plan-scope.js
  * decides per phase: reuse (skip, or sync-only from a sibling session) |
@@ -16,7 +16,7 @@
  *   node run-pipeline.js --keyword "ashwagandha gummies"
  *   node run-pipeline.js --keyword "ashwagandha gummies" --from P6
  *   node run-pipeline.js --keyword "ashwagandha gummies" --phases P6,P7,P8
- *   node run-pipeline.js --keyword "ashwagandha gummies" --ai   (enables AI for P8)
+ *   node run-pipeline.js --keyword "ashwagandha gummies" --ai   (forwarded to P9; phase8-formula-brief.js ignores it)
  *   node run-pipeline.js --keyword "ashwagandha gummies" --force (re-run all phases)
  *   node run-pipeline.js --keyword "..." --no-reuse    (print the plan, run every phase anyway)
  *   node run-pipeline.js --keyword "..." --alias "electrolytes powder" --fresh P3=45

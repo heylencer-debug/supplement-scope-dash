@@ -1,0 +1,28 @@
+{
+  "keyword": "magnesium gummies",
+  "scrapes": [
+    {
+      "B0PARENT01": [
+        { "asin": "B0PARENT01", "review_id": "R1PARENTONLY01", "rating": 5, "review_header": "Love them", "review_text": "Tastes like berries.", "review_posted_date": "Reviewed in the United States on July 2, 2026", "is_verified": true, "helpful_count": 3 },
+        { "asin": "B0PARENT01", "review_id": "R2PARENTONLY02", "rating": 2, "review_header": "Chalky", "review_text": "Chalky aftertaste.", "review_posted_date": "Reviewed in the United States on July 9, 2026", "is_verified": true, "helpful_count": 0 },
+        { "asin": "B0PARENT01", "review_id": "R3SHAREDREVIEW", "rating": 4, "review_header": "Good sleep", "review_text": "Helps me sleep.", "review_posted_date": "Reviewed in the United States on July 12, 2026", "is_verified": true, "helpful_count": 7 }
+      ],
+      "B0CHILD001": [
+        { "asin": "B0CHILD001", "review_id": "R3SHAREDREVIEW", "rating": 4, "review_header": "Good sleep", "review_text": "Helps me sleep.", "review_posted_date": "Reviewed in the United States on July 12, 2026", "is_verified": true, "helpful_count": 7 },
+        { "asin": "B0CHILD001", "review_id": "R4CHILDONLY001", "rating": 1, "review_header": "Melted", "review_text": "Arrived melted.", "review_posted_date": "Reviewed in the United States on July 20, 2026", "is_verified": false, "helpful_count": 1 }
+      ]
+    },
+    {
+      "B0PARENT01": [
+        { "asin": "B0PARENT01", "review_id": "R1PARENTONLY01", "rating": 5, "review_header": "Love them", "review_text": "Tastes like berries.", "review_posted_date": "Reviewed in the United States on July 2, 2026", "is_verified": true, "helpful_count": 4 },
+        { "asin": "B0PARENT01", "review_id": "R2PARENTONLY02", "rating": 2, "review_header": "Chalky", "review_text": "Chalky aftertaste.", "review_posted_date": "Reviewed in the United States on July 9, 2026", "is_verified": true, "helpful_count": 0 },
+        { "asin": "B0PARENT01", "review_id": "R3SHAREDREVIEW", "rating": 4, "review_header": "Good sleep", "review_text": "Helps me sleep.", "review_posted_date": "Reviewed in the United States on July 12, 2026", "is_verified": true, "helpful_count": 8 },
+        { "asin": "B0PARENT01", "review_id": "R3SHAREDREVIEW", "rating": 4, "review_header": "Good sleep", "review_text": "Helps me sleep.", "review_posted_date": "Reviewed in the United States on July 12, 2026", "is_verified": true, "helpful_count": 8 }
+      ],
+      "B0CHILD001": [
+        { "asin": "B0CHILD001", "review_id": "R3SHAREDREVIEW", "rating": 4, "review_header": "Good sleep", "review_text": "Helps me sleep.", "review_posted_date": "Reviewed in the United States on July 12, 2026", "is_verified": true, "helpful_count": 8 },
+        { "asin": "B0CHILD001", "review_id": "R4CHILDONLY001", "rating": 1, "review_header": "Melted", "review_text": "Arrived melted.", "review_posted_date": "Reviewed in the United States on July 20, 2026", "is_verified": false, "helpful_count": 1 }
+      ]
+    }
+  ]
+}

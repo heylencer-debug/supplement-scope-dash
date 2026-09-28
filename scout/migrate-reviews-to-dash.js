@@ -196,6 +196,9 @@ async function run() {
   // keep it in raw_json; their title/review_date COLUMNS are null, so a
   // column-only key would collapse every same-star review of an ASIN into
   // one) — the text key is only the fallback for id-less rows.
+  // Kept on purpose after migration 016 (2026-09-29): the collector now
+  // upserts on (keyword, asin, review_id), but rows written before 016 is
+  // applied, id-less rows, and sibling-session reads can still repeat.
   const byAsin = {};
   const seenReview = new Set();
   for (const r of allReviews) {

@@ -36,6 +36,7 @@ const brightData = require('./bright-data-amazon');
 const { reportProgress } = require('./utils/job-heartbeat');
 const { reuseAsinsFromEnv, rescrapeAsinsFromEnv } = require('./utils/reuse-asins');
 const { loadSelectionForKeyword, applySelection } = require('./utils/selected-competitors');
+const { buildReviewRows, saveReviewRows } = require('./utils/review-rows');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
@@ -163,8 +164,13 @@ async function scrapeReviewPage(page, asin) {
       const verified = !!card.querySelector('[data-hook="avp-badge"]');
       const helpfulText = card.querySelector('[data-hook="helpful-vote-statement"]')?.textContent || '';
       const helpfulMatch = helpfulText.match(/[\d,]+/);
+      // Amazon's review id is the card's element id ("R1ABC…", sometimes
+      // "customer_review-R1ABC…"): the same id Bright Data returns as
+      // review_id, and the key dovive_reviews upserts on (migration 016).
+      const idMatch = String(card.id || card.getAttribute('data-review-id') || '').match(/\bR[A-Z0-9]{8,20}\b/);
       return {
         asin,
+        review_id: idMatch ? idMatch[0] : null,
         rating: ratingMatch ? parseFloat(ratingMatch[0]) : null,
         title,
         body,
@@ -177,50 +183,16 @@ async function scrapeReviewPage(page, asin) {
   }, asin);
 }
 
-function parseReviewDate(dateText) {
-  if (!dateText) return null;
-  // Amazon format: "Reviewed in the United States on August 17, 2025"
-  const m = dateText.match(/(\w+ \d+, \d{4})/);
-  if (!m) return null;
-  // Parse at noon UTC: `new Date("August 17, 2025")` is LOCAL midnight, and
-  // toISOString() then shifts it to the previous day on any host east of UTC.
-  const d = new Date(`${m[1]} 12:00:00 UTC`);
-  return isNaN(d.getTime()) ? null : d.toISOString().split('T')[0];
-}
-
 // ── Save reviews to Supabase (same schema as apify-reviews.js) ────────────────
+// 2026-09-29: upserts on (keyword, asin, review_id) — migration 016 — so a
+// re-scrape refreshes the rows it already has instead of appending copies.
+// Row building and the fallbacks live in utils/review-rows.js (unit-tested).
 async function saveReviews(asin, keyword, rawReviews) {
   if (!rawReviews.length) return 0;
-
-  const rows = rawReviews.map((r) => ({
-    asin: r.asin || asin,
-    keyword: keyword || null,
-    reviewer_name: r.reviewer_name,
-    rating: r.rating,
-    title: r.title,
-    body: r.body,
-    review_date: parseReviewDate(r.date_text),
-    verified_purchase: r.verified_purchase,
-    helpful_votes: r.helpful_votes || 0,
-    raw_json: r, // full scraped fields (dovive_reviews.raw_json — see migrations/004)
-    scraped_at: new Date().toISOString(),
-  }));
-
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/dovive_reviews`, {
-    method: 'POST',
-    headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${SUPABASE_KEY}`,
-      'Content-Type': 'application/json',
-      Prefer: 'return=minimal',
-    },
-    body: JSON.stringify(rows),
-  });
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Save failed: ${res.status} - ${errText.substring(0, 200)}`);
-  }
-  return rows.length;
+  const rows = buildReviewRows(asin, keyword, rawReviews);
+  const r = await saveReviewRows(rows, { fetchImpl: fetch, supabaseUrl: SUPABASE_URL, supabaseKey: SUPABASE_KEY });
+  if (r.duplicatesInBatch) console.log(`    (${r.duplicatesInBatch} duplicate review(s) within this batch skipped)`);
+  return r.upserted + r.inserted;
 }
 
 // ── Scrape all review pages for one ASIN ────────────────────────────────────

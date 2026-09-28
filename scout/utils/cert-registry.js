@@ -28,6 +28,11 @@
  *     200, server-rendered. Company rows `<font size='+2'>Company&nbsp;</font>`,
  *     product rows `<td … width="28%">Trade Designation</td>`,
  *     empty result "No Matching Products Found".
+ *     The same page without &Standard= (…?Company=&TradeName=<q>) lists every
+ *     NSF dietary standard for the brand: adapter `nsf_dietary`, brand-level,
+ *     used by P5b web research (utils/cert-registry-web.js). Both NSF dietary
+ *     adapters share ONE parser, parseNsfDietaryListings(), which also reads
+ *     the page's "Number of matching Products is N" counter.
  *   NSF Certified for Sport
  *     https://www.nsfsport.com/certified-products/search-results.php?search=<q>
  *     200, returns the whole catalogue (~2.2 MB) and filters in the browser;
@@ -90,24 +95,62 @@ function stripTags(h) { return String(h || '').replace(/<script[\s\S]*?<\/script
 
 // ── adapters ────────────────────────────────────────────────────────────
 
+const NSF_DIETARY_LISTINGS = 'https://info.nsf.org/Certified/Dietary/Listings.asp';
+
+/**
+ * info.nsf.org dietary listing page → { recognised, listings, products }.
+ * The ONE NSF dietary parser (2026-09-29: the labels path and P5b used to
+ * parse this page separately and could disagree on the same HTML).
+ *   - company header `<font size='+2'>Company&nbsp;</font>`, then product rows
+ *     Trade Designation | Product ID | Product Form | Serving;
+ *   - "No Matching Products Found", or a "Number of matching Products is 0"
+ *     counter, is a recognised empty answer;
+ *   - rows that no longer parse while the counter says N > 0 (a layout change)
+ *     fall back to the page's cell/row texts as listings, so a block naming the
+ *     brand can still verify; never the other way round.
+ * `counter` (the page's own product count) is present only when the page shows one.
+ */
+function parseNsfDietaryListings(html) {
+  const s = String(html || '');
+  const text = stripTags(s).replace(/&[a-z#0-9]+;/gi, ' ').replace(/\s+/g, ' ');
+  const cm = /Number of matching Products is\s+(\d+)/i.exec(text);
+  const counter = cm ? Number(cm[1]) : null;
+  const withCounter = (o) => (counter != null ? { ...o, counter } : o);
+  if (/No Matching Products Found/i.test(s) || counter === 0) return withCounter({ recognised: true, listings: [] });
+  let listings = [];
+  const re = /<font size='\+2'>([^<]*?)(?:&nbsp;)?<\/font>|<td align="left" valign="top" width="28%">([^<]+)<\/td>\s*<td[^>]*>[^<]*<\/td>\s*<td[^>]*>([^<]*)<\/td>/gi;
+  let company = null;
+  let m;
+  while ((m = re.exec(s))) {
+    if (m[1] != null) company = m[1].replace(/&nbsp;/g, ' ').trim();
+    else listings.push({ company, product: m[2].trim(), form: formOf(m[3]), url: null });
+  }
+  if (!listings.length && counter > 0) {
+    listings = s.split(/<(?:tr|td|li)\b[^>]*>/i).slice(1)
+      .map((b) => stripTags(b.split(/<\/(?:tr|td|li)>/i)[0]).replace(/&[a-z#0-9]+;/gi, ' ').replace(/\s+/g, ' ').trim())
+      .filter((t) => t.length > 3 && t.length < 400 && !/Number of matching/i.test(t))
+      .map((t) => ({ company: null, product: t, form: formOf(t), url: null }));
+  }
+  return withCounter({
+    recognised: listings.length > 0 || counter != null || /NSF Product and Service Listings/i.test(s),
+    listings,
+  });
+}
+
 const ADAPTERS = {
   nsf_contents: {
     registry: 'NSF Contents Tested & Certified (NSF/ANSI 173)',
     scope: 'product',
-    url: ({ brand }) => `https://info.nsf.org/Certified/Dietary/Listings.asp?TradeName=${enc(brand)}&Standard=173`,
-    parse(html) {
-      if (/No Matching Products Found/i.test(html)) return { recognised: true, listings: [] };
-      const listings = [];
-      // company header, then rows: Trade Designation | Product ID | Product Form | Serving
-      const re = /<font size='\+2'>([^<]*?)(?:&nbsp;)?<\/font>|<td align="left" valign="top" width="28%">([^<]+)<\/td>\s*<td[^>]*>[^<]*<\/td>\s*<td[^>]*>([^<]*)<\/td>/gi;
-      let company = null;
-      let m;
-      while ((m = re.exec(html))) {
-        if (m[1] != null) company = m[1].replace(/&nbsp;/g, ' ').trim();
-        else listings.push({ company, product: m[2].trim(), form: formOf(m[3]), url: null });
-      }
-      return { recognised: listings.length > 0 || /NSF Product and Service Listings/i.test(html), listings };
-    },
+    url: ({ brand }) => `${NSF_DIETARY_LISTINGS}?TradeName=${enc(brand)}&Standard=173`,
+    parse: parseNsfDietaryListings,
+  },
+  // Every NSF dietary-supplement standard for the brand, brand-level: what a
+  // web claim that just says "NSF certified" can be checked against (P5b).
+  nsf_dietary: {
+    registry: 'NSF',
+    scope: 'operation',
+    url: ({ brand }) => `${NSF_DIETARY_LISTINGS}?Company=&TradeName=${enc(brand)}`,
+    parse: parseNsfDietaryListings,
   },
   nsf_sport: {
     registry: 'NSF Certified for Sport',
@@ -157,7 +200,8 @@ function genericAdapter(registry, scope, url, { noResults = null } = {}) {
     url,
     parse(html) {
       const explicitNone = !!(noResults && noResults.test(stripTags(html)));
-      const blocks = String(html).split(/<(?:tr|li|article)\b/i).slice(1).map((b) => stripTags(b.split(/<\/(?:tr|li|article)>/i)[0])).filter((t) => t.length > 3 && t.length < 400);
+      // split on the WHOLE opening tag: splitting on "<li" left ` class="…">` glued to the text
+      const blocks = String(html).split(/<(?:tr|li|article)\b[^>]*>/i).slice(1).map((b) => stripTags(b.split(/<\/(?:tr|li|article)>/i)[0])).filter((t) => t.length > 3 && t.length < 400);
       return { recognised: explicitNone, listings: explicitNone ? [] : blocks.map((t) => ({ company: null, product: t, form: formOf(t), url: null })) };
     },
   };
@@ -297,12 +341,29 @@ async function checkOne(key, { brand, title }, opts) {
     return { ...base, status: 'not_checked', evidence_url: null, match: null, reason: 'CERT_VERIFY_MAX_MS reached before this lookup' };
   }
   const page = await fetchPage(url, opts);
-  if (!page.ok) return { ...base, status: 'registry_unavailable', evidence_url: url, match: null, reason: page.error ? `request failed: ${page.error}` : `HTTP ${page.status}` };
+  const v = judgePage(key, page, { brand, title });
+  if (v.status === 'verified') return { ...base, status: 'verified', evidence_url: v.hit.listing.url || url, match: { company: v.hit.listing.company, product: v.hit.listing.product, form: v.hit.listing.form || null, quality: v.hit.quality }, reason: null };
+  return { ...base, status: v.status, evidence_url: url, match: null, reason: v.reason };
+}
+
+/**
+ * The verdict for one fetched registry page — the single decision both the
+ * labels path (checkOne) and P5b web research (cert-registry-web.js) use.
+ * @param {string} key          an ADAPTERS key
+ * @param {{ok, status?, body, error?}} page
+ * @param {{brand, title?}} who
+ * @param {{scope?: 'product'|'operation'}} [opts]  defaults to the adapter's own scope
+ * @returns {{ status: 'verified'|'not_found'|'registry_unavailable', hit, parsed, reason }}
+ */
+function judgePage(key, page, { brand, title } = {}, { scope } = {}) {
+  const a = ADAPTERS[key];
+  const sc = scope || a.scope;
+  if (!page || !page.ok) return { status: 'registry_unavailable', hit: null, parsed: null, reason: page && page.error ? `request failed: ${page.error}` : `HTTP ${page ? page.status : 'none'}` };
   const parsed = a.parse(page.body);
-  const hit = matchListing(parsed.listings, { brand, title }, a.scope);
-  if (hit) return { ...base, status: 'verified', evidence_url: hit.listing.url || url, match: { company: hit.listing.company, product: hit.listing.product, form: hit.listing.form || null, quality: hit.quality }, reason: null };
-  if (!parsed.recognised) return { ...base, status: 'registry_unavailable', evidence_url: url, match: null, reason: 'registry page not recognised — no explicit "no results" and no listing for this brand (layout change, JavaScript-rendered results or bot wall)' };
-  return { ...base, status: 'not_found', evidence_url: url, match: null, reason: `no ${a.scope === 'operation' ? 'operation' : 'product'} listed for brand "${brand}" matching this product` };
+  const hit = matchListing(parsed.listings, { brand, title }, sc);
+  if (hit) return { status: 'verified', hit, parsed, reason: null };
+  if (!parsed.recognised) return { status: 'registry_unavailable', hit: null, parsed, reason: 'registry page not recognised — no explicit "no results" and no listing for this brand (layout change, JavaScript-rendered results or bot wall)' };
+  return { status: 'not_found', hit: null, parsed, reason: `no ${sc === 'operation' ? 'operation' : 'product'} listed for brand "${brand}" matching this product` };
 }
 
 /**
@@ -344,4 +405,4 @@ async function verifyCertifications({ claims, brand, title } = {}, opts = {}) {
   return out;
 }
 
-module.exports = { classifyClaim, matchListing, verifyCertifications, formOf, ADAPTERS };
+module.exports = { classifyClaim, matchListing, verifyCertifications, formOf, ADAPTERS, judgePage, parseNsfDietaryListings };

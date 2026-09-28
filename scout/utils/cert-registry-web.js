@@ -1,13 +1,14 @@
 /**
  * utils/cert-registry-web.js — claim-verification hooks for P5b web research.
  *
- * OVERLAP NOTE: another builder (feat/label-verification) is writing
- * utils/cert-registry.js for LABEL certifications. That file had not landed
- * when this was written (2026-09-27), so this module stands alone and only
- * covers what web claims need: spotting a verifiable claim, building the
- * registry / PubMed lookup, and parsing the answer. When cert-registry.js
- * lands, registryLookup() here should delegate to it and this file should
- * keep only the web-claim detection and the PubMed half.
+ * ONE NSF PARSER (2026-09-29): registry pages are parsed and judged by
+ * utils/cert-registry.js — its ADAPTERS are the canonical shape, and
+ * judgePage() is the single verdict both the labels path and this file use.
+ * The NSF listing lookup here is its `nsf_dietary` adapter (every NSF dietary
+ * standard, brand-level). parseNsfListing() and runVerification() keep their
+ * call signatures and return shapes for P5b; this file only adds what web
+ * claims need on top: spotting a verifiable claim, the lookup links, and the
+ * PubMed half.
  *
  * Honesty rule: a target is 'supported' ONLY when a fetched page/API response
  * contains a hit. Anything not fetched is 'not_checked'; a fetched miss is
@@ -21,11 +22,14 @@
 
 'use strict';
 
+const { ADAPTERS, judgePage } = require('./cert-registry');
+
 // Confirmed 2026-09-27: server-rendered, "Number of matching Products is N".
-const NSF_DIETARY = (brand) => `https://info.nsf.org/Certified/Dietary/Listings.asp?Company=&TradeName=${encodeURIComponent(brand)}`;
+const NSF_DIETARY = (brand) => ADAPTERS.nsf_dietary.url({ brand });
 
 const REGISTRIES = {
-  'NSF': { lookup: NSF_DIETARY, checkable: true, parser: 'nsf_listing' },
+  // `adapter` names the cert-registry.js ADAPTERS entry that parses and judges the page.
+  'NSF': { lookup: NSF_DIETARY, checkable: true, adapter: 'nsf_dietary' },
   // Landing pages only — searched in-browser, not fetchable as plain HTML.
   'NSF Certified for Sport': { lookup: () => 'https://www.nsfsport.com/certified-products/', checkable: false },
   'USP': { lookup: () => 'https://www.quality-supplements.org/verified-products', checkable: false },
@@ -132,18 +136,19 @@ function parsePubmedResult(json) {
 }
 
 /**
- * NSF dietary listing page → hit? Supported only when the page reports ≥ 1
- * matching product AND the brand name appears in it.
+ * NSF dietary listing page → { available, products, hit } (P5b's shape).
+ * A thin wrapper: parsing and the verdict are cert-registry.js's
+ * (ADAPTERS.nsf_dietary + judgePage, brand-level). `hit` = a listing on the
+ * page names the brand on word boundaries; `available` = the page was
+ * recognised as the listing (an empty answer counts, an error page does not).
  */
 function parseNsfListing(html, brand) {
-  const text = String(html || '').replace(/<[^>]+>/g, ' ').replace(/&[a-z#0-9]+;/gi, ' ').replace(/\s+/g, ' ');
-  const m = /Number of matching Products is\s+(\d+)/i.exec(text);
-  // No listing counter → not the listing page we know (error page, redesign, block).
-  if (!m) return { available: false, products: 0, hit: false };
-  const products = Number(m[1]);
-  const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-  const brandHit = !!brand && norm(text).includes(norm(brand));
-  return { available: true, products, hit: products > 0 && brandHit };
+  const v = judgePage('nsf_dietary', { ok: true, body: html }, { brand });
+  const available = v.status !== 'registry_unavailable';
+  if (!available) return { available: false, products: 0, hit: false };
+  const p = v.parsed || {};
+  const products = p.counter != null ? p.counter : (p.listings || []).length;
+  return { available: true, products, hit: v.status === 'verified' };
 }
 
 /**
@@ -203,6 +208,7 @@ async function runVerification(targets, { fetchText, maxChecks = 20, log = () =>
         for (const l of checkable) {
           const res = await get(l.url);
           if (!res.ok) { unavailable = true; continue; }
+          // Same verdict as the labels path: cert-registry.js judges the page.
           const p = parseNsfListing(res.text, t.brand);
           if (!p.available) { unavailable = true; continue; }
           if (p.hit) { found = { url: l.url, products: p.products, registry: l.registry }; break; }

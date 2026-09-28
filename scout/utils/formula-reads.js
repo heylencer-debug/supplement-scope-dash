@@ -15,7 +15,7 @@
 
 'use strict';
 
-const { P7_PRODUCT_COLUMNS } = require('./formula-inputs');
+const { P7_PRODUCT_COLUMNS, P9_ALL_PRODUCT_COLUMNS } = require('./formula-inputs');
 
 // ── P5 — Deep Research (phase5-deep-research.js) ──────────────────────────
 
@@ -144,6 +144,79 @@ function p8Products(ev, categoryId, topN) {
   return ev.products(categoryId, 'id, asin, title, brand, bsr_current, price, main_image_url, feature_bullets_text, supplement_facts_raw', { ops });
 }
 
+// ── P9 — Formula Brief (phase8-formula-brief.js) ─────────────────────────
+
+const P9_TOP20_COLUMNS = `
+      asin, brand, title, bsr_current, bsr_30_days_avg, bsr_90_days_avg,
+      price, monthly_revenue, monthly_sales, rating_value, rating_count,
+      packaging_type, serving_size, servings_per_container,
+      claims_on_label, supplement_facts_raw, all_nutrients, other_ingredients,
+      proprietary_blends, feature_bullets_text, marketing_analysis, cohort
+    `;
+
+const P9_NEW_WINNER_COLUMNS = `
+      asin, brand, title, bsr_current, price, monthly_revenue, monthly_sales,
+      rating_count, packaging_type, serving_size, servings_per_container,
+      claims_on_label, supplement_facts_raw, all_nutrients, other_ingredients,
+      proprietary_blends, feature_bullets_text, marketing_analysis, cohort
+    `;
+
+/** Comparison set: selection (when active) or top 50 by BSR, rows with a BSR. */
+function p9Top20(ev, categoryId, selection) {
+  return ev.products(categoryId, P9_TOP20_COLUMNS, {
+    selection, ops: [['not', 'bsr_current', 'is', null], ['order', 'bsr_current', { ascending: true }], ['limit', 50]],
+  });
+}
+
+/** New winners: BSR < 30k, < 500 reviews, revenue desc, 15. Not selection-scoped. */
+function p9NewWinners(ev, categoryId) {
+  return ev.products(categoryId, P9_NEW_WINNER_COLUMNS, {
+    ops: [['not', 'bsr_current', 'is', null], ['lt', 'bsr_current', 30000], ['lt', 'rating_count', 500],
+      ['order', 'monthly_revenue', { ascending: false }], ['limit', 15]],
+  });
+}
+
+/** Aggregate set: every product with marketing_analysis (P9_ALL_PRODUCT_COLUMNS incl. serving_size). */
+function p9AllProducts(ev, categoryId) {
+  return ev.products(categoryId, P9_ALL_PRODUCT_COLUMNS, { ops: [['not', 'marketing_analysis', 'is', null]] });
+}
+
+/** Exact product count for the category (head request). */
+function p9ProductCount(ev, categoryId) {
+  return ev.products(categoryId, '*', { selectOptions: { count: 'exact', head: true } });
+}
+
+/** P3b category synthesis, staleness-checked against `reviewsClient`. */
+function p9CategorySynthesis(ev, { keyword, categoryId, reviewsClient }) {
+  return ev.reviewThemes({ scope: 'category', keyword, categoryId, reviewsClient });
+}
+
+/** P5 deep research for the exact session keyword, bsr_rank asc, 20. */
+function p9P5Research(ev, keyword) {
+  return ev.deepResearch({ keyword, columns: 'asin, brand, bsr_rank, pool, benefits, formula_notes, key_strengths, key_weaknesses, competitor_angle, certifications, third_party_tested, full_research, researched_by', ops: [['order', 'bsr_rank', { ascending: true }], ['limit', 20]] });
+}
+
+/** P5 brand-page excerpts for those ASINs (no keyword filter — as before). */
+function p9P5Sources(ev, asins) {
+  return ev.p5Sources({ asins, columns: 'asin, source_url, raw_html_excerpt' });
+}
+
+/** P8 category packaging summary row (maybeSingle). */
+function p9PackagingSummary(ev, keyword) {
+  return ev.packaging({ keyword, ops: [['maybeSingle']] });
+}
+
+/** Raw-review fallback: ≥4★ ('positive') or ≤2★ ('negative') with a body, 100 (Scout dovive_reviews). */
+function p9RawReviews(ev, asins, polarity) {
+  const star = polarity === 'positive' ? ['gte', 'rating', 4] : ['lte', 'rating', 2];
+  return ev.rawReviews(asins, 'asin, rating, title, body', { ops: [star, ['not', 'body', 'is', null], ['limit', 100]] });
+}
+
+/** Skip check: does the category's brief already hold AI content? */
+function p9BriefSkip(ev, categoryId) {
+  return ev.briefCurrent(categoryId, { columns: 'id, created_at, ingredients', ops: [['limit', 1]] });
+}
+
 // ── formula_briefs reads shared by P11 / P12 ──────────────────────────────
 
 /** Skip check: the category's brief `ingredients`, one row, `.single()`. */
@@ -210,6 +283,8 @@ module.exports = {
   P6_PRODUCT_COLUMNS, p6Products, p6RawReviews, p6ProductSyntheses,
   p7Products, p7CategorySynthesis, p7CategoryAsins, p7RawReviews, p7WebEvidence, p7MarketingAssets,
   p8Products,
+  P9_TOP20_COLUMNS, P9_NEW_WINNER_COLUMNS, p9Top20, p9NewWinners, p9AllProducts, p9ProductCount,
+  p9CategorySynthesis, p9P5Research, p9P5Sources, p9PackagingSummary, p9RawReviews, p9BriefSkip,
   briefSkipRow, BRIEF_FORMULA_READ, briefFormulaRow, briefFormulaWriteBase,
   P11_PRODUCT_COLUMNS, p11Products, p11P5Research, p11P5Sources,
   P13_BRIEF_READ, p13Brief, p13BriefWriteBase,

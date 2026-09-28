@@ -67,8 +67,11 @@ test('P9: servingSizeDistribution keeps the top 8 and is empty with no data', ()
 });
 
 test('P9 selects its aggregate set through P9_ALL_PRODUCT_COLUMNS', () => {
+  // The read moved to utils/formula-reads.js (evidence layer); it still selects P9_ALL_PRODUCT_COLUMNS.
   const src = fs.readFileSync(path.join(__dirname, '..', 'phase8-formula-brief.js'), 'utf8');
-  assert.match(src, /\.select\(P9_ALL_PRODUCT_COLUMNS\)/);
+  const reads = fs.readFileSync(path.join(__dirname, '..', 'utils', 'formula-reads.js'), 'utf8');
+  assert.match(src, /p9AllProducts\(EV, categoryId\)/);
+  assert.match(reads, /ev\.products\(categoryId, P9_ALL_PRODUCT_COLUMNS,/);
   assert.match(src, /serving_size_distribution: servingSizeDist,/);
 });
 

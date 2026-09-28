@@ -13,21 +13,26 @@
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const { resolveCategory } = require('./utils/category-resolver');
-const { loadSelection, scopeToSelection } = require('./utils/selected-competitors');
+const { createEvidenceSource } = require('./utils/evidence-source');
+const {
+  p9Top20, p9NewWinners, p9AllProducts, p9ProductCount, p9CategorySynthesis, p9P5Research,
+  p9P5Sources, p9PackagingSummary, p9RawReviews, p9BriefSkip, p7WebEvidence, p7MarketingAssets,
+} = require('./utils/formula-reads');
 const { withUsageTracking, extractUsageFromSSE, recordAiUsage } = require('./utils/ai-usage');
 // P3b (2026-09-26): evidence-counted review themes over ALL collected reviews.
-// Preferred over the random 60+60 sample below when a synthesis row exists.
-const { fetchCategorySynthesis } = require('./utils/review-synthesis-store');
+// Preferred over the random 60+60 sample below when a synthesis row exists
+// (utils/review-synthesis-store.js, through the evidence layer).
 const { briefReviewInput, painPointsFromSynthesis, formatPainPointCount } = require('./utils/review-synthesis');
 // P5b (2026-09-27): counted, source-labelled web claims. Added to the prompt
-// only when a dovive_web_research row exists; otherwise the prompt is unchanged.
-const { loadWebEvidence } = require('./utils/web-research-store');
+// only when a dovive_web_research row exists; otherwise the prompt is unchanged
+// (utils/web-research-store.js, through the evidence layer).
 // P7b (2026-09-27): competitor gallery / A+ images read by vision, counted, and
-// claimed benefits checked against the P3b themes. No row → prompt unchanged.
-const { fetchCategoryMarketingAssets } = require('./utils/marketing-assets-store');
-// P7's report, read from where P7 writes it (formula_briefs.ingredients.market_intelligence).
-const { fetchMarketIntel } = require('./utils/market-intel-store');
-const { P9_ALL_PRODUCT_COLUMNS, servingSizeDistribution } = require('./utils/formula-inputs');
+// claimed benefits checked against the P3b themes. No row → prompt unchanged
+// (utils/marketing-assets-store.js, through the evidence layer).
+// P7's report, read from where P7 writes it (formula_briefs.ingredients.market_intelligence)
+// by utils/market-intel-store.js, through the evidence layer (EV.marketIntel).
+// The "all products" set selects P9_ALL_PRODUCT_COLUMNS (formula-reads p9AllProducts).
+const { servingSizeDistribution } = require('./utils/formula-inputs');
 const { formatMarketingAssetsForPrompt } = require('./utils/marketing-assets');
 
 // Set once run() resolves the category — read by recordAiUsage() calls
@@ -40,6 +45,10 @@ const DASH = createClient(
   process.env.DASH_KEY || process.env.SUPABASE_KEY
 );
 const DOVIVE = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+// Evidence reads (SCOUT_EVIDENCE_SOURCE: 'scout' default | 'rnd'). The
+// formula_briefs delete/insert (and the preserve-keys read before it) and the
+// categories bump stay on DASH.
+const EV = createEvidenceSource({ dash: DASH, dovive: DOVIVE });
 
 const KEYWORD = process.argv.includes('--keyword')
   ? process.argv[process.argv.indexOf('--keyword') + 1]
@@ -362,11 +371,7 @@ async function fetchP5DeepResearch(keyword) {
     // this select, regardless of how much real P5 data existed. Dropped
     // the nonexistent column and added explicit error logging so a future
     // schema drift here is loud, not silent.
-    const { data, error } = await DOVIVE.from('dovive_phase5_research')
-      .select('asin, brand, bsr_rank, pool, benefits, formula_notes, key_strengths, key_weaknesses, competitor_angle, certifications, third_party_tested, full_research, researched_by')
-      .ilike('keyword', keyword)
-      .order('bsr_rank', { ascending: true })
-      .limit(20);
+    const { data, error } = await p9P5Research(EV, keyword);
     if (error) {
       console.warn('  ⚠️ P5 data fetch failed (non-fatal, but P8 prompt will lack P5 grounding):', error.message);
       return [];
@@ -396,10 +401,7 @@ async function fetchP5DeepResearch(keyword) {
 // `keyword`), which P8 never queried. Fetch it here.
 async function fetchCategoryPackagingSummary(keyword) {
   try {
-    const { data } = await DOVIVE.from('dovive_packaging_intelligence')
-      .select('intelligence, generated_at, products_analyzed')
-      .eq('keyword', keyword)
-      .maybeSingle();
+    const { data } = await p9PackagingSummary(EV, keyword);
     return data?.intelligence || null;
   } catch (e) {
     console.warn('  ⚠️ Category packaging summary fetch failed (non-fatal):', e.message);
@@ -523,7 +525,7 @@ async function compileMarketData(categoryId) {
   // formula_briefs.ingredients.market_intelligence; this used to look in a
   // `market_intelligence` table and a formula_briefs.brief_type column,
   // neither of which exists, so the brief always ran with has_data:false.
-  const marketIntelDoc = await fetchMarketIntel(DASH, categoryId);
+  const marketIntelDoc = await EV.marketIntel(categoryId);
   console.log(marketIntelDoc
     ? `  P7 market intelligence: ${Math.round(marketIntelDoc.ai_market_analysis.length / 1000)}k chars (${marketIntelDoc.generated_at || 'no timestamp'})`
     : '  P7 market intelligence: not found — brief runs without it');
@@ -536,43 +538,18 @@ async function compileMarketData(categoryId) {
   // comparison set is the selected competitors in selection_rank order
   // (one per variation family, promo/shared-review checked). Inactive →
   // top by BSR, unchanged.
-  const selection = await loadSelection(DASH, categoryId);
+  const selection = await EV.selection(categoryId);
   console.log(selection.active ? `  Competitor set: selection (${selection.why})` : `  Competitor set: top by BSR (selection inactive: ${selection.why})`);
-  const { data: top20 } = await scopeToSelection(DASH.from('products')
-    .select(`
-      asin, brand, title, bsr_current, bsr_30_days_avg, bsr_90_days_avg,
-      price, monthly_revenue, monthly_sales, rating_value, rating_count,
-      packaging_type, serving_size, servings_per_container,
-      claims_on_label, supplement_facts_raw, all_nutrients, other_ingredients,
-      proprietary_blends, feature_bullets_text, marketing_analysis, cohort
-    `)
-    .eq('category_id', categoryId), selection)
-    .not('bsr_current', 'is', null)
-    .order('bsr_current', { ascending: true })
-    .limit(50);
+  const { data: top20 } = await p9Top20(EV, categoryId, selection);
 
   const top5 = top20?.slice(0, 5) || [];
 
   // New winners: high revenue, low review count, BSR < 30k
-  const { data: newWinners } = await DASH.from('products')
-    .select(`
-      asin, brand, title, bsr_current, price, monthly_revenue, monthly_sales,
-      rating_count, packaging_type, serving_size, servings_per_container,
-      claims_on_label, supplement_facts_raw, all_nutrients, other_ingredients,
-      proprietary_blends, feature_bullets_text, marketing_analysis, cohort
-    `)
-    .eq('category_id', categoryId)
-    .not('bsr_current', 'is', null)
-    .lt('bsr_current', 30000)
-    .lt('rating_count', 500)
-    .order('monthly_revenue', { ascending: false })
-    .limit(15);
+  const { data: newWinners } = await p9NewWinners(EV, categoryId);
 
   // All products for aggregates
-  const { data: allProducts } = await DASH.from('products')
-    .select(P9_ALL_PRODUCT_COLUMNS) // includes serving_size for the distribution below
-    .eq('category_id', categoryId)
-    .not('marketing_analysis', 'is', null);
+  // P9_ALL_PRODUCT_COLUMNS includes serving_size for the distribution below
+  const { data: allProducts } = await p9AllProducts(EV, categoryId);
 
   // 2026-08-28: this query is already scoped to `categoryId`, which the
   // caller (run()) resolves via resolveCategory() — the same deterministic
@@ -581,9 +558,7 @@ async function compileMarketData(categoryId) {
   // returns null/0 while real product rows clearly exist (allProducts
   // fetched below), fall back to a live count instead of silently
   // persisting 0 into formula_briefs.market_summary.
-  let { count: total, error: totalErr } = await DASH.from('products')
-    .select('*', { count: 'exact', head: true })
-    .eq('category_id', categoryId);
+  let { count: total, error: totalErr } = await p9ProductCount(EV, categoryId);
   if (totalErr) console.warn('  ⚠️ total_products count query failed (non-fatal):', totalErr.message);
 
   // Fallback: if the exact-count query above errored or returned falsy while
@@ -668,7 +643,7 @@ async function compileMarketData(categoryId) {
   // conflicting reviews) instead of the 5 most-helpful critical TITLES per
   // product, and the VOC section below shows those themes instead of a random
   // 60+60 sample. No synthesis row → everything below runs exactly as before.
-  const reviewSynthesis = await fetchCategorySynthesis(DASH, { keyword: KEYWORD, categoryId, reviewsClient: DOVIVE });
+  const reviewSynthesis = await p9CategorySynthesis(EV, { keyword: KEYWORD, categoryId, reviewsClient: DOVIVE });
   const reviewInput = briefReviewInput(reviewSynthesis, null);
   if (reviewInput.mode === 'synthesis') {
     topPainPoints = painPointsFromSynthesis(reviewSynthesis, 40);
@@ -676,8 +651,8 @@ async function compileMarketData(categoryId) {
   } else {
     console.log('  P3b review synthesis not found — falling back to sampled reviews');
   }
-  const webEvidence = await loadWebEvidence(DASH, { keyword: KEYWORD, categoryId });
-  const marketingAssets = await fetchCategoryMarketingAssets(DASH, { keyword: KEYWORD, categoryId });
+  const webEvidence = await p7WebEvidence(EV, { keyword: KEYWORD, categoryId });
+  const marketingAssets = await p7MarketingAssets(EV, { keyword: KEYWORD, categoryId });
   const marketingAssetsText = formatMarketingAssetsForPrompt(marketingAssets);
   if (marketingAssetsText) console.log(`  P7b marketing assets: ${marketingAssets.rollup.products_analyzed} products read by vision (${marketingAssets.status})`);
 
@@ -757,9 +732,7 @@ async function compileMarketData(categoryId) {
   try {
     const p5Asins = p5Research.map(r => r.asin).filter(Boolean);
     if (p5Asins.length) {
-      const { data: p5Sources } = await DOVIVE.from('dovive_p5_sources')
-        .select('asin, source_url, raw_html_excerpt')
-        .in('asin', p5Asins);
+      const { data: p5Sources } = await p9P5Sources(EV, p5Asins);
       const excerptByAsin = {};
       for (const s of (p5Sources || [])) {
         if (s.raw_html_excerpt) excerptByAsin[s.asin] = s;
@@ -794,12 +767,8 @@ async function compileMarketData(categoryId) {
   try {
     const allAsins = (top20 || []).map(p => p.asin).filter(Boolean);
     if (allAsins.length && reviewInput.mode !== 'synthesis') {
-      const { data: rawPos } = await DOVIVE.from('dovive_reviews')
-        .select('asin, rating, title, body').in('asin', allAsins)
-        .gte('rating', 4).not('body', 'is', null).limit(100);
-      const { data: rawNeg } = await DOVIVE.from('dovive_reviews')
-        .select('asin, rating, title, body').in('asin', allAsins)
-        .lte('rating', 2).not('body', 'is', null).limit(100);
+      const { data: rawPos } = await p9RawReviews(EV, allAsins, 'positive');
+      const { data: rawNeg } = await p9RawReviews(EV, allAsins, 'negative');
       rawReviewText.positive = (rawPos || []).sort(() => Math.random()-0.5).slice(0,60)
         .map(r => `[★${r.rating}] "${r.title || ''}" — ${(r.body||'').slice(0,900)}`);
       rawReviewText.negative = (rawNeg || []).sort(() => Math.random()-0.5).slice(0,60)
@@ -1907,10 +1876,7 @@ async function run() {
 
   // Check if brief already exists WITH actual AI content (not just a market intel stub)
   if (!FORCE) {
-    const { data: existing } = await DASH.from('formula_briefs')
-      .select('id, created_at, ingredients')
-      .eq('category_id', cat.id)
-      .limit(1);
+    const { data: existing } = await p9BriefSkip(EV, cat.id);
     const hasActualBrief = existing?.[0]?.ingredients?.ai_generated_brief ||
                            existing?.[0]?.ingredients?.ai_generated_brief_grok;
     if (hasActualBrief) {

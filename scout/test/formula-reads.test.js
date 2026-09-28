@@ -378,3 +378,84 @@ test('P5 phase file reads through the evidence layer; skip check and writes stay
   assert.match(s, /DOVIVE\.from\('dovive_phase5_research'\)\s*\.select\('asin, pool, researched_by'\)/, 'already-researched check stays on Scout');
   assert.match(s, /DASH\.from\('products'\)\s*\.select\('marketing_analysis'\)/, 'mirror merge-read stays on Scout');
 });
+
+// ── P9 ──────────────────────────────────────────────────────────────────────
+
+test('P9 reads: scout chains identical to the pre-layer phase, rnd on the views', async () => {
+  const { P9_ALL_PRODUCT_COLUMNS } = require('../utils/formula-inputs');
+  const x = backends();
+  const sel = { active: true, why: '40', ranks: new Map([['B1', 1]]) };
+  await FR.p9Top20(x.scout, CAT, sel);
+  await FR.p9NewWinners(x.scout, CAT);
+  await FR.p9AllProducts(x.scout, CAT);
+  await FR.p9ProductCount(x.scout, CAT);
+  await FR.p9BriefSkip(x.scout, CAT);
+  await FR.p9CategorySynthesis(x.scout, { keyword: 'kw', categoryId: CAT, reviewsClient: null });
+  await FR.p9P5Research(x.scout, 'kw #5');
+  await FR.p9P5Sources(x.scout, ['B1']);
+  await FR.p9PackagingSummary(x.scout, 'kw #5');
+  await FR.p9RawReviews(x.scout, ['B1', 'B2'], 'positive');
+  await FR.p9RawReviews(x.scout, ['B1', 'B2'], 'negative');
+  const C = ['eq', 'category_id', CAT];
+  // phase8-formula-brief.js before the layer: top20 :541-552, new winners :557-570,
+  // all :572-575, count :584-586, synthesis :671, P5 :365-369, sources :760-762,
+  // packaging :399-402, raw reviews :797-802, skip :1910-1913
+  assert.deepEqual(x.dash.queries, [
+    { table: 'products', calls: [['select', `
+      asin, brand, title, bsr_current, bsr_30_days_avg, bsr_90_days_avg,
+      price, monthly_revenue, monthly_sales, rating_value, rating_count,
+      packaging_type, serving_size, servings_per_container,
+      claims_on_label, supplement_facts_raw, all_nutrients, other_ingredients,
+      proprietary_blends, feature_bullets_text, marketing_analysis, cohort
+    `], C, ['eq', 'selected', true], ['order', 'selection_rank', { ascending: true }],
+      ['not', 'bsr_current', 'is', null], ['order', 'bsr_current', { ascending: true }], ['limit', 50]] },
+    { table: 'products', calls: [['select', `
+      asin, brand, title, bsr_current, price, monthly_revenue, monthly_sales,
+      rating_count, packaging_type, serving_size, servings_per_container,
+      claims_on_label, supplement_facts_raw, all_nutrients, other_ingredients,
+      proprietary_blends, feature_bullets_text, marketing_analysis, cohort
+    `], C, ['not', 'bsr_current', 'is', null], ['lt', 'bsr_current', 30000], ['lt', 'rating_count', 500],
+      ['order', 'monthly_revenue', { ascending: false }], ['limit', 15]] },
+    { table: 'products', calls: [['select', P9_ALL_PRODUCT_COLUMNS], C, ['not', 'marketing_analysis', 'is', null]] },
+    { table: 'products', calls: [['select', '*', { count: 'exact', head: true }], C] },
+    { table: 'formula_briefs', calls: [['select', 'id, created_at, ingredients'], C, ['limit', 1]] },
+    { table: 'dovive_review_synthesis', calls: [
+      ['select', 'keyword, category_id, scope, asin, ledger, themes, domain_breakdown, generated_at, model, prompt_version, status'],
+      ['eq', 'scope', 'category'], ['eq', 'keyword', 'kw'], ['order', 'generated_at', { ascending: false }], ['limit', 1],
+    ] },
+  ]);
+  assert.deepEqual(x.dovive.queries, [
+    { table: 'dovive_phase5_research', calls: [
+      ['select', 'asin, brand, bsr_rank, pool, benefits, formula_notes, key_strengths, key_weaknesses, competitor_angle, certifications, third_party_tested, full_research, researched_by'],
+      ['ilike', 'keyword', 'kw #5'], ['order', 'bsr_rank', { ascending: true }], ['limit', 20],
+    ] },
+    { table: 'dovive_p5_sources', calls: [['select', 'asin, source_url, raw_html_excerpt'], ['in', 'asin', ['B1']]] },
+    { table: 'dovive_packaging_intelligence', calls: [['select', 'intelligence, generated_at, products_analyzed'], ['eq', 'keyword', 'kw #5'], ['maybeSingle']] },
+    { table: 'dovive_reviews', calls: [['select', 'asin, rating, title, body'], ['in', 'asin', ['B1', 'B2']], ['gte', 'rating', 4], ['not', 'body', 'is', null], ['limit', 100]] },
+    { table: 'dovive_reviews', calls: [['select', 'asin, rating, title, body'], ['in', 'asin', ['B1', 'B2']], ['lte', 'rating', 2], ['not', 'body', 'is', null], ['limit', 100]] },
+  ]);
+
+  await FR.p9Top20(x.rndEv, CAT, sel);
+  await FR.p9ProductCount(x.rndEv, CAT);
+  await FR.p9BriefSkip(x.rndEv, CAT);
+  await FR.p9P5Research(x.rndEv, 'kw #5');
+  await FR.p9P5Sources(x.rndEv, ['B1']);
+  await FR.p9PackagingSummary(x.rndEv, 'kw #5');
+  await FR.p9RawReviews(x.rndEv, ['B1'], 'positive');
+  assert.deepEqual(x.rnd.tables(), ['v_formula_products', 'v_formula_products', 'v_formula_brief_current', 'v_formula_deep_research', 'v_formula_p5_sources', 'v_formula_packaging']);
+  assert.deepEqual(x.rnd.queries[0].calls, x.dash.queries[0].calls);
+  assert.equal(x.dovive.queries.at(-1).table, 'dovive_reviews', 'raw reviews stay on Scout under rnd');
+});
+
+test('P9 phase file reads through the evidence layer; the brief delete/insert and its preserve-read stay on Scout', () => {
+  const f = 'phase8-formula-brief.js';
+  const s = src(f);
+  assert.deepEqual(directReads(f, ['products', 'dovive_reviews', 'dovive_phase5_research', 'dovive_p5_sources', 'dovive_packaging_intelligence', 'dovive_review_synthesis']), []);
+  assert.doesNotMatch(s, /fetchCategorySynthesis\(|loadWebEvidence\(|fetchCategoryMarketingAssets\(|fetchMarketIntel\(|scopeToSelection\(/);
+  assert.match(s, /EV\.marketIntel\(categoryId\)/);
+  assert.match(s, /EV\.selection\(categoryId\)/);
+  assert.match(s, /p9BriefSkip\(EV, cat\.id\)/);
+  assert.match(s, /DASH\.from\('formula_briefs'\)\.select\('ingredients'\)\.eq\('category_id', categoryId\)\.limit\(1\)\.maybeSingle\(\)/, 'preserve-keys read stays on Scout');
+  assert.match(s, /DASH\.from\('formula_briefs'\)\.delete\(\)/);
+  assert.match(s, /DASH\.from\('formula_briefs'\)\.insert\(/);
+});

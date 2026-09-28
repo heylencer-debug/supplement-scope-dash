@@ -893,26 +893,30 @@ node submit-job.js "magnesium gummies" --cheap    # all-Flash test run, is_test
 ### 3.2 Re-running a job or a phase
 
 ```bash
-node requeue-job.js <job-id> <from_phase> false      # status→queued, from_phase set, force=false
+node requeue-job.js <job-id> <from_phase>            # status→queued, from_phase set, force=false, only_phases=NULL
 gcloud run jobs execute dovive-scout --region=us-central1 --project=noodle-worker \
   --update-env-vars SCOUT_JOB_ID=<job-id> --async     # the override applies to this execution only
 ```
 
-This pattern is recorded in the operations log (2026-09-27).
+This pattern is recorded in the operations log (2026-09-27). The script prints
+the row as stored (id, keyword, from_phase, only_phases, force).
 
-- **Always pass `false` as the third argument unless you want force.**
-  `requeue-job.js` defaults `force` to **true** (`requeue-job.js:13`). Force
+- **`force` is off unless the third argument is the word `true`**
+  (`node requeue-job.js <job-id> <from_phase> true`); anything other than
+  `true`/`false` is refused. Until 2026-09-29 it defaulted to **true**. Force
   runs `clearPhaseData`, which **deletes** `dovive_ocr` rows (P4) and
   `dovive_phase5_research` rows (P5) for the label, and strips the phase keys
   from `products` and `formula_briefs` (`run-pipeline.js:218-314`). It also
-  makes the READ-FIRST plan advisory.
-- **`requeue-job.js` does not touch `only_phases`.** A research-scope row keeps
-  `only_phases = '1,…,8'`, so requeuing it `from 9` runs **no** phase. The final
-  verifier then checks only P1–P8 and can mark the job `complete` with nothing
-  done.
-  - For the formula chain, submit a new continuation job from the dashboard.
+  makes the READ-FIRST plan advisory. With `true`, the script prints the clears
+  the run will reach before it writes the row.
+- **`only_phases` is reset to NULL**, so the run goes from `from_phase` to P13.
+  Before 2026-09-29 it was left alone: a research-scope row
+  (`only_phases = '1,…,8'`) requeued `from 9` ran **no** phase, and the final
+  verifier, checking only P1–P8, could mark the job `complete` with nothing
+  done. Pass `--keep-scope` to keep the row's `only_phases`; the script warns
+  when that scope has no phase at or after `from_phase`.
   - For a single phase, set the row's `only_phases` (for example `'3'`) through
-    the SQL editor or the dashboard. There is no CLI for it, and it is a
+    the SQL editor or the dashboard, then requeue with `--keep-scope`. It is a
     database write.
 - `--from Pn` and `--phases` combine: the runner runs `phasesToRun` minus the
   phases before `from` (`run-pipeline.js:746,787-790`).

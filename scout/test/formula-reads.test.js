@@ -491,3 +491,23 @@ test('P10 phase file reads through the evidence layer; both brief updates target
   assert.doesNotMatch(s, /briefRow\.id|briefRow\.ingredients \|\|/);
   assert.match(s, /DASH\.from\('products'\)\s*\.select\('marketing_analysis'\)\.eq\('asin', asin\)/, 'qa note merge-read stays on Scout');
 });
+
+// ── falsy keyword: the old chains still filtered on it ────────────────────
+
+test('P9 / P11 / P5b P5 reads keep the keyword filter even when KEYWORD is empty or missing (never widen to every keyword)', async () => {
+  const P5b = require('../phase5b-web-research');
+  for (const kw of [undefined, '']) {
+    const x = backends();
+    await FR.p9P5Research(x.scout, kw);
+    await FR.p11P5Research(x.scout, ['B1'], kw);
+    await FR.p9P5Sources(x.scout, ['B1']);
+    await P5b.loadBrandDomains({ dovive: x.dovive, evidence: x.scout, keyword: kw, log: () => {} });
+    // phase8 :365-369 / phase10 :259-262 / phase5b :164-165 before the layer: .ilike / .eq('keyword', KEYWORD) unconditionally
+    assert.deepEqual(x.dovive.queries.map((q) => q.calls.filter(([m, c]) => c === 'keyword')), [
+      [['ilike', 'keyword', kw]],
+      [['ilike', 'keyword', kw]],
+      [],
+      [['eq', 'keyword', kw]],
+    ], `KEYWORD=${JSON.stringify(kw)}`);
+  }
+});

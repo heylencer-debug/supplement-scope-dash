@@ -111,6 +111,11 @@ function applyOps(q, ops = []) {
   return q;
 }
 
+/** The caller named `key` in its options (even with an empty / undefined value). */
+function has(opts, key) {
+  return !!opts && Object.prototype.hasOwnProperty.call(opts, key);
+}
+
 function backendFromEnv(env = process.env) {
   const v = String((env && env.SCOUT_EVIDENCE_SOURCE) || '').trim().toLowerCase();
   return v || 'scout';
@@ -345,31 +350,38 @@ function createEvidenceSource({ dash = null, dovive = null, backend = null, env 
 
   /**
    * §3.7 P5 deep research rows.
-   * Scout: `dovive_phase5_research`, `.in('asin')` when asins given, then
-   * `.ilike('keyword')` (exact session label), then the phase's ops.
+   * Scout: `dovive_phase5_research`, `.in('asin')` when `asins` is named, then
+   * `.ilike('keyword')` (exact session label) when `keyword` is named, then the phase's ops.
    * RnD: `v_formula_deep_research` (same columns).
    * @returns {Promise<{ data: Array<{ asin, brand, bsr_rank, pool, benefits, formula_notes, key_strengths, key_weaknesses,
    *   competitor_angle, certifications, third_party_tested, full_research, researched_by }>|null, error }>} (per `columns`)
    */
-  function deepResearch({ keyword = null, asins = null, columns, ops = [] } = {}) {
+  function deepResearch(opts = {}) {
+    const { keyword, asins, columns, ops = [] } = opts;
     const { client, table } = src('deepResearch');
     let q = client.from(table).select(columns);
-    if (asins) q = q.in('asin', asins);
-    if (keyword) q = q.ilike('keyword', keyword);
+    // Filter iff the caller NAMED the key — the old chains issued .in / .ilike
+    // unconditionally with whatever value they had (an empty or undefined
+    // KEYWORD matched nothing); skipping a falsy one would widen the read to
+    // every keyword's rows.
+    if (has(opts, 'asins')) q = q.in('asin', asins);
+    if (has(opts, 'keyword')) q = q.ilike('keyword', keyword);
     return applyOps(q, ops);
   }
 
   /**
    * §3.7 P5 off-Amazon sources.
-   * Scout: `dovive_p5_sources`, `.in('asin')` when asins given, `.eq('keyword')`
-   * when keyword given, then ops. RnD: `v_formula_p5_sources`.
+   * Scout: `dovive_p5_sources`, `.in('asin')` when `asins` is named, `.eq('keyword')`
+   * when `keyword` is named, then ops. RnD: `v_formula_p5_sources`.
    * @returns {Promise<{ data: Array<{ asin, keyword, source_url, source_type, raw_html_excerpt, extracted }>|null, error }>} (per `columns`)
    */
-  function p5Sources({ keyword = null, asins = null, columns, ops = [] } = {}) {
+  function p5Sources(opts = {}) {
+    const { keyword, asins, columns, ops = [] } = opts;
     const { client, table } = src('p5Sources');
     let q = client.from(table).select(columns);
-    if (asins) q = q.in('asin', asins);
-    if (keyword) q = q.eq('keyword', keyword);
+    // Filter iff the caller named the key (see deepResearch).
+    if (has(opts, 'asins')) q = q.in('asin', asins);
+    if (has(opts, 'keyword')) q = q.eq('keyword', keyword);
     return applyOps(q, ops);
   }
 

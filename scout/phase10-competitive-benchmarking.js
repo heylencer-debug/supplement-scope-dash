@@ -23,6 +23,10 @@
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const { resolveCategory } = require('./utils/category-resolver');
+const { createEvidenceSource } = require('./utils/evidence-source');
+const {
+  briefSkipRow, briefFormulaRow, briefFormulaWriteBase, p11Products, p11P5Research, p11P5Sources,
+} = require('./utils/formula-reads');
 const { withUsageTracking, extractUsageFromSSE, recordAiUsage } = require('./utils/ai-usage');
 const fs = require('fs');
 const path = require('path');
@@ -38,6 +42,10 @@ const DASH = createClient(
 // DOVIVE client — P5's off-Amazon research (dovive_phase5_research / dovive_p5_sources)
 // lives here, same as phase5-deep-research.js/phase8-formula-brief.js.
 const DOVIVE = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+// Evidence reads (SCOUT_EVIDENCE_SOURCE: 'scout' default | 'rnd'); the
+// formula_briefs write below stays on DASH.
+const EV = createEvidenceSource({ dash: DASH, dovive: DOVIVE });
 
 const KEYWORD = process.argv.includes('--keyword')
   ? process.argv[process.argv.indexOf('--keyword') + 1]
@@ -256,13 +264,8 @@ async function fetchP5OffAmazonData(asins, keyword) {
     // full-string substring — see phase8-formula-brief.js's matching
     // comment. `keyword` here is always the full KEYWORD (session label).
     const [researchRes, sourcesRes] = await Promise.all([
-      DOVIVE.from('dovive_phase5_research')
-        .select('asin, competitor_angle, key_strengths, key_weaknesses, certifications')
-        .in('asin', asins)
-        .ilike('keyword', keyword),
-      DOVIVE.from('dovive_p5_sources')
-        .select('asin, source_url, source_type, extracted')
-        .in('asin', asins),
+      p11P5Research(EV, asins, keyword),
+      p11P5Sources(EV, asins),
     ]);
     const byAsin = {};
     for (const r of (researchRes.data || [])) {
@@ -537,8 +540,7 @@ async function run() {
 
   // Skip if already done
   if (!FORCE) {
-    const { data: existing } = await DASH.from('formula_briefs')
-      .select('ingredients').eq('category_id', CAT_ID).limit(1).single();
+    const { data: existing } = await briefSkipRow(EV, CAT_ID);
     // Match the verifier's standard (run-pipeline isRealModelText): a stale
     // partial row from a crashed run (empty/[ERROR] draft or validation)
     // must NOT count as "exists" — otherwise the phase skips in 2s forever
@@ -554,8 +556,7 @@ async function run() {
 
   // Load adjusted formula from P10
   console.log(`Loading P10 adjusted formula...`);
-  const { data: briefRow } = await DASH.from('formula_briefs')
-    .select('id, ingredients').eq('category_id', CAT_ID).not('ingredients', 'is', null).limit(1).single();
+  const { data: briefRow } = await briefFormulaRow(EV, CAT_ID);
   const adjustedFormula = briefRow?.ingredients?.adjusted_formula
     || briefRow?.ingredients?.final_formula_brief
     || briefRow?.ingredients?.ai_generated_brief;
@@ -568,14 +569,7 @@ async function run() {
 
   // Load competitors with formula data
   console.log(`Loading competitor formulas from DASH...`);
-  const { data: allProducts } = await DASH.from('products')
-    .select(`asin, brand, title, bsr_current, price, monthly_revenue, monthly_sales,
-             rating_value, rating_count, serving_size, servings_per_container,
-             supplement_facts_raw, all_nutrients, nutrients_count, marketing_analysis`)
-    .eq('category_id', CAT_ID)
-    .not('bsr_current', 'is', null)
-    .order('bsr_current', { ascending: true })
-    .limit(50);
+  const { data: allProducts } = await p11Products(EV, CAT_ID);
 
   const withFormula = (allProducts || []).filter(p => p.nutrients_count > 0 || p.supplement_facts_raw);
   const withoutFormula = (allProducts || []).filter(p => !p.nutrients_count && !p.supplement_facts_raw);
@@ -644,13 +638,17 @@ async function run() {
     models_used: { draft: ANALYSIS_MODEL, validation: VALIDATION_MODEL },
   };
 
+  // Merge into Scout's row: the row read above under 'scout' (no extra query),
+  // Scout's own formula_briefs row under 'rnd' (the write never carries a view).
+  const writeRow = await briefFormulaWriteBase(EV, CAT_ID, briefRow);
+  if (!writeRow) throw new Error('No Scout formula_briefs row to save competitive_benchmarking into');
   const updatedIngredients = {
-    ...(briefRow.ingredients || {}),
+    ...(writeRow.ingredients || {}),
     competitive_benchmarking: benchmarkingData,
   };
   const { error: saveErr } = await DASH.from('formula_briefs')
     .update({ ingredients: updatedIngredients })
-    .eq('id', briefRow.id);
+    .eq('id', writeRow.id);
   if (saveErr) console.error(`  ❌ Save error: ${saveErr.message}`);
   else {
     console.log(`  ✅ Saved to formula_briefs.ingredients.competitive_benchmarking`);

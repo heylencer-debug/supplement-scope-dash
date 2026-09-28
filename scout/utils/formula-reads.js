@@ -91,8 +91,56 @@ function p8Products(ev, categoryId, topN) {
   return ev.products(categoryId, 'id, asin, title, brand, bsr_current, price, main_image_url, feature_bullets_text, supplement_facts_raw', { ops });
 }
 
+// ── formula_briefs reads shared by P11 / P12 ──────────────────────────────
+
+/** Skip check: the category's brief `ingredients`, one row, `.single()`. */
+function briefSkipRow(ev, categoryId) {
+  return ev.briefCurrent(categoryId, { columns: 'ingredients', ops: [['limit', 1], ['single']] });
+}
+
+/** The chain P11 / P12 load the formula with (and write back by `id`). */
+const BRIEF_FORMULA_READ = Object.freeze({
+  columns: 'id, ingredients',
+  ops: [['not', 'ingredients', 'is', null], ['limit', 1], ['single']],
+});
+
+/** The brief row whose formula P11 / P12 analyse. */
+function briefFormulaRow(ev, categoryId) {
+  return ev.briefCurrent(categoryId, BRIEF_FORMULA_READ);
+}
+
+/** The Scout row the new key is merged into (== `row` under 'scout', no query). */
+function briefFormulaWriteBase(ev, categoryId, row) {
+  return ev.briefWriteBase(categoryId, row, BRIEF_FORMULA_READ);
+}
+
+// ── P11 — Competitive Formula Benchmarking (phase10-competitive-benchmarking.js) ──
+
+const P11_PRODUCT_COLUMNS = `asin, brand, title, bsr_current, price, monthly_revenue, monthly_sales,
+             rating_value, rating_count, serving_size, servings_per_container,
+             supplement_facts_raw, all_nutrients, nutrients_count, marketing_analysis`;
+
+/** Top 50 by BSR with a BSR. Not selection-scoped. */
+function p11Products(ev, categoryId) {
+  return ev.products(categoryId, P11_PRODUCT_COLUMNS, {
+    ops: [['not', 'bsr_current', 'is', null], ['order', 'bsr_current', { ascending: true }], ['limit', 50]],
+  });
+}
+
+/** P5 research rows for the competitors with a formula, exact session keyword. */
+function p11P5Research(ev, asins, keyword) {
+  return ev.deepResearch({ asins, keyword, columns: 'asin, competitor_angle, key_strengths, key_weaknesses, certifications' });
+}
+
+/** P5 off-Amazon sources for those ASINs (no keyword filter — as before). */
+function p11P5Sources(ev, asins) {
+  return ev.p5Sources({ asins, columns: 'asin, source_url, source_type, extracted' });
+}
+
 module.exports = {
   P6_PRODUCT_COLUMNS, p6Products, p6RawReviews, p6ProductSyntheses,
   p7Products, p7CategorySynthesis, p7CategoryAsins, p7RawReviews, p7WebEvidence, p7MarketingAssets,
   p8Products,
+  briefSkipRow, BRIEF_FORMULA_READ, briefFormulaRow, briefFormulaWriteBase,
+  P11_PRODUCT_COLUMNS, p11Products, p11P5Research, p11P5Sources,
 };

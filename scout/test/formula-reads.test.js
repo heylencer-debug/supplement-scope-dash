@@ -162,3 +162,65 @@ test('P8 phase file reads through the evidence layer; merge-read and writes stay
   assert.match(s, /DASH\.from\('products'\)\.select\('marketing_analysis'\)\.eq\('id', p\.id\)/, 'per-row merge-read stays on Scout');
   assert.match(s, /DOVIVE\s*\.from\('dovive_packaging_intelligence'\)\s*\.upsert\(/);
 });
+
+// ── formula_briefs reads shared by P11 / P12 ──────────────────────────────
+
+const BRIEF_SKIP_CHAIN = [['select', 'ingredients'], ['eq', 'category_id', CAT], ['limit', 1], ['single']];
+const BRIEF_FORMULA_CHAIN = [['select', 'id, ingredients'], ['eq', 'category_id', CAT], ['not', 'ingredients', 'is', null], ['limit', 1], ['single']];
+
+test('brief reads (P11/P12): skip row + formula row on formula_briefs, write base == the row under scout', async () => {
+  const row = { id: 7, ingredients: { adjusted_formula: 'f' } };
+  const x = backends(() => ({ data: row, error: null }));
+  await FR.briefSkipRow(x.scout, CAT);
+  const { data } = await FR.briefFormulaRow(x.scout, CAT);
+  assert.equal(await FR.briefFormulaWriteBase(x.scout, CAT, data), data);
+  assert.deepEqual(x.dash.queries, [
+    { table: 'formula_briefs', calls: BRIEF_SKIP_CHAIN },
+    { table: 'formula_briefs', calls: BRIEF_FORMULA_CHAIN },
+  ]);
+  // rnd: evidence from the view, write base from Scout with the same chain
+  await FR.briefSkipRow(x.rndEv, CAT);
+  await FR.briefFormulaRow(x.rndEv, CAT);
+  await FR.briefFormulaWriteBase(x.rndEv, CAT, { id: 7, ingredients: {} });
+  assert.deepEqual(x.rnd.queries, [
+    { table: 'v_formula_brief_current', calls: BRIEF_SKIP_CHAIN },
+    { table: 'v_formula_brief_current', calls: BRIEF_FORMULA_CHAIN },
+  ]);
+  assert.deepEqual(x.dash.queries[2], { table: 'formula_briefs', calls: BRIEF_FORMULA_CHAIN });
+});
+
+// ── P11 ─────────────────────────────────────────────────────────────────────
+
+test('P11 reads: scout chain identical to the pre-layer phase, rnd on the views', async () => {
+  const x = backends();
+  await FR.p11Products(x.scout, CAT);
+  await FR.p11P5Research(x.scout, ['B1', 'B2'], 'kw #3');
+  await FR.p11P5Sources(x.scout, ['B1', 'B2']);
+  // phase10-competitive-benchmarking.js before the layer (products :571-579, P5 :259-265)
+  assert.deepEqual(x.dash.queries, [{ table: 'products', calls: [
+    ['select', `asin, brand, title, bsr_current, price, monthly_revenue, monthly_sales,
+             rating_value, rating_count, serving_size, servings_per_container,
+             supplement_facts_raw, all_nutrients, nutrients_count, marketing_analysis`],
+    ['eq', 'category_id', CAT], ['not', 'bsr_current', 'is', null], ['order', 'bsr_current', { ascending: true }], ['limit', 50],
+  ] }]);
+  assert.deepEqual(x.dovive.queries, [
+    { table: 'dovive_phase5_research', calls: [['select', 'asin, competitor_angle, key_strengths, key_weaknesses, certifications'], ['in', 'asin', ['B1', 'B2']], ['ilike', 'keyword', 'kw #3']] },
+    { table: 'dovive_p5_sources', calls: [['select', 'asin, source_url, source_type, extracted'], ['in', 'asin', ['B1', 'B2']]] },
+  ]);
+  await FR.p11Products(x.rndEv, CAT);
+  await FR.p11P5Research(x.rndEv, ['B1'], 'kw #3');
+  await FR.p11P5Sources(x.rndEv, ['B1']);
+  assert.deepEqual(x.rnd.tables(), ['v_formula_products', 'v_formula_deep_research', 'v_formula_p5_sources']);
+  assert.deepEqual(x.rnd.queries[0].calls, x.dash.queries[0].calls);
+});
+
+test('P11 phase file reads through the evidence layer; the write merges into the Scout write base', () => {
+  const f = 'phase10-competitive-benchmarking.js';
+  const s = src(f);
+  assert.deepEqual(directReads(f, ['products', 'formula_briefs', 'dovive_phase5_research', 'dovive_p5_sources']), []);
+  assert.match(s, /briefSkipRow\(EV, CAT_ID\)/);
+  assert.match(s, /briefFormulaRow\(EV, CAT_ID\)/);
+  assert.match(s, /const writeRow = await briefFormulaWriteBase\(EV, CAT_ID, briefRow\)/);
+  assert.match(s, /\.\.\.\(writeRow\.ingredients \|\| \{\}\),\s*competitive_benchmarking/);
+  assert.match(s, /\.eq\('id', writeRow\.id\)/);
+});

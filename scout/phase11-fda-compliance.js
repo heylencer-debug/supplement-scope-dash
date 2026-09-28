@@ -23,6 +23,8 @@
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const { resolveCategory } = require('./utils/category-resolver');
+const { createEvidenceSource } = require('./utils/evidence-source');
+const { briefSkipRow, briefFormulaRow, briefFormulaWriteBase } = require('./utils/formula-reads');
 const { withUsageTracking, extractUsageFromSSE, recordAiUsage } = require('./utils/ai-usage');
 const fs = require('fs');
 const path = require('path');
@@ -34,6 +36,9 @@ const DASH = createClient(
   process.env.DASH_URL || process.env.SUPABASE_URL,
   process.env.DASH_KEY || process.env.SUPABASE_KEY
 );
+// Evidence reads (SCOUT_EVIDENCE_SOURCE: 'scout' default | 'rnd'); the
+// formula_briefs write below stays on DASH. P12 reads only the brief.
+const EV = createEvidenceSource({ dash: DASH });
 
 const KEYWORD = process.argv.includes('--keyword')
   ? process.argv[process.argv.indexOf('--keyword') + 1]
@@ -605,8 +610,7 @@ async function run() {
 
   // Skip if already done
   if (!FORCE) {
-    const { data: existing } = await DASH.from('formula_briefs')
-      .select('ingredients').eq('category_id', CAT_ID).limit(1).single();
+    const { data: existing } = await briefSkipRow(EV, CAT_ID);
     // Same real-content standard as the verifier (see phase10's P11 check):
     // stale partial rows from crashed runs must not block regeneration.
     const fc = existing?.ingredients?.fda_compliance;
@@ -620,8 +624,7 @@ async function run() {
 
   // Load formula
   console.log(`Loading formula from formula_briefs...`);
-  const { data: briefRow } = await DASH.from('formula_briefs')
-    .select('id, ingredients').eq('category_id', CAT_ID).not('ingredients', 'is', null).limit(1).single();
+  const { data: briefRow } = await briefFormulaRow(EV, CAT_ID);
   const adjustedFormula = briefRow?.ingredients?.adjusted_formula
     || briefRow?.ingredients?.final_formula_brief
     || briefRow?.ingredients?.ai_generated_brief;
@@ -706,13 +709,17 @@ async function run() {
     ),
   };
 
+  // Merge into Scout's row: the row read above under 'scout' (no extra query),
+  // Scout's own formula_briefs row under 'rnd' (the write never carries a view).
+  const writeRow = await briefFormulaWriteBase(EV, CAT_ID, briefRow);
+  if (!writeRow) throw new Error('No Scout formula_briefs row to save fda_compliance into');
   const updatedIngredients = {
-    ...(briefRow.ingredients || {}),
+    ...(writeRow.ingredients || {}),
     fda_compliance: complianceData,
   };
   const { error: saveErr } = await DASH.from('formula_briefs')
     .update({ ingredients: updatedIngredients })
-    .eq('id', briefRow.id);
+    .eq('id', writeRow.id);
   if (saveErr) console.error(`  ❌ Save error: ${saveErr.message}`);
   else {
     console.log(`  ✅ Saved to formula_briefs.ingredients.fda_compliance`);

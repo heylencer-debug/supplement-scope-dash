@@ -224,3 +224,17 @@ test('P11 phase file reads through the evidence layer; the write merges into the
   assert.match(s, /\.\.\.\(writeRow\.ingredients \|\| \{\}\),\s*competitive_benchmarking/);
   assert.match(s, /\.eq\('id', writeRow\.id\)/);
 });
+
+// ── P12 ─────────────────────────────────────────────────────────────────────
+
+test('P12 phase file reads the brief through the evidence layer (shared brief chains above); write merges into the Scout write base', () => {
+  const f = 'phase11-fda-compliance.js';
+  const s = src(f);
+  assert.deepEqual(directReads(f, ['formula_briefs', 'products']), []);
+  assert.match(s, /const EV = createEvidenceSource\(\{ dash: DASH \}\)/);
+  assert.match(s, /briefSkipRow\(EV, CAT_ID\)/);
+  assert.match(s, /const \{ data: briefRow \} = await briefFormulaRow\(EV, CAT_ID\)/);
+  assert.match(s, /const writeRow = await briefFormulaWriteBase\(EV, CAT_ID, briefRow\)/);
+  assert.match(s, /\.\.\.\(writeRow\.ingredients \|\| \{\}\),\s*fda_compliance/);
+  assert.match(s, /\.eq\('id', writeRow\.id\)/);
+});

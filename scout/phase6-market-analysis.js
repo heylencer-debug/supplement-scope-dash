@@ -10,7 +10,8 @@
  *   - Consumer pain points (aggregated from reviews)
  *   - Market opportunity gaps for DOVIVE
  *
- * Output saved to: market_intelligence table (Supabase DASH) + vault
+ * Output saved to: formula_briefs.ingredients.market_intelligence (Supabase DASH) + vault
+ * (read back by P9/P10 through utils/market-intel-store.js)
  *
  * Usage:
  *   node phase6-market-analysis.js --keyword "ashwagandha gummies"
@@ -33,6 +34,8 @@ const { loadWebEvidence } = require('./utils/web-research-store');
 // prompt is byte-identical to before.
 const { fetchCategoryMarketingAssets } = require('./utils/marketing-assets-store');
 const { formatMarketingAssetsForPrompt } = require('./utils/marketing-assets');
+// Read side of this phase's own output (skip check) — shared with P9/P10.
+const { fetchMarketIntel } = require('./utils/market-intel-store');
 const fs = require('fs');
 const path = require('path');
 
@@ -518,11 +521,13 @@ async function run() {
   _categoryId = CAT_ID;
 
   // Check for existing (skip unless --force)
+  // Same place saveToSupabase() writes: formula_briefs.ingredients.market_intelligence.
+  // (Used to filter on formula_briefs.brief_type, a column that does not
+  // exist, so the query errored and this never skipped.)
   if (!FORCE) {
-    const { data: existing } = await DASH.from('formula_briefs')
-      .select('id, created_at').eq('category_id', CAT_ID).eq('brief_type', 'market_analysis').limit(1);
-    if (existing?.length) {
-      console.log(`✅ Market intelligence already exists (${existing[0].created_at}). Use --force to regenerate.`);
+    const existing = await fetchMarketIntel(DASH, CAT_ID);
+    if (existing) {
+      console.log(`✅ Market intelligence already exists (${existing.generated_at || 'no timestamp'}). Use --force to regenerate.`);
       process.exit(0);
     }
   }

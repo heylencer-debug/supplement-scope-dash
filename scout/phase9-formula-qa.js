@@ -15,8 +15,8 @@
  *   - Adjusted formula saved to formula_briefs.ingredients.adjusted_formula
  *   - Per-product comparison notes saved to products.marketing_analysis.qa_comparison_note
  *   - Vault (local dev only, best-effort): C:\SirPercival-Vault\07_ai-systems\agents\scout\qa-reports\
- *   - P6 market intelligence is loaded from Supabase (market_intelligence table,
- *     falling back to formula_briefs.brief_type='market_analysis') — NOT the vault.
+ *   - P7 market intelligence is loaded from Supabase
+ *     (formula_briefs.ingredients.market_intelligence, where P7 writes it) — NOT the vault.
  *
  * Usage:
  *   node phase9-formula-qa.js --keyword "ashwagandha gummies"
@@ -27,6 +27,8 @@ require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const { resolveCategory } = require('./utils/category-resolver');
 const { withUsageTracking, extractUsageFromSSE, recordAiUsage } = require('./utils/ai-usage');
+// P7's report, read from where P7 writes it (formula_briefs.ingredients.market_intelligence).
+const { fetchMarketIntel } = require('./utils/market-intel-store');
 const fs = require('fs');
 const path = require('path');
 
@@ -211,31 +213,20 @@ async function callClaudeSonnetQA(prompt, maxTokens = 64000, model = ANALYSIS_MO
 // â"€â"€â"€ Load P6 market intelligence from vault â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 // 2026-08-28 FIX: this used to read C:\SirPercival-Vault\... which does not
-// exist on Cloud Run, silently degrading P9's market-context input to
-// 'Not available' on every cloud run. Load from Supabase the same way P8's
-// compileMarketData() does — market_intelligence table first, then the
-// formula_briefs(brief_type='market_analysis') fallback saved by
-// phase6-market-analysis.js. Returns null (graceful fallback) if neither
-// source has data yet.
+// exist on Cloud Run. 2026-09-29 FIX: the Supabase replacement then looked in a
+// `market_intelligence` table and a formula_briefs.brief_type column, neither
+// of which exists, so P10 still ran "without market context" on every run.
+// P7 writes its report to formula_briefs.ingredients.market_intelligence —
+// read it from there. Capped at 30k chars, the same cap P9 applies. Returns
+// null (graceful fallback) when P7 has not run for the category.
+const MARKET_INTEL_MAX_CHARS = 30000;
 async function loadMarketIntelFromDB(categoryId) {
-  const { data: marketIntelDoc } = await DASH.from('market_intelligence')
-    .select('ai_market_analysis, generated_at')
-    .eq('category_id', categoryId)
-    .order('generated_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (marketIntelDoc?.ai_market_analysis) return marketIntelDoc.ai_market_analysis;
-
-  const { data: fbDoc } = await DASH.from('formula_briefs')
-    .select('ingredients, created_at')
-    .eq('category_id', categoryId)
-    .eq('brief_type', 'market_analysis')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (fbDoc?.ingredients?.ai_generated_brief) return fbDoc.ingredients.ai_generated_brief;
-
-  return null;
+  const mi = await fetchMarketIntel(DASH, categoryId);
+  if (!mi) return null;
+  const text = mi.ai_market_analysis;
+  return text.length > MARKET_INTEL_MAX_CHARS
+    ? `${text.substring(0, MARKET_INTEL_MAX_CHARS)}\n[... report continues — using first 30k chars for context ...]`
+    : text;
 }
 
 // â"€â"€â"€ Build QA prompt â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€

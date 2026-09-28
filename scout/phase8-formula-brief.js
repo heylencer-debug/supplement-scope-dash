@@ -25,6 +25,8 @@ const { loadWebEvidence } = require('./utils/web-research-store');
 // P7b (2026-09-27): competitor gallery / A+ images read by vision, counted, and
 // claimed benefits checked against the P3b themes. No row → prompt unchanged.
 const { fetchCategoryMarketingAssets } = require('./utils/marketing-assets-store');
+// P7's report, read from where P7 writes it (formula_briefs.ingredients.market_intelligence).
+const { fetchMarketIntel } = require('./utils/market-intel-store');
 const { formatMarketingAssetsForPrompt } = require('./utils/marketing-assets');
 
 // Set once run() resolves the category — read by recordAiUsage() calls
@@ -516,33 +518,14 @@ function mergeCategoryPackagingSummary(perProductIntel, categorySummary) {
 }
 
 async function compileMarketData(categoryId) {
-  // Pull P6 market intelligence doc (new single-doc market analysis)
-  const { data: marketIntelDocs } = await DASH.from('market_intelligence')
-    .select('ai_market_analysis, aggregated_data, generated_at')
-    .eq('category_id', categoryId)
-    .order('generated_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  // Fallback: check formula_briefs for market_analysis type (saved by phase6-market-analysis.js)
-  let marketIntelDoc = marketIntelDocs;
-  if (!marketIntelDoc) {
-    const { data: fbDoc } = await DASH.from('formula_briefs')
-      .select('ingredients, generated_at, brief_type')
-      .eq('category_id', categoryId)
-      .eq('brief_type', 'market_analysis')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (fbDoc?.ingredients?.ai_generated_brief) {
-      marketIntelDoc = {
-        ai_market_analysis: fbDoc.ingredients.ai_generated_brief,
-        aggregated_data: fbDoc.ingredients.data_sources,
-        generated_at: fbDoc.generated_at,
-        source: 'formula_briefs.market_analysis',
-      };
-    }
-  }
+  // P7 market report. P7 (phase6-market-analysis.js) writes it to
+  // formula_briefs.ingredients.market_intelligence; this used to look in a
+  // `market_intelligence` table and a formula_briefs.brief_type column,
+  // neither of which exists, so the brief always ran with has_data:false.
+  const marketIntelDoc = await fetchMarketIntel(DASH, categoryId);
+  console.log(marketIntelDoc
+    ? `  P7 market intelligence: ${Math.round(marketIntelDoc.ai_market_analysis.length / 1000)}k chars (${marketIntelDoc.generated_at || 'no timestamp'})`
+    : '  P7 market intelligence: not found — brief runs without it');
 
   // Top 20 all-time performers by BSR (expanded from 5 for richer formula comparison)
   // `cohort` (2026-09-03) — established/emerging/context tag from

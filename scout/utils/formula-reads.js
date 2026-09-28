@@ -137,10 +137,25 @@ function p11P5Sources(ev, asins) {
   return ev.p5Sources({ asins, columns: 'asin, source_url, source_type, extracted' });
 }
 
+// ── P13 — Final Sign-off (phase12-final-signoff.js) ───────────────────────
+
+/** P13 reads the brief once — for its inputs, its skip check and its write — `.maybeSingle()`. */
+const P13_BRIEF_READ = Object.freeze({ columns: 'id, ingredients', ops: [['limit', 1], ['maybeSingle']] });
+
+function p13Brief(ev, categoryId) {
+  return ev.briefCurrent(categoryId, P13_BRIEF_READ);
+}
+
+/** The Scout row final_signoff is merged into (== `row` under 'scout', no query). */
+function p13BriefWriteBase(ev, categoryId, row) {
+  return ev.briefWriteBase(categoryId, row, P13_BRIEF_READ);
+}
+
 module.exports = {
   P6_PRODUCT_COLUMNS, p6Products, p6RawReviews, p6ProductSyntheses,
   p7Products, p7CategorySynthesis, p7CategoryAsins, p7RawReviews, p7WebEvidence, p7MarketingAssets,
   p8Products,
   briefSkipRow, BRIEF_FORMULA_READ, briefFormulaRow, briefFormulaWriteBase,
   P11_PRODUCT_COLUMNS, p11Products, p11P5Research, p11P5Sources,
+  P13_BRIEF_READ, p13Brief, p13BriefWriteBase,
 };

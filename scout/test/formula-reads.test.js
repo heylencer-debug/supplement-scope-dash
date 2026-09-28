@@ -238,3 +238,28 @@ test('P12 phase file reads the brief through the evidence layer (shared brief ch
   assert.match(s, /\.\.\.\(writeRow\.ingredients \|\| \{\}\),\s*fda_compliance/);
   assert.match(s, /\.eq\('id', writeRow\.id\)/);
 });
+
+// ── P13 ─────────────────────────────────────────────────────────────────────
+
+test('P13 reads: the one brief read, scout chain identical, write base == the row under scout', async () => {
+  const row = { id: 3, ingredients: { fda_compliance: {} } };
+  const x = backends(() => ({ data: row, error: null }));
+  const { data } = await FR.p13Brief(x.scout, CAT);
+  assert.equal(await FR.p13BriefWriteBase(x.scout, CAT, data), data);
+  // phase12-final-signoff.js before the layer (:307-308)
+  const chain = [['select', 'id, ingredients'], ['eq', 'category_id', CAT], ['limit', 1], ['maybeSingle']];
+  assert.deepEqual(x.dash.queries, [{ table: 'formula_briefs', calls: chain }]);
+  await FR.p13Brief(x.rndEv, CAT);
+  await FR.p13BriefWriteBase(x.rndEv, CAT, { id: 3, ingredients: {} });
+  assert.deepEqual(x.rnd.queries, [{ table: 'v_formula_brief_current', calls: chain }]);
+  assert.deepEqual(x.dash.queries[1], { table: 'formula_briefs', calls: chain });
+});
+
+test('P13 phase file reads the brief through the evidence layer; final_signoff merges into the Scout write base', () => {
+  const s = src('phase12-final-signoff.js');
+  assert.deepEqual(directReads('phase12-final-signoff.js', ['formula_briefs']), []);
+  assert.match(s, /const \{ data: fb \} = await p13Brief\(EV, cat\.id\)/);
+  assert.match(s, /const writeRow = await p13BriefWriteBase\(EV, cat\.id, fb\)/);
+  assert.match(s, /\.\.\.\(writeRow\.ingredients \|\| \{\}\),\s*final_signoff/);
+  assert.match(s, /\.update\(\{ ingredients: updated \}\)\.eq\('id', writeRow\.id\)/);
+});

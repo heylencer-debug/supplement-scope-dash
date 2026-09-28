@@ -19,6 +19,8 @@
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const { resolveCategory } = require('./utils/category-resolver');
+const { createEvidenceSource } = require('./utils/evidence-source');
+const { p13Brief, p13BriefWriteBase } = require('./utils/formula-reads');
 const { withUsageTracking, extractUsageFromSSE, recordAiUsage } = require('./utils/ai-usage');
 
 // Set once run() resolves the category — read by callOpusOnce() below.
@@ -28,6 +30,9 @@ const DASH = createClient(
   process.env.DASH_URL || process.env.SUPABASE_URL,
   process.env.DASH_KEY || process.env.SUPABASE_KEY
 );
+// Evidence reads (SCOUT_EVIDENCE_SOURCE: 'scout' default | 'rnd'); the
+// formula_briefs write below stays on DASH. P13 reads only the brief.
+const EV = createEvidenceSource({ dash: DASH });
 
 const KEYWORD = process.argv.includes('--keyword')
   ? process.argv[process.argv.indexOf('--keyword') + 1]
@@ -304,8 +309,7 @@ async function run() {
   console.log(`  → Resolved category (${cat.method}): "${cat.name}" (${cat.id})`);
   _categoryId = cat.id;
 
-  const { data: fb } = await DASH.from('formula_briefs')
-    .select('id, ingredients').eq('category_id', cat.id).limit(1).maybeSingle();
+  const { data: fb } = await p13Brief(EV, cat.id);
   if (!fb) throw new Error('No formula_briefs row — run P9-P12 first.');
   const ing = fb.ingredients || {};
 
@@ -354,8 +358,12 @@ async function run() {
     console.log(`Verdict: ${verdict} | Review: ${Math.round(review.length / 1000)}k chars`);
   }
 
+  // Merge into Scout's row: `fb` itself under 'scout' (no extra query), Scout's
+  // own formula_briefs row under 'rnd' (the write never carries a view).
+  const writeRow = await p13BriefWriteBase(EV, cat.id, fb);
+  if (!writeRow) throw new Error('No Scout formula_briefs row to save final_signoff into');
   const updated = {
-    ...ing,
+    ...(writeRow.ingredients || {}),
     final_signoff: {
       opus_review: review,
       verdict,
@@ -368,7 +376,7 @@ async function run() {
       ...(perFormula ? { per_formula: perFormula, comparative_note: comparativeNote } : {}),
     },
   };
-  const { error } = await DASH.from('formula_briefs').update({ ingredients: updated }).eq('id', fb.id);
+  const { error } = await DASH.from('formula_briefs').update({ ingredients: updated }).eq('id', writeRow.id);
   if (error) throw new Error(`Save failed: ${error.message}`);
   console.log(`✅ Saved to formula_briefs.ingredients.final_signoff`);
 }

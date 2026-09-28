@@ -39,6 +39,7 @@ const { resolveCategory } = require('./utils/category-resolver');
 const { prepareReviews, buildProductEvidence } = require('./utils/review-synthesis');
 const { fetchProductSyntheses } = require('./utils/review-synthesis-store');
 const { reuseAsinsFromEnv, reuseKeywordsFromEnv, reuseMaxAgeDays, siblingReviewNeed, mergeSiblingReviews } = require('./utils/reuse-asins');
+const { toleratedFailure } = require('./utils/script-exit');
 
 const DOVIVE = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 const DASH = createClient(
@@ -288,8 +289,11 @@ async function run() {
   console.log(`Skipped (ASIN not in dash or no reviews): ${skipped}`);
   console.log(`Errors: ${errors}`);
   if (rowsWithoutReviewId) console.log(`Note: ${rowsWithoutReviewId} rows had no Amazon review_id — de-duplicated within their ASIN by rating + text only.`);
+  if (errors && !updated) throw new Error(`every review_analysis write failed (${errors})`);
 }
 
-if (require.main === module) run().catch(console.error);
+// Runs AFTER the paid P3 scrape in the same phase chain, so it keeps exit 0 on
+// failure (a non-zero exit would re-run the scrape) and reports it loudly.
+if (require.main === module) run().catch((e) => toleratedFailure('migrate-reviews-to-dash.js', e, { phase: 'P3' }));
 
 module.exports = { buildReviewAnalysis };

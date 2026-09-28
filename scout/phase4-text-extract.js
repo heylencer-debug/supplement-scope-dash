@@ -23,6 +23,7 @@ const { resolveCategory } = require('./utils/category-resolver');
 const { reportProgress } = require('./utils/job-heartbeat');
 const { reuseAsinsFromEnv, rescrapeAsinsFromEnv } = require('./utils/reuse-asins');
 const { loadSelection, applySelection } = require('./utils/selected-competitors');
+const { failAndExit } = require('./utils/script-exit');
 
 // Support both: node phase4-text-extract.js "keyword" AND node phase4-text-extract.js --keyword "keyword"
 const _kwIdx = process.argv.indexOf('--keyword');
@@ -351,6 +352,14 @@ async function main() {
   console.log(`Total   : ${list.length}`);
   console.log(`Table   : dovive_ocr (image_index=99 = text extraction)`);
   console.log(`─────────────────────────────────────────\n`);
+
+  // Every product failing is a broken pass (bad model id, key, outage), not
+  // thin listings: fail the step so P4 retries it and stops on it rather
+  // than spending on the vision OCR pass with the same broken setup.
+  if (failed > 0 && failed === list.length) throw new Error(`all ${failed} text extractions failed`);
 }
 
-main().catch(console.error);
+// Exit 1 on its own failure (was .catch(console.error) → exit 0). This is the
+// FIRST script in the P4 chain, so a retry re-runs nothing paid before it, and
+// already-extracted ASINs are skipped. Per-product failures stay tolerated.
+main().catch((e) => failAndExit('phase4-text-extract.js', e));

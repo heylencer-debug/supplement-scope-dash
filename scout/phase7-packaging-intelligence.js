@@ -17,6 +17,7 @@ const { createClient } = require('@supabase/supabase-js');
 const { resolveCategory } = require('./utils/category-resolver');
 const { createEvidenceSource } = require('./utils/evidence-source');
 const { p8Products } = require('./utils/formula-reads');
+const { failAndExit } = require('./utils/script-exit');
 
 const DASH = createClient(
   process.env.DASH_URL || process.env.SUPABASE_URL,
@@ -331,6 +332,10 @@ async function run() {
   console.log(`  Rationale: ${strat.color_rationale}`);
   console.log(`  Key insight: ${strat.key_insight}`);
   console.log(`  Headline formula: ${strat.packaging_headline_formula}`);
+
+  if (products.length && saved === 0) throw new Error(`no packaging_intelligence saved (${errors}/${products.length} product writes failed)`);
 }
 
-run().catch(console.error);
+// Exit 1 on its own failure (was .catch(console.error) → exit 0). This script
+// is the whole P8 phase and makes no model calls, so a runner retry is free.
+run().catch((e) => failAndExit('phase7-packaging-intelligence.js', e));

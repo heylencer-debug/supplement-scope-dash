@@ -30,6 +30,7 @@ const { createClient } = require('@supabase/supabase-js');
 const { resolveCategory } = require('./utils/category-resolver');
 const { resolveLabelFields } = require('./utils/label-sources');
 const { runCertificationVerification } = require('./verify-certifications');
+const { toleratedFailure } = require('./utils/script-exit');
 
 const isMissingColumn = (error) => !!error && (error.code === '42703' || error.code === 'PGRST204' || /column .* does not exist|Could not find the .* column/i.test(error.message || ''));
 const MIGRATION_013_PRODUCT_KEYS = ['label_facts', 'label_sources', 'label_conflicts', 'label_product_match', 'claims_all_sources'];
@@ -92,7 +93,7 @@ async function main() {
     .from('dovive_research')
     .select('asin')
     .eq('keyword', KEYWORD);
-  if (researchErr) { console.error('dovive_research fetch error:', researchErr.message); return; }
+  if (researchErr) throw new Error(`dovive_research fetch error: ${researchErr.message}`);
   const keywordAsins = (researchRows || []).map(r => r.asin);
   if (!keywordAsins.length) {
     console.log('No ASINs found in dovive_research for this keyword.');
@@ -113,7 +114,7 @@ async function main() {
       console.warn('  ⚠ dovive_ocr has no facts_v2 / label_product_match yet (migration 013) — building v2 rows from the legacy facts in memory');
       res = await DOVIVE.from('dovive_ocr').select(BASE_COLS).in('asin', chunk);
     }
-    if (res.error) { console.error('OCR fetch error:', res.error.message); return; }
+    if (res.error) throw new Error(`OCR fetch error: ${res.error.message}`);
     ocrRows.push(...(res.data || []));
   }
   console.log(`Fetched ${ocrRows.length} OCR records`);
@@ -132,7 +133,7 @@ async function main() {
     .select('id,asin,title,bsr_current')
     .eq('category_id', DASH_CAT_ID);
 
-  if (prodErr) { console.error('Products fetch error:', prodErr.message); return; }
+  if (prodErr) throw new Error(`Products fetch error: ${prodErr.message}`);
   console.log(`Products in DASH: ${products.length}\n`);
 
   const dashByAsin = new Map(products.map(p => [p.asin, p]));
@@ -231,6 +232,9 @@ async function main() {
   } catch (e) {
     console.warn(`  ⚠ Certification verification skipped: ${e.message}`);
   }
+  if (errors && !updated) throw new Error(`every product write failed (${errors})`);
 }
 
-main().catch(console.error);
+// Runs AFTER the paid P4 vision OCR in the same phase chain, so it keeps exit 0
+// on failure (a non-zero exit would re-run the OCR) and reports it loudly.
+main().catch((e) => toleratedFailure('migrate-ocr-to-dash.js', e, { phase: 'P4' }));

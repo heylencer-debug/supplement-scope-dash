@@ -576,7 +576,13 @@ the local `scout/.env` has none for Keepa, Bright Data or Perplexity
     sets `CERT_VERIFY=1` (operations log, 2026-09-27).
   - `--force` **deletes** `dovive_ocr` rows for the label before re-running
     (`run-pipeline.js:226-231`).
-  - `phase4-text-extract.js` and `migrate-ocr-to-dash.js` exit 0 on failure.
+  - Exit codes (2026-09-29, `utils/script-exit.js`): `phase4-text-extract.js`
+    exits 1 when it fails as a whole or every product fails, so P4 retries and
+    stops on it (it is the first script in the chain; nothing paid runs before
+    it). `migrate-ocr-to-dash.js` still exits 0 on failure on purpose: it runs
+    after the paid vision OCR, and a non-zero exit would re-run that OCR. It
+    prints a `SYNC FAILED — migrate-ocr-to-dash.js: …` line instead, and the P4
+    bar reports the missing data.
     All three default to `'ashwagandha gummies'` when called without a keyword.
 - **Re-run.** from_phase 4. The label-v2 parse of already-stored OCR rows is
   free: `node backfill-facts-v2.js …` then `node migrate-ocr-to-dash.js --keyword "<label>"`
@@ -752,7 +758,9 @@ the local `scout/.env` has none for Keepa, Bright Data or Perplexity
 - **Known limits.**
   - The category summary hard-codes `keyword: 'ashwagandha gummies'` and a
     KSM-66 headline (`FORMULA-INPUTS.md`, gap 7).
-  - Exits 0 on failure (`run().catch(console.error)`).
+  - Exits 1 on failure, including when no product write lands (2026-09-29).
+    It is the whole phase and makes no model call, so the runner's retry is
+    free.
 - **Re-run.** from_phase 8. It costs nothing.
 
 ### P9 — Formula Brief
@@ -1002,10 +1010,21 @@ image".
   is missing.** These include `migrate-keepa-to-dash.js`,
   `migrate-ocr-to-dash.js`, `phase4-text-extract.js`, `ocr-phase4.js`,
   `phase5-deep-research.js`, P6 and P8. Always pass the full session label.
-- **These exit 0 on failure:**
-  - the `migrate-*` scripts, P8 and `phase4-text-extract.js`, by accident
-    (`.catch(console.error)`);
-  - P3b, P5b, P7b and `verify-certifications.js`, by design.
+- **Exit codes on a script's own failure** (`utils/script-exit.js`). The runner
+  re-runs a phase's WHOLE script chain on any non-zero exit (up to 3 times),
+  then stops, so the exit code decides what gets re-run:
+  - exit 1: `phase4-text-extract.js` and `phase7-packaging-intelligence.js`
+    (P8), since 2026-09-29. Nothing paid runs before them in their chain.
+  - exit 0 on purpose, with a loud `SYNC FAILED — <script>: …` line:
+    `migrate-reviews-to-dash.js` (after the paid P3 scrape) and
+    `migrate-ocr-to-dash.js` (after the paid P4 vision OCR). A non-zero exit
+    there would re-run the paid step. The runner has no warnings channel, so
+    the failure shows in the log and as the P3/P4 bar failure in
+    `scout_jobs.error`, not as its own message.
+  - exit 0 by accident, unchanged: `migrate-keepa-to-dash.js` and
+    `migrate-p1-to-dash.js`. Both run after a paid step in their chain (Keepa,
+    the P1 scrape), so the same reasoning as the two above applies.
+  - exit 0 by design: P3b, P5b, P7b and `verify-certifications.js`.
 
   The phase bars are the real check.
 - **Other scripts in `scout/`:**

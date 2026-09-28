@@ -22,6 +22,12 @@
  *
  * buildInventory = fetchRaw (all DB reads) + assembleInventory (pure). The
  * pure half is what the unit tests exercise with fixtures.
+ *
+ * RnD coverage (advisory): when an RnD client is passed (`rnd`, see
+ * utils/rnd-client.js) the inventory also counts how many of the category's
+ * ASINs exist in the RnD evidence database (product_identifiers, id_type
+ * 'asin') and how many research_runs each has. It is printed as advisory text
+ * and is NEVER an input to plan-scope.js — no decision reads it.
  */
 
 const path = require('path');
@@ -482,6 +488,58 @@ function assembleInventory(raw, { now = new Date(), topN = TOP_N, topK = TOP_K, 
 }
 
 const DEFAULT_TIMEOUT_MS = 90000;
+const RND_COVERAGE_TIMEOUT_MS = 20000;
+
+/**
+ * RnD coverage for `asins` (read-only, fail-open). Returns
+ *   { available: true, basis, asinsChecked, inRnd, withRuns, totalRuns, runsByAsin, missing[] }
+ * or { available: false, reason } when there is no client, or
+ *    { available: true, error } when a read failed — never throws.
+ */
+async function fetchRndCoverage(rnd, asins, { basis = 'category', reason = null, timeoutMs = RND_COVERAGE_TIMEOUT_MS } = {}) {
+  if (!rnd) return { available: false, reason: reason || 'RnD client unavailable' };
+  const list = uniq(asins || []);
+  const base = { available: true, basis, asinsChecked: list.length };
+  if (!list.length) return { ...base, inRnd: 0, withRuns: 0, totalRuns: 0, runsByAsin: {}, missing: [] };
+  try {
+    return await withTimeout((async () => {
+      const ids = await fetchChunked(list, (a) => rnd.from('product_identifiers')
+        .select('product_id, value').eq('id_type', 'asin').in('value', a));
+      const productByAsin = new Map();
+      for (const r of ids) if (r.value && r.product_id && !productByAsin.has(r.value)) productByAsin.set(r.value, r.product_id);
+      const pids = uniq([...productByAsin.values()]);
+      const runs = pids.length ? await fetchChunked(pids, (p) => rnd.from('research_runs').select('id, product_id').in('product_id', p)) : [];
+      const runsByProduct = new Map();
+      for (const r of runs) runsByProduct.set(r.product_id, (runsByProduct.get(r.product_id) || 0) + 1);
+      const runsByAsin = {};
+      for (const asin of list) if (productByAsin.has(asin)) runsByAsin[asin] = runsByProduct.get(productByAsin.get(asin)) || 0;
+      const counts = Object.values(runsByAsin);
+      return {
+        ...base,
+        inRnd: productByAsin.size,
+        withRuns: counts.filter((n) => n > 0).length,
+        totalRuns: counts.reduce((a, b) => a + b, 0),
+        runsByAsin,
+        missing: list.filter((a) => !productByAsin.has(a)),
+      };
+    })(), timeoutMs, 'RnD coverage reads');
+  } catch (e) {
+    return { ...base, error: e.message };
+  }
+}
+
+/** One advisory line (or two) for the plan output; '' when coverage was not requested. */
+function formatRndCoverage(cov) {
+  if (!cov) return '';
+  const tag = 'RnD coverage (advisory — no plan decision reads it)';
+  if (!cov.available) return `${tag}: not checked — ${cov.reason}`;
+  if (cov.error) return `${tag}: read failed — ${cov.error}`;
+  if (!cov.asinsChecked) return `${tag}: no ${cov.basis} ASINs to check`;
+  const L = [`${tag}: ${cov.inRnd}/${cov.asinsChecked} ${cov.basis} ASINs exist in RnD; ${cov.withRuns} have research runs (${cov.totalRuns} runs)`];
+  const withRuns = Object.entries(cov.runsByAsin).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
+  if (withRuns.length) L.push(`  runs per ASIN: ${withRuns.slice(0, 12).map(([a, n]) => `${a} ${n}`).join(' · ')}${withRuns.length > 12 ? ` · +${withRuns.length - 12} more` : ''}`);
+  return L.join('\n');
+}
 
 /** Rejects after `ms` — a hung read must never hold a job (the pipeline fails open on it). */
 function withTimeout(promise, ms, what = 'inventory reads') {
@@ -491,13 +549,27 @@ function withTimeout(promise, ms, what = 'inventory reads') {
   return Promise.race([promise, timeout]).finally(() => clearTimeout(t));
 }
 
+/**
+ * @param {object} [opts.rnd]  RnD client (utils/rnd-client.js). `undefined` →
+ *   no RnD coverage section at all; `null` → the section says why it was not
+ *   checked (`rndReason`). Advisory only: assembled AFTER the inventory and
+ *   never passed to plan-scope.js.
+ */
 async function buildInventory({ keyword, db, dash, aliases = [], autoAliases = true, now = new Date(), topN = TOP_N, topK = TOP_K,
-  timeoutMs = Number(process.env.SCOUT_PLAN_TIMEOUT_MS) || DEFAULT_TIMEOUT_MS }) {
+  timeoutMs = Number(process.env.SCOUT_PLAN_TIMEOUT_MS) || DEFAULT_TIMEOUT_MS, rnd = undefined, rndReason = null }) {
   if (!keyword) throw new Error('buildInventory: keyword is required');
   if (!db) throw new Error('buildInventory: db (supabase client) is required');
   const warnings = [];
   const raw = await withTimeout(fetchRaw({ keyword, db, dash: dash || db, aliases, autoAliases, warnings }), timeoutMs);
-  return assembleInventory(raw, { now, topN, topK, warnings });
+  const inv = assembleInventory(raw, { now, topN, topK, warnings });
+  if (rnd !== undefined) {
+    // The category's ASINs; before P1 has landed any, the planned candidates.
+    const useCategory = inv.categoryAsins.length > 0;
+    inv.rndCoverage = await fetchRndCoverage(rnd, useCategory ? inv.categoryAsins : inv.candidates.top40, {
+      basis: useCategory ? 'category' : 'candidate', reason: rndReason,
+    });
+  }
+  return inv;
 }
 
 // ─── Printing ────────────────────────────────────────────────────────────────
@@ -534,6 +606,8 @@ function formatInventory(inv) {
   }
   const ch = Object.entries(inv.costHistory);
   if (ch.length) L.push('', `AI cost ledger for this family: ${ch.map(([k, v]) => `${k} $${v.usd} (${v.sessions} sess)`).join(' · ')}`);
+  const rndLine = formatRndCoverage(inv.rndCoverage);
+  if (rndLine) L.push('', rndLine);
   if (inv.warnings.length) L.push('', ...inv.warnings.map(w => `⚠ ${w}`));
   return L.join('\n');
 }
@@ -555,10 +629,12 @@ async function main(argv = process.argv.slice(2)) {
   }
   const db = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
   const dash = createClient(process.env.DASH_URL || process.env.SUPABASE_URL, process.env.DASH_KEY || process.env.SUPABASE_KEY);
+  const { createRndClient, rndClientReason } = require('./utils/rnd-client');
   const inv = await buildInventory({
     keyword, db, dash,
     aliases: argValues(argv, '--alias'),
     autoAliases: !argv.includes('--no-auto-aliases'),
+    rnd: createRndClient(), rndReason: rndClientReason(),
   });
   let plan = null;
   if (argv.includes('--plan')) {
@@ -576,4 +652,4 @@ if (require.main === module) {
   main().catch(e => { console.error(`inventory failed: ${e.message}`); process.exit(1); });
 }
 
-module.exports = { buildInventory, fetchRaw, assembleInventory, formatInventory, withTimeout, TOP_N, TOP_K };
+module.exports = { buildInventory, fetchRaw, assembleInventory, formatInventory, fetchRndCoverage, formatRndCoverage, withTimeout, TOP_N, TOP_K };

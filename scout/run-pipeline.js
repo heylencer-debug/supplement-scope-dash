@@ -705,7 +705,9 @@ const PLAN_FRESH_CLI = process.argv.includes('--fresh') ? process.argv[process.a
 async function buildScopePlan(stage) {
   if (PLAN_MODE === 'off') return null;
   try {
-    const inv = await buildInventory({ keyword: KEYWORD, db: DOVIVE, dash: DASH, aliases: PLAN_ALIASES });
+    // rnd: advisory RnD coverage section in the printed plan (never a decision input)
+    const { createRndClient, rndClientReason } = require('./utils/rnd-client');
+    const inv = await buildInventory({ keyword: KEYWORD, db: DOVIVE, dash: DASH, aliases: PLAN_ALIASES, rnd: createRndClient(), rndReason: rndClientReason() });
     const plan = planScope(inv, { freshnessDays: freshnessFromEnv(process.env, PLAN_FRESH_CLI) });
     Object.assign(plan, {
       stage, mode: PLAN_MODE,
